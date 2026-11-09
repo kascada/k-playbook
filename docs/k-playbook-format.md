@@ -38,7 +38,6 @@ locations derive from the project root, the directory that holds
 |---|---|
 | shipped commands | `~/.local/share/k-playbook/commands/`, linked through `.k-playbook/share` |
 | shipped skills | `~/.local/share/k-playbook/skills/`, linked through `.k-playbook/share` |
-| shipped rules | `<hub>:k-playbook/defaults/rules/` (Kephalaion, since task 131) |
 | shipped review recipes | `<hub>:k-playbook/defaults/reviews/` (Kephalaion, since task 131) |
 | shipped checks | `k-playbook/checks/` |
 | shipped guidelines | `<hub>:k-playbook/defaults/guidelines/` (Kephalaion, since task 131) |
@@ -50,9 +49,8 @@ locations derive from the project root, the directory that holds
 | shared script library | `~/.local/share/k-playbook/scripts/lib/` |
 | project-owned commands | `.k-playbook/commands/` — setup does not create it; it appears when the project puts a command there |
 | project-owned skills | `.k-playbook/skills/` — setup does not create it; it appears when the project puts a skill there |
-| project-owned rules | `k-playbook-local/rules/` |
 | project-owned review recipes | `k-playbook-local/reviews/` |
-| project-owned checks | `k-playbook-local/checks/` |
+| project-owned checks | none since task 134: `k-check` runs only the shipped checks from `k-playbook/checks/`; `/k-upgrade` 3.4 removes a leftover `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
 | project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` and `/k-docs-tools` to `keph:/docs/generated/libs/`, both through `k-playbook docs checkout|publish` |
 | tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs`, not under `k-playbook-local/` |
@@ -122,8 +120,9 @@ it in the "Inventory" section, showing the path, status, and count of roots,
 sources, exclusions, and configured Helm values; it does not edit it.
 That section also offers the inventory prompt, the same run as `k-playbook
 inventory` and `/k-doc-inventory`, writing into the project collection. The contract is in
-[`version-inventory.md`](./version-inventory.md), and the requirement to update
-version jumps is in `rules/docs-sync.md`.
+[`version-inventory.md`](./version-inventory.md); after a version jump in the current pass
+the inventory is updated right away through this run, and the profiles are queued
+(`erzeuger: tools`).
 
 Two directories are optional in this respect: `results/` and `priv/`.
 `results/` is made private during installation by default: review results are
@@ -173,18 +172,26 @@ above.
 
 ## Merge shipped and project-owned content
 
-Five directories exist twice. What applies is the union of both sides:
+Three kinds exist twice. What applies is the union of both sides:
 
 | Kind | Shipped | Project-owned | Unit |
 |---|---|---|---|
-| rules | `<hub>:k-playbook/defaults/rules/` | `k-playbook-local/rules/` | `*.md` |
 | review recipes | `<hub>:k-playbook/defaults/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
-| checks | `k-playbook/checks/` | `k-playbook-local/checks/` | `*.sh`, top level only |
 | commands | `~/.local/share/k-playbook/commands/` | `.k-playbook/commands/` | `*.md`, recursive |
 | skills | `~/.local/share/k-playbook/skills/` | `.k-playbook/skills/` | directory with `SKILL.md` |
 
 The comparison unit is the **name**. Both sides use the same naming convention,
 so no derived key is required.
+
+The kind for rules is gone since task 135: nothing is shipped, read or listed for it, and
+`/k-upgrade` 3.4 removes a leftover local directory once it is empty.
+
+Checks have no project-owned side since task 134. The catalog `checks` lists the shipped
+checks from `k-playbook/checks/` (`*.sh`, top level only) and nothing else: `origin` is
+always `dist`, nothing is overlaid and nothing disabled, and a leftover
+`k-playbook-local/checks/` is not read; `/k-upgrade` 3.4 removes it once it is empty and
+otherwise notes that what lies there no longer runs. A new form for project-owned checks
+is still open.
 
 Project-owned commands and skills live in `.k-playbook/` since task 129, versioned next to
 the configuration; the former place `k-playbook-local/commands/` and
@@ -200,7 +207,7 @@ replaced skill cannot sensibly be composed.
 
 **For the same filename, the project-owned file wins, completely.** The shipped
 one is not read at all, and no individual sections from it are retained. To
-change a shipped rule, copy it and change the copy, at the cost that later
+change a shipped entry, copy it and change the copy, at the cost that later
 improvements to the original no longer reach that copy. The advantage outweighs
 this: what applies is in exactly one file.
 
@@ -213,10 +220,8 @@ which lets the file record its own reason:
 # Disabled: this project does not use Django.
 ```
 
-The difference between kinds is intentional. `rules` and `reviews` are read;
-their entry remains visible in the catalog and its content says it is disabled.
-A check is instead **executed**: an empty script would exit 0 and look like a
-passed check. It therefore disappears from the catalog entirely.
+A disabled review stays visible in the catalog, and its content says it is disabled.
+Checks cannot be disabled since they have no project-owned side.
 
 Disable a project-owned file by deleting it.
 
@@ -267,7 +272,7 @@ to merge.
 
 `guidelines/` is a pair since task 086 (2026-10-16): shipped
 `<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`)
-and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `rules/`
+and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `reviews/`
 -- a file of the same name replaces, an empty one disables. `k_playbook_doc_read`
 (`k-playbook:/guidelines/<name>.md`) and the briefing resolve it that way. The field
 `guidelines` of the context output is the one named exception: it still lists only
@@ -275,7 +280,7 @@ the project-owned files until the context output is switched (see the next secti
 `catalogs` does not list the kind.
 
 Nothing below `k-playbook/` may be written, including by commands that read
-rules or recipes there. An update replaces the directory completely.
+recipes or checks there. An update replaces the directory completely.
 
 ## The resolved working state
 
@@ -298,16 +303,16 @@ configuration and the filesystem:
 | `gh` | the GitHub CLI host finding for this machine |
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
-| `catalogs` | `rules`, `reviews`, `checks`, merged; the shipped side of `rules` and `reviews` comes from `<hub>:k-playbook/defaults/` (task 131) |
-| `catalogsProblem` | only when the shipped layer of `rules` and `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty): why both lists are empty -- they are never shown from the local layer alone; the rest of the output stays, and `kephalaion` says more |
+| `catalogs` | `reviews`, merged with the project-owned side, and `checks`, shipped only (task 134); the shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131) |
+| `catalogsProblem` | only when the shipped layer of `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty): why that list is empty -- they are never shown from the local layer alone; the rest of the output stays, and `kephalaion` says more |
 | `guidelines` | files from `k-playbook-local/guidelines/` only -- not merged with the shipped guidelines, unlike `k_playbook_doc_read` and the briefing; the one named exception until the context output is switched (task 086) |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
 Each catalog entry has `name` (the filename), `key` (the invocation name without
-extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`),
-and `disabled`, where applicable. `path` is a file on disk for a project-owned entry and for
-a shipped check; for a shipped rule or recipe it is the reference
+extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`; for
+`checks` always `dist`), and `disabled`, where applicable (never for `checks`). `path` is a file on disk for a project-owned entry and for
+a shipped check; for a shipped recipe it is the reference
 `k-playbook:/<kind>/<name>`, read with `k_playbook_doc_read` or `k-playbook read`, because
 that layer lies in `<hub>:k-playbook` (task 131).
 
@@ -318,9 +323,9 @@ and everyone receives the same one.
 `k-playbook briefing [--json]` and the MCP tool `k_playbook_briefing`. The context
 output is the environment -- paths, configuration, tools, the merged catalogs with
 their paths. The briefing is what a session has to know at the start: which
-instructions, rules, reviews and guidelines apply, as references in the prefix
+instructions, reviews and guidelines apply, as references in the prefix
 scheme with title, description and origin (`k-playbook:/instructions/always/` with
-its parts, `on-demand/`, `rules/`, `reviews/`, `guidelines/`), and what is pending in
+its parts, `on-demand/`, `reviews/`, `guidelines/`), and what is pending in
 the project's collection -- own open tasks and workbench topics, the number of open
 findings. References, never paths; no contents, with one exception: the text of the
 always-instructions itself (`documents.always.content`, the plain text starts with
@@ -333,9 +338,8 @@ Since task 091 (2026-10-17) the briefing also carries **the rest of the context
 output**: everything in the table above that its own sections do not cover, in the
 section `context` (`--json`, MCP) resp. behind the separator line "Noch aus
 k-playbook context — wird abgebaut" (plain text). The rest comes from the same
-function as `k-playbook context` (`ContextForDir`), minus `catalogs.rules`,
-`catalogs.reviews` and `guidelines`, which are `documents.rules`, `.reviews` and
-`.guidelines` -- the list stands at one place in the code
+function as `k-playbook context` (`ContextForDir`), minus `catalogs.reviews`
+and `guidelines`, which are `documents.reviews` and `.guidelines` -- the list stands at one place in the code
 (`briefingCoveredContextFields`). Nothing stands twice: environment facts are in
 the briefing only there. So one call is enough for the start of a session, and
 because the rest comes through `ContextForDir`, the briefing heals the assistant
@@ -479,7 +483,7 @@ remediation:
 #   # Add with `k-playbook docs exclude add <pattern>…`.
 #   exclude:
 #     - docs/
-#     - rules/
+#     - vendor/
 ```
 
 The `docs:` block is written as a comment only: without it nothing changes.
@@ -505,7 +509,7 @@ remediation:
 docs:
   exclude:
     - docs/
-    - rules/
+    - vendor/
 
 tools:
   mcp:
@@ -687,7 +691,7 @@ Optional block for the docs producers such as `/k-docs-code` (task 116).
 | `exclude` | list of strings | patterns excluded from the code scan, in addition to the fixed exclusions of the command text |
 
 The patterns mean the same as in a `.gitignore` placed in `project.repo_root`, the scan root
-of `/k-docs-code` -- for example `docs/` excludes every directory named `docs`, `rules/x.md`
+of `/k-docs-code` -- for example `docs/` excludes every directory named `docs`, `vendor/x.md`
 is bound to the root. Only the block form is read, one `- <pattern>` per line, indented
 deeper than `exclude:` or -- equally valid YAML -- in the same column as `exclude:`; quotes
 are removed, and a comment after an entry, empty entries and

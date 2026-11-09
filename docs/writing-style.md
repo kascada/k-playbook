@@ -11,7 +11,7 @@ and ß — no ASCII transliteration.
 | `heisst`, `schliessen`, `muessen`      | heißt, schließen, müssen      |
 
 This applies to everything people read: documentation, interface text, commands,
-skills, rules, review recipes, checks, commit descriptions, and code comments.
+skills, instructions, review recipes, checks, commit descriptions, and code comments.
 
 ## Where ASCII remains
 

@@ -100,12 +100,9 @@ func newProject(t *testing.T) string {
 
 	root := t.TempDir()
 	for _, dir := range []string{
-		filepath.Join(root, "k-playbook", "defaults", "rules"),
 		filepath.Join(root, "k-playbook", "defaults", "reviews"),
 		filepath.Join(root, "k-playbook", "checks"),
-		filepath.Join(root, "k-playbook-local", "rules"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
-		filepath.Join(root, "k-playbook-local", "checks"),
 		filepath.Join(root, "k-playbook-local", "guidelines"),
 	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -736,7 +733,6 @@ func newMCPReviewProject(t *testing.T) string {
 	for _, dir := range []string{
 		filepath.Join(sharetest.Dir(t), "scripts"),
 		filepath.Join(root, "k-playbook", "defaults", "reviews"),
-		filepath.Join(root, "k-playbook", "defaults", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", review.ResultsDirName),

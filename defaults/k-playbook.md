@@ -19,11 +19,11 @@ verloren. Wer eine mitgelieferte Datei anpassen will, legt eine gleichnamige in
 `k-playbook-local/` an.
 
 Alles, was das Projekt selbst hervorbringt, gehört nach `k-playbook-local/`: eigene
-Regeln, Reviews, Checks, Commands und Skills, dazu Ergebnisse und Notizen.
+Reviews, Commands und Skills, dazu Ergebnisse und Notizen.
 
 ## Überlagern und Abschalten
 
-Für `rules`, `reviews`, `checks`, `commands` und `skills` gilt: Ein gleichnamiger
+Für `reviews`, `commands` und `skills` gilt: Ein gleichnamiger
 Eintrag in `k-playbook-local/` **ersetzt** den mitgelieferten vollständig. Der
 mitgelieferte wird dann gar nicht gelesen; es werden auch keine einzelnen Abschnitte
 übernommen.
@@ -35,17 +35,18 @@ mitgelieferten ab. So kann die Datei ihren eigenen Grund tragen:
 # Abgeschaltet: dieses Projekt nutzt kein Django.
 ```
 
-Bei `rules` und `reviews` bleibt der Eintrag sichtbar, sein Inhalt sagt dann, dass er
-abgeschaltet ist. Ein Check fällt ganz aus dem Katalog: ein leeres Skript würde mit
-Exit 0 durchlaufen und wie ein bestandener Check aussehen. Ein abgeschalteter Command
-oder Skill wird nicht mehr beim Assistenten registriert.
+Bei `reviews` bleibt der Eintrag sichtbar, sein Inhalt sagt dann, dass er
+abgeschaltet ist. Ein abgeschalteter Command oder Skill wird nicht mehr beim Assistenten
+registriert.
+
+Checks haben keine projekteigene Ebene: `k-check` führt nur die mitgelieferten aus, ein
+`k-playbook-local/checks/` wird nicht gelesen, und `/k-upgrade` räumt es ab.
 
 Die Vergleichseinheit ist der Name:
 
 | Sorte | Einheit | Name |
 |---|---|---|
-| `rules`, `reviews` | eine `*.md`-Datei | Dateiname |
-| `checks` | ein `*.sh`-Skript | Dateiname |
+| `reviews` | eine `*.md`-Datei | Dateiname |
 | `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/context.md` |
 | `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname |
 
@@ -62,7 +63,8 @@ vergleicht den Katalog mit dem Registrierten und richtet die Verlinkung ein.
 
 Verlass dich nicht auf Annahmen über Pfade. `k-playbook context`
 liefert die aufgelösten Verzeichnisse und die effektiven Kataloge — mitgeliefert und
-projekteigen bereits zusammengeführt, abgeschaltete Einträge markiert.
+projekteigen bereits zusammengeführt, abgeschaltete Einträge markiert; `checks` nur
+mitgeliefert.
 
 ## Wie gearbeitet wird
 
@@ -86,7 +88,7 @@ Die mitgelieferten Commands im Überblick — Details in `k-playbook/docs/comman
   während der Arbeit nach `keph:/queue/findings/` geschrieben wurden, trägt Fehlendes nach,
   lässt den Nutzer je Befund das Ziel wählen und prüft den Docs-Nachzug.
   Was währenddessen festzuhalten ist, steht in `k-playbook:/instructions/on-demand/befunde.md`.
-- **Hilfen** — `/k-enforcement` prüft gegen die effektive Regelmenge, `/k-test-check`
+- **Hilfen** — `/k-enforcement` prüft den Doku-Nachzug und `k-check`, `/k-test-check`
   führt Tests aus und diagnostiziert Fehler, `/k-verlauf` durchsucht alte AI-Verläufe,
   `/k-vscode-project-color` setzt Fensterfarbe und Titel.
 

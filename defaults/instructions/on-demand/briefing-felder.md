@@ -14,14 +14,14 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 
 | Feld | Bedeutung |
 |---|---|
-| `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"5"`. |
+| `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"6"`. |
 | `session` | Die Kennung dieser Sitzung, mit jedem Briefing neu vergeben, etwa `20261024-183012-3fa9c1`. Sie steht in allem, was die Sitzung später wiederfinden muss — im Kopf eines Befunds unter `sitzung`, nach dem `/k-danke` sucht. Lädt eine Sitzung das Briefing neu, gilt die neue Kennung, und die frühere gehört weiter zu ihr. |
 | `documents.always` | Das zusammengebaute Verzeichnis `k-playbook:/instructions/always/`: `ref`, `content` (der Text selbst, Includes eingesetzt — eine Sitzung muss ihn nicht eigens lesen), `parts` in der Reihenfolge des Texts, `problems` (übergangene Teile). |
-| `documents.onDemand`, `documents.rules`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Mitgeliefert und projektlokal sind schon gegeneinander aufgelöst. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
+| `documents.onDemand`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Mitgeliefert und projektlokal sind schon gegeneinander aufgelöst. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
 | `work` | Die eigene offene Arbeit aus der Projekt-Collection: `available` und `message` (ob die Collection lesbar war und sonst warum nicht), `user` (der eigene Kephalaion-User), `tasks` und `workbench` (je `ref`, `title`, `updated`; offen heißt: nicht in `done/`), `openFindings` (Zahl der offenen Befunde in `queue/findings/`). |
 | `projectDocs` | Der Einstieg der Projektdokumentation, als Verweis. |
 | `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, …), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
-| `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.rules`, `catalogs.reviews` und `guidelines` fehlen darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
+| `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.reviews` und `guidelines` fehlen darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
 
 ### Der Abschnitt `context`
 
@@ -43,7 +43,7 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.mcp` | Die Pflichtliste der MCP-Server aus der Konfiguration (`required`, `configured`). Liest kein Command; Sache der Oberfläche. |
 | `context.git` | Ob die Oberfläche das Umschalten des Branches anbietet (`switch`, `allow`, `environments`, `configured`). Liest kein Command. |
 | `context.baseTools` | Die Werkzeuge, die k-playbook selbst aufruft, und was davon fehlt: `matrix`, `present`, `missing` (je `name`, `role`, `methods`), `ok`, `installCommand`. |
-| `context.catalogs.checks` | Die effektiven Checks — mitgeliefert und projektlokal schon zusammengeführt, `origin` vermerkt, abgeschaltete als `disabled`. Regeln und Reviews stehen nicht hier, sondern unter `documents.rules` und `documents.reviews`. |
+| `context.catalogs.checks` | Die Checks — nur die mitgelieferten, `origin` immer `dist`; projekteigene Checks gibt es nicht. Reviews stehen nicht hier, sondern unter `documents.reviews`. |
 | `context.versionSources` | Zustand der Quellenkonfiguration des Versionsinventars `<local.dir>/version-sources.yaml`: ob sie da ist, welche Wurzeln außerhalb des Projekts sie öffnet, welche Zusatzquellen sie nennt, welche Bereiche sie ausschließt und welche Helm-Werte sie ausdrücklich nennt. Von hier lesen — nie die Datei selbst. Einzelheiten unten. |
 | `context.kephalaion` | Die Anbindung des Projekts an seine Collection: `address`, `ok`, `user`, `message` u. a. `keph:`-Verweise sind nur erreichbar, wenn `ok` wahr ist. |
 | `context.links` | Die Selbstheilung der Assistenten-Verknüpfungen: `healed`, `open`, `note`. Nur da, wenn es etwas zu melden gab; `note` sagt, was das für diese Sitzung heißt. |

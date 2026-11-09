@@ -20,10 +20,8 @@ func briefingProject(t *testing.T) string {
 
 	root := readProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/rules/befunde.md":       "# Regel: Befunde\n\nText.\n",
 		"k-playbook/defaults/reviews/review-code.md": "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
 		"k-playbook/defaults/guidelines/betrieb.md":  "# Betrieb\n\nText.\n",
-		"k-playbook-local/rules/befunde.md":          "# Abgeschaltet.\n",
 		"k-playbook-local/guidelines/stil.md":        "# Stil\n\nText.\n",
 		"k-playbook-local/reviews/review-eigen.md":   "# Eigenes Review\n\nText.\n",
 	}
@@ -79,14 +77,13 @@ func TestBriefingKlartext(t *testing.T) {
 	if !strings.HasPrefix(stdout[loc[1]:], "## A\n\n## B lokal\n\nText.\nHinweis: k-playbook:/instructions/always/notiz.md (lokal)") {
 		t.Errorf("auf den Kopf folgen nicht die immer geltenden Anweisungen:\n%s", stdout)
 	}
-	for _, absent := range []string{"Immer (", "[dist]  A\n", "[override]  B lokal\n", "[disabled]  200-c.md\n"} {
+	for _, absent := range []string{"Immer (", "[dist]  A\n", "[override]  B lokal\n", "[disabled]  200-c.md\n", "Regeln:\n"} {
 		if strings.Contains(stdout, absent) {
 			t.Errorf("Ausgabe enthält %q:\n%s", absent, stdout)
 		}
 	}
 	for _, want := range []string{
 		"Auf Abruf:\n  k-playbook:/instructions/on-demand/aus.md  [disabled]  aus.md\n  k-playbook:/instructions/on-demand/thema.md  [dist]  Thema — D\n",
-		"Regeln:\n  k-playbook:/rules/befunde.md  [disabled]  befunde.md\n",
 		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n  k-playbook:/reviews/review-eigen.md  [local]  Eigenes Review\n",
 		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\n  k-playbook:/guidelines/stil.md  [local]  Stil\n",
 		"Eigene Arbeit: Kephalaion nicht nutzbar — ",
@@ -138,7 +135,7 @@ func TestBriefingKlartextOhneKontext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("briefing: %v", err)
 	}
-	if !strings.Contains(stdout, "Regeln:\n") || !strings.Contains(stdout, briefingContextSeparator+"\n  nicht verfügbar — K-PLAYBOOK.yaml hat schema_version 99") {
+	if !strings.Contains(stdout, "Reviews:\n") || !strings.Contains(stdout, briefingContextSeparator+"\n  nicht verfügbar — K-PLAYBOOK.yaml hat schema_version 99") {
 		t.Errorf("Ausgabe:\n%s", stdout)
 	}
 }
@@ -157,7 +154,7 @@ func TestBriefingJSON(t *testing.T) {
 	if briefing.SchemaVersion != project.BriefingSchemaVersion {
 		t.Errorf("schemaVersion %q", briefing.SchemaVersion)
 	}
-	if len(briefing.Documents.Always.Parts) != 3 || len(briefing.Documents.Rules) != 1 || len(briefing.Documents.Reviews) != 2 || len(briefing.Documents.Guidelines) != 2 {
+	if len(briefing.Documents.Always.Parts) != 3 || len(briefing.Documents.Reviews) != 2 || len(briefing.Documents.Guidelines) != 2 {
 		t.Errorf("Listen: %+v", briefing.Documents)
 	}
 	if !strings.HasPrefix(briefing.Documents.Always.Content, "## A\n\n## B lokal\n") {
@@ -240,7 +237,7 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &briefing); err != nil {
 		t.Fatalf("kein JSON: %v", err)
 	}
-	if briefing.SchemaVersion != "5" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
+	if briefing.SchemaVersion != "6" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
 		t.Errorf("health im JSON: %q %+v", briefing.SchemaVersion, briefing.Health)
 	}
 }

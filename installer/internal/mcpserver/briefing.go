@@ -45,7 +45,7 @@ func addBriefingTool(server *mcp.Server) {
 			"zusammengebaut wie bei k_playbook_doc_read — lies ihn zuerst, er ist der einzige Inhalt im Briefing; " +
 			"alles Weitere sind Verweise im Präfixschema, keine Pfade. session: die Kennung dieser Sitzung, je Aufruf " +
 			"neu vergeben — sie steht in allem, was die Sitzung später wiederfinden muss, etwa im Kopf eines Befunds. documents: always (ref, content, parts), " +
-			"onDemand, rules, reviews, guidelines — lokal und " +
+			"onDemand, reviews, guidelines — lokal und " +
 			"mitgeliefert schon gegeneinander aufgelöst, je Eintrag ref, title, description und origin (dist, local, " +
 			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
 			"mit Titel und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
@@ -57,7 +57,7 @@ func addBriefingTool(server *mcp.Server) {
 			"und hint; nenne die Einträge in deiner ersten Antwort, Fehler vor der Arbeit, behebe nichts still — " +
 			"dieselbe Antwort wie k_playbook_health. context: der Übergangsabschnitt " +
 			"mit dem Rest von k_playbook_context — die Umgebungsangaben (Pfade, Werkzeuge, gh, git, mcp, " +
-			"remediation, Kephalaion-Anbindung …) unter ihren Namen aus der Kontextausgabe, ohne catalogs.rules, " +
+			"remediation, Kephalaion-Anbindung …) unter ihren Namen aus der Kontextausgabe, ohne " +
 			"catalogs.reviews und guidelines, die documents schon liefert; lässt sich die Kontextausgabe nicht " +
 			"bauen, steht available false mit message. Ein Aufruf genügt damit für den Einstieg; k_playbook_context " +
 			"ist nicht zusätzlich nötig. Nebenwirkung wie dort: zieht die Assistenten-Verlinkung nach und meldet " +

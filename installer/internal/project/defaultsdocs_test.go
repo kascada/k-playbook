@@ -33,8 +33,8 @@ func openStore(store DefaultsStore, calls *int) func() (DefaultsStore, string, e
 
 func TestDefaultsSourceListetUndLiest(t *testing.T) {
 	store := defaultsStore(map[string]string{
-		"rules/a.md":                       "# A\n",
-		"rules/README.md":                  "# Rules\n",
+		"guidelines/a.md":                  "# A\n",
+		"guidelines/README.md":             "# Guidelines\n",
 		"instructions/always/010-x.md":     "## X\n",
 		"commands/_skills/s/vorlage.md":    "V\n",
 		"commands/k-task-create.md":        "# k-task-create\n",
@@ -48,7 +48,7 @@ func TestDefaultsSourceListetUndLiest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List(\"\"): %v", err)
 	}
-	if got := entryNames(root); got != "VERSION commands/ instructions/ rules/ testdata/" {
+	if got := entryNames(root); got != "VERSION commands/ guidelines/ instructions/ testdata/" {
 		t.Errorf("Wurzel: %s", got)
 	}
 	commands, err := source.List("commands")
@@ -82,22 +82,22 @@ func TestDefaultsSourceListetUndLiest(t *testing.T) {
 }
 
 func TestDefaultsSourceFehlendesIstNichtVorhanden(t *testing.T) {
-	store := defaultsStore(map[string]string{"rules/a.md": "# A\n"})
+	store := defaultsStore(map[string]string{"guidelines/a.md": "# A\n"})
 	calls := 0
 	source := NewKephDefaultsSource(openStore(store, &calls))
 
-	for _, dir := range []string{"reviews", "rules/a.md", "rules/leer"} {
+	for _, dir := range []string{"reviews", "guidelines/a.md", "guidelines/leer"} {
 		if _, err := source.List(dir); !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("List(%s): %v, erwartet fs.ErrNotExist", dir, err)
 		}
 	}
-	for _, file := range []string{"rules/b.md", "rules/a.md/x.md", "reviews/x.md"} {
+	for _, file := range []string{"guidelines/b.md", "guidelines/a.md/x.md", "reviews/x.md"} {
 		if _, err := source.Read(file); !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("Read(%s): %v, erwartet fs.ErrNotExist", file, err)
 		}
 	}
-	if _, err := source.Read("rules"); !errors.Is(err, ErrDocIsDir) {
-		t.Errorf("Read(rules): %v, erwartet ErrDocIsDir", err)
+	if _, err := source.Read("guidelines"); !errors.Is(err, ErrDocIsDir) {
+		t.Errorf("Read(guidelines): %v, erwartet ErrDocIsDir", err)
 	}
 	for _, call := range store.Calls {
 		if strings.HasPrefix(call, "read ") {
@@ -112,8 +112,8 @@ func TestDefaultsSourceOhneKephalaion(t *testing.T) {
 		calls++
 		return nil, "vm:k-playbook", docRefErrorf(DocCodeKephalaionUnavailable, "Kephalaion ist für dieses Projekt nicht bereit")
 	})
-	_, listErr := source.List("rules")
-	_, readErr := source.Read("rules/a.md")
+	_, listErr := source.List("guidelines")
+	_, readErr := source.Read("guidelines/a.md")
 	for _, err := range []error{listErr, readErr} {
 		if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 			t.Fatalf("Code %q, erwartet %s: %v", DocRefErrorCode(err), DocCodeKephalaionUnavailable, err)
@@ -136,7 +136,7 @@ func TestDefaultsSourceCollectionNichtLesbar(t *testing.T) {
 	store := defaultsStore(nil)
 	store.Fail["list"] = &kephalaion.ToolError{Tool: "list", Message: "vm:k-playbook nicht lesbar"}
 	calls := 0
-	_, err := NewKephDefaultsSource(openStore(store, &calls)).List("rules")
+	_, err := NewKephDefaultsSource(openStore(store, &calls)).List("guidelines")
 	if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 		t.Fatalf("Code %q: %v", DocRefErrorCode(err), err)
 	}
@@ -149,9 +149,9 @@ func TestDefaultsSourceCollectionNichtLesbar(t *testing.T) {
 
 func TestDefaultsSourceOhneVersionIstLeer(t *testing.T) {
 	store := kephtest.New()
-	store.Put("defaults/rules/a.md", "# A\n")
+	store.Put("defaults/guidelines/a.md", "# A\n")
 	calls := 0
-	_, err := NewKephDefaultsSource(openStore(store, &calls)).Read("rules/a.md")
+	_, err := NewKephDefaultsSource(openStore(store, &calls)).Read("guidelines/a.md")
 	if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 		t.Fatalf("Code %q: %v", DocRefErrorCode(err), err)
 	}
@@ -163,10 +163,10 @@ func TestDefaultsSourceOhneVersionIstLeer(t *testing.T) {
 }
 
 func TestDefaultsSourceLesefehlerIstNichtErreichbar(t *testing.T) {
-	store := defaultsStore(map[string]string{"rules/a.md": "# A\n"})
+	store := defaultsStore(map[string]string{"guidelines/a.md": "# A\n"})
 	store.Fail["read"] = &kephalaion.ToolError{Tool: "read", Code: kephalaion.CodeNodeUnreachable, Message: "weg"}
 	calls := 0
-	_, err := NewKephDefaultsSource(openStore(store, &calls)).Read("rules/a.md")
+	_, err := NewKephDefaultsSource(openStore(store, &calls)).Read("guidelines/a.md")
 	if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 		t.Fatalf("Code %q: %v", DocRefErrorCode(err), err)
 	}
@@ -177,20 +177,20 @@ func TestDefaultsSourceLesefehlerIstNichtErreichbar(t *testing.T) {
 // wenn die lokale Ebene den Eintrag hat.
 func TestDefaultsSourceHinterVerweisen(t *testing.T) {
 	root := t.TempDir()
-	writeDocTree(t, filepath.Join(root, "k-playbook-local"), map[string]string{"rules/b.md": "# B lokal\n\nText.\n"})
-	store := defaultsStore(map[string]string{"rules/a.md": "# A\n", "rules/b.md": "# B\n"})
+	writeDocTree(t, filepath.Join(root, "k-playbook-local"), map[string]string{"guidelines/b.md": "# B lokal\n\nText.\n"})
+	store := defaultsStore(map[string]string{"guidelines/a.md": "# A\n", "guidelines/b.md": "# B\n"})
 	calls := 0
 	layers := DocLayers{Dist: NewKephDefaultsSource(openStore(store, &calls)), Local: NewProjectLocalDocSource(root)}
 
-	a, err := ResolveDocRef(layers, "k-playbook:/rules/a.md")
+	a, err := ResolveDocRef(layers, "k-playbook:/guidelines/a.md")
 	if err != nil || a.Content != "# A\n" || a.Parts[0].Origin != DocOriginDist {
 		t.Errorf("a: %+v, %v", a, err)
 	}
-	b, err := ResolveDocRef(layers, "k-playbook:/rules/b.md")
+	b, err := ResolveDocRef(layers, "k-playbook:/guidelines/b.md")
 	if err != nil || b.Content != "# B lokal\n\nText.\n" || b.Parts[0].Origin != DocOriginOverride {
 		t.Errorf("b: %+v, %v", b, err)
 	}
-	if _, err := ResolveDocRef(layers, "k-playbook:/rules/c.md"); DocRefErrorCode(err) != DocCodeNotFound {
+	if _, err := ResolveDocRef(layers, "k-playbook:/guidelines/c.md"); DocRefErrorCode(err) != DocCodeNotFound {
 		t.Errorf("c: %v, erwartet not_found", err)
 	}
 
@@ -200,7 +200,7 @@ func TestDefaultsSourceHinterVerweisen(t *testing.T) {
 		}),
 		Local: NewProjectLocalDocSource(root),
 	}
-	if _, err := ResolveDocRef(down, "k-playbook:/rules/b.md"); DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
+	if _, err := ResolveDocRef(down, "k-playbook:/guidelines/b.md"); DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 		t.Errorf("lokaler Eintrag ohne mitgelieferte Ebene: %v, erwartet kephalaion_unavailable", err)
 	}
 }
@@ -242,11 +242,11 @@ func entryNames(entries []DocSourceEntry) string {
 // den Node nicht mehr. README.md und Unterverzeichnisse liest es nicht.
 func TestDefaultsSourceListLiestVoraus(t *testing.T) {
 	store := defaultsStore(map[string]string{
-		"reviews/review-a.md":  "# A\n",
-		"reviews/review-b.md":  "# B\n",
-		"reviews/README.md":    "# Liesmich\n",
-		"reviews/unter/x.md":   "# X\n",
-		"rules/nicht-gelistet": "# R\n",
+		"reviews/review-a.md":       "# A\n",
+		"reviews/review-b.md":       "# B\n",
+		"reviews/README.md":         "# Liesmich\n",
+		"reviews/unter/x.md":        "# X\n",
+		"guidelines/nicht-gelistet": "# R\n",
 	})
 	calls := 0
 	source := NewKephDefaultsSource(openStore(store, &calls))
@@ -300,12 +300,12 @@ func TestBriefingOhneMitgelieferteEbeneScheitert(t *testing.T) {
 }
 
 // Die Kontextausgabe scheitert ohne mitgelieferte Ebene nicht — sie trägt
-// unter kephalaion, warum —, führt aber rules und reviews leer, statt die
+// unter kephalaion, warum —, führt aber reviews leer, statt die
 // lokale Ebene allein zu zeigen, und nennt den Grund in catalogsProblem.
 // checks liegt weiter in der Installation und bleibt.
 func TestBuildContextOhneMitgelieferteEbene(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# Eigene\n\nText.\n")
+	write(t, filepath.Join(LocalDir(root), "reviews", "review-eigen.md"), "# Eigene\n\nText.\n")
 	write(t, filepath.Join(PlaybookDir(root), "checks", "check_a.sh"), "#!/bin/sh\n")
 	stubDefaultsStore(t, func(string) (DefaultsStore, string, error) {
 		return nil, "vm:k-playbook", docRefErrorf(DocCodeKephalaionUnavailable, "nicht bereit")
@@ -315,7 +315,7 @@ func TestBuildContextOhneMitgelieferteEbene(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
-	if len(built.Catalogs["rules"]) != 0 || len(built.Catalogs["reviews"]) != 0 {
+	if len(built.Catalogs["reviews"]) != 0 {
 		t.Errorf("lokale Ebene allein im Katalog: %+v", built.Catalogs)
 	}
 	if !strings.Contains(built.CatalogsProblem, "nicht bereit") {

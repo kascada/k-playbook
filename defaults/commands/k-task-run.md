@@ -187,8 +187,8 @@ konfigurieren und nichts zu suchen:
   `context.baseTools.installCommand` nennen.
 - Sonst: `DIFF_ENABLED=false`, still weiter.
 
-`DIFF_ENABLED` ist kein Guard im Sinn von `k-playbook:/rules/command-authoring.md`; jeder
-`git`-Aufruf in einem Shell-Codeblock dieses Commands hat seinen eigenen.
+`DIFF_ENABLED` ist kein Guard für ein externes Werkzeug; jeder `git`-Aufruf in einem
+Shell-Codeblock dieses Commands hat seinen eigenen.
 
 Mit `DIFF_ENABLED=true`:
 
@@ -829,9 +829,9 @@ Ohne Intent entfällt dieser Schritt still.
 
 **Doku-Nachzug.** Vor der Zusammenfassung prüft der Hauptkontext, ob der Lauf Code geändert
 hat, und reiht dann den Nachzug der erzeugten Doku ein — er, nicht der
-Ausführungs-Sub-Agent, denn die Sub-Agenten laden das Briefing nicht. Maßgeblich sind
-`k-playbook:/rules/docs-sync.md` und `k-playbook:/instructions/on-demand/doku-auftraege.md`;
-dieser Text wiederholt sie nicht.
+Ausführungs-Sub-Agent, denn die Sub-Agenten laden das Briefing nicht. Maßgeblich sind der
+Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
+`k-playbook:/instructions/on-demand/doku-auftraege.md`; dieser Text wiederholt sie nicht.
 
 - Grundlage ist `CHANGED_PATHS` aus 5f, Schritt 6 — nur Namen, kein Diff. Code für `code` ist
   Quelltext unter `context.project.repoRoot` außerhalb von `k-playbook/`, `k-playbook-local/`,

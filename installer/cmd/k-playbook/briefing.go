@@ -15,8 +15,8 @@ import (
 )
 
 // runBriefing gibt das Briefing aus — dieselbe Fachlogik, die das MCP-Werkzeug
-// k_playbook_briefing als Hülle anbietet: welche Anweisungen, Regeln, Reviews
-// und Leitlinien für dieses Projekt gelten und was in der Projekt-Collection
+// k_playbook_briefing als Hülle anbietet: welche Anweisungen, Reviews und
+// Leitlinien für dieses Projekt gelten und was in der Projekt-Collection
 // für die eigene Arbeit ansteht, als Verweise im Präfixschema; vorweg der Text
 // der immer geltenden Anweisungen und die Umgebungsprüfung, dahinter der Rest
 // von `k-playbook context`,
@@ -100,8 +100,6 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 
 	b.WriteString("Auf Abruf:\n")
 	entries(briefing.Documents.OnDemand)
-	b.WriteString("Regeln:\n")
-	entries(briefing.Documents.Rules)
 	b.WriteString("Reviews:\n")
 	entries(briefing.Documents.Reviews)
 	b.WriteString("Leitlinien:\n")
@@ -365,7 +363,7 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     Quellenkonfiguration), je Eintrag Stufe, Bereich, Satz und Abhilfe —
     dieselbe Liste wie k-playbook health; ohne Problem die eine Zeile
     „Umgebung: keine Probleme“;
-  - die Anweisungen auf Abruf, Regeln, Reviews und Leitlinien — lokal und
+  - die Anweisungen auf Abruf, Reviews und Leitlinien — lokal und
     mitgeliefert schon gegeneinander aufgelöst, je Eintrag Verweis, Titel,
     Beschreibung und Herkunft (dist, local, override, disabled);
   - aus der Projekt-Collection die eigenen offenen Tasks und aktiven
@@ -380,8 +378,8 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     unter context.github;
   - hinter einer Trennzeile den Rest von k-playbook context — die
     Umgebungsangaben (Pfade, Werkzeuge, gh, git, Kephalaion-Anbindung …), die
-    das Briefing noch nicht selbst abdeckt; ohne catalogs.rules,
-    catalogs.reviews und guidelines, die oben schon stehen. Der Abschnitt wird
+    das Briefing noch nicht selbst abdeckt; ohne catalogs.reviews und
+    guidelines, die oben schon stehen. Der Abschnitt wird
     Feld für Feld abgebaut; ist er leer, entfällt k-playbook context. Lässt
     sich die Kontextausgabe nicht bauen, steht das dort — kein Fehler.
 
@@ -395,7 +393,7 @@ Sitzungskennung, bitten, die Ausgabe ganz zu lesen, und zählen die geltenden
 Teile der immer geltenden Anweisungen auf. Mit --json kommt die Antwort als
 JSON mit schemaVersion, session (die Kennung dieser Sitzung, je Aufruf neu),
 documents (always mit content und parts, onDemand,
-rules, reviews, guidelines), work (available, message, user, tasks, workbench,
+reviews, guidelines), work (available, message, user, tasks, workbench,
 openFindings), projectDocs, health (ok, problems — je Eintrag level, area,
 message, hint) und context (available, message, dazu die übrigen Felder der
 Kontextausgabe unter ihren Namen) — dieselbe Antwort wie das MCP-Werkzeug

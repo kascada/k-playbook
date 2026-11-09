@@ -56,9 +56,9 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
 - `200-befunde-festhalten.md`: Erkenntnisse aus Analyse und Fehlersuche festhalten.
 - `210-workbench.md`: Den Stand eines laufenden Vorhabens in der Workbench führen. Steht
   hinter den Befunden, weil beide sagen, was eine Sitzung während der Arbeit festhält.
-- `220-regeln-anwenden.md`: Vor dem Abschluss einer Änderung die Regeln aus dem Briefing
-  lesen, die den Diff betreffen, und anwenden; für die erzeugte Doku einen Auftrag nach
-  `on-demand/doku-auftraege.md` einreihen; den ausdrücklichen Bericht liefert
+- `220-regeln-anwenden.md`: Doku nachziehen — nach einer Änderung am Code Handdoku,
+  `README.md` und `AGENTS.md` im selben Arbeitsgang nachziehen; für die erzeugte Doku einen
+  Auftrag nach `on-demand/doku-auftraege.md` einreihen; den ausdrücklichen Bericht liefert
   `/k-enforcement`. Steht hinter Befunden und Workbench, weil auch er sagt, was eine Sitzung
   während der Arbeit festhält, und vor den Tasks, weil er für jede Änderung gilt, ob mit Task
   oder ohne.

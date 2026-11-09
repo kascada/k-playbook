@@ -72,11 +72,10 @@ type Context struct {
 	// anders als gh.ready.
 	BaseTools BaseTools                 `json:"baseTools"`
 	Catalogs  map[string][]CatalogEntry `json:"catalogs"`
-	// CatalogsProblem sagt, warum catalogs.rules und catalogs.reviews leer
-	// sind: Ihre mitgelieferte Ebene liegt in <hub>:k-playbook unter
-	// defaults/ und ist ohne Kephalaion nicht lesbar. Die lokale Ebene steht
-	// dann nicht allein da — beide Kataloge bleiben leer. Leer, wenn die
-	// Kataloge gelesen wurden.
+	// CatalogsProblem sagt, warum catalogs.reviews leer ist: Seine
+	// mitgelieferte Ebene liegt in <hub>:k-playbook unter defaults/ und ist
+	// ohne Kephalaion nicht lesbar. Die lokale Ebene steht dann nicht allein
+	// da — der Katalog bleibt leer. Leer, wenn die Kataloge gelesen wurden.
 	CatalogsProblem string   `json:"catalogsProblem,omitempty"`
 	Guidelines      []string `json:"guidelines"`
 	// VersionSources ist der Zustand der Quellenkonfiguration des
@@ -273,7 +272,8 @@ func buildNow() ContextNow {
 	}
 }
 
-// CatalogEntry ist ein aufgelöster Eintrag einer der drei Overlay-Sorten.
+// CatalogEntry ist ein aufgelöster Eintrag eines Katalogs: reviews mit
+// Overlay, checks nur mitgeliefert.
 type CatalogEntry struct {
 	// Name ist der Dateiname und zugleich die Vergleichseinheit zwischen
 	// mitgeliefert und projekteigen.
@@ -282,14 +282,14 @@ type CatalogEntry struct {
 	Key string `json:"key"`
 	// Path sagt, wo der wirksame Eintrag liegt: bei einem projekteigenen der
 	// Pfad auf der Platte unter k-playbook-local/; bei einem mitgelieferten
-	// rules- oder reviews-Eintrag der Verweis k-playbook:/<sorte>/<name> —
+	// reviews-Eintrag der Verweis k-playbook:/<sorte>/<name> —
 	// diese Ebene liegt in <hub>:k-playbook, nicht auf der Platte; gelesen
-	// wird er mit ReadCatalogEntry. Mitgelieferte checks liegen weiter in der
-	// Installation.
+	// wird er mit ReadCatalogEntry. checks liegen nur in der Installation.
 	Path string `json:"path"`
-	// Origin: dist, local oder override.
+	// Origin: dist, local oder override; bei checks immer dist.
 	Origin string `json:"origin"`
-	// Disabled: eine leere projekteigene Datei schaltet den Eintrag ab.
+	// Disabled: eine leere projekteigene Datei schaltet den Eintrag ab; bei
+	// checks nie, sie haben keine lokale Ebene.
 	Disabled bool         `json:"disabled,omitempty"`
 	Audit    *CatalogMode `json:"audit,omitempty"`
 	Review   *CatalogMode `json:"review,omitempty"`
@@ -317,7 +317,8 @@ type CatalogScope struct {
 	Paths []string `json:"paths,omitempty"`
 }
 
-// catalogKind beschreibt eine der drei Sorten.
+// catalogKind beschreibt einen Katalog: reviews mit lokaler Ebene, checks
+// ohne (Task 134).
 type catalogKind struct {
 	name    string
 	dirName string
@@ -327,7 +328,6 @@ type catalogKind struct {
 
 func catalogKinds() []catalogKind {
 	return []catalogKind{
-		{name: "rules", dirName: "rules", suffix: ".md"},
 		{name: "reviews", dirName: "reviews", suffix: ".md", prefix: "review-"},
 		{name: "checks", dirName: "checks", suffix: ".sh"},
 	}
@@ -345,7 +345,7 @@ func catalogKindNamed(name string) catalogKind {
 }
 
 // guidelinesKind ist die Sorte guidelines/: für ResolveDocRef und das
-// Briefing eine Überlagerungssorte wie rules — mitgeliefert in
+// Briefing eine Überlagerungssorte wie reviews — mitgeliefert in
 // k-playbook/guidelines/, lokal in k-playbook-local/guidelines/, gleicher Name
 // ersetzt, leer schaltet ab. Bewusst nicht in catalogKinds(): das Feld
 // Guidelines der Kontextausgabe liest bis zur Umstellung der Kontextausgabe
@@ -359,8 +359,8 @@ func BuildContext(projectDir string) (Context, error) {
 }
 
 // BuildContextWithLayers ist BuildContext und gibt dazu die Ebenen des
-// Projekts zurück (ProjectDocLayers), deren mitgelieferte Ebene die Kataloge
-// rules und reviews schon gelesen hat. Wer danach Einträge dieser Kataloge
+// Projekts zurück (ProjectDocLayers), deren mitgelieferte Ebene den Katalog
+// reviews schon gelesen hat. Wer danach Einträge dieses Katalogs
 // liest, nimmt sie über ReadCatalogEntryWith aus diesen Ebenen: Die
 // mitgelieferte Ebene ist dann einmal geöffnet und hält die gelesenen
 // Dateien, statt je Eintrag einen neuen Zugang zum Node aufzubauen (Task 132,
@@ -374,8 +374,8 @@ func BuildContextWithLayers(projectDir string) (Context, DocLayers, error) {
 	return built, layers, nil
 }
 
-// buildContext ist BuildContext mit der mitgelieferten Ebene der Kataloge
-// rules und reviews; nil heißt eine eigene (NewProjectDefaultsSource). Das
+// buildContext ist BuildContext mit der mitgelieferten Ebene des Katalogs
+// reviews; nil heißt eine eigene (NewProjectDefaultsSource). Das
 // Briefing reicht seine durch, damit es dieselben Dokumente nicht zweimal vom
 // Node liest.
 func buildContext(projectDir string, defaults DocSource) (Context, error) {
@@ -465,9 +465,13 @@ func buildContext(projectDir string, defaults DocSource) (Context, error) {
 // Verweise und das Briefing anwenden; eine zweite Fassung der Regel gäbe
 // irgendwann eine zweite Antwort.
 //
-// Die mitgelieferte Ebene von rules und reviews ist defaults, dieselbe
+// Die mitgelieferte Ebene von reviews ist defaults, dieselbe
 // Quelle wie hinter k-playbook:-Verweisen (<hub>:k-playbook unter
 // defaults/); checks liest weiter aus der Installation k-playbook/.
+//
+// checks hat keine lokale Ebene mehr (Task 134): Local bleibt leer, ein
+// k-playbook-local/checks/ wird nicht gelesen, jeder Eintrag ist dist und
+// keiner abgeschaltet.
 //
 // Vergleichseinheit ist der Dateiname: beide Seiten benutzen dieselbe
 // Namenskonvention. Ein projekteigener Eintrag ersetzt den gleichnamigen
@@ -479,7 +483,7 @@ func resolveCatalog(projectDir string, defaults DocSource, kind catalogKind) ([]
 	localDir := LocalDir(projectDir)
 	layers := DocLayers{Dist: defaults, Local: NewDiskDocSource(localDir)}
 	if kind.name == "checks" {
-		layers.Dist = NewDiskDocSource(playbookDir)
+		layers = DocLayers{Dist: NewDiskDocSource(playbookDir)}
 	}
 	resolved, _, err := overlayDocDir(layers, kind.dirName, func(name string) bool { return isCatalogEntry(name, kind) })
 	if err != nil {

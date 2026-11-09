@@ -54,7 +54,7 @@ fields from two loads.
 | `project.languages` | The languages this project needs tools for. Always filled — a missing entry falls back to the default, so there is nothing to interpret. |
 | `playbook.dir` | The installation. Read-only; replaced on every update. |
 | `local.dir` | Everything the project owns. |
-| `catalogs` | Effective `rules`, `reviews` and `checks` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. |
+| `catalogs` | Effective `reviews` and `checks` — reviews shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`; checks are shipped only, `origin` always `dist`. |
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether the GitHub CLI is installed and logged in on this machine (a host finding). |
 | `guidelines` | Project guideline files. |
@@ -120,9 +120,10 @@ Nothing reads or indexes it. Its subdirectory `material/befunde/` holds the find
 before they moved to `keph:/queue/findings/`; nothing writes there any more. Everything below
 `material/` is left untouched by every command.
 
-`<local.dir>/rules/`, `reviews/`, `checks/` and `guidelines/` are the project-local side
-of the catalogs. Do not read them directly — `catalogs` and `guidelines` already contain
-the merged result.
+`<local.dir>/reviews/` and `guidelines/` are the project-local side of the
+catalogs. Do not read them directly — `catalogs` and `guidelines` already contain the
+merged result. Checks have no project-local side; a leftover `<local.dir>/checks/` is not
+read, and `/k-upgrade` removes it.
 
 `<project.dir>/.k-playbook/commands/` and `skills/` overlay the shipped ones by the same
 rule, but they are not in `catalogs`: the assistant loaded them at startup, so by the time a

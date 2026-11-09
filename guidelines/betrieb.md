@@ -49,7 +49,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
-| Projekteigene Regel, Rezept, Check | `rules/`, `reviews/`, `checks/` | von Hand |
+| Projekteigenes Rezept | `reviews/` | von Hand |
 | Projekteigener Command | `.k-playbook/commands/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command | von Hand |
 | Projekteigener Skill | `.k-playbook/skills/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |
 | Projekteigene Vorgabe | `guidelines/<thema>.md` | von Hand |
@@ -89,8 +89,9 @@ den falschen Nachzug.
 
 - **Ein Plan als Datei.** Eine Umsetzung, die über einen trivialen Einzelschritt
   hinausgeht, wird eine Task — nicht `plan.md`, nicht `konzept.md` neben dem Code.
-- **Ergebnisse in `checks/`.** Dort liegen ausführbare Checks. Ein Ergebnis daneben
-  sieht beim nächsten Lauf wie ein Skript aus.
+- **Ein projekteigener Check in `checks/`.** Das Verzeichnis gibt es nicht mehr (Task 134):
+  `k-check` führt nur die mitgelieferten Checks aus, ein Skript dort läuft nie.
+  `/k-upgrade` räumt es ab.
 - **Eine zweite Doku-Wurzel.** Projektwissen für AI-Sessions hat genau einen Einstieg:
   `keph:/docs/`, das Briefing nennt ihn unter `Projektdoku`. Eine weitere Sammlung
   daneben — auch ein Index auf der Platte — wird nicht gefunden und veraltet unbemerkt.

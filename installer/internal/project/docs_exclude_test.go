@@ -69,7 +69,7 @@ docs:
   exclude:
     - docs/
     # Kopien aus defaults/
-    - rules/
+    - vendor/
 
     - "guidelines/"   # Kommentar hinter dem Eintrag
     - reviews/ # auch so
@@ -81,7 +81,7 @@ tools:
   gh:
     status: enabled
 `)
-	if want := []string{"docs/", "rules/", "guidelines/", "reviews/"}; !reflect.DeepEqual(config.DocsExclude, want) {
+	if want := []string{"docs/", "vendor/", "guidelines/", "reviews/"}; !reflect.DeepEqual(config.DocsExclude, want) {
 		t.Errorf("DocsExclude = %v, erwartet %v", config.DocsExclude, want)
 	}
 	if len(config.DocsProblems) != 0 {
@@ -125,7 +125,7 @@ docs:
 // Die Flussform wird nicht gelesen, aber gemeldet — still übergangen sähe sie
 // aus wie keine Liste.
 func TestReadConfigMeldetDocsFlussform(t *testing.T) {
-	config := readDocsConfig(t, "schema_version: 3\ndocs:\n  exclude: [docs/, rules/]\n")
+	config := readDocsConfig(t, "schema_version: 3\ndocs:\n  exclude: [docs/, vendor/]\n")
 	if len(config.DocsExclude) != 0 {
 		t.Errorf("DocsExclude = %v, erwartet leer", config.DocsExclude)
 	}
@@ -262,19 +262,19 @@ func TestAddDocsExcludeLegtBlockInNeuerDateiAn(t *testing.T) {
 	}
 	before := readConfigFile(t, root)
 
-	result, err := AddDocsExclude(root, []string{"docs/", " rules/ "})
+	result, err := AddDocsExclude(root, []string{"docs/", " vendor/ "})
 	if err != nil {
 		t.Fatalf("AddDocsExclude: %v", err)
 	}
-	if !result.Changed || !reflect.DeepEqual(result.Added, []string{"docs/", "rules/"}) ||
-		!reflect.DeepEqual(result.Exclude, []string{"docs/", "rules/"}) || len(result.Rejected) != 0 {
+	if !result.Changed || !reflect.DeepEqual(result.Added, []string{"docs/", "vendor/"}) ||
+		!reflect.DeepEqual(result.Exclude, []string{"docs/", "vendor/"}) || len(result.Rejected) != 0 {
 		t.Errorf("Antwort = %+v", result)
 	}
 	after := readConfigFile(t, root)
 	if !strings.HasPrefix(after, strings.TrimRight(before, "\n")+"\n\n") {
 		t.Errorf("Text vor dem neuen Block geändert:\n%s", after)
 	}
-	if !strings.HasSuffix(after, "\ndocs:\n"+docsBlockComment+"  exclude:\n    - docs/\n    - rules/\n") {
+	if !strings.HasSuffix(after, "\ndocs:\n"+docsBlockComment+"  exclude:\n    - docs/\n    - vendor/\n") {
 		t.Errorf("Block nicht hinten angelegt:\n%s", after)
 	}
 	if !strings.Contains(after, docsBlockExample) {
@@ -285,7 +285,7 @@ func TestAddDocsExcludeLegtBlockInNeuerDateiAn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadConfig: %v", err)
 	}
-	if !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "rules/"}) || len(config.DocsProblems) != 0 {
+	if !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "vendor/"}) || len(config.DocsProblems) != 0 {
 		t.Errorf("ReadConfig: %v %v", config.DocsExclude, config.DocsProblems)
 	}
 	if config.RepoRoot != "." || config.VCS == "" {
@@ -303,11 +303,11 @@ func TestAddDocsExcludeErgaenztVorhandenenBlock(t *testing.T) {
 	tail := "\n# Kommentar vor tools\ntools:\n  gh:\n    status: enabled\n"
 	writeFile(t, ConfigPath(root), head+"docs:\n  exclude:\n    - docs/\n"+tail)
 
-	result, err := AddDocsExclude(root, []string{"docs/", "../weg", "rules/", "/abs", "rules/"})
+	result, err := AddDocsExclude(root, []string{"docs/", "../weg", "vendor/", "/abs", "vendor/"})
 	if err != nil {
 		t.Fatalf("AddDocsExclude: %v", err)
 	}
-	if !reflect.DeepEqual(result.Added, []string{"rules/"}) || !reflect.DeepEqual(result.Exclude, []string{"docs/", "rules/"}) {
+	if !reflect.DeepEqual(result.Added, []string{"vendor/"}) || !reflect.DeepEqual(result.Exclude, []string{"docs/", "vendor/"}) {
 		t.Errorf("Antwort = %+v", result)
 	}
 	rejected := []string{}
@@ -322,7 +322,7 @@ func TestAddDocsExcludeErgaenztVorhandenenBlock(t *testing.T) {
 	}
 
 	after := readConfigFile(t, root)
-	want := head + "docs:\n  exclude:\n    - docs/\n    - rules/\n" + tail
+	want := head + "docs:\n  exclude:\n    - docs/\n    - vendor/\n" + tail
 	if after != want {
 		t.Errorf("Datei danach:\n%s\nerwartet:\n%s", after, want)
 	}
@@ -330,7 +330,7 @@ func TestAddDocsExcludeErgaenztVorhandenenBlock(t *testing.T) {
 		t.Errorf("verworfenes Muster geschrieben:\n%s", after)
 	}
 	config, err := ReadConfig(root)
-	if err != nil || !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "rules/"}) {
+	if err != nil || !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "vendor/"}) {
 		t.Errorf("ReadConfig: %v %v", config.DocsExclude, err)
 	}
 }
@@ -361,7 +361,7 @@ func TestAddDocsExcludeErkenntBlockMitKommentar(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, ConfigPath(root), "schema_version: 3\ndocs:   # eigener Kommentar\n  exclude:\n    - docs/\n    - ../alt\n")
 
-	if _, err := AddDocsExclude(root, []string{"rules/"}); err != nil {
+	if _, err := AddDocsExclude(root, []string{"vendor/"}); err != nil {
 		t.Fatalf("AddDocsExclude: %v", err)
 	}
 	after := readConfigFile(t, root)
@@ -369,7 +369,7 @@ func TestAddDocsExcludeErkenntBlockMitKommentar(t *testing.T) {
 		t.Errorf("zweiter Block docs: angelegt:\n%s", after)
 	}
 	config, err := ReadConfig(root)
-	if err != nil || !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "rules/"}) ||
+	if err != nil || !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "vendor/"}) ||
 		len(config.DocsProblems) != 1 || config.DocsProblems[0].Pattern != "../alt" {
 		t.Errorf("ReadConfig: %v %+v %v\n%s", config.DocsExclude, config.DocsProblems, err, after)
 	}
@@ -429,7 +429,7 @@ func TestAddDocsExcludeBehaeltNachbarnUndKommentare(t *testing.T) {
 		"  exclude:\n" +
 		"    - \"docs/\"   # Handdoku\n" +
 		"    # Kopien aus defaults/\n" +
-		"    - rules/\n" +
+		"    - vendor/\n" +
 		"    - ../alt\n"
 	after := "    # Kommentar hinter der Liste\n" +
 		"  weiteres: wert   # Nachbar dahinter\n" +
@@ -442,7 +442,7 @@ func TestAddDocsExcludeBehaeltNachbarnUndKommentare(t *testing.T) {
 		t.Fatalf("AddDocsExclude: %v", err)
 	}
 	if !result.Changed || !reflect.DeepEqual(result.Added, []string{"guidelines/", "reviews/"}) ||
-		!reflect.DeepEqual(result.Exclude, []string{"docs/", "rules/", "guidelines/", "reviews/"}) {
+		!reflect.DeepEqual(result.Exclude, []string{"docs/", "vendor/", "guidelines/", "reviews/"}) {
 		t.Errorf("Antwort = %+v", result)
 	}
 	if want := head + before + "    - guidelines/\n    - reviews/\n" + after; got != want {
@@ -469,11 +469,11 @@ func projectOf(t *testing.T, content string) string {
 // sich ändert.
 func TestDocsExcludeListeOhneEinrueckung(t *testing.T) {
 	head := "schema_version: 3\n\n"
-	before := "docs:\n  exclude:\n  - docs/\n  # Kommentar\n  - rules/\n"
+	before := "docs:\n  exclude:\n  - docs/\n  # Kommentar\n  - vendor/\n"
 	after := "  include:\n  - .devcontainer/\n\ntools:\n  gh:\n    status: enabled\n"
 
 	config := readDocsConfig(t, head+before+after)
-	if want := []string{"docs/", "rules/"}; !reflect.DeepEqual(config.DocsExclude, want) || len(config.DocsProblems) != 0 {
+	if want := []string{"docs/", "vendor/"}; !reflect.DeepEqual(config.DocsExclude, want) || len(config.DocsProblems) != 0 {
 		t.Errorf("ReadConfig: %v %+v, erwartet %v", config.DocsExclude, config.DocsProblems, want)
 	}
 
@@ -481,14 +481,14 @@ func TestDocsExcludeListeOhneEinrueckung(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddDocsExclude: %v", err)
 	}
-	if !reflect.DeepEqual(result.Exclude, []string{"docs/", "rules/", "reviews/"}) {
+	if !reflect.DeepEqual(result.Exclude, []string{"docs/", "vendor/", "reviews/"}) {
 		t.Errorf("Antwort = %+v", result)
 	}
 	if want := head + before + "  - reviews/\n" + after; got != want {
 		t.Errorf("Datei danach:\n%s\nerwartet:\n%s", got, want)
 	}
 	config, err = ReadConfig(projectOf(t, got))
-	if err != nil || !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "rules/", "reviews/"}) {
+	if err != nil || !reflect.DeepEqual(config.DocsExclude, []string{"docs/", "vendor/", "reviews/"}) {
 		t.Errorf("ReadConfig danach: %v %v", config.DocsExclude, err)
 	}
 }
@@ -507,7 +507,7 @@ func TestDocsExcludeListeOhneEinrueckungEndetAmSchluessel(t *testing.T) {
 // byte-gleich, und die Antwort nennt nichts als eingetragen.
 func TestAddDocsExcludeVerweigertUnsichereFormen(t *testing.T) {
 	for name, content := range map[string]string{
-		"Flussform":             "schema_version: 3\ndocs:\n  exclude: [docs/, rules/]\n  include:\n    - x/\n",
+		"Flussform":             "schema_version: 3\ndocs:\n  exclude: [docs/, vendor/]\n  include:\n    - x/\n",
 		"Flussform mit Komm.":   "schema_version: 3\ndocs:\n  exclude: [docs/]   # Handdoku\n",
 		"Skalar":                "schema_version: 3\ndocs:\n  exclude: docs/\n",
 		"docs in einer Zeile":   "schema_version: 3\ndocs: {exclude: [docs/]}\n",
@@ -665,8 +665,8 @@ func TestReadConfigVerwirftSteuerzeichen(t *testing.T) {
 		}
 	}
 
-	crlf := readDocsConfig(t, "docs:\r\n  exclude:\r\n    - docs/\r\n    - 'rules/'\r\n")
-	if !reflect.DeepEqual(crlf.DocsExclude, []string{"docs/", "rules/"}) || len(crlf.DocsProblems) != 0 {
+	crlf := readDocsConfig(t, "docs:\r\n  exclude:\r\n    - docs/\r\n    - 'vendor/'\r\n")
+	if !reflect.DeepEqual(crlf.DocsExclude, []string{"docs/", "vendor/"}) || len(crlf.DocsProblems) != 0 {
 		t.Errorf("CRLF: %q %+v", crlf.DocsExclude, crlf.DocsProblems)
 	}
 }

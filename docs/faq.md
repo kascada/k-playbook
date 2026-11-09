@@ -50,35 +50,37 @@ Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The
 
 ## Where are the paths for tasks, reviews, and results?
 
-Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/` and shipped rules under `k-playbook/rules/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it.
+Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/` and shipped checks under `k-playbook/checks/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it.
 
 Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
-## How do I change a shipped rule?
+## How do I change a shipped review recipe?
 
 You do not: `k-playbook/` is replaced during updates. Instead, create a file with the same name under `k-playbook-local/`:
 
 ```text
-k-playbook/rules/docs-sync.md          is no longer read
-k-playbook-local/rules/docs-sync.md    applies on its own
+<hub>:k-playbook/defaults/reviews/review-code.md    is no longer read
+k-playbook-local/reviews/review-code.md             applies on its own
 ```
 
-The local file **completely** replaces the shipped one. It must therefore contain the whole rule; individual sections are not retained from the original. The cost is that later improvements to the original no longer reach this copy.
+The local file **completely** replaces the shipped one. It must therefore contain the whole recipe; individual sections are not retained from the original. The cost is that later improvements to the original no longer reach this copy.
 
-The same applies to `reviews/` and `checks/`.
+Shipped checks cannot be changed this way: there are no project-owned checks since task 134. `k-check` runs only the shipped checks from `k-playbook/checks/`, and a leftover `k-playbook-local/checks/` is not read; `/k-upgrade` removes it.
 
-## How do I disable a shipped rule?
+## How do I disable a shipped review recipe?
 
 With an **empty** file of the same name. Because the local file completely replaces the shipped one, nothing remains for an empty file.
 
 "Empty" means nothing except blank lines and comments. This lets the file state its own reason:
 
-```bash
-# k-playbook-local/checks/check_django_baseline.sh
-# Disabled: this project does not use Django.
+```text
+# k-playbook-local/reviews/review-dependabot-alerts.md
+# Disabled: this project is not on GitHub.
 ```
 
-For `rules` and `reviews`, the entry remains visible in the catalog and its content states that it is disabled. A check disappears from the catalog entirely: an empty script would run with exit 0 and look like a passing check.
+The entry remains visible in the catalog and its content states that it is disabled.
+
+A shipped check cannot be disabled for a single project: checks have no project-owned side. A check that does not apply skips on its own.
 
 There is no list for this in the configuration.
 
@@ -107,7 +109,7 @@ It is deliberately not named `AGENTS.md`: assistants read that name themselves, 
 
 ## Can I add my own slash commands?
 
-Yes. `.k-playbook/commands/` holds them, and `.k-playbook/skills/` holds custom skills, both versioned next to the configuration. Setup does not create the two directories; create them when you put the first entry there. The same rule applies as for rules and reviews: the same name replaces the shipped item, and an empty entry disables it.
+Yes. `.k-playbook/commands/` holds them, and `.k-playbook/skills/` holds custom skills, both versioned next to the configuration. Setup does not create the two directories; create them when you put the first entry there. The same rule applies as for reviews: the same name replaces the shipped item, and an empty entry disables it.
 
 ```text
 .k-playbook/commands/k-own.md    new, only in this project

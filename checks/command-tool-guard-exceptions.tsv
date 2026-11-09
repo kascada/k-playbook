@@ -1,8 +1,7 @@
 # Bewusst zurückgestellte Werkzeugaufrufe in Commands, eine Zeile je Fundstelle.
 #
 # Gelesen wird diese Datei nur von check_command_tool_guards.sh im selben
-# Verzeichnis. Ersetzt ein projekteigener Check den mitgelieferten, gilt allein
-# die Datei neben ihm; diese hier wird dann nicht zusätzlich gelesen.
+# Verzeichnis.
 #
 # Das ist keine Werkzeugliste. Werkzeuge kommen aus scripts/base-tools.tsv; hier
 # darf nur stehen, was dort in der Spalte name steht.

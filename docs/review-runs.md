@@ -304,8 +304,7 @@ Result contract, validated when reporting through `k_playbook_review_write_ai_en
 The `level` for each finding is the assessment assigned by the recipe, and the merge takes
 it seriously: `error` and `note` apply unchanged (`severitySource: native`), while
 `warning` and `none` continue through CVSS, tool metadata, and `scripts/severity.tsv`.
-The recipe defines the `level` for each rule ID; details are in
-[`rules/review-authoring.md`](../rules/review-authoring.md).
+The recipe defines the `level` for each rule ID.
 
 Scope semantics for `mode: evidence`:
 
@@ -499,8 +498,8 @@ only when the job was split, which is not the usual case.
 
 The executable for a job comes from the preflight (`install-security-tools.sh --json`),
 not from its own PATH resolution: otherwise, a run in a Python project with an active venv
-would use its `ruff` and thus check a different tool than the preflight
-([`rules/tool-install-scope.md`](../rules/tool-install-scope.md)).
+would use its `ruff` and thus check a different tool than the preflight. Host-local tools are
+never picked up from a project venv; the venv belongs to the project.
 
 Jobs run in parallel, with a limit across the whole run. **They do not write directly**:
 they report their result to their entry, and the entry writes its file. This preserves one
@@ -992,7 +991,7 @@ state and fails if someone shifts it unnoticed.
 `k-playbook-local/known-decisions.md` records findings that deliberately should no longer
 count as findings: false positives, accepted risks, deferred items, and rejected items. It
 is hand-maintained **input**, not a review result, which is why it resides directly in
-`k-playbook-local/`, next to `rules/`, `reviews/`, and `guidelines/`, rather than in
+`k-playbook-local/`, next to `reviews/` and `guidelines/`, rather than in
 `results/`. No command creates it; it is written by hand and optional.
 
 Known decisions are applied centrally in the merge step before assessment. Matching does

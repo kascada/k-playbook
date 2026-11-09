@@ -239,8 +239,10 @@ func TestBaseGuardJeEintrag(t *testing.T) {
 	})
 }
 
-// TestBaseVenvGuard hält rules/tool-install-scope.md ein: ein aktives
-// Projekt-venv bricht die Installation ab, den Preflight aber nicht.
+// TestBaseVenvGuard: Host-lokale Werkzeuge werden nie in ein Projekt-venv
+// installiert, das venv gehört dem Projekt. Ein aktives Projekt-venv bricht
+// die Installation deshalb ab, den Preflight aber nicht — ein lesender Lauf
+// darf es als Messkontext nutzen.
 func TestBaseVenvGuard(t *testing.T) {
 	env := []string{
 		"K_BASE_TOOLS_MATRIX=" + writeMatrix(t, aptOnlyEntryMatrix),

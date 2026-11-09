@@ -129,7 +129,7 @@ der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche übe
 steht — `project:` eine Datei des Projekts ab seiner Wurzel (`os.DirFS`, eine Ebene), `keph:`
 ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zugang wie
 `OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
-`rules/`, `reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
+`reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
 Include-Ziele `includes/` und `testdata/`, zusammen `docRefKinds`), lokal vor mitgeliefert —
 mitgeliefert heißt seit Task 131 aus `<hub>:k-playbook/defaults/` über den Node (siehe „Die
 mitgelieferte Ebene aus `<hub>:k-playbook`“),
@@ -150,8 +150,8 @@ Hülle darum (Parameter `includes`, `lines`, `section`); beide rufen
 `briefing [--json]` gibt das Briefing aus (Task 086): vorweg den Text der immer geltenden
 Anweisungen `k-playbook:/instructions/always/` (`documents.always.content`, zusammengebaut von
 derselben Funktion wie bei `read`, `joinDocDirParts`; im Klartext steht er am Anfang, ohne die
-Liste seiner Teile), dann als Daten, welche Anweisungen, Regeln, Reviews und Leitlinien für
-das Projekt gelten — `always/` mit seinen Teilen, `on-demand/`, `rules/`, `reviews/`,
+Liste seiner Teile), dann als Daten, welche Anweisungen, Reviews und Leitlinien für
+das Projekt gelten — `always/` mit seinen Teilen, `on-demand/`, `reviews/`,
 `guidelines/`, je Eintrag Verweis, Titel,
 Beschreibung (Frontmatter, sonst erste Überschrift) und Herkunft (`dist`, `local`, `override`,
 `disabled`) — und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
@@ -159,7 +159,7 @@ Tasks und aktive Arbeitsstände (nicht in `done/`) mit Titel, die Zahl der offen
 `queue/findings/`; ist Kephalaion nicht nutzbar, steht das dort (`work.available`). Verweise,
 keine Pfade, keine Inhalte außer dem Text der immer geltenden Anweisungen. Umgebungsangaben stehen nur im Übergangsabschnitt `context` (Task
 091): der Rest der Kontextausgabe, den das Briefing nicht selbst abdeckt, aus `ContextForDir`
-— derselben Funktion wie `k-playbook context` — ohne `catalogs.rules`, `catalogs.reviews` und
+— derselben Funktion wie `k-playbook context` — ohne `catalogs.reviews` und
 `guidelines` (Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code); lässt sich
 die Kontextausgabe nicht bauen, steht das dort (`context.available`). Weil der Rest über
 `ContextForDir` kommt, zieht auch das Briefing die Assistenten-Verlinkung nach
@@ -420,7 +420,7 @@ installer/
 │   │                            über fs.FS), overlayDocDir (die eine Überlagerung, auch
 │   │                            für resolveCatalog), ResolveDocRef für alle drei Präfixe —
 │   │                            project:/ ab der Projektwurzel, keph:/ über den Node,
-│   │                            k-playbook:/ instructions/…, rules/…, reviews/…,
+│   │                            k-playbook:/ instructions/…, reviews/…,
 │   │                            guidelines/…, commands/… (der Text, die Hülle liegt beim
 │   │                            Assistenten), includes/…, testdata/… — und der
 │   │                            docIncluder, der Include-Zeilen einsetzt (Task 093)
@@ -726,7 +726,7 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-rules/  reviews/  checks/  results/  guidelines/  priv/
+reviews/  results/  guidelines/  priv/
 k-playbook.md  version-sources.yaml
 ```
 
@@ -747,6 +747,12 @@ Einrichten legt beide nicht an. Den alten Ort liest nichts mehr, auch nicht als 
 weder die Registry (`registryDirs()`) noch die lokale Ebene von `k-playbook:/commands/`
 (`NewProjectLocalDocSource()` in `project/docref.go`). `/k-upgrade` 3.4 löscht die leeren alten
 Verzeichnisse und nennt sonst jeden Eintrag mit seinem Ziel.
+
+`checks/` steht seit Task 134 nicht mehr darin. Projekteigene Checks gibt es nicht, bis sie
+eine neue Form bekommen: `bin/k-check` führt nur die mitgelieferten aus
+`k-playbook/checks/` aus, und der Katalog `checks` hat keine lokale Ebene
+(`resolveCatalog()`, unten). `/k-upgrade` 3.4 löscht ein leeres `checks/` und meldet sonst,
+dass das, was darin liegt, nicht mehr läuft.
 
 Die frühere Wissensablage auf der Platte samt Suchindex hat Task 123 mit dem Wissenstor
 entfernt; nichts im Programm schreibt oder liest dort noch. Ein Bestandsprojekt räumt
@@ -917,8 +923,8 @@ so und wird nicht umgangen.
 
 `project/registry.go` führt zusammen, was mitgeliefert wird — seit Stufe 2 von Punkt 20
 der Arbeitsliste aus `~/.local/share/k-playbook/`, nicht mehr aus dem Clone `k-playbook/`
-— und was unter `k-playbook-local/` dazukommt. Es ist dieselbe Overlay-Regel wie bei rules, reviews
-und checks: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
+— und was unter `k-playbook-local/` dazukommt. Es ist dieselbe Overlay-Regel wie bei
+reviews: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
 
 | Sorte | Einheit | Schlüssel | Abschalten durch |
 |---|---|---|---|
@@ -1195,14 +1201,14 @@ Zustände in `LinkState`:
 ## Die mitgelieferte Ebene aus `<hub>:k-playbook`
 
 Seit Task 131 liest das Binary die mitgelieferte Ebene hinter `k-playbook:` — und damit die
-Texte im Briefing, `k-playbook read`, `k_playbook_doc_read` und die Kataloge `rules` und
-`reviews` — aus der öffentlichen Collection `<hub>:k-playbook` unter `defaults/`, nicht mehr
+Texte im Briefing, `k-playbook read`, `k_playbook_doc_read` und den Katalog `reviews` — aus
+der öffentlichen Collection `<hub>:k-playbook` unter `defaults/`, nicht mehr
 aus dem Clone `<projekt>/k-playbook/`. Die Kette: Der Release packt `defaults/` und `VERSION`
 nach `k-playbook-defaults.tar.gz` (`.github/scripts/pack-defaults.sh`), der Hub holt das
 Archiv aus dem neuesten Release nach `<hub>:k-playbook/defaults/` (`fetch_release` in
 Kephalaion), der Node gleicht die Collection auf den Rechner ab. Darunter gilt derselbe Pfad
-wie unter `k-playbook:` — `k-playbook:/rules/docs-sync.md` ist
-`<hub>:k-playbook/defaults/rules/docs-sync.md`.
+wie unter `k-playbook:` — `k-playbook:/guidelines/betrieb.md` ist
+`<hub>:k-playbook/defaults/guidelines/betrieb.md`.
 
 - **Zugang.** `OpenDefaultsStore` (`project/defaultsdocs.go`) geht denselben Weg wie
   `openKephClient` — Status (`kephalaion.ok`), Anbindung, Umgebung — mit Hub und Account der
@@ -1266,7 +1272,7 @@ Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `alw
 `NewKephDefaultsSource` in `project/defaultsdocs.go`) — ebenso jede andere Sorte unter
 `k-playbook:`: `commands`, deren Text in `defaults/commands/` liegt, während die Hülle für den
 Assistenten aus dem Binary kommt (Task 092), die Include-Sorten `includes` und `testdata`
-(Task 093) und `rules`, `reviews`, `guidelines`. Aus der Installation `k-playbook/` liest
+(Task 093) und `reviews`, `guidelines`. Aus der Installation `k-playbook/` liest
 keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`
 steht, entscheidet Task 086. Regeln und Zugriffswege:
 [`../../docs/verweisschema.md`](../../docs/verweisschema.md).
@@ -1403,25 +1409,26 @@ rufen sie — dieselbe Sorte kommt über jeden Weg gleich heraus (Test
 `guidelines` der Kontextausgabe liest bis zu deren Umstellung weiter nur lokal — die eine
 benannte Ausnahme (Task 086).
 
-Drei Sorten, definiert in `catalogKinds()`:
+Zwei Sorten, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 135 entfallen:
 
 | Sorte | Verzeichnis | Muster |
 |---|---|---|
-| `rules` | `rules/` | `*.md` |
 | `reviews` | `reviews/` | `review-*.md` |
 | `checks` | `checks/` | `*.sh` |
 
-Mitgeliefert liegen `rules` und `reviews` seit Task 131 in `<hub>:k-playbook/defaults/`:
+Mitgeliefert liegt `reviews` seit Task 131 in `<hub>:k-playbook/defaults/`:
 `resolveCatalog()` nimmt dafür dieselbe Quelle wie die Verweise (`NewProjectDefaultsSource`),
 `checks` liest weiter aus der Installation `k-playbook/checks/` (die Checks fallen ohnehin
-weg). `path` eines Eintrags ist darum nicht immer ein Plattenpfad: projekteigen die Datei
-unter `k-playbook-local/<sorte>/`, mitgeliefert bei `checks` die Datei in der Installation,
-bei `rules` und `reviews` der Verweis `k-playbook:/<sorte>/<name>`. Wer den Inhalt braucht,
+weg). `checks` hat seit Task 134 keine lokale Ebene: `resolveCatalog()` lässt `Local` leer,
+jeder Eintrag ist `dist`, keiner abgeschaltet, ein `k-playbook-local/checks/` wird nicht
+gelesen. `path` eines Eintrags ist darum nicht immer ein Plattenpfad: projekteigen die Datei
+unter `k-playbook-local/reviews/`, mitgeliefert bei `checks` die Datei in der Installation,
+bei `reviews` der Verweis `k-playbook:/<sorte>/<name>`. Wer den Inhalt braucht,
 liest über `project.ReadCatalogEntry()` — Verweis über frische `ProjectDocLayers`, sonst die
 Platte; so liest `readAIRecipeMetadata()` in `mcpserver/review.go` ein einzelnes Rezept, auch
 den `recipePath` eines älteren Laufs. Wer viele Einträge liest, baut den Katalog mit
 `project.BuildContextWithLayers()` — derselbe Kontext wie `BuildContext()`, dazu die Ebenen,
-deren mitgelieferte Ebene die Kataloge schon gelesen hat — und liest die Einträge mit
+deren mitgelieferte Ebene den Katalog schon gelesen hat — und liest die Einträge mit
 `project.ReadCatalogEntryWith()` aus diesen Ebenen. So hält es die Review-Auswahl
 (`buildSelectionBase()`): Die mitgelieferte Ebene wird je Auswahl einmal geöffnet, nicht
 einmal je Rezept, und die Rezepte kommen aus dem Zwischenspeicher, den das Auflisten des
@@ -1430,7 +1437,7 @@ Katalogs gefüllt hat (Task 132: vorher 10 Aufrufe von `OpenDefaultsStore` je Au
 (`parseAIRecipeFrontmatter()`, sonst `firstHeading()`), nicht `CatalogEntry.Audit`. Ist die
 mitgelieferte Ebene nicht lesbar (`kephalaion_unavailable`),
 scheitert `BuildContext()` nicht — die Kontextausgabe trägt unter `kephalaion`, warum —, führt
-`rules` und `reviews` aber leer statt nur mit der lokalen Ebene und nennt den Grund in
+`reviews` aber leer statt nur mit der lokalen Ebene und nennt den Grund in
 `catalogsProblem`; die Review-Auswahl der MCP-Werkzeuge bricht dann mit
 `kephalaion_unavailable` ab.
 
@@ -1523,7 +1530,7 @@ seinen Inode und arbeitet mit dem alten Code weiter.
 
 Früher wurden dafür die Dateien unter `dist/` gehasht. Seit die Binaries Release-Assets
 sind, liegt im Clone keins mehr, das sich vergleichen ließe; `VERSION` ist an diese
-Stelle getreten und trennt zugleich sauber: Commits an Regeln, Reviews, Commands oder
+Stelle getreten und trennt zugleich sauber: Commits an Anweisungen, Reviews, Commands oder
 Docs ändern sie nicht.
 
 Hat `VERSION` gewechselt und ist das laufende Programm **älter** als die neue, installiert
@@ -1644,7 +1651,7 @@ wirklich etwas wegfällt; ein Fehler hält den Start nicht auf, und der nächste
 versucht es erneut.
 
 Die Tool-venvs unter `~/.local/share/k-playbook/security-tools/`
-(`rules/tool-install-scope.md`) bleiben ausdrücklich außerhalb dieser Bereinigung. Die
+(host-lokale Werkzeuge, getrennt von jedem Projekt-venv) bleiben ausdrücklich außerhalb dieser Bereinigung. Die
 Ebene `installation/` gab es genau dafür: ein venv bringt ein eigenes `bin/` mit, ohne
 diese Trennung kollidierten beide.
 
@@ -1652,7 +1659,7 @@ diese Trennung kollidierten beide.
 
 Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 
-**Das Binary** gibt es an mehreren Orten. **Die Dateien** — Regeln, Reviews, Checks —
+**Das Binary** gibt es an mehreren Orten. **Die Dateien** — Reviews, Checks —
 kommen dagegen aus `PlaybookDir(projektDir)`, also aus `<projekt>/k-playbook/`; Commands,
 Skills und `scripts/` (Skripte, Tool-Matrizen, Scanner- und Severity-Katalog) kommen seit
 2026-10-25 aus `~/.local/share/k-playbook/` (unten). Das Binary liest nie neben sich.
@@ -1722,7 +1729,7 @@ der Arbeitsstand, `~/dev/k-playbook/k-playbook/` ein eigener Clone auf dem zulet
 gepushten Commit.
 
 Das bleibt so und ist gewollt. `make dev-install` baut den Arbeitsstand und ersetzt damit
-das Binary unter `~/.local/bin`; der Inhalt — Regeln, Reviews, Checks, Commands, Skills —
+das Binary unter `~/.local/bin`; der Inhalt — Reviews, Checks, Commands, Skills —
 kommt weiterhin aus dem Clone unter `k-playbook/` und damit vom zuletzt gepushten Stand.
 Der Preis dafür ist bewusst bezahlt: der Clone bleibt ein read-only Vendor-Verzeichnis,
 in das nichts eingespielt wird. Es gibt keinen Sync-Weg aus dem Arbeitsstand in die
@@ -2320,7 +2327,7 @@ MCP-Konfiguration eines Assistenten dasselbe, noch gültige Token tragen.
 
 `k-playbook context` und das MCP-Werkzeug hängen das Ergebnis als `kephalaion` an
 (`project.KephalaionStatus`, gerufen in `ContextForDir`). `BuildContext` selbst hängt es nicht
-an, fragt den Node seit Task 131 aber für die Kataloge `rules` und `reviews`: deren
+an, fragt den Node seit Task 131 aber für den Katalog `reviews`: dessen
 mitgelieferte Ebene liegt in `<hub>:k-playbook` (siehe „Die mitgelieferte Ebene aus
 `<hub>:k-playbook`“).
 
@@ -4077,7 +4084,7 @@ Standvergleich des GUI-Servers greift hier nicht: es gibt keine Laufzeitdatei, k
 Port und keinen zweiten Prozess, der nachsehen könnte.
 
 Der Schaden ist begrenzt, aber real. Die **Inhalte** sind aktuell: `contextTool` ruft bei
-jedem Aufruf `project.ContextForDir()`, Regeln, Reviews, Checks und Instruktionen kommen
+jedem Aufruf `project.ContextForDir()`, Reviews, Checks und Instruktionen kommen
 frisch von der Platte. Veraltet ist der **Code** der Werkzeuge — und `tools/list` geht
 genau einmal beim Start, ein seither hinzugekommenes Werkzeug kann die laufende Sitzung
 deshalb nie sehen.

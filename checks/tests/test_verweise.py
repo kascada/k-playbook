@@ -153,12 +153,12 @@ class ExceptionsTest(unittest.TestCase):
         self.assertFalse(entry.covers("share/skills/x/SKILL.md", 3, "link"))
 
     def test_line_entry_covers_only_its_line_and_kind(self) -> None:
-        entries, problems = read_exceptions(self.write("defaults/rules/a.md\t4\tpfad\tOrtsangabe\n"))
+        entries, problems = read_exceptions(self.write("defaults/guidelines/a.md\t4\tpfad\tOrtsangabe\n"))
         self.assertEqual(problems, [])
         entry = entries[0]
-        self.assertTrue(entry.covers("defaults/rules/a.md", 4, "pfad"))
-        self.assertFalse(entry.covers("defaults/rules/a.md", 5, "pfad"))
-        self.assertFalse(entry.covers("defaults/rules/a.md", 4, "link"))
+        self.assertTrue(entry.covers("defaults/guidelines/a.md", 4, "pfad"))
+        self.assertFalse(entry.covers("defaults/guidelines/a.md", 5, "pfad"))
+        self.assertFalse(entry.covers("defaults/guidelines/a.md", 4, "link"))
 
     def test_area_in_commands_is_rejected(self) -> None:
         entries, problems = read_exceptions(self.write("defaults/commands/\t*\t*\tzu breit\n"))
@@ -168,13 +168,13 @@ class ExceptionsTest(unittest.TestCase):
 
     def test_invalid_and_duplicate_entries(self) -> None:
         entries, problems = read_exceptions(self.write(
-            "defaults/rules/a.md\t0\tpfad\tGrund\n"
-            "defaults/rules/a.md\t4\twort\tGrund\n"
-            "defaults/rules/a.md\t4\tpfad\t\n"
-            "defaults/rules/a.md\t5\tlink\tGrund\n"
-            "defaults/rules/a.md\t5\tlink\tGrund\n"
+            "defaults/guidelines/a.md\t0\tpfad\tGrund\n"
+            "defaults/guidelines/a.md\t4\twort\tGrund\n"
+            "defaults/guidelines/a.md\t4\tpfad\t\n"
+            "defaults/guidelines/a.md\t5\tlink\tGrund\n"
+            "defaults/guidelines/a.md\t5\tlink\tGrund\n"
         ))
-        self.assertEqual([(e.datei, e.zeile, e.art) for e in entries], [("defaults/rules/a.md", 5, "link")])
+        self.assertEqual([(e.datei, e.zeile, e.art) for e in entries], [("defaults/guidelines/a.md", 5, "link")])
         self.assertEqual(len(problems), 4)
 
     def test_line_entry_below_project_commands_and_skills_is_valid(self) -> None:
@@ -200,14 +200,15 @@ class SourceFilesTest(unittest.TestCase):
                 return path
             command = put(".k-playbook/commands/_x/eins.md")
             skill = put(".k-playbook/skills/forelle/SKILL.md")
-            rule = put("k-playbook-local/rules/r.md")
+            guideline = put("k-playbook-local/guidelines/g.md")
+            put("k-playbook-local/rules/r.md")
             put("k-playbook-local/commands/alt.md")
             put("k-playbook-local/skills/alt/SKILL.md")
             files = source_files(root / "k-playbook", root / "k-playbook-local", root / ".k-playbook")
         self.assertEqual(files, {
             ".k-playbook/commands/_x/eins.md": command,
             ".k-playbook/skills/forelle/SKILL.md": skill,
-            "k-playbook-local/rules/r.md": rule,
+            "k-playbook-local/guidelines/g.md": guideline,
         })
 
     def test_dot_k_playbook_is_a_known_root(self) -> None:
@@ -226,15 +227,15 @@ class RunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             playbook = root / "playbook"
-            rules = playbook / "defaults" / "rules"
-            rules.mkdir(parents=True)
-            (rules / "a.md").write_text("## Referenzen\n\n- `docs/a.md`\n", encoding="utf-8")
+            guidelines = playbook / "defaults" / "guidelines"
+            guidelines.mkdir(parents=True)
+            (guidelines / "a.md").write_text("## Referenzen\n\n- `docs/a.md`\n", encoding="utf-8")
             script_dir = root / "checks"
             script_dir.mkdir()
             (script_dir / "verweis-exceptions.tsv").write_text(
                 "datei\tzeile\tart\tbegründung\n"
-                "defaults/rules/a.md\t3\tpfad\tOrtsangabe\n"
-                "defaults/rules/a.md\t9\tpfad\tOrtsangabe\n",
+                "defaults/guidelines/a.md\t3\tpfad\tOrtsangabe\n"
+                "defaults/guidelines/a.md\t9\tpfad\tOrtsangabe\n",
                 encoding="utf-8",
             )
             env = dict(os.environ, K_CHECK_PLAYBOOK_DIR=str(playbook), K_CHECK_CONFIG_ROOT=str(root))
@@ -243,8 +244,8 @@ class RunTest(unittest.TestCase):
                 env=env, capture_output=True, text=True, check=False,
             )
         self.assertIn("K_CHECK_STATUS=fail", result.stdout)
-        self.assertIn("stale exception: no pfad finding at defaults/rules/a.md:9", result.stdout)
-        self.assertNotIn("datei=defaults/rules/a.md zeile=3", result.stdout)
+        self.assertIn("stale exception: no pfad finding at defaults/guidelines/a.md:9", result.stdout)
+        self.assertNotIn("datei=defaults/guidelines/a.md zeile=3", result.stdout)
 
 
 if __name__ == "__main__":

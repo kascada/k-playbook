@@ -121,14 +121,15 @@ wieder.
 
 ## Schritt 6 — Doku nachziehen
 
-Wurde in dieser Sitzung Code geändert, greift die Regel `docs-sync.md`. Sie verlangt den
+Wurde in dieser Sitzung Code geändert, greift der Doku-Nachzug aus
+`k-playbook:/instructions/always/220-regeln-anwenden.md`. Er verlangt den
 Nachzug **im selben Arbeitsgang** — für Handdoku, `README.md` und `AGENTS.md` als Änderung,
 für die erzeugte Doku als eingereihten Auftrag in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`). Dieser Schritt ist das Auffangnetz,
 nicht der Hauptweg.
 
-Führe dafür **`/k-enforcement`** aus. Baue die Prüfung nicht nach — sie gehört dorthin und
-kennt den vollständigen Regelkatalog.
+Führe dafür **`/k-enforcement`** aus. Baue die Prüfung nicht nach — sie gehört dorthin,
+samt `k-check` über die geänderten Dateien.
 
 Der Ausgang **„eingereiht“** zählt als erledigt: Liegt für die erzeugte Doku schon ein
 offener Auftrag dieser Sitzung vor, oder reiht `/k-enforcement` ihn nach Freigabe ein, ist
@@ -165,9 +166,8 @@ warten in `keph:/queue/findings/` auf die Übernahme.
 
 ## Anti-Muster (nicht tun)
 
-- **Die Prüfung aus `/k-enforcement` nachbauen.** Sie kennt den zusammengeführten
-  Regelkatalog; eine zweite Fassung läuft davon weg.
-- **Selbst übernehmen.** Nichts nach `docs/`, `guidelines/fallen.md` oder `rules/`
+- **Die Prüfung aus `/k-enforcement` nachbauen.** Eine zweite Fassung läuft davon weg.
+- **Selbst übernehmen.** Nichts nach `docs/` oder `guidelines/fallen.md`
   schreiben, auch wenn das Ziel feststeht. Das tut die Übernahme aus der Queue.
 - **`ziel` ohne Bestätigung setzen.** Der Vorschlag ist deiner, die Entscheidung gehört
   dem Nutzer.

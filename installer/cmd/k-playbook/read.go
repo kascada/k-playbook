@@ -120,7 +120,6 @@ ab dem Arbeitsverzeichnis aufwärts.
             den eigenen User. Ist die Anbindung nicht bereit, ist das ein
             Fehler (kephalaion_unavailable), kein Rückfall.
   k-playbook:/instructions/on-demand/<name>.md
-  k-playbook:/rules/<name>.md
   k-playbook:/reviews/review-<name>.md
   k-playbook:/guidelines/<name>.md
   k-playbook:/commands/<name>.md
@@ -133,7 +132,7 @@ ab dem Arbeitsverzeichnis aufwärts.
             beiden Ebenen, numerisch sortiert, ohne Frontmatter zu einem Text
             zusammengefügt. Dateien ohne Ziffer werden übergangen und auf
             stderr gemeldet. Zusammengebaut wird nur dieses Verzeichnis; jedes
-            andere mit / am Ende — on-demand/, instructions/ selbst, rules/,
+            andere mit / am Ende — on-demand/, instructions/ selbst, reviews/,
             eine Datei mit /, auch bei project: und keph: — ist ein Fehler:
             der Dateiname fehlt (invalid_input).
 
@@ -163,7 +162,7 @@ JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled),
 problems, includes (ref, origin, depth, disabled — die eingesetzten Ziele
 in Lesereihenfolge), totalLines (Zeilen des ganzen Inhalts) und bei keph:
 revision. Ein unbekannter Verweis ist ein Fehler (not_found);
-k-playbook: außerhalb von instructions/, rules/, reviews/, guidelines/ und
-commands/ wird nicht aufgelöst (unsupported).
+k-playbook: außerhalb von instructions/, reviews/, guidelines/ und commands/
+wird nicht aufgelöst (unsupported).
 `)
 }

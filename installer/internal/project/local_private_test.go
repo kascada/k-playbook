@@ -69,7 +69,7 @@ func TestPrivateEntriesNenntResultsUndPriv(t *testing.T) {
 	if !slices.Equal(paths, erwartet) {
 		t.Errorf("PrivateEntries = %v, erwartet %v", paths, erwartet)
 	}
-	for _, name := range []string{"rules", "data", "cache", "inbox", "material"} {
+	for _, name := range []string{"reviews", "data", "cache", "inbox", "material"} {
 		if _, ok := PrivateEntry(name); ok {
 			t.Errorf("%s gilt als privates Verzeichnis", name)
 		}
@@ -472,10 +472,10 @@ func TestSetPrivateOhneVersionskontrolle(t *testing.T) {
 func TestSetPrivateLehntFremdenEintragAb(t *testing.T) {
 	root := privateRepo(t)
 
-	if _, err := SetPrivate(root, LocalEntry{Path: "rules"}, true); err == nil {
+	if _, err := SetPrivate(root, LocalEntry{Path: "reviews"}, true); err == nil {
 		t.Fatal("kein Fehler für ein Verzeichnis ohne Private-Markierung")
 	}
-	if pathExists(filepath.Join(LocalDir(root), "rules", PrivateIgnoreFile)) {
+	if pathExists(filepath.Join(LocalDir(root), "reviews", PrivateIgnoreFile)) {
 		t.Error("es wurde trotzdem eine .gitignore geschrieben")
 	}
 }

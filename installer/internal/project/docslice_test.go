@@ -34,7 +34,7 @@ Rest
 // sliceLayers sind Ebenen mit sliceDoc im Projekt und in der Collection.
 func sliceLayers(t *testing.T) (DocLayers, *fakeDocStore) {
 	t.Helper()
-	layers, _, _ := docTree(t, map[string]string{"rules/a.md": sliceDoc}, nil)
+	layers, _, _ := docTree(t, map[string]string{"guidelines/a.md": sliceDoc}, nil)
 	root := t.TempDir()
 	writeDocTree(t, root, map[string]string{"docs/a.md": sliceDoc})
 	layers.Project = NewDiskDocSource(root)
@@ -57,7 +57,7 @@ func TestDocReadZeilenbereich(t *testing.T) {
 	if err != nil || result.Content != "# Titel\n\nEinleitung\n" || result.TotalLines != total {
 		t.Fatalf("5-7: %q %d %v", result.Content, result.TotalLines, err)
 	}
-	result, err = readWith(t, layers, "k-playbook:/rules/a.md", DocReadOptions{Lines: "21-"})
+	result, err = readWith(t, layers, "k-playbook:/guidelines/a.md", DocReadOptions{Lines: "21-"})
 	if err != nil || result.Content != "## Folge\n\nRest\n" {
 		t.Fatalf("21-: %q %v", result.Content, err)
 	}
@@ -117,11 +117,11 @@ func TestDocReadAbschnitt(t *testing.T) {
 
 func TestDocReadAbschnittNachIncludes(t *testing.T) {
 	layers, _, _ := docTree(t, map[string]string{
-		"rules/a.md":         "# A\n\ninclude: teil.md\n\n## Danach\n",
-		"rules/teil.md":      "## Teil\n\nEingesetzt\n",
-		"rules/kein-teil.md": "x\n",
+		"guidelines/a.md":         "# A\n\ninclude: teil.md\n\n## Danach\n",
+		"guidelines/teil.md":      "## Teil\n\nEingesetzt\n",
+		"guidelines/kein-teil.md": "x\n",
 	}, nil)
-	result, err := readWith(t, layers, "k-playbook:/rules/a.md", DocReadOptions{Section: "## Teil"})
+	result, err := readWith(t, layers, "k-playbook:/guidelines/a.md", DocReadOptions{Section: "## Teil"})
 	if err != nil || result.Content != "## Teil\n\nEingesetzt\n\n" {
 		t.Fatalf("%q %v", result.Content, err)
 	}

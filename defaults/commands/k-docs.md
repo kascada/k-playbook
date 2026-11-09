@@ -103,8 +103,11 @@ gelesen, wo eine Prüfung unten es verlangt.
   Inventar gibt die Auskunft; der Steckbrief wird nicht umgeschrieben. Nachgezogen wird er
   mit `/k-docs-tools`, wenn sein Inhalt veraltet ist, nicht nur seine Zahl. Diese Zeilen
   sind keine Abweichungen des Inventars: Die entstehen aus zwei Quellen, diese aus zwei
-  Dokumenten. Wann ein Versionssprung welchen Nachzug auslöst, steht in
-  `k-playbook:/rules/docs-sync.md` unter „Nachzug bei Versionssprüngen“.
+  Dokumenten. Kommt in einem Manifest, Lockfile, einer Container-, Compose-, Helm- oder
+  CI-Datei eine Versionsangabe hinzu, fällt sie weg oder wechselt sie, wird das Inventar im
+  selben Arbeitsgang über den Erzeuger nachgezogen (`/k-doc-inventory`); die Steckbriefe
+  werden danach eingereiht (`erzeuger: tools`). Eine fremde, schon vorhandene Abweichung ist
+  ein Hinweis an den Nutzer, kein stilles Nachziehen.
 - **Reste.** Dateien unter `<context.local.dir>/docs/` → `/k-upgrade`, Umstellung 3.2. Ein
   liegengebliebenes Arbeitsverzeichnis → der Erzeuger fragt beim nächsten Lauf, ob
   weitergemacht oder verworfen wird.

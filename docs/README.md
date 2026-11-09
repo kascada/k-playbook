@@ -1,6 +1,6 @@
 # Documentation
 
-k-playbook is a toolkit of slash commands, skills, review recipes, rules, and
+k-playbook is a toolkit of slash commands, skills, review recipes, and
 checks. It is cloned into a subdirectory of the project it is meant to support.
 
 ## Getting started
@@ -37,7 +37,6 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Architecture of the Go tool: finding anchors, linking, web API, design decisions. |
 | [`../installer/README.md`](../installer/README.md) | Quick start and checks for working on the tool. |
 | [`../checks/README.md`](../checks/README.md) | Interface and use of `bin/k-check`. |
-| [`../rules/README.md`](../rules/README.md) | The shipped rules. |
 | [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv) | Canonical security tool matrix for the script, interface, and review recipes. |
 
 ## Skills
@@ -69,7 +68,7 @@ questions and the ordered work list.
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
 - `commands` -> [`commands.md`](./commands.md)
 - `docs first` -> [`manual.md`](./manual.md#docs-first)
-- `enforcement` / `rules` / `/k-enforcement` -> [`../rules/README.md`](../rules/README.md), [`commands.md`](./commands.md), [`manual.md`](./manual.md#rules-and-checks)
+- `enforcement` / `docs follow-up` / `/k-enforcement` -> [`commands.md`](./commands.md), [`manual.md`](./manual.md#docs-follow-up-and-checks)
 - `queue/docs/` / `documentation orders` / `Doku-Aufträge` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`commands.md`](./commands.md)
 - `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
 - `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
@@ -104,11 +103,11 @@ questions and the ordered work list.
 - `/k-task-refine` / `task hardening` -> [`task-flow.md`](./task-flow.md)
 - `review-input` / `merge` / `consolidation` -> [`review-runs.md`](./review-runs.md#consolidating-with-k-playbook-merge)
 - `evidence contract` / `review-input.json` schema / `stableId` generation -> [`../commands/_review-run/review-input-contract.md`](../commands/_review-run/review-input-contract.md)
-- `audit.mode` / `perspective` / `evidence recipe` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#catalog-recipes-in-the-run), [`../rules/review-authoring.md`](../rules/review-authoring.md)
+- `audit.mode` / `perspective` / `evidence recipe` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#catalog-recipes-in-the-run)
 - `known decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd)
 - `spelling` / `umlauts` / `orthography` -> [`writing-style.md`](./writing-style.md)
 - `reviews` -> [`code-review.md`](./code-review.md)
-- `review-code` / `code review recipe` / `diff of a task` -> [`code-review.md`](./code-review.md#code-review), [`../rules/review-authoring.md`](../rules/review-authoring.md)
+- `review-code` / `code review recipe` / `diff of a task` -> [`code-review.md`](./code-review.md#code-review)
 - `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)
 - `security tools` / `tool matrix` -> [`installation.md`](./installation.md#security-tools), [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv)
 - `tasks` -> [`task-flow.md`](./task-flow.md)

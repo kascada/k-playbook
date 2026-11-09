@@ -11,7 +11,7 @@ and the same knowledge on the other.
 
 ```mermaid
 flowchart LR
-    Means["Means<br>rules · guidelines<br>commands · skills<br>review recipes · checks<br>scanners"]
+    Means["Means<br>guidelines<br>commands · skills<br>review recipes · checks<br>scanners"]
 
     Means --> Build
     Means --> Diagnose
@@ -69,7 +69,7 @@ flowchart LR
 
 ## The means, on the left
 
-Rules, guidelines, commands, skills, review recipes, checks and the scanner
+Guidelines, commands, skills, review recipes, checks and the scanner
 matrix are not owned by any one of the three. They exist once and apply to all
 of them. Every one of these kinds exists twice — shipped under `k-playbook/` and
 project-owned under `k-playbook-local/` — and what actually applies is the union,
@@ -77,7 +77,7 @@ with the project-owned entry winning for the same name.
 
 Nothing works this out for itself. `k-playbook context` resolves it once per
 session and hands out the same answer to every command: the directories, the
-instruction files in read order, and the three catalogs with `dist`, `local` and
+instruction files in read order, and the catalogs with `dist`, `local` and
 `override` already merged. The core model behind it is in
 [`manual.md`](./manual.md#core-model), the contract in
 [`k-playbook-format.md`](./k-playbook-format.md).
@@ -107,7 +107,7 @@ reached through MCP.
 
 ```mermaid
 flowchart LR
-    Rules["Rules · guidelines"] --> Effective
+    Guidelines["Guidelines"] --> Effective
     Skills["Commands · skills"] --> Effective
     Recipes["Review recipes · checks"] --> Effective
     Scanners["Scanners · tool matrix"] --> Effective

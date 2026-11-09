@@ -19,7 +19,7 @@ Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
 Führe ein gezieltes Review gegen das aktuelle Projekt aus, anhand eines Review-Rezepts
 aus dem effektiven Katalog der Context-Ausgabe.
 
-This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review). The rules for writing review recipes live in the `review-authoring` entry of `catalogs.rules`.
+This command owns the **generic** review process. Review files describe **only** what is specific to each review (criteria, style choices, examples, anti-patterns for that review).
 
 Produces:
 - Im Report-Modus `review-input.json` und `review-triage.md` unter

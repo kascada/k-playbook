@@ -1262,7 +1262,6 @@ const ORIGIN_LABELS = {
 // Reihenfolge und Beschriftung der Katalogsorten. Die Antwort ist ein Objekt
 // und trägt die Sorten alphabetisch; hier steht die fachliche Reihenfolge.
 const CATALOG_LABELS = {
-  rules: "Regeln",
   reviews: "Reviews",
   checks: "Checks",
 };

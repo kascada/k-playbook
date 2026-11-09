@@ -25,7 +25,7 @@ eingesetzt.
   Hub unter `<hub>:k-playbook/defaults/includes/` ankommt. Einen Baustein trägt es weiterhin
   nicht: Module, die nur Commands einbinden, liegen als relative Includes in
   `defaults/commands/_shared/` (seit Task 094: `context.md`, `gh.md`, `base-tools.md`) — dem
-  Namensraum, den `rules/command-authoring.md` für Command-Module festlegt; ein relatives
+  Namensraum für Command-Module; ein relatives
   Include bleibt in der Sorte `commands` und nimmt an deren Überlagerung teil. Hierher kommt
   erst ein Baustein, den mehr als eine Sorte nutzt, etwa später ein Skill-Text. Feste Testfälle
   für den Mechanismus liegen in `defaults/testdata/includes/`.

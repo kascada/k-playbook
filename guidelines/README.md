@@ -4,10 +4,9 @@ Verbindliche Vorgaben für den Betrieb eines k-playbook-Projekts: Konventionen, 
 mehr als ein Command betreffen und deshalb nicht in einem einzelnen Command-Text
 stehen dürfen.
 
-Eine Guideline sagt, **wie** gearbeitet wird. Eine Regel unter `rules/` sagt, **was**
-bei einer Änderung zusätzlich zu tun ist, und ein Review-Rezept unter `reviews/`
-sagt, **wonach** gesucht wird. Wer eine Vorgabe sucht, die keinem dieser beiden
-Zwecke dient, findet sie hier.
+Eine Guideline sagt, **wie** gearbeitet wird. Ein Review-Rezept unter `reviews/` sagt,
+**wonach** gesucht wird. Wer eine Vorgabe sucht, die nicht der Suche eines Reviews dient,
+findet sie hier.
 
 ## Zusammenführung
 
@@ -16,7 +15,7 @@ Die Dateien hier werden ausgeliefert und gelten in jedem Projekt. Daneben steht
 
 Gelesen wird zuerst die mitgelieferte Datei, danach die projekteigene. Eine
 gleichnamige projekteigene Datei **ersetzt** die mitgelieferte vollständig — dieselbe
-Overlay-Regel wie bei `rules/`, `reviews/` und `checks/`. Eine leere projekteigene
+Overlay-Regel wie bei `reviews/`. Eine leere projekteigene
 Datei schaltet die mitgelieferte ab; ihr Inhalt darf dann den Grund nennen.
 
 ## Dateien

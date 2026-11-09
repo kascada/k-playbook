@@ -33,7 +33,7 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"rules", "reviews", "checks", "results", "guidelines", "priv"} {
+	for _, name := range []string{"reviews", "results", "guidelines", "priv"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
 		}
@@ -94,23 +94,25 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	readme := filepath.Join(LocalDir(root), "rules", "README.md")
+	readme := filepath.Join(LocalDir(root), "reviews", "README.md")
 	content, err := os.ReadFile(readme)
 	if err != nil {
 		t.Fatalf("README fehlt: %v", err)
 	}
-	if !strings.Contains(string(content), "Enforcement-Regeln") {
+	if !strings.Contains(string(content), "Review-Rezepte") {
 		t.Errorf("README ohne Zweckbeschreibung:\n%s", content)
 	}
 }
 
-// removedLocalEntries sind die neun Einträge, die nicht mehr zur Struktur
+// removedLocalEntries sind die elf Einträge, die nicht mehr zur Struktur
 // gehören: docs bis material hat Task 107 herausgenommen, ihr Inhalt liegt in
 // der Projekt-Collection; inbox, queue, knowledge und cache waren die
-// Wissensablage auf der Platte, die Task 123 entfernt hat.
-var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", "inbox", "queue", "knowledge", "cache"}
+// Wissensablage auf der Platte, die Task 123 entfernt hat; rules ist die
+// Sorte, die Task 135 entfernt hat, checks die lokale Ebene der Checks, die
+// Task 134 entfernt hat.
+var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", "inbox", "queue", "knowledge", "cache", "rules", "checks"}
 
-// Das Einrichten legt die neun Einträge nicht mehr an und zählt sie nicht als
+// Das Einrichten legt die elf Einträge nicht mehr an und zählt sie nicht als
 // fehlend; ein Projekt ohne sie ist vollständig. Auch cache/ entsteht nicht
 // nebenbei.
 func TestCreateLocalLegtEntfernteEintraegeNichtAn(t *testing.T) {
@@ -193,10 +195,10 @@ func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 	local := LocalDir(root)
 
 	// Ein Projekt, das schon Inhalte hat.
-	if err := os.MkdirAll(filepath.Join(local, "rules"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(local, "reviews"), 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
-	eigen := filepath.Join(local, "rules", "README.md")
+	eigen := filepath.Join(local, "reviews", "README.md")
 	if err := os.WriteFile(eigen, []byte("# eigene Beschreibung\n"), 0o644); err != nil {
 		t.Fatalf("README anlegen: %v", err)
 	}
@@ -238,15 +240,16 @@ func TestCreateLocalIstIdempotent(t *testing.T) {
 	}
 }
 
-// Die drei Overlay-Sorten müssen ein lokales Gegenstück haben, sonst greift
-// die Overlay-Auflösung ins Leere.
+// Die Overlay-Sorte reviews muss ein lokales Gegenstück haben, sonst greift
+// die Overlay-Auflösung ins Leere. checks hat seit Task 134 keine lokale
+// Ebene mehr.
 func TestLocalStructureDecktOverlaySortenAb(t *testing.T) {
 	vorhanden := map[string]bool{}
 	for _, entry := range LocalStructure() {
 		vorhanden[entry.Path] = true
 	}
 
-	for _, kind := range []string{"rules", "reviews", "checks"} {
+	for _, kind := range []string{"reviews"} {
 		if !vorhanden[kind] {
 			t.Errorf("Overlay-Sorte %s fehlt in der lokalen Struktur", kind)
 		}
@@ -405,7 +408,7 @@ func TestEnsureLocalLaesstUnvollstaendigesVerzeichnisStehen(t *testing.T) {
 	if _, err := CreateLocal(root); err != nil {
 		t.Fatalf("CreateLocal: %v", err)
 	}
-	readme := filepath.Join(LocalDir(root), "rules", "README.md")
+	readme := filepath.Join(LocalDir(root), "reviews", "README.md")
 	if err := os.Remove(readme); err != nil {
 		t.Fatalf("README entfernen: %v", err)
 	}

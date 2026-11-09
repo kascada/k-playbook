@@ -1,10 +1,10 @@
 # k-enforcement
 
-Prüft die laufende Änderung gegen die Regeln des Projekts und berichtet je Regel, ob sie
-eingehalten ist — dazu das Ergebnis von `k-check --mode changed` und den Stand des
-Doku-Nachzugs. Das ist der ausdrückliche Prüfbericht. Die Regeln selbst wendet jede Sitzung
-schon vor dem Abschluss einer Änderung an (Anweisung „Regeln anwenden“ im Briefing); dieser
-Command macht die Prüfung sichtbar und liefert sie auf Abruf, etwa aus `/k-danke`.
+Prüft die laufende Änderung und berichtet das Ergebnis von `k-check --mode changed` und den
+Stand des Doku-Nachzugs. Das ist der ausdrückliche Prüfbericht. Den Doku-Nachzug selbst
+leistet jede Sitzung schon vor dem Abschluss einer Änderung (Anweisung „Doku nachziehen“ im
+Briefing, `k-playbook:/instructions/always/220-regeln-anwenden.md`); dieser Command macht die
+Prüfung sichtbar und liefert sie auf Abruf, etwa aus `/k-danke`.
 
 Produces:
 
@@ -20,14 +20,12 @@ include: _shared/erster-schritt.md
 
 Aus dem Briefing brauchst du:
 
-- `documents.rules` — die wirksamen Regeln, schon verrechnet: mitgeliefert, lokal ersetzt
-  oder abgeschaltet, mit `origin` je Eintrag. Verzeichnisse listest du nicht selbst.
 - `session` — die Kennung dieser Sitzung (Klartext: Zeile `Sitzung:`).
 - `context.project.dir`, `context.project.repoRoot`, `context.playbook.dir`.
 - `context.kephalaion` — `ok`, `address`, `message` — für den Doku-Nachzug.
 
 **Prüfumfang.** Geprüft werden die geänderten Dateien des Arbeitsbaums gegen `HEAD`, samt
-unverfolgten. Regelprüfung und `k-check` nehmen dieselbe Menge; deshalb bestimmst du sie
+unverfolgten. Doku-Nachzug und `k-check` nehmen dieselbe Menge; deshalb bestimmst du sie
 einmal und gibst sie `k-check` als Datei mit:
 
 ```bash
@@ -44,57 +42,35 @@ fi
 
 Die erste Zeile der Ausgabe ist die Datei mit der Menge; merke sie dir als `CHANGED_FILES` —
 jeder Shell-Aufruf beginnt neu, die Variable überlebt ihn nicht. Die Pfade sind relativ zu
-`ROOT`. Gelöschte Dateien gehören dazu; sie zählen für die Regeln
+`ROOT`. Gelöschte Dateien gehören dazu; sie zählen für den Doku-Nachzug
 (etwa eine entfernte Funktion, die die Doku noch nennt).
 
 - `$ARGUMENTS` nennt ein Verzeichnis oder eine Datei innerhalb von `ROOT`: Dann gilt nur der
-  Teil der Menge darunter, für die Regeln und für `k-check`; schreibe die gekürzte Liste in
+  Teil der Menge darunter, für den Doku-Nachzug und für `k-check`; schreibe die gekürzte Liste in
   dieselbe Datei. Liegt das Argument außerhalb von `ROOT`, abbrechen und es sagen.
 - Ist `ROOT` kein Git-Repo, oder hat es noch keinen Commit (`git diff HEAD` scheitert), gibt
   es keine Menge aus dem Arbeitsbaum: Frag, welche Dateien geprüft werden sollen, und schreib
-  die Antwort in die Datei. Will der Nutzer nur die Regeln sehen, fasse sie zusammen und
-  ende.
-- Ist die Menge leer, sag „kein Diff“; die Regeln werden dann nicht geprüft, `k-check` läuft
-  nicht, und der Bericht nennt nur die geladenen Regeln.
+  die Antwort in die Datei.
+- Ist die Menge leer, sag „kein Diff“; der Doku-Nachzug wird dann nicht geprüft, `k-check`
+  läuft nicht, und der Bericht nennt nur den leeren Prüfumfang.
 
 Command-specific policy:
 
-- Eine leere Regelmenge (`documents.rules` ohne aktiven Eintrag) ist eine Entscheidung des
-  Projekts. Sag das und prüfe keine Regeln; es gibt keinen Rückfall auf die mitgelieferten.
 - Ohne Kephalaion (`context.kephalaion.ok` nicht `true`) ist die erzeugte Doku nicht
   erreichbar: Der Doku-Nachzug wird nicht geprüft und nicht eingereiht, der Bericht nennt ihn
   als offen mit `context.kephalaion.message`. Es gibt keinen Rückfall auf die Platte.
-
-## Schritt 2 — Regeln laden
-
-Lies jede Regel aus `documents.rules`, deren `origin` nicht `disabled` ist, mit
-`k_playbook_doc_read` und ihrem Verweis als `ref` (ersatzweise `k-playbook read <verweis>`),
-in der Reihenfolge des Briefings. Einträge mit `disabled` überspringst du und zählst sie.
 
 ```text
 Enforcement-Check
 ─────────────────────────────
 Prüfumfang:   <N> Dateien unter <ROOT> | kein Diff | <ARGUMENTS>
-Regeln:       <N> aktiv  (<A> dist, <B> local, <C> override)
-Abgeschaltet: <D> | —
 ```
 
-## Schritt 3 — Regeln prüfen
+## Schritt 2 — Doku-Nachzug prüfen
 
-Für jede geladene Regel:
-
-1. Entscheide, ob sie den Prüfumfang betrifft. Eine Regel, die keine der Dateien berührt, ist
-   „nicht betroffen“.
-2. Ist sie betroffen, prüfe, ob der Stand der Dateien sie erfüllt.
-3. Ist es unklar, stell eine kurze Frage, statt zu raten.
-
-Die Regeln gelten für neue und geänderte Arbeit, nicht rückwirkend für den ganzen Bestand,
-außer eine Regel sagt das ausdrücklich.
-
-## Schritt 4 — Doku-Nachzug prüfen
-
-Immer, wenn der Prüfumfang Code enthält. Maßstab ist `k-playbook:/rules/docs-sync.md` aus
-Schritt 2.
+Immer, wenn der Prüfumfang Code enthält. Maßstab ist der Absatz zum Doku-Nachzug in
+`k-playbook:/instructions/always/220-regeln-anwenden.md`; lies ihn mit `k_playbook_doc_read`
+(ersatzweise `k-playbook read <verweis>`), wenn er dir nicht schon aus dem Briefing vorliegt.
 
 - **Handgeschriebene Doku** — Handdoku, `README.md`, `AGENTS.md`, Architektur-, Setup- und
   API-Beschreibungen: Sind sie im selben Arbeitsgang angepasst, oder ist begründet, warum
@@ -108,7 +84,7 @@ Schritt 2.
   2. Sonst suchst du mit `k_playbook_doc_grep`, `kind: docs`, Muster
      `^sitzung: <session>$`, einen offenen Auftrag dieser Sitzung, und prüfst für die Treffer
      `^erzeuger: code$` bzw. `^erzeuger: tools$`. Gibt es ihn: „eingereiht“, mit Verweis.
-  3. Sonst: „nachzuziehen“. Das Einreihen bietet Schritt 6 an.
+  3. Sonst: „nachzuziehen“. Das Einreihen bietet Schritt 4 an.
 
 Ein veraltetes Dokument unter `libs/`, `versions/` oder `manual/` meldest du nicht als Folge
 einer Codeänderung; die `README.md` eines Erzeuger-Verzeichnisses schreibt `publish`.
@@ -118,13 +94,15 @@ Ausgang je Teil, einer davon:
 - **angepasst** — die Handdoku wurde mit dem Code geändert.
 - **eingereiht** — für die erzeugte Doku liegt ein offener Auftrag dieser Sitzung vor.
 - **nachzuziehen** — die erzeugte Doku veraltet, es gibt noch keinen Auftrag.
-- **nicht nötig** — mit Begründung in einem Satz.
+- **nicht nötig** — mit Begründung in einem Satz. Reine Formatierung, Tests für bestehendes
+  Verhalten und interne Umbauten ohne geänderte Semantik, die keine Doku beschreibt, brauchen
+  in der Regel keine Doku-Änderung.
 - **fehlt** — die wahrscheinlich betroffene Handdoku, mit Pfad oder Thema.
 - **unklar** — Frage an den Nutzer: anpassen, anlegen oder bewusst auslassen.
 
 Keine Codeänderung geht ohne einen dieser Ausgänge durch.
 
-## Schritt 5 — k-check ausführen
+## Schritt 3 — k-check ausführen
 
 Führe die Checks über dieselbe Dateimenge aus, mit dem Programm aus der Installation. Die
 Pfade in `CHANGED_FILES` sind relativ zu `ROOT`; deshalb bekommt `k-check` dieselbe Wurzel
@@ -137,20 +115,16 @@ ausdrücklich als `--target-root`, die Konfiguration liest es weiter aus dem Pro
 `k-check` findet die wirksamen Checks selbst. Berichte je Check die Zeile seiner Ausgabe
 (`OK`, `FAIL`, `SKIP`, `ERROR` mit Grund) und den Exit-Code: `0` alles grün, `1` mindestens
 ein Check rot, `2` ein technischer Fehler. Ein Ergebnis, das du nicht gesehen hast, meldest du
-nicht. Fehlt `k-check` oder bricht es ab, nenne die Meldung; die Regelprüfung bleibt gültig.
+nicht. Fehlt `k-check` oder bricht es ab, nenne die Meldung; die Prüfung des Doku-Nachzugs
+bleibt gültig.
 Die Datei `CHANGED_FILES` löschst du danach.
 
-## Schritt 6 — Bericht
+## Schritt 4 — Bericht
 
 ```text
 Enforcement
 ─────────────────────────────
-Regeln geladen:  <N> aktiv (<A> dist, <B> local, <C> override, <D> abgeschaltet)
 Geprüfter Scope: <N> Dateien | kein Diff
-Betroffen:       <Regeln>
-
-Ergebnis:
-- <regel> [dist|local|override]: ok | offen | unklar | verletzt | nicht betroffen
 
 k-check:         grün | rot | Fehler (Exit <n>) | nicht gelaufen (<Grund>)
 - <check>: OK | FAIL | SKIP | ERROR — <Grund>
@@ -160,7 +134,7 @@ Docs-Sync:       Handdoku angepasst | nicht nötig (<Grund>) | fehlt (<Pfad/Them
                  tools: eingereiht (<verweis>) | nachzuziehen | noch keine erzeugte Doku | nicht betroffen
 ```
 
-Ist etwas `offen`, `unklar`, `verletzt`, rot oder `fehlt`, nenne die konkrete nächste Aktion
+Ist etwas `unklar`, rot oder `fehlt`, nenne die konkrete nächste Aktion
 und frag, bevor du etwas änderst.
 
 **Doku-Auftrag nach Freigabe.** Steht bei `code` oder `tools` „nachzuziehen“, frag, ob der
@@ -183,9 +157,6 @@ korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge ar
 
 ## Fehlerfälle
 
-- `documents.rules` fehlt im Briefing → das Briefing ist älter als dieser Command: neu laden
-  (`k_playbook_briefing`); fehlt es weiter, `/k-upgrade` nennen.
-- Eine Regel ist nicht lesbar (`not_found`) → nennen und mit den übrigen weitermachen.
 - `k_playbook_doc_create` meldet `invalid_input` für die Sorte `docs` → die Installation ist
   älter als dieser Command: melden, `/k-upgrade` nennen, nichts von Hand anlegen.
 - `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Bericht nennt den Nachzug
@@ -194,9 +165,7 @@ korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge ar
 
 ## Anti-Muster (nicht tun)
 
-- **Die Regeln selbst zusammensuchen.** Welche gelten, sagt `documents.rules`; wer
-  Verzeichnisse listet, erwischt eine abgeschaltete oder ersetzte Fassung.
-- **Zwei Prüfumfänge.** Regeln und `k-check` prüfen dieselbe Dateimenge; ohne `--files-from`
+- **Zwei Prüfumfänge.** Doku-Nachzug und `k-check` prüfen dieselbe Dateimenge; ohne `--files-from`
   nähme `k-check` gegebenenfalls einen anderen Vergleichsstand.
 - **Erzeugte Doku von Hand nachziehen** oder den Erzeuger ungefragt starten. Der Normalfall
   ist der Auftrag, und der kommt nur nach Freigabe.

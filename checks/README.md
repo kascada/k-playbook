@@ -1,12 +1,12 @@
 # Checks
 
-`<playbook.dir>/bin/k-check` führt die effektive Check-Menge aus: mitgelieferte Checks aus
-`<playbook.dir>/checks/` kombiniert mit projekteigenen aus `<local.dir>/checks/`.
-Es gilt dieselbe Overlay-Regel wie für Regeln und Reviews:
-ein gleichnamiger lokaler Check ersetzt den mitgelieferten, eine leere lokale Datei
-schaltet mitgelieferte Checks ab.
+`<playbook.dir>/bin/k-check` führt die mitgelieferten Checks aus `<playbook.dir>/checks/`
+aus, und nur diese. Projekteigene Checks gibt es nicht mehr (Task 134): Es gibt kein
+Überlagern und kein Abschalten eines mitgelieferten Checks, und ein liegengebliebenes
+`checks/` unter dem Projektverzeichnis wird nicht gelesen; `/k-upgrade` räumt es ab. Eine
+neue Form projekteigener Prüfungen steht noch aus.
 
-Jeder Check wird mit seiner Herkunft ausgewiesen: `dist`, `local` oder `override`.
+Jeder Check wird mit seiner Herkunft ausgewiesen, immer `dist`.
 
 Der Runner trennt zwei Roots:
 
@@ -23,7 +23,7 @@ Der Runner trennt zwei Roots:
 <playbook.dir>/bin/k-check --config-root /path/to/project --target-root app --mode baseline --output /path/to/k-playbook-local/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt --metadata-output /path/to/k-playbook-local/results/k-check/YYYY-MM-DD/run-metadata.json
 ```
 
-Der Config-Root ist standardmäßig das aktuelle Arbeitsverzeichnis; dort liegt `.k-playbook/K-PLAYBOOK.yaml`. Lokale Checks liegen fest unter `k-playbook-local/checks/`. Der Target-Root ergibt sich aus `project.repo_root`. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
+Der Config-Root ist standardmäßig das aktuelle Arbeitsverzeichnis; dort liegt `.k-playbook/K-PLAYBOOK.yaml`. Der Target-Root ergibt sich aus `project.repo_root`. Nested Repos werden nicht automatisch als neuer Config-Root interpretiert.
 
 `--output <file>` schreibt die vollständige Runner-Ausgabe zusätzlich zu stdout/stderr in eine Raw-Datei. `--metadata-output <file>` schreibt Run-Metadaten als JSON, inklusive Kommando, Exit-Code, Arbeitsverzeichnis, Datum/Zeit, Roots, Modus, Check-Konfiguration und k-check-Version/Git-Commit soweit verfügbar. Beide Optionen verweigern vorhandene Ziel-Dateien, damit auditierbare Artefakte nicht still überschrieben werden. Für Review-Läufe gehören diese Artefakte unter `<reviews>/results/k-check/YYYY-MM-DD/`.
 
@@ -59,8 +59,8 @@ Checks bekommen diese Umgebungsvariablen:
 
 - `K_CHECK_CONFIG_ROOT` — Hauptverzeichnis mit `.k-playbook/K-PLAYBOOK.yaml`.
 - `K_CHECK_PLAYBOOK_DIR` — das Playbook-Verzeichnis, aus dem der Runner stammt
-  (`<playbook.dir>`). Ein Check unter `k-playbook-local/checks/` kann es aus seinem
-  eigenen Ort nicht ableiten.
+  (`<playbook.dir>`). Ohne die Variable leiten die Checks es aus ihrem eigenen Ort ab:
+  der Elternordner von `checks/`.
 - `K_CHECK_TARGET_ROOT` — gescannter Codebaum.
 - `K_CHECK_PROJECT_ROOT` — Kompatibilitäts-Alias für `K_CHECK_TARGET_ROOT`.
 - `K_CHECK_MODE` — `changed` oder `baseline`.
@@ -86,9 +86,8 @@ Ist der Target-Root kein Git-Repo, scannt der globale Runner keine nested Repos 
 
 ## Werkzeug-Guards in Commands
 
-`check_command_tool_guards.sh` setzt den Abschnitt „Externe Werkzeuge" aus
-`rules/command-authoring.md` durch: Ein Command ruft ein externes Werkzeug nur mit Guard
-oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
+`check_command_tool_guards.sh` setzt die Vorgabe für externe Werkzeuge in Commands durch:
+Ein Command ruft ein externes Werkzeug nur mit Guard oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
 
 - **Werkzeugliste** ist allein die Spalte `name` aus `<playbook.dir>/share/scripts/base-tools.tsv` (derselbe Stand wie unter `~/.local/share/k-playbook/scripts/`).
   Eine neue Zeile dort wirkt ohne Änderung am Check. Fehlt die Matrix, endet der Check mit
@@ -124,13 +123,9 @@ oder Rückfall auf. Der Check meldet Fundstellen, er repariert nichts.
   wird so umgeschrieben, dass er auswertbar ist.
 
 Bewusst zurückgestellte Fundstellen stehen in `command-tool-guard-exceptions.tsv` neben
-dem wirksamen Skript. Der Check liest nur diese eine Datei: ersetzt ein projekteigener
-Check den mitgelieferten, gilt ausschließlich die TSV neben ihm unter
-`k-playbook-local/checks/`. Matrix und mitgelieferte Commands kommen aus
-`K_CHECK_PLAYBOOK_DIR`, das der Runner setzt. Fehlt die Variable, nimmt ein Override
-`<config-root>/k-playbook/` an; liegt dort keine Matrix, endet er mit einem technischen
-Fehler (Exit 2) statt mit `skip`, damit ein geratener Pfad den Check nicht unbemerkt
-abschaltet. Eine projekteigene TSV allein überlagert nichts.
+dem Skript. Der Check liest nur diese eine Datei. Matrix und mitgelieferte Commands kommen
+aus `K_CHECK_PLAYBOOK_DIR`, das der Runner setzt; fehlt die Variable, aus dem Elternordner
+von `checks/`. Liegt dort keine Matrix, endet der Check mit `skip`.
 
 Die TSV hat die Kopfzeile `datei`, `zeile`, `werkzeug`, `begründung`, getrennt durch
 Tabulatoren; Zeilen mit `#` sind Kommentare. `datei` ist der Pfad ab `commands/`, für die
@@ -151,9 +146,9 @@ KI nach dieser Datei.
 
 - **Umfang** ist immer derselbe, unabhängig von `K_CHECK_MODE` und `K_CHECK_FILES_FROM`:
   alle `.md`- und `.md.template`-Dateien unter `<playbook.dir>/defaults/` (`commands/`,
-  `instructions/`, `rules/`, `guidelines/`) und `<playbook.dir>/share/` (`commands/`,
+  `instructions/`, `guidelines/`) und `<playbook.dir>/share/` (`commands/`,
   `skills/`) und unter den projekteigenen Gegenstücken: `commands/` und `skills/` in
-  `<config-root>/.k-playbook/`, `instructions/`, `rules/` und `guidelines/` in
+  `<config-root>/.k-playbook/`, `instructions/` und `guidelines/` in
   `<config-root>/k-playbook-local/`. Schlüssel ist der Pfad ab dem Playbook bzw. ab dem
   Config-Root (`.k-playbook/…`, `k-playbook-local/…`); eine Ausnahme mit `datei` unter
   `.k-playbook/commands/` oder `.k-playbook/skills/` ist gültig. Den früheren Ort
@@ -162,7 +157,7 @@ KI nach dieser Datei.
 - **Gemeldet** werden relative Markdown-Links, deren Ziel mit `../` oder `./` beginnt, überall
   (Art `link`), und Pfade ohne Präfix in Backticks, die mit einer bekannten Wurzel beginnen
   (`k-playbook-local/`, `k-playbook/`, `.k-playbook/`, `.claude/`, `.opencode/`, `share/`, `defaults/`,
-  `installer/`, `rules/`, `guidelines/`, `instructions/`, `docs/`, `checks/`, `bin/`,
+  `installer/`, `guidelines/`, `instructions/`, `docs/`, `checks/`, `bin/`,
   `commands/`, `skills/`, `tasks/`), wenn sie unter einer Überschrift `Referenzen` stehen
   oder in einer Zeile mit Lese-Anweisung (`lies`, `liest`, `lesen`, `siehe`) — Art `pfad`.
   Andere Backtick-Pfade meldet er nicht.
@@ -174,11 +169,10 @@ KI nach dieser Datei.
 Ausnahmen stehen in `verweis-exceptions.tsv` neben dem wirksamen Skript, mit Kopfzeile
 `datei`, `zeile`, `art`, `begründung`. Jede Fundstelle steht einzeln; nur Bereiche mit
 Inhalt für Leser — Vorlagen wie `share/skills/*/vorlagen/` — bekommen einen Eintrag je
-Bereich (`datei` endet auf `/`, `zeile` und `art` sind `*`), in `commands/`,
-`instructions/` und `rules/` nie. Die Begründung nennt einen der Gründe „Inhalt für Leser“,
+Bereich (`datei` endet auf `/`, `zeile` und `art` sind `*`), in `commands/` und
+`instructions/` nie. Die Begründung nennt einen der Gründe „Inhalt für Leser“,
 „Ortsangabe“, „Plattenort“ oder „zurückgestellt“. Ein Eintrag ohne Fundstelle ist veraltet
-und selbst ein `fail`; wie beim Guard-Check gilt bei einem projekteigenen Override nur die
-TSV neben ihm.
+und selbst ein `fail`.
 
 ## Tests
 
@@ -187,11 +181,11 @@ Die Fachlogik beider Checks hat Tests unter `checks/tests/` (`test_verweise.py`,
 `make test` im Quell-Repo, einzeln mit `python3 -m unittest discover -s checks/tests`.
 `k-check` führt nur `checks/*.sh` aus; die Tests laufen dort nicht mit.
 
-## Global vs. Lokal
+## Mitgeliefert und projektspezifisch
 
-Mitgelieferte Checks müssen wiederverwendbar bleiben. Projekteigene Checks gehören nach `k-playbook-local/checks/` und werden per Overlay dazugenommen.
+Mitgelieferte Checks müssen wiederverwendbar bleiben. Projekteigene Checks gibt es seit Task 134 nicht mehr; `k-check` führt nur die mitgelieferten aus, und für eine neue Form projekteigener Prüfungen gibt es noch keinen Ort.
 
-Domain-spezifische Begriffe, Modellnamen und Runtime-Dateien gehören nicht in globale Checks. Solche Regeln bleiben projektlokal; Test-Fixtures dürfen Domain-Begriffe nur als explizite Negativbeispiele markieren.
+Domain-spezifische Begriffe, Modellnamen und Runtime-Dateien gehören nicht in globale Checks. Solche Regeln gehören ins Projekt, nicht in die mitgelieferten Checks; Test-Fixtures dürfen Domain-Begriffe nur als explizite Negativbeispiele markieren.
 
 ## Keine Scanner-Result-Familien
 

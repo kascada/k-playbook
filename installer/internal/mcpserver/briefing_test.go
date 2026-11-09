@@ -65,7 +65,7 @@ func TestBriefingWerkzeugListetDokumente(t *testing.T) {
 		t.Errorf("onDemand: %+v", envelope.Documents.OnDemand)
 	}
 	for name, list := range map[string][]project.BriefingEntry{
-		"rules": envelope.Documents.Rules, "reviews": envelope.Documents.Reviews, "guidelines": envelope.Documents.Guidelines,
+		"reviews": envelope.Documents.Reviews, "guidelines": envelope.Documents.Guidelines,
 	} {
 		if list == nil || len(list) != 0 {
 			t.Errorf("%s: %v, erwartet leere Liste", name, list)

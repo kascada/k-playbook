@@ -57,7 +57,7 @@ const docsBlockExample = `# docs:
 #   # Eintragen mit ` + "`k-playbook docs exclude add <muster>…`" + `.
 #   exclude:
 #     - docs/
-#     - rules/
+#     - vendor/
 `
 
 // docsBlock rendert den Block mit den Einträgen in dieser Reihenfolge.

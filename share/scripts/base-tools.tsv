@@ -25,8 +25,8 @@
 #               interpreter  — das Werkzeug ist der Interpreter selbst und kann
 #                              nicht fehlen, während ein Skript läuft.
 #               selbsterklaerend — ungeguarded, der Fehlschlag benennt sich aber
-#                              selbst; siehe die zurückgestellte Ausnahme in
-#                              rules/command-authoring.md. Der Wert nimmt
+#                              selbst; eine bewusst zurückgestellte Ausnahme
+#                              von der Guard-Pflicht für Commands. Der Wert nimmt
 #                              keinen Aufruf aus: check_command_tool_guards.sh
 #                              meldet jede Fundstelle in einem Command, bis sie
 #                              einzeln in checks/command-tool-guard-exceptions.tsv

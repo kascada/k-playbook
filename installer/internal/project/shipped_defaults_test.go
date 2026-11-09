@@ -80,7 +80,7 @@ func TestDefaultsAlwaysTraegtBriefingTeil(t *testing.T) {
 // `name` bzw. `context.name`, Unterfelder zählen nicht. Die Schlüssel kommen
 // auf demselben Weg zustande wie das Briefing selbst (Marshal eines gebauten
 // Briefings, briefingContextFields auf BuildContext), nicht durch Reflexion
-// über Context: die würde guidelines und catalogs.rules verlangen, die das
+// über Context: die würde guidelines und catalogs.reviews verlangen, die das
 // Briefing herausnimmt. Optionale Felder werden gesetzt, damit sie in der
 // Liste sind.
 func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
@@ -143,7 +143,7 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 		}
 	}
 	// Die abgedeckten Felder stehen nicht als context.-Feld im Blatt.
-	for _, covered := range []string{"context.guidelines", "context.catalogs.rules", "context.catalogs.reviews"} {
+	for _, covered := range []string{"context.guidelines", "context.catalogs.reviews"} {
 		if mentions(covered) {
 			t.Errorf("Blatt nennt `%s`, das das Briefing herausnimmt", covered)
 		}
@@ -813,8 +813,10 @@ func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
 
 // /k-upgrade 3.4 räumt seit Task 129 auch commands/ und skills/ unter
 // k-playbook-local/ ab: leer wird gelöscht, sonst je Eintrag mit Ziel unter
-// .k-playbook/ genannt; umgezogen wird nur auf ausdrücklichen Zuruf. Die
-// Hülle nennt beide Verzeichnisse in ihrer description.
+// .k-playbook/ genannt; umgezogen wird nur auf ausdrücklichen Zuruf. rules/
+// (Task 135) und checks/ (Task 134) haben keinen Nachfolger und werden nur
+// gemeldet, wenn sie bleiben. Die Hülle nennt alle Verzeichnisse in ihrer
+// description.
 func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
 	start, end := strings.Index(file, "### 3.4 — "), strings.Index(file, "## Schritt 4 — ")
@@ -823,9 +825,14 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"legt sieben Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
+		"legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
 		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/`",
+		"- `material/` - `commands/` - `skills/` - `rules/` - `checks/`",
+		"Der Inhalt von `rules/` hat keinen Nachfolger in der Collection",
+		"dass diese Regeln nicht mehr gelesen werden",
+		"Auch der Inhalt von `checks/` hat keinen Nachfolger",
+		"dass diese Checks nicht mehr laufen",
+		"checks/ gelöscht: README.md",
 		"Erst das neue Programm nimmt Einträge aus `.k-playbook/<sorte>/`",
 		"diese Dateien mit diesem Programm nicht mehr wirken",
 		"`.k-playbook/<sorte>/<gleicher pfad>`",
@@ -844,15 +851,17 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 			t.Errorf("3.4 nennt %q nicht", needle)
 		}
 	}
-	if strings.Contains(section, "fünf Verzeichnisse") {
-		t.Error("3.4 zählt noch fünf Verzeichnisse")
+	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse"} {
+		if strings.Contains(section, stale) {
+			t.Errorf("3.4 zählt noch %s", stale)
+		}
 	}
 
 	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, needle := range []string{"(docs, tasks, data, material, commands, skills)", "mit seinem Ziel unter .k-playbook/"} {
+	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks)", "mit seinem Ziel unter .k-playbook/"} {
 		if !strings.Contains(string(hull), needle) {
 			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
 		}
@@ -860,7 +869,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 }
 
 // Die Doku-Aufträge (Task 124): Die Anweisung doku-auftraege.md beschreibt
-// Kopf und Lebenslauf, docs-sync nennt das Einreihen als Normalfall, /k-docs
+// Kopf und Lebenslauf, /k-docs
 // zählt die offenen Aufträge, und die beiden Erzeuger listen sie im Preflight
 // und schließen sie nach einem erfolgreichen publish ab — alles über die
 // doc-Werkzeuge, die ihre Hüllen erlauben.
@@ -878,21 +887,6 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 	} {
 		if !strings.Contains(squashSpace(instruction), squashSpace(needle)) {
 			t.Errorf("doku-auftraege.md nennt %q nicht", needle)
-		}
-	}
-
-	sync := readRepoDefault(t, "rules/docs-sync.md")
-	project, err := os.ReadFile(filepath.Join("..", "..", "..", "rules", "docs-sync.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(project) != sync {
-		t.Error("rules/docs-sync.md und defaults/rules/docs-sync.md weichen voneinander ab")
-	}
-	for _, needle := range []string{"k-playbook:/instructions/on-demand/doku-auftraege.md", "„Nachzug eingereiht“",
-		"`erzeuger: tools`", "**einzureihen**"} {
-		if !strings.Contains(sync, needle) {
-			t.Errorf("docs-sync.md nennt %q nicht", needle)
 		}
 	}
 
@@ -937,10 +931,11 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 // /k-enforcement ist seit Task 124 Hülle plus Text: Die Hülle nennt nur den
 // Verweis und erlaubt genau die Werkzeuge des Prüfberichts samt Einreihen;
 // der Text ist deutsch, beginnt mit dem Include _shared/erster-schritt.md,
-// nimmt die Regeln aus documents.rules, prüft dieselbe Dateimenge wie
-// k-check --mode changed, führt k-check selbst aus und reiht erst nach
-// Freigabe einen Doku-Auftrag ein. _shared/context.md, catalogs.rules,
-// extracted/ und der Skill ks-enforcement kommen nicht mehr vor.
+// prüft den Doku-Nachzug nach 220-regeln-anwenden.md über dieselbe
+// Dateimenge wie k-check --mode changed, führt k-check selbst aus und reiht
+// erst nach Freigabe einen Doku-Auftrag ein. _shared/context.md, die
+// entfallene Regelprüfung, extracted/ und der Skill ks-enforcement kommen
+// nicht mehr vor.
 func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 	const ref = "k-playbook:/commands/k-enforcement.md"
@@ -977,9 +972,10 @@ func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
 	wantText := strings.Replace(file, line, module+"\n", 1)
 	for _, needle := range []string{
-		"`documents.rules`", "`k_playbook_doc_read`", "gegen `HEAD`, samt\nunverfolgten",
+		"`k_playbook_doc_read`", "gegen `HEAD`, samt\nunverfolgten",
 		"git -C \"$ROOT\" diff --name-only HEAD", "git -C \"$ROOT\" ls-files --others --exclude-standard",
-		"bin/k-check\" --mode changed", "--target-root \"<context.project.repoRoot>\"", "--files-from", "k-playbook:/rules/docs-sync.md",
+		"bin/k-check\" --mode changed", "--target-root \"<context.project.repoRoot>\"", "--files-from",
+		"k-playbook:/instructions/always/220-regeln-anwenden.md", "interne Umbauten ohne geänderte Semantik",
 		"k-playbook:/instructions/on-demand/doku-auftraege.md", "nach Freigabe", "`k_playbook_doc_create` mit `kind: docs`",
 		"Kephalaion `write`", "`^sitzung: <session>$`", "eingereiht", "nachzuziehen", "Folge-Command: keiner",
 	} {
@@ -987,15 +983,15 @@ func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 			t.Errorf("k-enforcement.md nennt %q nicht", needle)
 		}
 	}
-	for _, stale := range []string{"_shared/context.md", "catalogs.rules", "catalogs.checks", "extracted/", "ks-enforcement",
+	for _, stale := range []string{"_shared/context.md", "documents.rules", "k-playbook:/rules/", "catalogs.checks", "extracted/", "ks-enforcement",
 		"k-playbook context", "Check k-playbook enforcement rules", "nicht ausgeführt"} {
 		if strings.Contains(file, stale) {
 			t.Errorf("k-enforcement.md trägt noch %q", stale)
 		}
 	}
 
-	// Der Skill ks-enforcement ist entfallen; die Regeln wendet jede Sitzung
-	// über die always-Anweisung an.
+	// Der Skill ks-enforcement ist entfallen; den Doku-Nachzug leistet jede
+	// Sitzung über die always-Anweisung.
 	if _, ok := skillSources(filepath.Join("..", "..", "..", "share", "skills"))["enforcement"]; ok {
 		t.Error("share/skills/enforcement ist noch da")
 	}
@@ -1006,24 +1002,24 @@ func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 	}
 }
 
-// Die always-Anweisung „Regeln anwenden“ (Task 124) steht im zusammengebauten
+// Die always-Anweisung „Doku nachziehen“ (Task 124, Titel seit Task 135) steht im zusammengebauten
 // Text zwischen Workbench und Tasks und verweist auf die Doku-Aufträge und
 // /k-enforcement; /k-task-run reiht im Hauptkontext ein, /k-danke zählt
 // „eingereiht“ als erledigt.
 func TestDefaultsRegelnAnwenden(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 	part := readRepoDefault(t, "instructions/always/220-regeln-anwenden.md")
-	if !strings.HasPrefix(part, "---\ntitle: Regeln anwenden\n---\n") {
+	if !strings.HasPrefix(part, "---\ntitle: Doku nachziehen\n---\n") {
 		t.Errorf("220-regeln-anwenden.md ohne title:\n%.120s", part)
 	}
-	for _, needle := range []string{"`documents.rules`", "`k_playbook_doc_read`", "k-playbook:/rules/docs-sync.md",
+	for _, needle := range []string{"im selben Arbeitsgang", "fragst im Zweifel", "sagt er kurz, warum",
 		"k-playbook:/instructions/on-demand/doku-auftraege.md", "`/k-enforcement`"} {
-		if !strings.Contains(part, needle) {
+		if !strings.Contains(squashSpace(part), needle) {
 			t.Errorf("220-regeln-anwenden.md nennt %q nicht", needle)
 		}
 	}
 	always := mustResolveDoc(t, layers, "k-playbook:/instructions/always/").Content
-	workbench, rules, tasks := strings.Index(always, "## Die Workbench"), strings.Index(always, "## Regeln anwenden"),
+	workbench, rules, tasks := strings.Index(always, "## Die Workbench"), strings.Index(always, "## Doku nachziehen"),
 		strings.Index(always, "## Arbeiten in Tasks")
 	if workbench < 0 || rules < workbench || tasks < rules {
 		t.Errorf("Reihenfolge im zusammengebauten Text: Workbench %d, Regeln %d, Tasks %d", workbench, rules, tasks)

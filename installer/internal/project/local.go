@@ -48,22 +48,22 @@ type LocalEntry struct {
 
 // LocalStructure beschreibt, was ein Projekt braucht.
 //
-// rules, reviews und checks sind die Overlay-Sorten hier: ein gleichnamiger
-// lokaler Eintrag ersetzt den mitgelieferten, ein leerer schaltet ihn ab.
-// Aufgelöst wird das in context.go.
+// reviews ist die Overlay-Sorte hier: ein gleichnamiger lokaler Eintrag
+// ersetzt den mitgelieferten, ein leerer schaltet ihn ab. Aufgelöst wird das
+// in context.go.
 //
 // docs, tasks, tasks/done, data und material stehen nicht mehr hier (Task
 // 107): ihr Inhalt liegt in der Projekt-Collection. commands und skills
 // ebenso nicht (Task 129): projekteigene Commands und Skills liegen in
 // .k-playbook/commands/ und .k-playbook/skills/ (registry.go), die das
-// Einrichten nicht anlegt. /k-upgrade räumt die leeren Verzeichnisse eines
+// Einrichten nicht anlegt. rules hat Task 135 entfernt, checks Task 134:
+// projekteigene Checks gibt es bis zu ihrer neuen Form nicht, k-check führt
+// nur die mitgelieferten aus. /k-upgrade räumt die leeren Verzeichnisse eines
 // Bestandsprojekts ab, dazu die Reste der früheren Wissensablage auf der
 // Platte (Task 123).
 func LocalStructure() []LocalEntry {
 	return []LocalEntry{
-		{Path: "rules", Purpose: "Projekteigene Enforcement-Regeln. Ergänzen die mitgelieferten aus " + PlaybookDirName + "/rules/; gleicher Dateiname ersetzt."},
 		{Path: "reviews", Purpose: "Projekteigene Review-Rezepte, benannt als review-<name>.md."},
-		{Path: "checks", Purpose: "Projekteigene Checks als *.sh, ausgeführt über " + PlaybookDirName + "/bin/k-check."},
 		{
 			Path:             "results",
 			Private:          true,

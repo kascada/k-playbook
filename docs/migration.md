@@ -316,8 +316,8 @@ anchored in `rules/command-authoring.md`: `commands/_<name>/` contains modules (
 `_shared/` remains for modules shared by all commands; `_<command-name>/` collects
 command-specific modules (`_audit/`), `_<family>/` collects modules of a command family (for
 example `_docs/`, once the Docs commands receive shared modules). Overlay works by file path from
-`commands/`; an empty file disables it. Rule in
-[`../rules/command-authoring.md`](../rules/command-authoring.md#ablage).
+`commands/`; an empty file disables it. The rule stood in `rules/command-authoring.md` until
+task 135 removed the kind; its content is being split into guidelines and instructions.
 
 **First real triage run.** 2026-08-19, this repository, `review-triage.md` under
 `k-playbook-local/results/2026-08-19/`. 173 groups were condensed into six bundles plus one

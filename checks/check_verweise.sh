@@ -2,7 +2,7 @@
 set -u
 
 # Meldet Verweise ohne Präfix in mitgelieferten und projekteigenen Commands,
-# Instructions, Rules, Guidelines und Skills: relative Markdown-Links und nackte
+# Instructions, Guidelines und Skills: relative Markdown-Links und nackte
 # Pfade, wo ein Verweis gemeint ist. Maßgeblich ist
 # k-playbook:/instructions/on-demand/verweise-nachziehen.md; der Check setzt den
 # Teil davon um, der am Text erkennbar ist, und korrigiert nichts. Die Ausnahmen

@@ -17,7 +17,7 @@ import (
 )
 
 // Das Briefing (Task 086): ein Aufruf zu Beginn einer Sitzung, der als Daten
-// auflistet, welche Anweisungen, Regeln, Reviews und Leitlinien für dieses
+// auflistet, welche Anweisungen, Reviews und Leitlinien für dieses
 // Projekt gelten und was in der Projekt-Collection für die eigene Arbeit
 // ansteht. Verweise im Präfixschema, keine Pfade; gelesen wird über
 // k_playbook_doc_read bzw. auf dem Weg des Präfixes. Inhalte stehen nicht
@@ -41,8 +41,9 @@ import (
 // BriefingSchemaVersion ist die Fassung der Briefing-Ausgabe. Fassung 2 hat den
 // Abschnitt context, Fassung 3 den Text der immer geltenden Anweisungen in
 // documents.always.content, Fassung 4 den Abschnitt health, Fassung 5 die
-// Sitzungskennung session.
-const BriefingSchemaVersion = "5"
+// Sitzungskennung session; in Fassung 6 entfällt documents.rules, die Sorte
+// rules gibt es nicht mehr.
+const BriefingSchemaVersion = "6"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -92,10 +93,9 @@ type BriefingDocuments struct {
 	// Always ist das zusammengebaute Verzeichnis instructions/always/ mit
 	// seinen Teilen.
 	Always BriefingAssembled `json:"always"`
-	// OnDemand sind die Anweisungen auf Abruf, Rules, Reviews und Guidelines
-	// die Einträge der Sorten — jede als Datei einzeln zu lesen.
+	// OnDemand sind die Anweisungen auf Abruf, Reviews und Guidelines die
+	// Einträge der Sorten — jede als Datei einzeln zu lesen.
 	OnDemand   []BriefingEntry `json:"onDemand"`
-	Rules      []BriefingEntry `json:"rules"`
 	Reviews    []BriefingEntry `json:"reviews"`
 	Guidelines []BriefingEntry `json:"guidelines"`
 }
@@ -237,7 +237,6 @@ func (c *BriefingContext) UnmarshalJSON(data []byte) error {
 // die eine Stelle für diese Liste; der Test vergleicht gegen BuildContext,
 // dass jedes andere Feld der Kontextausgabe im Abschnitt steht.
 var briefingCoveredContextFields = []string{
-	"catalogs.rules",   // documents.rules
 	"catalogs.reviews", // documents.reviews
 	"guidelines",       // documents.guidelines — dort überlagert, hier nur lokal
 }
@@ -403,7 +402,6 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 		target *[]BriefingEntry
 	}{
 		{markdown, &briefing.Documents.OnDemand},
-		{catalogKindNamed("rules"), &briefing.Documents.Rules},
 		{catalogKindNamed("reviews"), &briefing.Documents.Reviews},
 		{guidelinesKind, &briefing.Documents.Guidelines},
 	} {

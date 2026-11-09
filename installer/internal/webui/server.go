@@ -670,7 +670,7 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 		if config, err := project.ReadConfig(environment.ProjectDir); err == nil {
 			data.RepoRoot = project.DisplayPath(project.RepoRootDir(environment.ProjectDir, config))
 		}
-		// Aus diesem Verzeichnis kommen Skripte, Regeln, Reviews und Checks. Es
+		// Aus diesem Verzeichnis kommen Skripte, Reviews und Checks. Es
 		// ist ein eigener Clone und kann einen anderen Stand tragen als das
 		// Binary — deshalb gehört es in den Kopf und nicht hinter einen Klick.
 		data.PlaybookDir = project.DisplayPath(environment.PlaybookDir)

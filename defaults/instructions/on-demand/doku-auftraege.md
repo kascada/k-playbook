@@ -60,8 +60,9 @@ Der Rumpf darf leer bleiben. Mehr als ein kurzer Absatz gehört nicht hinein.
 
 ### Wer ihn schreibt
 
-- **Jede Sitzung nach einer Codeänderung**, bevor sie die Änderung abschließt — als Teil der
-  Regel `k-playbook:/rules/docs-sync.md`. Bei `/k-task-run` ist das der Hauptkontext im
+- **Jede Sitzung nach einer Codeänderung**, bevor sie die Änderung abschließt — als Teil des
+  Doku-Nachzugs aus `k-playbook:/instructions/always/220-regeln-anwenden.md`. Bei
+  `/k-task-run` ist das der Hauptkontext im
   Abschluss, nicht der Ausführungs-Sub-Agent.
 - **`/k-enforcement`** nach Freigabe durch den Nutzer, wenn sein Bericht für die erzeugte Doku
   „nachzuziehen“ ergibt.
@@ -108,8 +109,10 @@ offen. Die Einzelheiten stehen in `k-playbook:/commands/_shared/docs.md`.
 - **Handdoku, `README.md`, `AGENTS.md`.** Sie werden im selben Arbeitsgang angepasst wie der
   Code, nicht eingereiht. Eine Handbuchseite unter `keph:/docs/manual/` ändert
   `k_playbook_doc_replace` stellenweise, `k_playbook_doc_append` hängt an — mit
-  `since_revision`, wie `k-playbook:/rules/docs-sync.md` es beschreibt; nicht als Ganzes mit
-  `write`.
+  `since_revision`, der Revision aus `k_playbook_doc_grep` mit `count_only` oder aus
+  `k_playbook_doc_read`; `foreign_change` heißt, jemand anderes hat inzwischen geschrieben,
+  dann nicht still nachziehen. Nicht als Ganzes mit `write`; in der Shell ersatzweise
+  `k-playbook doc replace|append <keph:-verweis> [--since N]`.
 - **Ein Teil-Scope.** Ein Auftrag engt den Lauf nicht auf seine Pfade ein.
 - **Inhalt für die Doku.** Was ein Erzeuger schreiben soll, findet er im Code. Erkenntnisse
   sind Befunde (`k-playbook:/instructions/on-demand/befunde.md`), Arbeitsstände gehören in die

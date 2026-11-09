@@ -60,7 +60,8 @@ const killGrace = 5 * time.Second
 // Der Pfad kommt aus dem Preflight und wird nicht selbst im PATH gesucht: in
 // einem Python-Projekt mit aktivem venv griffe eine eigene Auflösung dessen
 // ruff, und der Lauf startete ein anderes Werkzeug, als der Preflight geprüft
-// hat (rules/tool-install-scope.md).
+// hat. Host-lokale Werkzeuge dürfen nie aus einem Projekt-venv erkannt werden;
+// das venv gehört dem Projekt.
 type Tool struct {
 	// Path ist das Programm, absolut. Leer heißt: nicht vorhanden.
 	Path string

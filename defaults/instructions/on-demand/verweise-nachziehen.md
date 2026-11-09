@@ -58,8 +58,7 @@ k-playbook-Repo selbst: `defaults/commands/x.md` ist
 
 Ebenso `.k-playbook/commands/x.md`: `project:/.k-playbook/commands/x.md`, wenn die Datei
 gemeint ist, die geändert wird, und `k-playbook:/commands/x.md`, wenn der wirksame Text gelesen
-werden soll. Ebenso `rules/x.md` (`k-playbook:/rules/x.md` oder die Repo-Kopie
-`project:/rules/x.md`) und `tasks/…` (ein Task in `keph:/user/<user>/tasks/…` oder eine alte Datei auf der Platte). Was
+werden soll. Ebenso `tasks/…` (ein Task in `keph:/user/<user>/tasks/…` oder eine alte Datei auf der Platte). Was
 sich aus dem Satz um den Pfad nicht eindeutig zuordnen lässt, wird erfragt, nicht geraten.
 
 ### Was unberührt bleibt

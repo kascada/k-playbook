@@ -238,8 +238,8 @@ Unterkommandos:
              Arbeitsverzeichnis verwendet; eine vorhandene Datei bleibt immer
              unverändert.
   context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
-            Konfiguration und die effektiven Kataloge für rules, reviews
-            und checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
+            Konfiguration und die effektiven Kataloge für reviews und
+            checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
             Zieht dabei die Assistenten-Verlinkung auf den Katalog nach;
             was sich geändert hat, steht unter "links".
   mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
@@ -272,7 +272,7 @@ Unterkommandos:
             dahinter steht: k-playbook read <verweis> [--raw] [--json].
             project: eine Datei des Projekts, keph: ein Dokument der
             Collection über den Node, k-playbook: die Sorten instructions/,
-            rules/, reviews/, guidelines/ und commands/, lokal vor
+            reviews/, guidelines/ und commands/, lokal vor
             mitgeliefert; ein Verweis auf instructions/always/ mit / am Ende
             baut das Verzeichnis zu einem Text zusammen. Include-Zeilen
             (include: <verweis>) werden eingesetzt, --raw lässt sie stehen.
@@ -281,7 +281,7 @@ Unterkommandos:
   briefing  Gibt aus, was für dieses Projekt gilt und was ansteht:
             k-playbook briefing [--json]. Vorweg der Text der immer
             geltenden Anweisungen k-playbook:/instructions/always/, dann
-            Anweisungen auf Abruf, Regeln, Reviews und Leitlinien — lokal und
+            Anweisungen auf Abruf, Reviews und Leitlinien — lokal und
             mitgeliefert aufgelöst, je Eintrag Verweis, Titel, Beschreibung,
             Herkunft —, dazu aus der Projekt-Collection die eigenen offenen
             Tasks und Arbeitsstände und die Zahl offener Befunde, und der

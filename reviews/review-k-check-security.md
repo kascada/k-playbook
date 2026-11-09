@@ -2,7 +2,7 @@
 name: review-k-check-security
 title: k-check Security Assessment
 interval-weeks: 4
-scope-hint: k-check Runner-Ergebnisse für globale und projektlokale Checks; keine Remediation, keine Produktcode-Änderungen
+scope-hint: k-check Runner-Ergebnisse der mitgelieferten Checks; keine Remediation, keine Produktcode-Änderungen
 handoff: /k-remediation
 result-family: k-check
 audit:
@@ -27,17 +27,19 @@ liefe ohne Go-Änderung — ein Evidence-Rezept darf `bin/k-check` aufrufen und 
 nach `raw/k-check.sarif` schreiben. Am Evidence-Vertrag scheitert es trotzdem, an drei
 Stellen:
 
-1. **`audit.ruleIds` ist eine abgeschlossene Liste, die Check-Menge ist ein
-   Overlay-Katalog.** Jede Rule-ID muss in `audit.ruleIds` stehen; eine unbekannte macht
+1. **`audit.ruleIds` ist eine abgeschlossene Liste, die Check-Menge wächst mit der
+   Installation.** Jede Rule-ID muss in `audit.ruleIds` stehen; eine unbekannte macht
    das ganze Artefakt ungültig, nicht nur den einzelnen Fund. Die natürliche Rule-ID eines
-   k-check-Funds ist sein Check — und welche Checks laufen, entscheidet jedes Projekt
-   selbst über `k-playbook-local/checks/`. Ein mitgeliefertes Rezept kann projekteigene
-   Checks nicht aufzählen; der erste davon ließe den ganzen Lauf des Eintrags scheitern.
+   k-check-Funds ist sein Check — und welche Checks laufen, bestimmt der mitgelieferte
+   Katalog der jeweiligen Installation. Das Rezept müsste jeden davon aufzählen und mit
+   jedem neuen Check nachgezogen werden; ein vergessener ließe den ganzen Lauf des
+   Eintrags scheitern. Projekteigene Checks, mit denen dieser Punkt zuerst begründet war,
+   gibt es seit Task 134 nicht mehr.
 2. **Funde ohne Ort fielen heraus.** Ein Evidence-Fund braucht einen Fundort im
    Pfad-Scope; ein Fund ohne Ort liegt nie im Scope und wird verworfen. Die Parser-Regeln
    unten halten ausdrücklich fest, dass nicht jede Ausgabe `path:line: message` ist —
-   „Lokale Legacy-Runner können Sammelzeilen oder abweichende Formate liefern". Genau
-   diese Funde verschwänden stillschweigend.
+   „Ein Check kann Sammelzeilen oder abweichende Formate liefern". Genau diese Funde
+   verschwänden stillschweigend.
 3. **`ok`, `skip` und technische `error`-Fälle haben in SARIF keinen Platz.** Dieses
    Rezept verlangt, sie getrennt zu dokumentieren — `skip` mit Reason und Wiedervorlage,
    `error` als blockierte Bewertbarkeit. Ein SARIF trägt Funde, keine Nicht-Funde mit
@@ -66,7 +68,7 @@ bringt seine Belege in den Lauf, statt sie danach zusammenzurechnen.
 
 ## Zweck
 
-- Globale und projektlokale Check-Ausgaben dauerhaft als Review-Artefakte sichern.
+- Die Ausgaben der mitgelieferten Checks dauerhaft als Review-Artefakte sichern.
 - Runner-Rohdaten von kuratierter Bewertung trennen.
 - Findings mit stabilen IDs und Status-Lifecycle für spätere Remediation vorbereiten.
 - `skip`, `ok`, `fail` und technische `error`-Fälle getrennt dokumentieren.
@@ -77,7 +79,8 @@ bringt seine Belege in den Lauf, statt sie danach zusammenzurechnen.
 `k-check`-Ausgaben werden nach diesen Regeln ausgewertet:
 
 - Check-Abschnitte beginnen mit `== <scope>:<check.sh> ==`, z. B.
-  `== global:check_no_obvious_secrets.sh ==`.
+  `== dist:check_no_obvious_secrets.sh ==`. `<scope>` ist immer `dist`: `k-check` führt
+  nur die mitgelieferten Checks aus.
 - Innerhalb eines Abschnitts genau eine `K_CHECK_STATUS=<ok|skip|fail>`-Zeile erfassen.
 - Optional `K_CHECK_REASON=<text>` erfassen.
 - Alles zwischen Abschnittsheader und Status/Summary als Check-Ausgabe behandeln.
@@ -91,16 +94,15 @@ bringt seine Belege in den Lauf, statt sie danach zusammenzurechnen.
 - Technische `error`-Fälle sind keine Security-Findings, aber blockieren die Bewertbarkeit
   des betroffenen Checks.
 
-Finding-Zeilen sind check-spezifisch. Generische globale Checks schreiben typischerweise:
+Finding-Zeilen sind check-spezifisch. Die mitgelieferten Checks schreiben typischerweise:
 
 ```text
 path:line: message
 ```
 
-Lokale Legacy-Runner können Sammelzeilen oder abweichende Formate liefern. Wenn globale
-und lokale Checks dieselbe semantische Stelle melden, globale Finding-ID behalten und
-lokale Legacy-Meldung als Beleg/Notiz deduplizieren statt eine zweite Remediation-ID zu
-erzeugen.
+Ein Check kann Sammelzeilen oder abweichende Formate liefern. Meldet ein Lauf dieselbe
+semantische Stelle mehrfach, eine Finding-ID behalten und die weiteren Meldungen als
+Beleg/Notiz deduplizieren statt eine zweite Remediation-ID zu erzeugen.
 
 ## Status-Lifecycle
 

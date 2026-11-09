@@ -29,9 +29,6 @@ func newBriefingProject(t *testing.T) string {
 		"k-playbook/defaults/instructions/always/README.md":       "# Liesmich\n",
 		"k-playbook/defaults/instructions/on-demand/muster.md":    "---\ntitle: Muster\ndescription: Zeigt den Aufbau.\n---\n\n## Muster\n",
 		"k-playbook/defaults/instructions/on-demand/release.md":   "## Release fahren\n",
-		"k-playbook/defaults/rules/befunde.md":                    "# Regel: Befunde\n\nText.\n",
-		"k-playbook/defaults/rules/docs-sync.md":                  "# Regel: Docs\n\nmitgeliefert\n",
-		"k-playbook/defaults/rules/README.md":                     "# Regeln\n",
 		"k-playbook/defaults/reviews/review-code.md":              "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
 		"k-playbook/defaults/reviews/review-tech.md":              "# Tech-Review\n",
 		"k-playbook/defaults/reviews/notiz.md":                    "# kein Rezept\n",
@@ -43,8 +40,7 @@ func newBriefingProject(t *testing.T) string {
 		"k-playbook-local/instructions/always/notiz.md":           "## Ohne Ziffer\n",
 		"k-playbook-local/instructions/on-demand/release.md":      "",
 		"k-playbook-local/instructions/on-demand/eigen.md":        "## Eigen auf Abruf\n\nText.\n",
-		"k-playbook-local/rules/docs-sync.md":                     "# Regel: Docs\n\nlokal\n",
-		"k-playbook-local/rules/eigene.md":                        "Text ohne Überschrift.\n",
+		"k-playbook-local/rules/eigene.md":                        "# Liegengeblieben\n",
 		"k-playbook-local/reviews/review-tech.md":                 "# Abgeschaltet.\n",
 		"k-playbook-local/guidelines/stil.md":                     "# Stil\n\nText.\n",
 	}
@@ -128,13 +124,10 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 		t.Errorf("onDemand:\n%+v\nerwartet\n%+v", briefing.Documents.OnDemand, wantOnDemand)
 	}
 
-	wantRules := []BriefingEntry{
-		{Ref: "k-playbook:/rules/befunde.md", Title: "Regel: Befunde", Origin: DocOriginDist},
-		{Ref: "k-playbook:/rules/docs-sync.md", Title: "Regel: Docs", Origin: DocOriginOverride},
-		{Ref: "k-playbook:/rules/eigene.md", Title: "eigene.md", Origin: DocOriginLocal},
-	}
-	if !reflect.DeepEqual(briefing.Documents.Rules, wantRules) {
-		t.Errorf("rules:\n%+v\nerwartet\n%+v", briefing.Documents.Rules, wantRules)
+	// Die Sorte rules gibt es nicht mehr: Ein liegengebliebenes
+	// k-playbook-local/rules/ erscheint nirgends im Briefing.
+	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "rules") || strings.Contains(string(data), "eigene.md") {
+		t.Errorf("documents nennt die entfallene Sorte: %s %v", data, err)
 	}
 
 	// Reviews folgen dem Muster des Katalogs: notiz.md ist kein Rezept.
@@ -158,7 +151,7 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 	// Jeder Verweis des Briefings lässt sich über ResolveDocRef lesen, mit
 	// derselben Herkunft.
 	layers := ProjectDocLayers(root)
-	for _, entries := range [][]BriefingEntry{always.Parts, briefing.Documents.OnDemand, briefing.Documents.Rules, briefing.Documents.Reviews, briefing.Documents.Guidelines} {
+	for _, entries := range [][]BriefingEntry{always.Parts, briefing.Documents.OnDemand, briefing.Documents.Reviews, briefing.Documents.Guidelines} {
 		for _, entry := range entries {
 			result := mustResolveDoc(t, layers, entry.Ref)
 			origin := result.Parts[0].Origin
@@ -185,8 +178,8 @@ func TestBriefingOhneVerzeichnisse(t *testing.T) {
 		t.Errorf("always: %+v", briefing.Documents.Always)
 	}
 	for name, list := range map[string][]BriefingEntry{
-		"onDemand": briefing.Documents.OnDemand, "rules": briefing.Documents.Rules,
-		"reviews": briefing.Documents.Reviews, "guidelines": briefing.Documents.Guidelines,
+		"onDemand": briefing.Documents.OnDemand, "reviews": briefing.Documents.Reviews,
+		"guidelines": briefing.Documents.Guidelines,
 	} {
 		if list == nil || len(list) != 0 {
 			t.Errorf("%s: %v, erwartet leere Liste", name, list)
@@ -411,8 +404,8 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 		t.Errorf("guidelines: im Rest %v, documents.guidelines %d", ok, len(briefing.Documents.Guidelines))
 	}
 	raw, _ := rest.Field("catalogs")
-	if strings.Contains(string(raw), "review-code.md") || strings.Contains(string(raw), "befunde.md") || len(briefing.Documents.Rules) == 0 || len(briefing.Documents.Reviews) == 0 {
-		t.Errorf("catalogs.rules/reviews im Rest: %s", raw)
+	if strings.Contains(string(raw), "review-code.md") || len(briefing.Documents.Reviews) == 0 {
+		t.Errorf("catalogs.reviews im Rest: %s", raw)
 	}
 
 	// Die Dokumentlisten nennen Verweise, keine Pfade der Platte.
@@ -462,7 +455,7 @@ func TestBriefingKontextNichtBaubar(t *testing.T) {
 	if section.Available || !strings.Contains(section.Message, "schema_version 99") || len(section.Fields) != 0 {
 		t.Errorf("context: %+v", section)
 	}
-	if len(briefing.Documents.Rules) == 0 || len(briefing.Documents.Always.Parts) == 0 {
+	if len(briefing.Documents.Reviews) == 0 || len(briefing.Documents.Always.Parts) == 0 {
 		t.Errorf("Dokumente fehlen: %+v", briefing.Documents)
 	}
 	encoded, err := json.Marshal(section)
@@ -620,8 +613,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "5" {
-		t.Errorf("schemaVersion %q, erwartet 5", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "6" {
+		t.Errorf("schemaVersion %q, erwartet 6", briefing.SchemaVersion)
 	}
 	if !briefing.Health.OK || len(briefing.Health.Problems) != 0 {
 		t.Errorf("health ohne Probleme: %+v", briefing.Health)

@@ -673,7 +673,6 @@ func newReviewProject(t *testing.T) string {
 		filepath.Join(sharetest.Dir(t), "scripts"),
 		filepath.Join(root, "k-playbook", "commands", "_audit"),
 		filepath.Join(root, "k-playbook", "defaults", "reviews"),
-		filepath.Join(root, "k-playbook", "defaults", "rules"),
 		filepath.Join(root, "k-playbook", "checks"),
 		filepath.Join(root, project.ProjectDirName, "commands", "_audit"),
 		filepath.Join(root, "k-playbook-local", "reviews"),

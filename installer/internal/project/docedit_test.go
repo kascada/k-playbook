@@ -293,7 +293,7 @@ func TestDocEditGeltungsbereich(t *testing.T) {
 	wantCode(t, err, DocCodeForeignUser)
 	for _, ref := range []string{
 		"keph:/todos/004-t.md", "keph:/docs/index.md", "keph:/docs/generated/code/a.md", "keph:/docs/manual",
-		"project:/README.md", "k-playbook:/rules/a.md",
+		"project:/README.md", "k-playbook:/guidelines/a.md",
 		"keph:/user/~/tasks/", "keph:/user/~/tasks/sub/100-a.md",
 	} {
 		_, err := docs.Append(ctx, ref, "y", DocEditOptions{})

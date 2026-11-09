@@ -249,7 +249,7 @@ missing_tools() {
 }
 
 # ---------------------------------------------------------------------------
-# Schutz des Projekt-venv (rules/tool-install-scope.md)
+# Schutz des Projekt-venv: host-lokale Werkzeuge gehören nie in ein Projekt-venv
 # ---------------------------------------------------------------------------
 
 is_project_venv_path() {

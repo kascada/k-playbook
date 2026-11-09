@@ -12,7 +12,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 | Prefix | Meaning | Example |
 |---|---|---|
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
-| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/rules/docs-sync.md` |
+| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/guidelines/betrieb.md` |
 | `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
 | `keph:` | the project's collection in Kephalaion | `keph:/docs/manual/abc.md` |
 | `keph:` with a trailing `/` | a directory in the project's collection, listed with Kephalaion `list` (`recursive`, `frontmatter`), its documents read one by one | `keph:/docs/` |
@@ -59,7 +59,7 @@ a place is recognized, which prefix a bare path gets, what stays untouched as ev
 how it is changed stands once, for sessions, in
 `instructions/on-demand/verweise-nachziehen.md` (task 108); `/k-task-refine`, `/k-upgrade`
 3.3 and every later check follow it. `checks/check_verweise.sh` reports the part that is
-recognizable in the text of the shipped and project-own commands, instructions, rules,
+recognizable in the text of the shipped and project-own commands, instructions,
 guidelines and skills; it does not correct anything, and deliberate exceptions are listed in
 `checks/verweis-exceptions.tsv` (see [checks/README.md](../checks/README.md#verweise-ohne-präfix)).
 
@@ -127,21 +127,22 @@ What each prefix answers:
   `none` is `not_found`, a directory `invalid_input` -- `keph:` names single documents, nothing
   is assembled. `parts` carries `origin: keph`. Other errors of the node keep their code where
   there is one (`kephalaion_error` otherwise).
-- **`k-playbook:`** resolves the kinds `instructions/`, `rules/`, `reviews/`, `guidelines/`
-  and `commands/` (`docReaderKinds` in `docref.go`; `rules`, `reviews` and `guidelines` since
-  task 086, `commands` since task 092) and, as targets of includes, `includes/` and
+- **`k-playbook:`** resolves the kinds `instructions/`, `reviews/`, `guidelines/` and
+  `commands/` (`docReaderKinds` in `docref.go`; `reviews` and `guidelines` since task 086,
+  `commands` since task 092; the former kind for rules is gone since task 135 and is
+  `unsupported` like any other path outside these kinds) and, as targets of includes, `includes/` and
   `testdata/` (see below). A `k-playbook:` path outside these kinds is refused as
   `unsupported` -- `k-playbook:/checks/check_x.sh` is a valid reference whose kind is not
   resolved: checks are scripts that run, skills live with the assistant; nobody reads them
   through a reference. The message names only the reader kinds. Commands lie with the
   assistant only as a hull (frontmatter plus the reference `k-playbook:/commands/<name>.md`);
-  their text is resolved like a rule, as a single file.
+  their text is resolved like a review recipe, as a single file.
 
 Paths with `..`, `.`, hidden or empty segments are not references at all (`invalid_input`).
 A `k-playbook:` reference ending in `/` whose directory is not on the list of assembled
 directories is incomplete -- the file name is missing -- and also `invalid_input`, decided
 without reading: `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`,
-`k-playbook:/rules/`, an unknown directory and a file with a trailing `/`
+`k-playbook:/reviews/`, an unknown directory and a file with a trailing `/`
 (`…/010-verweise.md/`); the same holds for every `project:` and `keph:` reference ending in
 `/`. The message says "Dateiname fehlt" and gives an example that fits the case. Outside the
 kinds the check for `unsupported` comes first, so `k-playbook:/checks/` stays `unsupported`.
@@ -247,9 +248,9 @@ empty `defaults/` (no `defaults/VERSION`), every `k-playbook:` reference — and
 a whole — fails with `kephalaion_unavailable` and a remedy; there is no fallback to the disk,
 and the local layer is never served alone. The shipped instructions exist once, in
 `defaults/instructions/` of this repo; the release packs them for the hub. Until 2026-10-17 a
-copy lay at the top of the repo as well; that copy is gone. `rules/`, `reviews/` and
-`guidelines/` at the top of the repo have the same content as their `defaults/` copies and are
-no longer read by the binary.
+copy lay at the top of the repo as well; that copy is gone. `reviews/` and `guidelines/` at
+the top of the repo have the same content as their `defaults/` copies and are no longer read
+by the binary.
 
 `commands/` is read from `defaults/commands/` as well, but the file at the top of the repo
 is not a copy: `commands/<name>.md` is the hull the assistant registers, frontmatter plus the
@@ -266,7 +267,7 @@ the difference.
 There is **one** overlay, not two: `overlayDocDir` in `docref.go` lays the two layers of a
 directory over each other -- same name wins locally, an empty local file disables -- and the
 catalogs of `k-playbook context` (`resolveCatalog`), the references here and the briefing all
-go through it. A test compares both ways for `rules` and `reviews`: name, origin and
+go through it. A test compares both ways for `reviews`: name, origin and
 `disabled` of every catalog entry are what `k-playbook:/<kind>/<name>` answers, and the
 content behind the reference is what the catalog's `path` names -- for a shipped entry that
 `path` is the reference itself. The one named exception is the
@@ -318,7 +319,7 @@ Overriding compares the whole file name, number included. A local
 
 ### What "empty" means
 
-The same as `isEmptyFile()` for `rules` and `reviews`: nothing but blank lines and lines
+The same as `isEmptyFile()` for `reviews`: nothing but blank lines and lines
 starting with `#`. That lets a disabling file carry its reason:
 
 ```markdown

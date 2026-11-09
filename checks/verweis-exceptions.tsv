@@ -1,10 +1,9 @@
 # Bewusste Ausnahmen für check_verweise.sh: Stellen, die der Check als Verweis ohne
 # Präfix erkennt, die aber keiner sind oder die bewusst noch nicht nachgezogen sind.
 #
-# Gelesen wird diese Datei nur von check_verweise.sh im selben Verzeichnis. Ersetzt
-# ein projekteigener Check den mitgelieferten, gilt allein die Datei neben ihm; diese
-# hier wird dann nicht zusätzlich gelesen. Was ein Verweis ist und wie er nachgezogen
-# wird, steht in k-playbook:/instructions/on-demand/verweise-nachziehen.md.
+# Gelesen wird diese Datei nur von check_verweise.sh im selben Verzeichnis. Was ein
+# Verweis ist und wie er nachgezogen wird, steht in
+# k-playbook:/instructions/on-demand/verweise-nachziehen.md.
 #
 # Fields: datei	zeile	art	begründung
 #
@@ -13,8 +12,8 @@
 #             für projekteigene Commands und Skills, k-playbook-local/… für die
 #             übrigen Sorten. Endet er auf /, ist er ein
 #             Bereich (Muster mit * erlaubt): ein Eintrag für alle Fundstellen darin.
-#             Bereiche gibt es nur für Inhalt für Leser, nie in commands/,
-#             instructions/ oder rules/ — dort steht jede Fundstelle einzeln.
+#             Bereiche gibt es nur für Inhalt für Leser, nie in commands/ oder
+#             instructions/ — dort steht jede Fundstelle einzeln.
 # zeile       1-basierte Zeilennummer der Fundstelle, bei einem Bereich *.
 # art         link (relativer Markdown-Link) oder pfad (Pfad ohne Präfix), bei einem
 #             Bereich auch *.
@@ -30,7 +29,7 @@ datei	zeile	art	begründung
 defaults/commands/_task-run/diff-review.md	12	pfad	Ortsangabe: nennt das Modulverzeichnis, in dem die Datei liegt; gelesen wird das Modul über k-playbook:/commands/_task-run/diff-review.md.
 defaults/commands/k-doc-inventory.md	40	pfad	Plattenort: die Datei, die das Subkommando k-playbook inventory liest; der Satz verbietet, sie selbst zu lesen.
 defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot (nie selbst aus k-playbook/ lesen); die Datei bleibt nach Task 108 unverändert.
-defaults/instructions/always/030-briefing.md	28	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
+defaults/instructions/always/030-briefing.md	30	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/instructions/always/100-projektwissen-zuerst.md	9	pfad	Ortsangabe: der Pfad ist das Argument von Kephalaion list in der Collection, kein Verweis.
 defaults/guidelines/betrieb.md	20	pfad	Ortsangabe: Beispiel der kurzen Schreibweise in Text für Menschen.
-share/commands/k-audit.md	386	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.
+share/commands/k-audit.md	388	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.

@@ -14,12 +14,9 @@ func newContextProject(t *testing.T) string {
 
 	root := t.TempDir()
 	for _, dir := range []string{
-		filepath.Join(PlaybookDir(root), "defaults", "rules"),
 		filepath.Join(PlaybookDir(root), "defaults", "reviews"),
 		filepath.Join(PlaybookDir(root), "checks"),
-		filepath.Join(LocalDir(root), "rules"),
 		filepath.Join(LocalDir(root), "reviews"),
-		filepath.Join(LocalDir(root), "checks"),
 		filepath.Join(LocalDir(root), "guidelines"),
 	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -53,28 +50,34 @@ func entryByName(entries []CatalogEntry, name string) (CatalogEntry, bool) {
 func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "rules", "docs-sync.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "rules", "review-authoring.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(LocalDir(root), "rules", "docs-sync.md"), "# eigene Fassung\n")
-	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# nur lokal\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-code.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-tech.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(LocalDir(root), "reviews", "review-code.md"), "# eigene Fassung\n")
+	write(t, filepath.Join(LocalDir(root), "reviews", "review-eigen.md"), "# nur lokal\n")
+	// Ein liegengebliebenes k-playbook-local/rules/ ergibt keinen Katalog:
+	// Die Sorte gibt es nicht mehr.
+	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# liegengeblieben\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
+	if _, ok := context.Catalogs["rules"]; ok {
+		t.Errorf("Katalog der entfallenen Sorte rules: %+v", context.Catalogs["rules"])
+	}
 
-	rules := context.Catalogs["rules"]
-	if len(rules) != 3 {
-		t.Fatalf("%d Regeln, erwartet 3: %+v", len(rules), rules)
+	reviews := context.Catalogs["reviews"]
+	if len(reviews) != 3 {
+		t.Fatalf("%d Reviews, erwartet 3: %+v", len(reviews), reviews)
 	}
 
 	cases := map[string]string{
-		"docs-sync.md":        "override",
-		"review-authoring.md": "dist",
-		"eigene.md":           "local",
+		"review-code.md":  "override",
+		"review-tech.md":  "dist",
+		"review-eigen.md": "local",
 	}
 	for name, origin := range cases {
-		entry, ok := entryByName(rules, name)
+		entry, ok := entryByName(reviews, name)
 		if !ok {
 			t.Errorf("%s fehlt im Katalog", name)
 			continue
@@ -89,23 +92,57 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "checks", "check_secrets.sh"), "#!/bin/sh\necho x\n")
-	write(t, filepath.Join(LocalDir(root), "checks", "check_secrets.sh"), "# Abgeschaltet: nicht nötig.\n")
+	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-code.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(LocalDir(root), "reviews", "review-code.md"), "")
 
 	context, err := BuildContext(root)
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
 
-	entry, ok := entryByName(context.Catalogs["checks"], "check_secrets.sh")
+	entry, ok := entryByName(context.Catalogs["reviews"], "review-code.md")
 	if !ok {
-		t.Fatal("check_secrets.sh fehlt im Katalog")
+		t.Fatal("review-code.md fehlt im Katalog")
 	}
 	if !entry.Disabled {
 		t.Error("Disabled = false, obwohl die lokale Datei leer ist")
 	}
 	if entry.Origin != "override" {
 		t.Errorf("Origin = %q, erwartet override", entry.Origin)
+	}
+}
+
+// checks hat keine lokale Ebene mehr (Task 134): Ein liegengebliebenes
+// k-playbook-local/checks/ ersetzt nichts, schaltet nichts ab und fügt nichts
+// hinzu; jeder Eintrag ist dist.
+func TestBuildContextChecksOhneLokaleEbene(t *testing.T) {
+	root := newContextProject(t)
+
+	write(t, filepath.Join(PlaybookDir(root), "checks", "check_secrets.sh"), "#!/bin/sh\necho x\n")
+	write(t, filepath.Join(PlaybookDir(root), "checks", "check_links.sh"), "#!/bin/sh\necho y\n")
+	write(t, filepath.Join(LocalDir(root), "checks", "check_secrets.sh"), "# Abgeschaltet: nicht nötig.\n")
+	write(t, filepath.Join(LocalDir(root), "checks", "check_links.sh"), "#!/bin/sh\necho lokal\n")
+	write(t, filepath.Join(LocalDir(root), "checks", "check_eigen.sh"), "#!/bin/sh\necho eigen\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	checks := context.Catalogs["checks"]
+	if len(checks) != 2 {
+		t.Fatalf("%d Checks, erwartet 2: %+v", len(checks), checks)
+	}
+	for _, entry := range checks {
+		if entry.Origin != "dist" || entry.Disabled {
+			t.Errorf("%s: Origin = %q, Disabled = %v, erwartet dist und nicht abgeschaltet", entry.Name, entry.Origin, entry.Disabled)
+		}
+		if want := filepath.Join(PlaybookDir(root), "checks", entry.Name); entry.Path != want {
+			t.Errorf("%s: Path = %q, erwartet %q", entry.Name, entry.Path, want)
+		}
+	}
+	if _, ok := entryByName(checks, "check_eigen.sh"); ok {
+		t.Error("check_eigen.sh aus k-playbook-local/checks/ steht im Katalog")
 	}
 }
 

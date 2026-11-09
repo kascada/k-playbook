@@ -76,7 +76,7 @@ const docTestdataRoot = "testdata"
 // checks und skills fehlen bewusst: Skripte laufen, Skills liegen beim
 // Assistenten; beides liest niemand über einen Verweis. Commands liegen beim
 // Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
-var docReaderKinds = []string{docInstructionsRoot, "rules", "reviews", "guidelines", docCommandsRoot}
+var docReaderKinds = []string{docInstructionsRoot, "reviews", "guidelines", docCommandsRoot}
 
 // docRefKinds sind alle Sorten, die ResolveDocRef auflöst: die Lesersorten
 // und dazu includes/ und testdata/, die in keinem Katalog, keinem Briefing
@@ -298,7 +298,7 @@ func memoKephDocs(open func() (KephDocs, error)) func() (KephDocs, error) {
 // Die Sorte commands/ liest aus .k-playbook/commands/, demselben Ort, aus dem
 // die Verlinkung projekteigene Commands nimmt (ProjectAssetDir), samt der
 // Bausteine unter commands/_shared/. Eine Datei dort ersetzt Hülle und Text
-// zugleich. Die übrigen Sorten (rules/, reviews/, guidelines/, instructions/,
+// zugleich. Die übrigen Sorten (reviews/, guidelines/, instructions/,
 // includes/) lesen bis zu ihrem Umzug weiter aus k-playbook-local/. Den
 // früheren Ort k-playbook-local/commands/ liest seit Task 129 nichts mehr.
 func NewProjectLocalDocSource(projectDir string) DocSource {

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Werkzeugaufrufe in Commands ohne lokalen Guard oder Rückfall finden.
 
-Der Check setzt den Abschnitt „Externe Werkzeuge" aus rules/command-authoring.md
-durch. Er ist ein Hinweisgeber, kein Shell-Parser; seine Grenzen sind bewusst:
+Der Check setzt die Vorgabe durch, dass ein Command ein externes Werkzeug nur mit
+Guard oder Rückfall aufruft. Er ist ein Hinweisgeber, kein Shell-Parser; seine
+Grenzen sind bewusst:
 
 - Werkzeugliste ist allein die Spalte ``name`` aus share/scripts/base-tools.tsv.
 - Gelesen wird der effektive Command-Katalog: mitgelieferte Hüllen aus
@@ -56,7 +57,6 @@ EXCEPTIONS_FILE = "command-tool-guard-exceptions.tsv"
 EXCEPTIONS_HEADER = ["datei", "zeile", "werkzeug", "begründung"]
 LOCAL_DIR_NAME = "k-playbook-local"
 PROJECT_DIR_NAME = ".k-playbook"
-PLAYBOOK_DIR_NAME = "k-playbook"
 SHELL_LANGUAGES = {"bash", "sh", "shell", "zsh"}
 CONSOLE_LANGUAGE = "console"
 
@@ -69,22 +69,19 @@ REDIRECTION = re.compile(r"^[0-9]*(>>?|<|&>>?|>&|<&|>\|)")
 # --- Pfade -------------------------------------------------------------------
 
 
-def resolve_dirs(script_dir: Path) -> tuple[Path, Path, bool]:
+def resolve_dirs(script_dir: Path) -> tuple[Path, Path]:
     """Playbook-Verzeichnis und projekteigenes Verzeichnis bestimmen.
 
     Der Runner übergibt das Playbook als K_CHECK_PLAYBOOK_DIR; dieser Wert gilt
-    zuerst. Ohne ihn liegt ein mitgeliefertes Skript in checks/, dessen
-    Elternordner das Playbook ist. Für einen Override unter
-    k-playbook-local/checks/ bleibt dann nur die Annahme k-playbook/ neben
-    k-playbook-local/. Der dritte Wert sagt, ob der Pfad so geraten wurde.
+    zuerst. Ohne ihn liegt das Skript in checks/ der Installation, dessen
+    Elternordner das Playbook ist. Einen Check unter k-playbook-local/checks/
+    gibt es nicht mehr (Task 134), geraten wird deshalb nichts.
     """
     local_dir = config_root() / LOCAL_DIR_NAME
     given = os.environ.get("K_CHECK_PLAYBOOK_DIR")
     if given:
-        return Path(given).resolve(), local_dir, False
-    if script_dir == (local_dir / "checks").resolve():
-        return config_root() / PLAYBOOK_DIR_NAME, local_dir, True
-    return script_dir.parent, local_dir, False
+        return Path(given).resolve(), local_dir
+    return script_dir.parent, local_dir
 
 
 def config_root() -> Path:
@@ -703,16 +700,10 @@ def run() -> int:
     if len(sys.argv) != 2:
         return fail_technical("usage: command_tool_guards.py <check-script-dir>")
     script_dir = Path(sys.argv[1]).resolve()
-    playbook_dir, _local_dir, guessed = resolve_dirs(script_dir)
+    playbook_dir, _local_dir = resolve_dirs(script_dir)
 
     matrix = playbook_dir / "share" / "scripts" / "base-tools.tsv"
     if not matrix.is_file():
-        # Ein geratener Pfad darf den Check nicht still per skip abschalten.
-        if guessed:
-            return fail_technical(
-                f"base tools matrix not found: {matrix}; the playbook directory of this "
-                "override check was guessed, set K_CHECK_PLAYBOOK_DIR"
-            )
         status("skip", f"base tools matrix not found: {matrix}")
         return 0
     try:

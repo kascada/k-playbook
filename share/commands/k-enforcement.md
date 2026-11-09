@@ -1,5 +1,5 @@
 ---
-description: Prüft die laufende Änderung — die geänderten Dateien des Arbeitsbaums samt unverfolgten — gegen die Regeln aus dem Briefing, führt k-check --mode changed über dieselbe Menge aus und berichtet je Regel und den Doku-Nachzug; reiht nach Freigabe einen Doku-Auftrag ein. Ein Argument grenzt den Prüfumfang auf ein Verzeichnis ein. Dünne Hülle über dem Text k-playbook:/commands/k-enforcement.md.
+description: Prüft die laufende Änderung — die geänderten Dateien des Arbeitsbaums samt unverfolgten — auf den Doku-Nachzug, führt k-check --mode changed über dieselbe Menge aus und berichtet beides; reiht nach Freigabe einen Doku-Auftrag ein. Ein Argument grenzt den Prüfumfang auf ein Verzeichnis ein. Dünne Hülle über dem Text k-playbook:/commands/k-enforcement.md.
 argument-hint: [verzeichnis]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Bash, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_create, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write]

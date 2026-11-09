@@ -541,11 +541,14 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 
 ### 3.4 — Aufräumen
 
-Das Einrichten legt sieben Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
+Das Einrichten legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
 sie nicht mehr als fehlend: Der Inhalt der ersten fünf liegt in der Projekt-Collection, der von
 `commands/` und `skills/` in `<context.project.dir>/.k-playbook/commands/` und
-`<context.project.dir>/.k-playbook/skills/`. In einem bestehenden Projekt liegen sie noch, oft
-nur mit ihrer README.
+`<context.project.dir>/.k-playbook/skills/`. Der Inhalt von `rules/` hat keinen Nachfolger in
+der Collection: Die Sorte gibt es nicht mehr, k-playbook liest dort nichts. Auch der Inhalt von
+`checks/` hat keinen Nachfolger: `k-check` führt nur noch die mitgelieferten Checks aus,
+projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen. In einem bestehenden
+Projekt liegen die Verzeichnisse noch, oft nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
 Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
 Sie läuft nach 3.0 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
@@ -558,6 +561,8 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `material/`
 - `commands/`
 - `skills/`
+- `rules/`
+- `checks/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
 die Collection nicht.
@@ -625,6 +630,14 @@ wirken, und darunter steht je Eintrag eine eigene Zeile mit seinem Ziel
 Dateien mit dem Namen `README.md` und die verwaltete `.gitignore` ziehen nicht um und
 erscheinen dort nicht. Liegt am Ziel schon etwas, steht `Ziel belegt` hinter der Zeile.
 
+Für `rules/` nennt die Zeile `bleibt:` wie sonst höchstens fünf Pfade und dazu als Warnung,
+dass diese Regeln nicht mehr gelesen werden: Ihr Inhalt gehört von Hand in Guidelines
+(`keph:/docs/`) oder Instructions. 3.4 zieht ihn nicht um.
+
+Für `checks/` nennt die Zeile `bleibt:` ebenso höchstens fünf Pfade und dazu als Hinweis, dass
+diese Checks nicht mehr laufen: `k-check` führt nur noch die mitgelieferten aus. 3.4 zieht
+nichts um und fragt nicht.
+
 ```text
 Aufräumen in k-playbook-local/
   docs/        gelöscht: README.md
@@ -637,6 +650,20 @@ Aufräumen in k-playbook-local/
     k-gui.md         → .k-playbook/commands/k-gui.md  Ziel belegt
   skills/      bleibt: wirkt mit diesem Programm nicht mehr, Ziel je Skill
     forelle/         → .k-playbook/skills/forelle/
+  rules/       gelöscht: README.md
+  checks/      gelöscht: README.md
+```
+
+Liegt in `rules/` mehr als die README, lautet seine Zeile etwa:
+
+```text
+  rules/       bleibt: README.md, eigene-regel.md — wird nicht mehr gelesen; Inhalt von Hand in Guidelines (keph:/docs/) oder Instructions
+```
+
+Liegt in `checks/` mehr als die README, lautet seine Zeile etwa:
+
+```text
+  checks/      bleibt: README.md, check_eigen.sh — läuft nicht mehr; k-check führt nur noch die mitgelieferten Checks aus
 ```
 
 Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:

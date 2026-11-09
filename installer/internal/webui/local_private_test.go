@@ -131,7 +131,7 @@ func TestSetLocalPrivateHandlerSchaltetUmUndIstIdempotent(t *testing.T) {
 func TestSetLocalPrivateHandlerLehntFremdePfadeAb(t *testing.T) {
 	root := privateProject(t)
 
-	for _, path := range []string{"rules", "..", "../..", "/etc", ""} {
+	for _, path := range []string{"reviews", "..", "../..", "/etc", ""} {
 		body, err := json.Marshal(privateRequest{Path: path, Private: true})
 		if err != nil {
 			t.Fatalf("Anfrage bauen: %v", err)
@@ -142,7 +142,7 @@ func TestSetLocalPrivateHandlerLehntFremdePfadeAb(t *testing.T) {
 		}
 	}
 
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "rules", project.PrivateIgnoreFile)); err == nil {
+	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "reviews", project.PrivateIgnoreFile)); err == nil {
 		t.Error("es wurde eine .gitignore außerhalb der privaten Verzeichnisse geschrieben")
 	}
 }

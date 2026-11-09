@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verweise ohne Präfix in Commands, Instructions, Rules, Guidelines und Skills finden.
+"""Verweise ohne Präfix in Commands, Instructions, Guidelines und Skills finden.
 
 Maßgeblich ist k-playbook:/instructions/on-demand/verweise-nachziehen.md: Dort steht,
 was ein Verweis ist und wie er nachgezogen wird. Dieser Check setzt nur den Teil
@@ -7,9 +7,9 @@ davon um, der am Text erkennbar ist; er meldet und korrigiert nichts. Seine Gren
 sind bewusst:
 
 - Gelesen werden die mitgelieferten Quellen unter <playbook>/defaults/ (commands/,
-  instructions/, rules/, guidelines/) und <playbook>/share/ (commands/, skills/) und
+  instructions/, guidelines/) und <playbook>/share/ (commands/, skills/) und
   ihre projekteigenen Gegenstücke: commands/ und skills/ unter
-  <config-root>/.k-playbook/, instructions/, rules/ und guidelines/ unter
+  <config-root>/.k-playbook/, instructions/ und guidelines/ unter
   <config-root>/k-playbook-local/, jeweils alle .md- und .md.template-Dateien.
   Schlüssel ist der Pfad ab dem Playbook (defaults/…, share/…) bzw. ab der
   Konfigurationswurzel (.k-playbook/…, k-playbook-local/…). Den früheren Ort
@@ -51,18 +51,18 @@ EXCEPTIONS_HEADER = ["datei", "zeile", "art", "begründung"]
 LOCAL_DIR_NAME = "k-playbook-local"
 KINDS = ("link", "pfad")
 
-PLAYBOOK_SCOPE = ("defaults/commands", "defaults/instructions", "defaults/rules",
+PLAYBOOK_SCOPE = ("defaults/commands", "defaults/instructions",
                   "defaults/guidelines", "share/commands", "share/skills")
-LOCAL_SCOPE = ("instructions", "rules", "guidelines")
+LOCAL_SCOPE = ("instructions", "guidelines")
 # Projekteigene Commands und Skills liegen in .k-playbook/, nicht in k-playbook-local/.
 PROJECT_SCOPE = ("commands", "skills")
 
 # Bereiche, für die es keinen Eintrag je Bereich gibt: Hier steht jede Fundstelle
 # einzeln in der Ausnahmeliste.
-NO_AREA_SEGMENTS = {"commands", "instructions", "rules"}
+NO_AREA_SEGMENTS = {"commands", "instructions"}
 
 KNOWN_ROOTS = ("k-playbook-local", "k-playbook", ".k-playbook", ".claude", ".opencode", "share", "defaults",
-               "installer", "rules", "guidelines", "instructions", "docs", "checks", "bin",
+               "installer", "guidelines", "instructions", "docs", "checks", "bin",
                "commands", "skills", "tasks")
 
 REL_LINK = re.compile(r"\]\((?:\.\./|\./)")
@@ -214,7 +214,7 @@ def read_exceptions(path: Path) -> tuple[list[ExceptionEntry], list[str]]:
             if zeile != "*":
                 errors.append("an area (datei ending in /) needs zeile '*'")
             if NO_AREA_SEGMENTS & set(parts):
-                errors.append(f"area '{datei}' lies in commands/, instructions/ or rules/; list each finding")
+                errors.append(f"area '{datei}' lies in commands/ or instructions/; list each finding")
         elif not (datei.endswith(".md") or datei.endswith(".md.template")):
             errors.append(f"datei '{datei}' is neither a .md file nor an area ending in /")
         elif not re.fullmatch(r"[0-9]+", zeile) or int(zeile) < 1:
@@ -249,7 +249,7 @@ def run() -> int:
     if len(sys.argv) != 2:
         return fail_technical("usage: verweise.py <check-script-dir>")
     script_dir = Path(sys.argv[1]).resolve()
-    playbook_dir, local_dir, _ = resolve_dirs(script_dir)
+    playbook_dir, local_dir = resolve_dirs(script_dir)
     project_dir = config_root() / PROJECT_DIR_NAME
 
     files = source_files(playbook_dir, local_dir, project_dir)

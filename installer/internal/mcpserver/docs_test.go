@@ -139,14 +139,16 @@ func TestDocReadFehlercodes(t *testing.T) {
 		"project:/scripts/123.sh":                       project.DocCodeNotFound,
 		"project:/k-playbook/":                          project.DocCodeInvalidInput,
 		// Ohne Anbindung des Projekts; der Node wird nicht gefragt.
-		"keph:/manual/abc.md":                    project.DocCodeKephalaionUnavailable,
-		"keph:/manual/":                          project.DocCodeInvalidInput,
-		"k-playbook:/checks/check_x.sh":          project.DocCodeUnsupported,
-		"k-playbook:/rules/":                     project.DocCodeInvalidInput,
-		"k-playbook:/rules/fehlt.md":             project.DocCodeNotFound,
-		"k-playbook:/instructions/../rules/x.md": project.DocCodeInvalidInput,
-		"instructions/always/":                   project.DocCodeInvalidInput,
-		"":                                       project.DocCodeInvalidInput,
+		"keph:/manual/abc.md":                      project.DocCodeKephalaionUnavailable,
+		"keph:/manual/":                            project.DocCodeInvalidInput,
+		"k-playbook:/checks/check_x.sh":            project.DocCodeUnsupported,
+		"k-playbook:/rules/":                       project.DocCodeUnsupported,
+		"k-playbook:/rules/fehlt.md":               project.DocCodeUnsupported,
+		"k-playbook:/reviews/":                     project.DocCodeInvalidInput,
+		"k-playbook:/reviews/review-fehlt.md":      project.DocCodeNotFound,
+		"k-playbook:/instructions/../reviews/x.md": project.DocCodeInvalidInput,
+		"instructions/always/":                     project.DocCodeInvalidInput,
+		"":                                         project.DocCodeInvalidInput,
 	} {
 		envelope, result := callDocRead(t, root, ref)
 		if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != code {

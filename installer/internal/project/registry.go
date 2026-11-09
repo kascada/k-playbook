@@ -100,7 +100,7 @@ func throughShareLink(projectDir string, kind AssetKind, shippedDir string, path
 //
 // Vergleichseinheit ist der Name: eine gleichnamige projekteigene Datei ersetzt
 // die mitgelieferte vollständig, eine leere schaltet sie ab. Das ist dieselbe
-// Regel wie bei rules, reviews und checks in context.go — nur dass hier bis in
+// Regel wie bei reviews in context.go — nur dass hier bis in
 // die Namensräume hinein verglichen wird, damit ein Projekt eine einzelne
 // Datei aus _shared/ ersetzen kann, ohne den ganzen Namensraum zu kopieren.
 //

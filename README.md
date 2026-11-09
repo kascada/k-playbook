@@ -1,6 +1,6 @@
 # k-playbook
 
-`k-playbook` is a toolbox of slash commands, skills, review recipes, rules and checks. It is cloned into a subdirectory of the target project, `<project>/k-playbook/`. The project's own artifacts live next to it. A project is self-contained that way.
+`k-playbook` is a toolbox of slash commands, skills, review recipes and checks. It is cloned into a subdirectory of the target project, `<project>/k-playbook/`. The project's own artifacts live next to it. A project is self-contained that way.
 
 ## Why k-playbook
 
@@ -120,14 +120,12 @@ project/
 │   ├── commands/ ←─┤     project-owned commands, committed (only when used)
 │   └── skills/   ←─┘     project-owned skills, committed (only when used)
 ├── k-playbook/           the installation, fully replaceable
-│   ├── rules/ reviews/ checks/
+│   ├── reviews/ checks/
 │   ├── bin/
 │   ├── k-playbook.md     shipped instruction layer
 │   └── installer/ docs/
 └── k-playbook-local/     project-owned, committed
-    ├── rules/            overlay onto k-playbook/rules/
     ├── reviews/          overlay onto k-playbook/reviews/
-    ├── checks/           overlay onto k-playbook/checks/
     ├── results/          everything reviews produce; not versioned
     ├── guidelines/
     ├── priv/             notes and work in progress
@@ -137,7 +135,12 @@ project/
 
 Tasks, todos and the project documentation live in the project's Kephalaion collection,
 so setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes
-them from an existing project once they hold nothing but their README. Project-owned
+them from an existing project once they hold nothing but their README. The former
+rule directory is gone as well (task 135); `/k-upgrade` removes it once empty or warns
+that what is left there is no longer read. The same goes for the former directory of
+project-owned checks (task 134): `k-check` runs only the shipped checks, and
+`/k-upgrade` removes the directory once empty or notes that what is left there no longer
+runs. Project-owned
 commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/` since task
 129; `k-playbook-local/commands/` and `k-playbook-local/skills/` are no longer read, and
 `/k-upgrade` removes them once empty or names each entry left there with its target. The former
@@ -155,8 +158,9 @@ switched by the **Local settings** block of the interface — measured with
 `.gitignore` already in place keeps working.
 
 An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty
-one disables it. This holds for `rules/`, `reviews/` and `checks/`, and in the same way for
-`commands/` and `skills/` in `.k-playbook/`.
+one disables it. This holds for `reviews/`, and in the same way for `commands/` and
+`skills/` in `.k-playbook/`. Checks have no project-owned layer: only the shipped ones
+run.
 
 That is why `.claude/commands/` and the other two targets are **real directories with
 individual symlinks**, not directory symlinks: only that way do both sources arrive. The
@@ -221,7 +225,7 @@ own; the call always goes through the clone. It is the way to go if the installa
 or if `k-playbook` in the `PATH` resolves to a different file than
 `~/.local/bin/k-playbook`; in that case the interface shows a note with both paths instead
 of the button, because a program installed there would not be the one the next call starts.
-If only commands, rules or recipes are new, `VERSION` does not change and the service keeps
+If only commands, instructions or recipes are new, `VERSION` does not change and the service keeps
 running.
 
 In the terminal, `k-playbook upgrade` does both in one go — the pull, the binary when
@@ -272,7 +276,7 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 
 - Every project carries its own installation in a subdirectory. No fixed host path, no global symlink.
 - Installation and project ownership are strictly separated: `k-playbook/` is fully replaced on every update, everything beside it is never touched.
-- Shipped rules, reviews and checks are not edited. A project deviates by overlay: a local file of the same name replaces completely, an empty one disables.
+- Shipped reviews and checks are not edited. A project deviates from a review by overlay: a local file of the same name replaces completely, an empty one disables. Checks have no overlay; only the shipped ones run.
 - Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
 - Reviews and results stay project-owned artifacts under `k-playbook-local/`; tasks and todos are documents in the project collection.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.

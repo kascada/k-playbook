@@ -6,13 +6,13 @@ model and normal sequence; detailed workflows are on the linked topic pages.
 ## Purpose
 
 `k-playbook` is a toolkit for AI assistant work: slash commands, skills, review
-recipes, rules, and checks. It is cloned into a subdirectory of the project it
+recipes, and checks. It is cloned into a subdirectory of the project it
 supports and sits alongside the project-owned artifacts.
 
 The goal is controlled, traceable, and repeatable assistant work:
 
 - Keep shipped and project-owned content clearly separate.
-- Update commands, skills, review recipes, rules, and checks using `git pull`.
+- Update commands, skills, review recipes, and checks using `git pull`.
 - Store tasks, reviews, and results in fixed locations.
 - Make review, task, and remediation flows auditable.
 - Establish docs as the first source for later AI sessions.
@@ -44,10 +44,10 @@ flowchart LR
     Anchor[".k-playbook/K-PLAYBOOK.yaml"] --> Playbook["k-playbook/"]
     Anchor --> Local["k-playbook-local/"]
 
-    Playbook --> Base["rules/ · reviews/ · checks/<br>commands/ · skills/"]
+    Playbook --> Base["reviews/ · checks/<br>commands/ · skills/"]
     Playbook --> Tool["bin/ · scripts/"]
 
-    Local --> Overlay["rules/ · reviews/ · checks/<br>commands/ · skills/"]
+    Local --> Overlay["reviews/<br>commands/ · skills/"]
     Local --> Artifacts["results/ · guidelines/ · priv/"]
     Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
 
@@ -61,8 +61,8 @@ flowchart LR
 
 There is no longer a `paths:` block. Every location derives from the location
 of `K-PLAYBOOK.yaml`: results are under `k-playbook-local/results/`, project
-knowledge under `keph:/docs/` in the project collection, and shipped rules under
-`k-playbook/rules/`. Tasks are documents in the project collection as well,
+knowledge under `keph:/docs/` in the project collection, and shipped checks under
+`k-playbook/checks/`. Tasks are documents in the project collection as well,
 `keph:/user/<user>/tasks/`, not files on disk. A command therefore neither guesses
 nor reads a path: it derives it, or it takes the reference.
 
@@ -70,9 +70,11 @@ The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
 ### Merge shipped and project-owned content
 
-Five directories exist twice: `rules/`, `reviews/`, `checks/`, `commands/`, and
-`skills/`. What applies is the union of both sides. **For the same name, the
-project-owned entry wins, completely**: the shipped entry is not read at all.
+Three directories exist twice: `reviews/`, `commands/`, and `skills/`. What
+applies is the union of both sides. **For the same name, the project-owned entry
+wins, completely**: the shipped entry is not read at all. Checks exist only once,
+shipped under `k-playbook/checks/`: there are no project-owned checks since task 134,
+and `/k-upgrade` removes a leftover `k-playbook-local/checks/`.
 
 Content is disabled with an **empty** local entry: nothing except blank lines
 and comments. This lets the file record its own reason, without requiring a
@@ -107,7 +109,7 @@ it offers on request; see [`mcp.md`](./mcp.md).
 One answer also means once per session. The output does not change while work
 is underway, so the next command does not retrieve it again but continues with
 the existing result. Retrieve it again only after writing `K-PLAYBOOK.yaml`,
-changing the set of rules, reviews, checks, or guidelines, or moving work to a
+changing the set of reviews, checks, or guidelines, or moving work to a
 different project.
 
 ### Instructions at two levels
@@ -163,7 +165,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
 | Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings |
 | Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
-| Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check rules, diagnose tests, read histories, mark VS Code |
+| Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check docs follow-up and `k-check`, diagnose tests, read histories, mark VS Code |
 
 New or changed commands become visible only after restarting the assistant.
 
@@ -271,14 +273,13 @@ which tool wrote it under `generated.by`. No command writes doc files in
 `keph:/docs/manual/`; other documentation maintained by a project also remains
 untouched. k-playbook claims only its own directory.
 
-## Rules and checks
+## Docs follow-up and checks
 
-Shipped rules are in `k-playbook/rules/`, project-owned rules in
-`k-playbook-local/rules/`. The briefing lists the effective set under `Regeln:`, and the
-always-instruction "Regeln anwenden" makes every session read the rules that concern its
-diff and apply them before it finishes a change. `/k-enforcement` is the explicit report:
-it checks the changed files of the working tree against these rules, runs
-`k-check --mode changed` over the same files and reports the docs follow-up. After a code
+The always-instruction "Doku nachziehen" makes every session update the hand-written
+documentation, `README.md` and `AGENTS.md` in the same pass as a code change, before it
+finishes the change. `/k-enforcement` is the explicit report: it determines the changed
+files of the working tree, runs `k-check --mode changed` over the same files and reports
+the docs follow-up. After a code
 change the generated documentation is not regenerated on the spot: the session queues a
 documentation order in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`), which `/k-docs-code` or
@@ -292,14 +293,13 @@ k-playbook/bin/k-check --mode changed
 k-playbook/bin/k-check --mode baseline
 ```
 
-Details are in [`../checks/README.md`](../checks/README.md) and
-[`../rules/README.md`](../rules/README.md).
+Details are in [`../checks/README.md`](../checks/README.md).
 
 ## Operating rules
 
 - Each project carries its own installation. No fixed host path and no global symlink.
 - `k-playbook/` is fully replaced on every update; never touch anything beside it.
-- Do not edit shipped rules, reviews, or checks. A project diverges through an overlay: a same-named local file replaces it, and an empty one disables it.
+- Do not edit shipped reviews or checks. A project diverges from a review through an overlay: a same-named local file replaces it, and an empty one disables it. Checks have no overlay; only the shipped ones run.
 - Paths are derived, not guessed or configured.
 - `K-PLAYBOOK.yaml` is configuration, not documentation. An existing file is never overwritten.
 - Projects may use their own venvs; security tools run separately, host/user-local or in dedicated k-playbook tool venvs.

@@ -379,8 +379,7 @@ evidence entry `tech` when it is selected. It takes the entry states from the st
 `/k-audit`. Run on its own, through `/k-review` or for the diff of a task, nothing is excluded.
 
 For the diff of a task, subject, yardstick, and classification are defined in the recipe only; this
-page does not repeat them. The result form itself is described in
-[`rules/review-authoring.md`](../rules/review-authoring.md). The use by `/k-task-run` has no switch
+page does not repeat them. The use by `/k-task-run` has no switch
 of its own: `review.enabled` only affects `/k-review` and `audit.enabled` only `/k-audit`; only an
 empty project-owned `review-code.md` disables it. A project-owned overlay must carry the section
 under the same heading.
@@ -432,7 +431,7 @@ k-playbook-local/results/              everything reviews create
 `reviews/` contains only `review-<name>.md`. This keeps it a pure overlay directory, where every
 file follows the same rule: same filename, the local file completely wins.
 
-`known-decisions.md` deliberately sits one level higher, next to `rules/` and `guidelines/`: it is
+`known-decisions.md` deliberately sits one level higher, next to `reviews/` and `guidelines/`: it is
 maintained by hand and created by no review, so it is input rather than output. Everything
 generated is next to it:
 
@@ -458,7 +457,7 @@ k-playbook-local/results/k-check/2026-07-24/
     └── k-check-baseline.txt
 ```
 
-`k-playbook-local/checks/` remains reserved for executable checks. Results never belong there.
+Results never belong next to the checks: `k-playbook/checks/` holds only the shipped executable checks, and there are no project-owned checks since task 134.
 
 ### `results/` Is Not Versioned
 

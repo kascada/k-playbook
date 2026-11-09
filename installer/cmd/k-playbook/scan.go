@@ -144,7 +144,8 @@ func selectEntries(runDir string, run review.Run, wanted []string) ([]review.Ent
 //
 // Gesucht wird nicht selbst im PATH: der Preflight bricht vorher ab, wenn ein
 // Projekt-venv aktiv ist, und liefert genau das Werkzeug, dessen Vorhandensein
-// er geprüft hat (rules/tool-install-scope.md).
+// er geprüft hat. Host-lokale Werkzeuge dürfen nie aus einem Projekt-venv
+// erkannt werden; das venv gehört dem Projekt.
 func resolveTools(preflight project.ToolPreflight) map[string]review.Tool {
 	tools := map[string]review.Tool{}
 	for _, tool := range preflight.Tools {

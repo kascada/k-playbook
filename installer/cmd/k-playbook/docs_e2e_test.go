@@ -225,12 +225,12 @@ func TestDocsSubkommandoFehler(t *testing.T) {
 func TestDocsExcludeSubkommandoAblauf(t *testing.T) {
 	root := todoProjectRoot(t)
 
-	stdout, _, err := runDocsCaptured(t, "exclude", "add", "docs/", "rules/")
-	if err != nil || !strings.Contains(stdout, "Eingetragen in ") || !strings.Contains(stdout, "docs.exclude: docs/, rules/") {
+	stdout, _, err := runDocsCaptured(t, "exclude", "add", "docs/", "vendor/")
+	if err != nil || !strings.Contains(stdout, "Eingetragen in ") || !strings.Contains(stdout, "docs.exclude: docs/, vendor/") {
 		t.Fatalf("exclude add: %q %v", stdout, err)
 	}
 	config, err := project.ReadConfig(root)
-	if err != nil || strings.Join(config.DocsExclude, ",") != "docs/,rules/" {
+	if err != nil || strings.Join(config.DocsExclude, ",") != "docs/,vendor/" {
 		t.Fatalf("ReadConfig: %v %v", config.DocsExclude, err)
 	}
 	before, err := os.ReadFile(project.ConfigPath(root))
@@ -272,7 +272,7 @@ func TestDocsExcludeSubkommandoAblauf(t *testing.T) {
 		}
 	}
 	config, err = project.ReadConfig(root)
-	if err != nil || strings.Join(config.DocsExclude, ",") != "docs/,rules/,-gen/" {
+	if err != nil || strings.Join(config.DocsExclude, ",") != "docs/,vendor/,-gen/" {
 		t.Errorf("Liste nach Aufruffehlern: %v %v", config.DocsExclude, err)
 	}
 }
