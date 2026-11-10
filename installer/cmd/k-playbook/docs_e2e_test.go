@@ -397,3 +397,40 @@ func TestDocsReadmeSubkommando(t *testing.T) {
 		t.Fatal("zwei Pfade angenommen")
 	}
 }
+
+// Fehlt die README-Vorlage (Versatz Binary/Hub, Task 133), veröffentlicht
+// publish über die CLI die Dokumente und räumt auf, endet aber mit Exit 1 und
+// nennt die README mit template_missing; eine README entsteht nicht.
+func TestDocsSubkommandoPublishOhneVorlage(t *testing.T) {
+	root := todoProjectRoot(t)
+	store := kephtest.New()
+	empty := project.NewDiskDocSource(t.TempDir())
+	original := openDocsWork
+	openDocsWork = func(projectDir string) (*project.DocsWork, error) {
+		return project.NewDocsWork(projectDir, store, "vm:projekt").WithTemplates(empty), nil
+	}
+	t.Cleanup(func() { openDocsWork = original })
+	store.Put("docs/generated/code/01-a.md", "---\ntitle: A\ndescription: D\n---\n")
+
+	if _, _, err := runDocsCaptured(t, "checkout", "code"); err != nil {
+		t.Fatal(err)
+	}
+	work := project.DocsWorkDir(root, "code")
+	if err := os.WriteFile(filepath.Join(work, "01-a.md"), []byte("---\ntitle: A neu\ndescription: D\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := runDocsCaptured(t, "publish", "code")
+	if err == nil || !strings.Contains(err.Error(), "Dokumente veröffentlicht, aber keph:/docs/generated/code/README.md nicht geschrieben") ||
+		!strings.Contains(err.Error(), "("+project.DocCodeTemplateMissing+")") {
+		t.Fatalf("publish ohne Vorlage: %v", err)
+	}
+	if content, _ := store.Content("docs/generated/code/01-a.md"); !strings.Contains(content, "A neu") {
+		t.Errorf("Dokument nicht geschrieben: %q", content)
+	}
+	if _, ok := store.Content("docs/generated/code/README.md"); ok {
+		t.Error("README ohne Vorlage angelegt")
+	}
+	if _, err := os.Stat(work); !os.IsNotExist(err) {
+		t.Errorf("Arbeitsverzeichnis nicht entfernt: %v", err)
+	}
+}
