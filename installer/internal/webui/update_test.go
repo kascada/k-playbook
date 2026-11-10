@@ -298,3 +298,32 @@ func TestDescribeMCPRepairNenntDiePortableForm(t *testing.T) {
 		}
 	}
 }
+
+// Bricht das Einrichten mit einem Fehler ab, nennt der Antworttext des
+// Updates trotzdem den README-Schritt (Task 137): Er steht neben dem
+// Fehlerwert im Ergebnis. Hier ohne Anbindung des Testprojekts als Hinweis.
+func TestRelinkAfterUpdateNenntReadmesAuchImFehlerzweig(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, project.RootInstructionsFile), "# AGENTS.md\n\n<!-- k-playbook:anstoss -->\n## k-playbook\n\n"+
+		"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn\n\n"+
+		"    k-playbook context\n\n"+
+		"auf und lies die Dateien aus `instructions`.\n\n"+
+		"Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n")
+
+	_, message := relinkAfterUpdate(root, "Aktualisiert.")
+	if !strings.Contains(message, "konnte nicht nachgezogen werden") {
+		t.Fatalf("kein Fehlerzweig: %s", message)
+	}
+	if !strings.Contains(message, "README unter keph:/docs/: nicht versucht") {
+		t.Errorf("der README-Schritt fehlt im Antworttext: %s", message)
+	}
+}
+
+// Im Erfolgszweig nennt describeSetup den README-Schritt.
+func TestRelinkAfterUpdateNenntReadmes(t *testing.T) {
+	root := newProject(t)
+	_, message := relinkAfterUpdate(root, "Aktualisiert.")
+	if !strings.Contains(message, "README unter keph:/docs/") {
+		t.Errorf("der README-Schritt fehlt im Antworttext: %s", message)
+	}
+}

@@ -40,6 +40,10 @@ func fixtureProject(t *testing.T, name string) (string, *kephtest.Store) {
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
+	// Die README-Vorlage von versions/ im Lieferumfang des Projekts — dort
+	// liest der abgeschirmte Store (defaultstest) ihn. Die Installation
+	// k-playbook/ gehört nie zum Inventar.
+	putVersionsTemplate(t, root)
 
 	before, err := os.Getwd()
 	if err != nil {
@@ -50,6 +54,24 @@ func fixtureProject(t *testing.T, name string) (string, *kephtest.Store) {
 	}
 	t.Cleanup(func() { os.Chdir(before) })
 	return root, store
+}
+
+// putVersionsTemplate legt die Vorlage k-playbook:/docs/generated/versions/README.md
+// aus dem Repo in den Lieferumfang des Projekts.
+func putVersionsTemplate(t *testing.T, root string) {
+	t.Helper()
+	rel := filepath.Join("docs", "generated", "versions", "README.md")
+	data, err := os.ReadFile(filepath.Join(repoDefaultsDir(t), rel))
+	if err != nil {
+		t.Fatalf("Vorlage lesen: %v", err)
+	}
+	target := filepath.Join(project.PlaybookDir(root), "defaults", rel)
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func fixtureOptions(root string) inventory.Options {
@@ -70,6 +92,13 @@ func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
 	})
 	if !strings.Contains(out, "Geschrieben: "+inventory.DocRef) {
 		t.Errorf("der Bericht nennt den keph:-Verweis nicht:\n%s", out)
+	}
+	// Nach dem Inventar die README des Verzeichnisses aus ihrer Vorlage.
+	if !strings.Contains(out, "README: created keph:/docs/generated/versions/README.md") {
+		t.Errorf("der Bericht nennt die README nicht:\n%s", out)
+	}
+	if readme, ok := store.Content("docs/generated/versions/README.md"); !ok || !strings.Contains(readme, "title: \"Version inventory\"") {
+		t.Errorf("README von versions/: %q", readme)
 	}
 	options := fixtureOptions(root)
 	written, ok := store.Content(inventory.DocName)
@@ -175,5 +204,31 @@ func TestSubkommandoOhneKephalaionBrichtAb(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
 		t.Error("einen Rückfall auf die Platte gibt es nicht")
+	}
+}
+
+// Fehlt die Vorlage auf dem Hub (Versatz Binary/Hub), scheitert nur der
+// README-Schritt: Das Inventar ist geschrieben, der Bericht nennt die README
+// mit template_missing, und der Lauf endet danach mit einem Fehler. Eine
+// leere README entsteht nicht.
+func TestSubkommandoOhneVorlageSchreibtDasInventar(t *testing.T) {
+	root, store := fixtureProject(t, "vollstaendig")
+	if err := os.RemoveAll(filepath.Join(project.PlaybookDir(root), "defaults", "docs")); err != nil {
+		t.Fatal(err)
+	}
+
+	var runErr error
+	out := captureStdout(t, func() { runErr = runInventory(nil) })
+	if runErr == nil || !strings.Contains(runErr.Error(), "Inventar geschrieben") || !strings.Contains(runErr.Error(), "(template_missing)") {
+		t.Fatalf("Fehler: %v", runErr)
+	}
+	if !strings.Contains(out, "Geschrieben: "+inventory.DocRef) || !strings.Contains(out, "README: failed keph:/docs/generated/versions/README.md — template_missing") {
+		t.Errorf("Bericht:\n%s", out)
+	}
+	if _, ok := store.Content(inventory.DocName); !ok {
+		t.Error("Inventar nicht geschrieben")
+	}
+	if _, ok := store.Content("docs/generated/versions/README.md"); ok {
+		t.Error("README trotz fehlender Vorlage angelegt")
 	}
 }

@@ -21,7 +21,9 @@ import (
 //
 // Die Handler hier rufen ausschließlich die Fachlogik aus internal/inventory
 // auf. Kein zweiter Parser, keine Sonderbehandlung von Pfaden: der Ort des
-// Inventars ist fest (inventory.DocName), der Anstoß ist inventory.Run, und
+// Inventars ist fest (inventory.DocName), der Anstoß ist inventory.Run über
+// project.RunInventory, das danach die README des Verzeichnisses aus ihrer
+// Vorlage schreibt (Task 137), und
 // die Vertrauensgrenze liegt dahinter in trust.go — abgelehnte Pfade stehen
 // in der Antwort so, wie die Fachlogik sie meldet. Den Zugang zur Collection
 // öffnet project.OpenInventoryStore, derselbe Weg wie beim Subkommando; ohne
@@ -111,6 +113,10 @@ type inventoryRunResponse struct {
 	// wie GET /api/inventory ihn liefert.
 	Status      inventory.Status `json:"status"`
 	DisplayPath string           `json:"displayPath"`
+	// Readme ist die README von docs/generated/versions/, geschrieben aus
+	// ihrer Vorlage nach dem Inventar (project.RunInventory); fehlt, wenn der
+	// Lauf vorher abbrach. Scheitert nur sie, ist der Lauf trotzdem ok.
+	Readme *project.DocsReadmeItem `json:"readme,omitempty"`
 }
 
 // inventoryFileResponse ist das Inventar, fertig gerendert.
@@ -232,7 +238,8 @@ func runInventoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, outcome, err := inventory.Run(r.Context(), store, options)
+	result, outcome, readme, err := project.RunInventory(r.Context(), environment.ProjectDir, store, options)
+	response.Readme = readme
 	if err != nil {
 		// Abgebrochen: Quellenkonfiguration nicht lesbar oder von fremder
 		// Fassung, oder das Schreiben ist fehlgeschlagen. Was davon, sagt err;

@@ -27,7 +27,7 @@
 # Zeile nachziehen und die Begründung dabei erneut prüfen.
 datei	zeile	art	begründung
 defaults/commands/_task-run/diff-review.md	12	pfad	Ortsangabe: nennt das Modulverzeichnis, in dem die Datei liegt; gelesen wird das Modul über k-playbook:/commands/_task-run/diff-review.md.
-defaults/commands/k-doc-inventory.md	40	pfad	Plattenort: die Datei, die das Subkommando k-playbook inventory liest; der Satz verbietet, sie selbst zu lesen.
+defaults/commands/k-doc-inventory.md	43	pfad	Plattenort: die Datei, die das Subkommando k-playbook inventory liest; der Satz verbietet, sie selbst zu lesen.
 defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot (nie selbst aus k-playbook/ lesen); die Datei bleibt nach Task 108 unverändert.
 defaults/instructions/always/030-briefing.md	30	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/instructions/always/100-projektwissen-zuerst.md	9	pfad	Ortsangabe: der Pfad ist das Argument von Kephalaion list in der Collection, kein Verweis.

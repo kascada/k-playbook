@@ -32,6 +32,12 @@ type AssistantSetup struct {
 	// RootRefreshed ist das eine Änderung an einer Projektdatei und steht
 	// deshalb in der Antwort, nicht nur im Log.
 	ConfigBlocksRemoved []string `json:"configBlocksRemoved,omitempty"`
+	// Readmes ist der README-Schritt (Task 137): die README.md unter
+	// keph:/docs/ aus den Vorlagen. Ein eigenes Feld, kein Teil des
+	// Fehlerwerts — ohne bereites Kephalaion, bei einem langsamen Hub oder
+	// einer fehlenden Vorlage steht hier ein Hinweis, und das Einrichten gilt
+	// trotzdem.
+	Readmes SetupReadmes `json:"readmes"`
 }
 
 // ApplyAssistantSetup richtet einen Assistenten vollständig ein: Einordnen und
@@ -48,6 +54,11 @@ type AssistantSetup struct {
 // Ein Fehler beendet den Ablauf nicht: die drei Katalog-Links haben mit der
 // Wurzeldatei nichts zu tun und sollen auch dann stehen, wenn dort etwas
 // schiefgeht. Gesammelt wird alles, was aufgetreten ist.
+//
+// Am Ende schreibt das Einrichten die README.md unter keph:/docs/ aus den
+// Vorlagen (Task 137) — hier und nur hier, damit jeder Weg den Schritt erbt:
+// `k-playbook upgrade`, Einrichten und Aktualisieren in der Oberfläche. Das
+// Ergebnis steht in Readmes, nicht im Fehlerwert.
 func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	setup := AssistantSetup{}
 	errs := []error{}
@@ -94,6 +105,8 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	if removed {
 		setup.ConfigBlocksRemoved = append(setup.ConfigBlocksRemoved, LegacyGHBlockName)
 	}
+
+	setup.Readmes = setupDocsReadmes(projectDir)
 
 	return setup, errors.Join(errs...)
 }

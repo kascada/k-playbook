@@ -168,6 +168,10 @@ func TestUpgradeCheckMeldetUndSchreibtNicht(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, ".claude", "commands")); err == nil {
 		t.Error("--check hat die Verlinkung angelegt")
 	}
+	// Die README unter keph:/docs/ übergeht --check; die meldet /k-docs.
+	if strings.Contains(stdout, "README unter keph:/docs/") {
+		t.Errorf("--check fasst die README an:\n%s", stdout)
+	}
 }
 
 // Ein Block, dessen Ende sich nicht bestimmen lässt, bleibt bei einem Lauf
@@ -268,6 +272,8 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 		"veraltete Anstoß in AGENTS.md wurde auf k-playbook briefing gebracht",
 		"Session-Memory-Block und Befunde-Block aus AGENTS.md entfernt",
 		"Verlinkung eingerichtet",
+		// Ohne Anbindung des Testprojekts: der README-Schritt nur als Hinweis.
+		"Projekt: README unter keph:/docs/: nicht versucht, Kephalaion ist für dieses Projekt nicht bereit",
 	} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
@@ -301,8 +307,8 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 			t.Errorf("zweiter Lauf: %v", err)
 		}
 	})
-	if !strings.Contains(second, "Projekt: nichts zu tun.") {
-		t.Errorf("der zweite Lauf meldet nicht „nichts zu tun“:\n%s", second)
+	if !strings.Contains(second, "Projekt: nichts zu tun.") || !strings.Contains(second, "Projekt: README unter keph:/docs/") {
+		t.Errorf("der zweite Lauf meldet nicht „nichts zu tun“ und den README-Hinweis:\n%s", second)
 	}
 	after, _ := os.ReadFile(filepath.Join(root, project.RootInstructionsFile))
 	if string(after) != string(content) {

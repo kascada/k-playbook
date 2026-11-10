@@ -356,7 +356,8 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field of a document of those kinds (not `docs/manual/`); other fields and the body stay byte for byte; optional `since_revision` |
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
 | `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew. `erzeuger` is one of the producer table, today `code` (`/k-docs-code`, skill `ks-overlay-repo-analyse`) and `libs` (`/k-docs-tools`, task 120); the input schema lists them as `enum` |
-| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from the producer table, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty |
+| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from its template `k-playbook:/docs/generated/<erzeuger>/README.md`, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty |
+| `k_playbook_docs_readme` | write the `README.md` of the directories under `keph:/docs/` from their templates `k-playbook:/docs/<pfad>/README.md` -- each one that is missing or differs (create, otherwise write with its revision); without `pfad` all templates, with `pfad` one; `check: true` writes nothing and reports `missing`, `differs` or `unchanged`; like `k-playbook docs readme` (task 137) |
 | `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `context.docs.exclude`; creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
 | `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, each with `problem` when its frontmatter is unreadable or its title looks cut off at ` #`, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing and writes nothing -- a missing access file is no entry and stays missing (`k-playbook github init` creates it); never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
@@ -709,7 +710,9 @@ All three prefixes are resolved (task 093; [verweisschema.md](verweisschema.md#a
 document of the project's collection through the node's replica (Kephalaion `read` via the
 client, access as for the `doc` tools, `~` replaced by `kephalaion.user`); `k-playbook:` the
 kinds `instructions/`, `reviews/`, `guidelines/` and `commands/`, each a single
-file local before shipped, and as include targets `includes/` and `testdata/`. Only
+file local before shipped, and as include targets `includes/` and `testdata/`; the README
+templates `docs/<pfad>/README.md` only from the shipped layer, without a local version
+(task 137). Only
 `instructions/always/` is assembled. The shipped layer of every kind is read from the public
 collection `<hub>:k-playbook` under `defaults/` through the node's replica (task 131): hub and
 account of the project binding, collection `k-playbook`; without a ready binding, or with an
@@ -761,7 +764,7 @@ Error codes, in the envelope's `error.code` like the other tool families:
 |---|---|
 | `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` without naming an assembled directory (today only `k-playbook:/instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/reviews/`, `project:/docs/`, `keph:/user/~/tasks/`, an unknown directory, a file with a trailing `/`; an include line with more than one argument; `lines` not of the form `from-to`/`from-`, `section` not a heading line, both set, or either on a directory |
 | `section_not_found` | the heading of `section` does not occur outside code blocks and the frontmatter |
-| `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `reviews/`, `guidelines/`, `commands/`, `includes/` and `testdata/` (for example `checks/`, `skills/` or the former kind for rules, gone since task 135); the message names only the reader kinds |
+| `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `reviews/`, `guidelines/`, `commands/`, `includes/`, `testdata/` and `docs/` (for example `checks/`, `skills/` or the former kind for rules, gone since task 135); the message names only the reader kinds |
 | `not_found` | neither layer has the file or the assembled directory, the project has no such file, or the node reports `none` for the name in the collection; there is no fallback to reading anywhere else |
 | `kephalaion_unavailable` | a `keph:` reference while the binding is not ready (`kephalaion.ok` not `true`), the node cannot be reached, or the session could not be opened; a `k-playbook:` reference whose shipped layer `<hub>:k-playbook/defaults/` cannot be read -- binding not ready, collection missing or unreadable, `defaults/VERSION` missing --, even when a local file exists; no fallback |
 | `kephalaion_error` | the node rejected `read` with a message (collection not readable, replica never synced, invalid name); the message is the node's |
@@ -1012,15 +1015,15 @@ last lines to stderr, with `--json` the state (`ref`, `sinceRevision`, `revision
 
 ### Generated Docs: Checkout and Publish
 
-A producer with several documents -- today only `code`, written by `/k-docs-code` and the skill
-`ks-overlay-repo-analyse` -- writes into `keph:/docs/generated/<erzeuger>/` through a
-machine-local working directory instead of single Kephalaion calls (task 109):
-`k_playbook_docs_checkout` fetches, the session edits with its file tools,
-`k_playbook_docs_publish` reconciles. The logic is `project.DocsWork` (`project/docswork.go`);
-the subcommand `k-playbook docs checkout|publish <erzeuger>` calls the same code. Valid
-producers come from the table `project.DocsProducers` (name, `title`, `description` and a short
-text for the directory's `README.md`); an unknown one is `invalid_input`, and the schema lists
-the valid ones as `enum` of `erzeuger`.
+A producer with several documents -- `code`, written by `/k-docs-code` and the skill
+`ks-overlay-repo-analyse`, and `libs`, written by `/k-docs-tools` -- writes into
+`keph:/docs/generated/<erzeuger>/` through a machine-local working directory instead of single
+Kephalaion calls (task 109): `k_playbook_docs_checkout` fetches, the session edits with its
+file tools, `k_playbook_docs_publish` reconciles. The logic is `project.DocsWork`
+(`project/docswork.go`); the subcommand `k-playbook docs checkout|publish <erzeuger>` calls the
+same code. Valid producers come from the table `project.DocsProducers` (only the name since
+task 137; the directory's `README.md` comes from its template); an unknown one is
+`invalid_input`, and the schema lists the valid ones as `enum` of `erzeuger`.
 
 **Inputs.** Both take `projectDir` (required by contract) and `erzeuger`;
 `k_playbook_docs_checkout` also `discard`, `k_playbook_docs_publish` also `allow_hints`.
@@ -1048,11 +1051,16 @@ new → `create`; changed → `write` with the checkout revision as `base_revisi
 the working directory → `delete` with that revision; unchanged → nothing. A document that
 was changed, created or deleted in Kephalaion since the checkout (`stale_revision`,
 `name_taken`, `not_found`) is reported as `conflict` with its current revision and not
-written. Afterwards publish writes `docs/generated/<erzeuger>/README.md` from the producer
-table, only when its content differs. The working directory and the record are removed only
-when no document is `conflict` or `failed` and the README went through; otherwise the record
-is updated with what was published, and a second publish after clearing up writes only the
-rest. Without a checkout the answer is `not_checked_out`.
+written. Afterwards publish writes `docs/generated/<erzeuger>/README.md` from its template
+`k-playbook:/docs/generated/<erzeuger>/README.md`, only when it is missing or its content
+differs (through the README writer below). The working directory and the record are removed
+only when no document is `conflict` or `failed` and the README went through; otherwise the
+record is updated with what was published, and a second publish after clearing up writes only
+the rest. One exception: if only the template is missing on the hub (`readme` `failed` with
+`template_missing` -- the hub's delivery is older than the program, task 133), the documents
+are published and the working directory is cleaned up anyway; nothing is written for the
+README, not even an empty one, and the CLI ends with exit 1 after the output. Without a
+checkout the answer is `not_checked_out`.
 
 **Answers**, in the usual envelope `{ok, tool, projectDir, …, error}`:
 
@@ -1071,6 +1079,29 @@ output. Error codes in `error.code`: `invalid_input`, `project_not_found`, `hint
 one line per document (path and revision) or the note about the existing working directory;
 publish prints status, reference and revision per document, tab-separated, then the README
 and the outcome.
+
+**READMEs from templates.** Every directory under `keph:/docs/` that has a template
+`k-playbook:/docs/<pfad>/README.md` (`defaults/docs/` in the source repo, shipped to the hub;
+only the shipped layer, no local version) gets that template as its `README.md`, identical in
+every project (task 137). `k_playbook_docs_readme` writes each one that is missing (`create`)
+or differs (`write` with the revision just read); a README changed by hand is overwritten.
+Directories without a template -- subdirectories of `manual/`, `decisions/` -- and
+`docs/README.md` at the top are never touched; Kephalaion places its reminder there (marked by
+`generated`, which no template carries). The logic is `project.DocsReadmes`
+(`project/docsreadme.go`), the one place that writes these READMEs: `publish` and the inventory
+call it for their directory, setup (`ApplyAssistantSetup`, hence `k-playbook upgrade` and
+"Einrichten"/"Aktualisieren" in the GUI) for all, and `k-playbook docs readme` on demand. A
+template is checked before writing -- frontmatter with `title` and `description`, no
+`generated`; a missing template is `template_missing`, an unusable one `invalid_input`, and
+nothing is written for it. Inputs: `projectDir` (required by contract), `pfad` (optional: a
+directory relative to `docs/`, such as `generated/code`, or a reference `keph:/docs/…/`;
+`docs/` itself is `invalid_input`) and `check`. Answer: `readmes`, each with `dir`, `ref`,
+`template`, `status` (`created`, `written`, `unchanged`, `failed`; with `check` `missing`,
+`differs`, `unchanged`), `revision`, `base`, and for `failed` `code` and `message`; `check`;
+`hint` when there are no templates at all. A README with `failed` is not a tool error
+(`ok: true`); the CLI `k-playbook docs readme [<pfad>] [--check] [--json]` ends with exit 1
+after the output. Without a ready Kephalaion binding: `kephalaion_unavailable`, nothing
+written, no fallback to disk.
 
 **Permanent exclusions.** `k_playbook_docs_exclude_add` (task 116) writes what a project
 excludes from the code scan once and for all, so a docs command no longer has to be told in

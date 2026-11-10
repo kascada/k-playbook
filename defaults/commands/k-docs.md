@@ -3,13 +3,16 @@
 Zeigt den Stand der Projektdoku unter `keph:/docs/` in der Collection des Projekts, meldet
 Lücken und Widersprüche und bietet die Erzeuger an: das Versionsinventar, die Doku aus dem
 Code und die Steckbriefe der Libraries und Tools. Mit `alle` laufen sie in dieser
-Reihenfolge nacheinander. Der Ablauf eines Erzeugers steht in seinem eigenen Text; dieser
+Reihenfolge nacheinander, danach schreibt das Programm die `README.md` der Verzeichnisse
+aus ihren Vorlagen. Der Ablauf eines Erzeugers steht in seinem eigenen Text; dieser
 Command wiederholt ihn nicht.
 
 Produces:
 
 - Im Statuslauf nichts. Ohne Auswahl ist `/k-docs` read-only.
 - Bei Auswahl schreibt nur der gewählte Erzeuger, nach den Regeln seines Textes.
+- Mit `alle` zuletzt die `README.md` unter `keph:/docs/`, die fehlen oder von ihrer Vorlage
+  abweichen — geschrieben vom Programm (`k_playbook_docs_readme`), nicht von Hand.
 
 ## Schritt 1 — Briefing und Ablage
 
@@ -47,6 +50,16 @@ weiterblättern). Daraus, ohne ein Dokument einzeln zu lesen:
   Rumpf.
 - Dokumente unter `docs/` außerhalb der Bereiche der Tabelle: unsortiert.
 
+Dazu der Stand der `README.md` gegen ihre Vorlagen: `k_playbook_docs_readme` mit
+`projectDir` = `context.project.dir` und `check: true` (ersatzweise
+`k-playbook docs readme --check --json`). Das schreibt nichts. Die Antwort nennt je Vorlage
+unter `k-playbook:/docs/` das Verzeichnis (`dir`), die README (`ref`) und `status`:
+`unchanged`, `missing` (fehlt), `differs` (weicht ab — von Hand geändert, älter als die
+Vorlage oder Kephalaions Mahnung) oder `failed` mit `code`; `hint`, wenn es keine Vorlagen
+gibt. Verzeichnisse ohne Vorlage kommen darin nicht vor. Ist das Werkzeug unbekannt oder
+meldet `k-playbook docs` `unbekannter Unterbefehl`, ist die Installation älter als dieser
+Command — die Zeile `README` in Schritt 4 nennt dann `/k-upgrade`.
+
 Dazu die offenen Doku-Aufträge in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`): ein `k_playbook_doc_list` mit
 `kind: docs`, ohne `done` — die erledigten unter `done/` zählen nicht. Für die Aufteilung
@@ -83,8 +96,12 @@ gelesen, wo eine Prüfung unten es verlangt.
 - **Schreiber.** `generated.by` passt nicht zum Verzeichnis laut Tabelle in Schritt 1; ein
   Dokument unter `manual/` oder `sources/` trägt `generated`; ein Dokument in einem
   Erzeuger-Verzeichnis trägt keins.
-- **README.** Ein Erzeuger-Verzeichnis mit Dokumenten, aber ohne `README.md` — sie entsteht
-  beim nächsten `publish`.
+- **README.** Je Vorlage eine `README.md`, die laut Schritt 2 fehlt (`missing`) oder abweicht
+  (`differs`) — eine Zeile je README mit Verweis; `failed` mit Code (`template_missing`: Der
+  Lieferumfang auf dem Hub ist älter als das Programm). Verzeichnisse ohne Vorlage — etwa
+  Unterordner von `manual/` — meldest du nicht; dort mahnt Kephalaion selbst. Nachgezogen
+  wird mit `alle` oder `k-playbook docs readme`; eine von Hand geänderte README wird dabei
+  überschrieben.
 - **`questions`.** Ein erzeugtes Dokument ohne `questions`.
 - **`sources`.** Ein Eintrag ohne `resource`; ein `keph:`-Verweis darin, der auf kein
   Dokument der Liste aus Schritt 2 zeigt.
@@ -128,6 +145,7 @@ Handdoku    <N> Dokumente | leer
 Quellen     <N> Verweise | leer
 Unsortiert  <N> Dokumente | —
 Aufträge    <N> (<N> code, <N> tools), ältester <entstanden> | keine
+README      <N> Vorlagen, <N> fehlen, <N> weichen ab | alle aktuell | keine Vorlagen
 Befunde     <N> (<Kategorien>) | keine
 Offen       Platte: <N> Dateien unter k-playbook-local/docs/ → /k-upgrade 3.2 | —
             Arbeitsverzeichnis: <erzeuger> seit <alter> | —
@@ -136,7 +154,7 @@ Mögliche Aktionen:
   1. inventory  Versionsinventar erheben            → /k-doc-inventory
   2. code       Doku aus dem Code                   → /k-docs-code    <N> Aufträge offen
   3. tools      Steckbriefe der Libraries und Tools → /k-docs-tools   <N> Aufträge offen
-  4. alle       1, 2 und 3 nacheinander
+  4. alle       1, 2 und 3 nacheinander, danach die README aus den Vorlagen
   5. status     nur diesen Bericht
 
 Was soll ich tun?
@@ -168,7 +186,12 @@ Aktion, der Rest geht an den Erzeuger.
   `tools`. Jeder Erzeuger läuft mit seinem eigenen Preflight und seinen eigenen
   Bestätigungen; dieser Command fasst sie nicht zusammen. Endet einer ohne Ergebnis —
   abgelehnt, abgebrochen, Konflikt offen —, fragst du, ob die übrigen trotzdem laufen
-  sollen. `tools` läuft nicht ohne Inventar.
+  sollen. `tools` läuft nicht ohne Inventar. Zuletzt, auch wenn ein Erzeuger übersprungen
+  wurde: `k_playbook_docs_readme` mit `projectDir` = `context.project.dir`, ohne `pfad` und
+  ohne `check` (ersatzweise `k-playbook docs readme --json`) — es schreibt jede README, die
+  fehlt oder von ihrer Vorlage abweicht. `publish` und das Inventar haben die ihrer
+  Verzeichnisse schon geschrieben; dieser Aufruf holt die übrigen nach, etwa die von
+  `manual/` und `sources/`.
 
 Das Briefing aus Schritt 1 gilt für den Erzeuger weiter; er lädt es nicht neu, außer sein
 Text verlangt es.
@@ -183,7 +206,10 @@ Im Statuslauf:
   keiner. Sind Reste auf der Platte gemeldet: `/k-upgrade`.
 
 Nach einer Weitergabe gilt der Abschluss des Erzeugers. Bei `alle` danach eine Zeile je
-Erzeuger: gelaufen, übersprungen oder abgebrochen, mit Grund.
+Erzeuger: gelaufen, übersprungen oder abgebrochen, mit Grund — und eine Zeile `README` aus
+der Antwort von `k_playbook_docs_readme`: wie viele angelegt, überschrieben und unverändert,
+und jede README mit `failed`, ihrem Code und ihrer Meldung. `outcome_unknown` heißt, das
+Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
 
 ## Fehlerfälle
 
@@ -205,4 +231,7 @@ Erzeuger: gelaufen, übersprungen oder abgebrochen, mit Grund.
   Kopf und kein Steckbrief mit abweichender Version.
 - **Den Stand des Inventars aus dem Rumpf lesen.** Er kommt nur aus dem Kopf.
 - **Die Platte als Doku nehmen.** `k-playbook-local/docs/` ist ein Rest für `/k-upgrade`,
-  keine Quelle; `index.md` und `README.md` schreibt kein Command.
+  keine Quelle.
+- **`README.md` oder `index.md` von Hand schreiben.** Die README schreibt das Programm aus
+  ihrer Vorlage (`k_playbook_docs_readme`), `index.md` erzeugt Kephalaion; kein Command
+  schreibt sie mit Kephalaion `write` oder `create`.

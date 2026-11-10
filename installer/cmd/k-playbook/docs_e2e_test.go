@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -16,9 +17,10 @@ import (
 func useCLIDocsWork(t *testing.T) *kephtest.Store {
 	t.Helper()
 	store := kephtest.New()
+	templates := repoDocsTemplates(t)
 	original := openDocsWork
 	openDocsWork = func(projectDir string) (*project.DocsWork, error) {
-		return project.NewDocsWork(projectDir, store, "vm:projekt"), nil
+		return project.NewDocsWork(projectDir, store, "vm:projekt").WithTemplates(templates), nil
 	}
 	t.Cleanup(func() { openDocsWork = original })
 	return store
@@ -172,7 +174,7 @@ func TestDocsSubkommandoLibs(t *testing.T) {
 	if content, ok := store.Content("docs/generated/libs/go-github.com-yuin-goldmark.md"); !ok || content != neu {
 		t.Errorf("nicht angelegt: %q", content)
 	}
-	if readme, ok := store.Content("docs/generated/libs/README.md"); !ok || !strings.Contains(readme, "title: Steckbriefe zu Libraries und Tools") {
+	if readme, ok := store.Content("docs/generated/libs/README.md"); !ok || !strings.Contains(readme, "title: \"Profiles of libraries and tools\"") {
 		t.Errorf("README von libs/: %q", readme)
 	}
 	if content, _ := store.Content("docs/generated/code/01-a.md"); content != "---\ntitle: A\ndescription: D\n---\n" {
@@ -318,5 +320,80 @@ func TestDocsExcludeSubkommandoVerwirftZeilenumbruch(t *testing.T) {
 	if err != nil || strings.Join(config.DocsExclude, ",") != strings.Join(result.Exclude, ",") ||
 		strings.Join(result.Exclude, ",") != "neu/,zwei/" || len(config.DocsProblems) != 0 {
 		t.Errorf("ReadConfig: %q %+v %v; gemeldet %q", config.DocsExclude, config.DocsProblems, err, result.Exclude)
+	}
+}
+
+// repoDefaultsDir ist defaults/ des Repos — über den Ort dieser Datei, nicht
+// das Arbeitsverzeichnis, das die Tests ins Projekt wechseln.
+func repoDefaultsDir(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("Ort der Testdatei unbekannt")
+	}
+	return filepath.Join(filepath.Dir(file), "..", "..", "..", "defaults")
+}
+
+// repoDocsTemplates ist das defaults/ des Repos als mitgelieferte Ebene — die
+// Vorlagen unter docs/, wie der Hub sie nach dem Release trägt.
+func repoDocsTemplates(t *testing.T) project.DocSource {
+	t.Helper()
+	store, err := kephtest.Defaults(repoDefaultsDir(t))
+	if err != nil {
+		t.Fatalf("defaults/ des Repos laden: %v", err)
+	}
+	return project.NewKephDefaultsSource(func() (project.DefaultsStore, string, error) { return store, "test:k-playbook", nil })
+}
+
+// useCLIDocsReadmes setzt eine Collection im Speicher und die Vorlagen des
+// Repos hinter docs readme ein.
+func useCLIDocsReadmes(t *testing.T) *kephtest.Store {
+	t.Helper()
+	store := kephtest.New()
+	templates := repoDocsTemplates(t)
+	original := openDocsReadmes
+	openDocsReadmes = func(string) (*project.DocsReadmes, error) { return project.NewDocsReadmes(store, templates), nil }
+	t.Cleanup(func() { openDocsReadmes = original })
+	return store
+}
+
+// docs readme über die CLI: --check schreibt nichts, ohne Pfad alle, mit Pfad
+// die eine; eine fehlende Vorlage endet mit Exit 1 und template_missing; ein
+// ungültiger Pfad ist invalid_input.
+func TestDocsReadmeSubkommando(t *testing.T) {
+	todoProjectRoot(t)
+	store := useCLIDocsReadmes(t)
+	store.Put("docs/manual/README.md", "---\ntitle: alt\n---\n")
+
+	stdout, _, err := runDocsCaptured(t, "readme", "--check")
+	if err != nil || !strings.Contains(stdout, "missing\tkeph:/docs/generated/code/README.md\t0") ||
+		!strings.Contains(stdout, "differs\tkeph:/docs/manual/README.md") || !strings.Contains(stdout, "nichts geschrieben") {
+		t.Fatalf("--check: %q %v", stdout, err)
+	}
+	if len(store.Names()) != 1 {
+		t.Fatalf("--check hat geschrieben: %v", store.Names())
+	}
+
+	stdout, _, err = runDocsCaptured(t, "readme", "keph:/docs/manual/", "--json")
+	var one project.DocsReadmeResult
+	if err != nil || json.Unmarshal([]byte(stdout), &one) != nil || len(one.Readmes) != 1 || one.Readmes[0].Status != project.DocsWritten ||
+		one.Readmes[0].Dir != "manual" {
+		t.Fatalf("readme manual: %q %v", stdout, err)
+	}
+
+	stdout, _, err = runDocsCaptured(t, "readme")
+	if err != nil || strings.Count(stdout, "created\t") != 5 || !strings.Contains(stdout, "unchanged\tkeph:/docs/manual/README.md") {
+		t.Fatalf("readme alle: %q %v", stdout, err)
+	}
+
+	stdout, _, err = runDocsCaptured(t, "readme", "generated/fehlt")
+	if err == nil || !strings.Contains(stdout, "failed\tkeph:/docs/generated/fehlt/README.md\t0\ttemplate_missing") {
+		t.Fatalf("fehlende Vorlage: %q %v", stdout, err)
+	}
+	if _, _, err := runDocsCaptured(t, "readme", "keph:/docs/README.md"); err == nil || !strings.Contains(err.Error(), "(invalid_input)") {
+		t.Fatalf("docs/README.md: %v", err)
+	}
+	if _, _, err := runDocsCaptured(t, "readme", "a", "b"); err == nil {
+		t.Fatal("zwei Pfade angenommen")
 	}
 }

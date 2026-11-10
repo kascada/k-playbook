@@ -1,8 +1,8 @@
 ---
-description: Zeigt den Stand der Projektdoku unter keph:/docs/ — Inventar, Doku aus dem Code, Steckbriefe der Libraries und Tools, Handdoku —, meldet Lücken, alte Köpfe und Abweichungen der Steckbriefe vom Inventar und bietet die Erzeuger an; mit alle laufen Inventar, Code und Tools nacheinander. Ohne Wahl read-only. Dünne Hülle über dem Text k-playbook:/commands/k-docs.md.
+description: Zeigt den Stand der Projektdoku unter keph:/docs/ — Inventar, Doku aus dem Code, Steckbriefe der Libraries und Tools, Handdoku —, meldet Lücken, alte Köpfe, fehlende oder abweichende README und Abweichungen der Steckbriefe vom Inventar und bietet die Erzeuger an; mit alle laufen Inventar, Code und Tools nacheinander, danach die README aus den Vorlagen. Ohne Wahl read-only. Dünne Hülle über dem Text k-playbook:/commands/k-docs.md.
 argument-hint: [status|inventory|code|tools|alle] [zusatz-pfad]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_done, mcp__k-playbook__k_playbook_docs_checkout, mcp__k-playbook__k_playbook_docs_publish, mcp__k-playbook__k_playbook_docs_exclude_add, mcp__kephalaion__list, mcp__kephalaion__read]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, WebFetch, TodoWrite, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_done, mcp__k-playbook__k_playbook_docs_checkout, mcp__k-playbook__k_playbook_docs_publish, mcp__k-playbook__k_playbook_docs_readme, mcp__k-playbook__k_playbook_docs_exclude_add, mcp__kephalaion__list, mcp__kephalaion__read]
 ---
 
 # k-docs

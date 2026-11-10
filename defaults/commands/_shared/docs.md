@@ -1,6 +1,6 @@
 ---
 title: Die Docs-Ablage in der Projekt-Collection
-description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, der eine Kopf jedes Dokuments (title, description, generated samt stats, hints, questions, sources, verified), Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), der Scope der Erzeuger, die den Code durchsuchen (/k-docs-code und /k-docs-tools), samt dauerhaften Ausschlüssen in docs.exclude, die Doku-Aufträge aus queue/docs/, die diese beiden im Preflight listen und nach einem erfolgreichen publish abschließen, README.md und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
+description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, der eine Kopf jedes Dokuments (title, description, generated samt stats, hints, questions, sources, verified), Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), der Scope der Erzeuger, die den Code durchsuchen (/k-docs-code und /k-docs-tools), samt dauerhaften Ausschlüssen in docs.exclude, die Doku-Aufträge aus queue/docs/, die diese beiden im Preflight listen und nach einem erfolgreichen publish abschließen, README.md (aus den Vorlagen unter k-playbook:/docs/, geschrieben vom Programm) und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
 ---
 
 Die Projektdokumentation liegt in der Collection des Projekts unter `keph:/docs/`; das ist
@@ -48,10 +48,15 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
   Abschnitt „Scope“ unten.
 - `docs/manual/` ist von Hand gepflegt; `docs/sources/` verlinkt Quellen außerhalb von
   Kephalaion. Beides fasst ein Erzeuger nicht an.
-- `README.md` und `index.md` schreibt kein Command-Text: Die `README.md` von
-  `generated/<erzeuger>/` schreibt `publish` aus der Erzeugertabelle im Programm, `index.md`
-  entsteht später beim Indizieren. Auch kein Eintrag „schon einmal“ — er wäre beim nächsten
-  Schreiben weg.
+- `README.md` und `index.md` schreibt kein Command-Text: Die `README.md` eines Verzeichnisses
+  unter `docs/` kommt aus ihrer Vorlage `k-playbook:/docs/<pfad>/README.md`, nicht aus einer
+  Tabelle im Programm, und ist in jedem Projekt gleich. Geschrieben wird sie vom Programm —
+  von `publish` und vom Inventar für ihr Verzeichnis, beim Einrichten und von
+  `k-playbook upgrade` für alle, und von `k-playbook docs readme`
+  (`k_playbook_docs_readme`) —, wenn sie fehlt oder abweicht; eine von Hand geänderte wird
+  dabei überschrieben. Verzeichnisse ohne Vorlage und `docs/README.md` ganz oben fasst das
+  Programm nicht an, dort mahnt Kephalaion. `index.md` entsteht beim Indizieren. Auch kein
+  Eintrag „schon einmal“ — er wäre beim nächsten Schreiben weg.
 - Gelesen und geschrieben wird über die Verweisregel aus dem Briefing: `keph:`-Verweise mit
   `k_playbook_doc_read` bzw. Kephalaion `read`, Collection = `context.kephalaion.address`.
 - Steht `context.kephalaion.ok` nicht auf `true`, ist die Ablage nicht erreichbar. Dann gibt es

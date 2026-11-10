@@ -180,6 +180,10 @@ func TestInventarAnstossSchreibtUndBleibtDanachByteStabil(t *testing.T) {
 	if names := store.Names(); len(names) != 1 || names[0] != inventory.DocName {
 		t.Errorf("in der Collection liegt %v, erwartet nur %s", names, inventory.DocName)
 	}
+	// Ohne Vorlage im Lieferumfang scheitert nur die README; der Lauf bleibt ok.
+	if first.Readme == nil || first.Readme.Status != project.DocsFailed || first.Readme.Code != project.DocCodeTemplateMissing {
+		t.Errorf("README ohne Vorlage: %+v", first.Readme)
+	}
 
 	before := storedInventory(t, store)
 	// GET sagt dasselbe wie der Lauf.
@@ -482,5 +486,31 @@ func TestInventarAnstossFuehrtNichtAuswertbareQuellen(t *testing.T) {
 
 	if !strings.Contains(storedInventory(t, store), "| `docker-compose.yml` | compose | dev | 0 | nicht auswertbar |") {
 		t.Errorf("die Quellentabelle zeigt den Zustand nicht:\n%s", storedInventory(t, store))
+	}
+}
+
+// Mit der Vorlage im Lieferumfang schreibt der Anstoß nach dem Inventar die
+// README von docs/generated/versions/ (project.RunInventory, Task 137).
+func TestInventarAnstossSchreibtDieReadmeAusDerVorlage(t *testing.T) {
+	root, store := newInventoryProject(t)
+	rel := filepath.Join("docs", "generated", "versions", "README.md")
+	data, err := os.ReadFile(filepath.Join(packageDir, "..", "..", "..", "defaults", rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(project.PlaybookDir(root), "defaults", rel)
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, response := postInventory(t)
+	if code != http.StatusOK || !response.OK || response.Readme == nil || response.Readme.Status != project.DocsCreated {
+		t.Fatalf("Antwort: %d %+v", code, response.Readme)
+	}
+	if content, _ := store.Content("docs/generated/versions/README.md"); content != string(data) {
+		t.Errorf("README: %q", content)
 	}
 }

@@ -29,20 +29,18 @@ import (
 // create, geändert → write mit der Revision beim checkout, gelöscht → delete
 // mit dieser Revision. Was inzwischen in Kephalaion geändert ist, wird
 // gemeldet, nicht überschrieben. Die README des Verzeichnisses schreibt
-// publish aus der Erzeugertabelle; die KI schreibt sie nie.
+// publish aus ihrer Vorlage k-playbook:/docs/generated/<erzeuger>/README.md
+// (DocsReadmes, Task 137); die KI schreibt sie nie.
 //
 // Ohne bereite Anbindung gibt es keinen Lauf und keinen Rückfall auf die
 // Platte.
 
 // DocsProducer ist ein Eintrag der Erzeugertabelle: ein Verzeichnis unter
 // docs/generated/ der Projekt-Collection, das über checkout/publish
-// geschrieben wird. Title, Description und Text bilden die README des
-// Verzeichnisses.
+// geschrieben wird. Die README des Verzeichnisses steht nicht hier, sondern
+// kommt aus der Vorlage k-playbook:/docs/generated/<name>/README.md.
 type DocsProducer struct {
-	Name        string `json:"name"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Text        string `json:"text"`
+	Name string `json:"name"`
 }
 
 // DocsProducers ist die Erzeugertabelle. Ein Verzeichnis kann mehrere
@@ -51,35 +49,8 @@ type DocsProducer struct {
 // Schreiber. libs/ schreibt /k-docs-tools (Task 120). versions/ steht nicht
 // darin: das Inventar ist ein Dokument und schreibt selbst (inventory.DocName).
 var DocsProducers = []DocsProducer{
-	{
-		Name:  "code",
-		Title: "Doku aus dem Code",
-		Description: "Erzeugte Projektdoku aus dem Code — ein Dokument je Thema, nach Bedeutung statt nach Dateien, " +
-			"geschrieben von /k-docs-code und dem Skill ks-overlay-repo-analyse.",
-		Text: "Jedes Dokument beschreibt ein Thema des Codes — Zweck, Ablauf, wichtige Stellen als `pfad:zeile`, " +
-			"Randfälle. Wer es geschrieben hat, steht im Frontmatter unter `generated.by` (`k-docs-code` oder " +
-			"`ks-overlay-repo-analyse`); `questions` nennt die Fragen, die das Dokument beantwortet.\n\n" +
-			"Von Hand gepflegt sind nur die `hints` im Frontmatter: kurze Sätze, worauf der nächste Lauf achten soll. " +
-			"Alles andere wird beim nächsten Lauf neu geschrieben.\n\n" +
-			"Geschrieben wird über `k-playbook docs checkout code` und `k-playbook docs publish code`. Diese README " +
-			"schreibt `publish` selbst.",
-	},
-	{
-		Name:  "libs",
-		Title: "Steckbriefe zu Libraries und Tools",
-		Description: "Kuratierte Steckbriefe zu den nicht-trivialen Libraries und Tools des Projekts — Pitfalls und Idiome, " +
-			"je Gegenstand des Versionsinventars ein Dokument, geschrieben von /k-docs-tools.",
-		Text: "Jedes Dokument beschreibt eine Library oder ein Tool aus dem Versionsinventar " +
-			"(`keph:/docs/generated/versions/inventory.md`) — Rolle im Projekt, Version und Migration, Pitfalls, Idiome " +
-			"und Anti-Patterns; kein Ersatz für die offizielle Doku. Gegen welchen Eintrag und welche Version des " +
-			"Inventars gelesen wurde, steht im Frontmatter unter `sources`; weicht das Inventar inzwischen ab, gibt es " +
-			"die Auskunft. Wer es geschrieben hat, steht unter `generated.by` (`k-docs-tools`); `questions` nennt die " +
-			"Fragen, die das Dokument beantwortet.\n\n" +
-			"Von Hand gepflegt sind nur die `hints` im Frontmatter: kurze Sätze, worauf der nächste Lauf achten soll. " +
-			"Alles andere wird beim nächsten Lauf neu geschrieben.\n\n" +
-			"Geschrieben wird über `k-playbook docs checkout libs` und `k-playbook docs publish libs`. Diese README " +
-			"schreibt `publish` selbst.",
-	},
+	{Name: "code"},
+	{Name: "libs"},
 }
 
 // Die Codes von docs checkout und publish über die der doc-Werkzeuge hinaus.
@@ -97,7 +68,7 @@ const (
 const docsGeneratedRoot = "docs/generated"
 
 // docsReadmeName ist die README eines Erzeuger-Verzeichnisses, geschrieben
-// von publish.
+// von publish aus ihrer Vorlage.
 const docsReadmeName = "README.md"
 
 // docsWorkRoot ist das Arbeitsverzeichnis unter ProjectDirName;
@@ -143,12 +114,6 @@ func ValidateDocsProducers(producers []DocsProducer) error {
 			return fmt.Errorf("%s: doppelt", label)
 		}
 		seen[producer.Name] = true
-		if strings.TrimSpace(producer.Title) == "" || strings.TrimSpace(producer.Description) == "" || strings.TrimSpace(producer.Text) == "" {
-			return fmt.Errorf("%s: title, description und text sind Pflicht", label)
-		}
-		if strings.ContainsAny(producer.Title+producer.Description, "\n") {
-			return fmt.Errorf("%s: title und description sind je eine Zeile", label)
-		}
 	}
 	return nil
 }
@@ -163,10 +128,10 @@ func (p DocsProducer) Ref() string { return "keph:/" + p.dir() + "/" }
 // Arbeitsverzeichnis.
 func (p DocsProducer) docName(rel string) string { return p.dir() + "/" + rel }
 
-// readme ist der Inhalt der README des Verzeichnisses.
-func (p DocsProducer) readme() string {
-	return "---\ntitle: " + docsYAMLScalar(p.Title) + "\ndescription: " + docsYAMLScalar(p.Description) +
-		"\n---\n\n# " + p.Title + "\n\n" + strings.TrimRight(p.Text, "\n") + "\n"
+// templateDir ist das Verzeichnis des Erzeugers relativ zu docs/ — der Pfad
+// seiner README-Vorlage k-playbook:/docs/generated/<name>/README.md.
+func (p DocsProducer) templateDir() string {
+	return strings.TrimPrefix(p.dir(), docDocsRoot+"/")
 }
 
 // docsYAMLScalar setzt einen einzeiligen Wert in doppelte Anführungszeichen,
@@ -203,18 +168,30 @@ type DocsStore interface {
 }
 
 // DocsWork ist der Zugang zu checkout und publish für ein Projekt.
+// templates ist die mitgelieferte Ebene mit den README-Vorlagen.
 type DocsWork struct {
 	projectDir string
 	store      DocsStore
 	address    string
+	templates  DocSource
 	now        func() time.Time
 }
 
 // NewDocsWork baut den Zugang. address ist die Collection
 // (<hub>:<collection>); sie steht in der Merkdatei, und publish lehnt ein
-// checkout aus einer anderen ab.
+// checkout aus einer anderen ab. Die README-Vorlagen kommen aus der
+// mitgelieferten Ebene des Projekts (NewProjectDefaultsSource), geöffnet erst
+// beim ersten publish; WithTemplates setzt eine andere ein.
 func NewDocsWork(projectDir string, store DocsStore, address string) *DocsWork {
-	return &DocsWork{projectDir: projectDir, store: store, address: address, now: time.Now}
+	return &DocsWork{projectDir: projectDir, store: store, address: address,
+		templates: NewProjectDefaultsSource(projectDir), now: time.Now}
+}
+
+// WithTemplates setzt die Ebene ein, aus der publish die README-Vorlagen
+// liest — für Tests, die den Lieferumfang selbst mitbringen.
+func (w *DocsWork) WithTemplates(templates DocSource) *DocsWork {
+	w.templates = templates
+	return w
 }
 
 // OpenDocsWork prüft die Anbindung des Projekts und baut den Zugang —
@@ -728,7 +705,7 @@ type docsPlanned struct {
 // alles geprüft (nur .md, keine README.md, Frontmatter mit title und
 // description, hints unverändert außer mit AllowHints); eine Ablehnung
 // schreibt nichts. Danach schreibt publish die README des Verzeichnisses aus
-// der Erzeugertabelle, wenn sie abweicht. Arbeitsverzeichnis und Merkdatei
+// ihrer Vorlage, wenn sie fehlt oder abweicht. Arbeitsverzeichnis und Merkdatei
 // werden nur entfernt, wenn nichts in Konflikt oder fehlgeschlagen ist;
 // sonst trägt die Merkdatei danach den Stand des Veröffentlichten, und ein
 // zweites publish schreibt nur noch den Rest.
@@ -777,7 +754,15 @@ func (w *DocsWork) Publish(ctx context.Context, name string, opts DocsPublishOpt
 	}
 	result.Readme = w.publishReadme(ctx, producer)
 
-	if len(result.Open) == 0 && (result.Readme.Status == DocsCreated || result.Readme.Status == DocsWritten || result.Readme.Status == DocsUnchanged) {
+	// Fehlt nur die Vorlage der README (template_missing — der Lieferumfang
+	// auf dem Hub ist älter als das Programm, Task 133), scheitert allein der
+	// README-Schritt: Die Dokumente sind veröffentlicht, aufgeräumt wird
+	// trotzdem; ein zweites publish hülfe nicht, erst ein neuer Lieferumfang
+	// und docs readme. Jeder andere Fehler der README hält das
+	// Arbeitsverzeichnis wie bisher fest.
+	readmeDone := result.Readme.Status == DocsCreated || result.Readme.Status == DocsWritten || result.Readme.Status == DocsUnchanged ||
+		(result.Readme.Status == DocsFailed && result.Readme.Code == DocCodeTemplateMissing)
+	if len(result.Open) == 0 && readmeDone {
 		if err := removeDocsWork(dir, recordFile); err != nil {
 			return result, err
 		}
@@ -930,41 +915,12 @@ func (w *DocsWork) publishStep(ctx context.Context, producer DocsProducer, step 
 	return item
 }
 
-// publishReadme schreibt die README des Verzeichnisses aus der
-// Erzeugertabelle, nur wenn sie inhaltlich abweicht.
+// publishReadme schreibt die README des Verzeichnisses aus ihrer Vorlage,
+// nur wenn sie fehlt oder inhaltlich abweicht — über DocsReadmes, die eine
+// Stelle dafür. Fehlt die Vorlage, ist der Eintrag failed mit
+// template_missing, und nichts wird geschrieben.
 func (w *DocsWork) publishReadme(ctx context.Context, producer DocsProducer) DocsPublishItem {
-	name := producer.docName(docsReadmeName)
-	item := DocsPublishItem{Path: docsReadmeName, Ref: "keph:/" + name}
-	fail := func(err error) DocsPublishItem {
-		mapped := kephError(err)
-		item.Status, item.Code, item.Message = DocsFailed, DocRefErrorCode(mapped), mapped.Error()
-		return item
-	}
-	want := producer.readme()
-	read, err := w.store.Read(ctx, name)
-	if err != nil {
-		return fail(err)
-	}
-	var doc kephalaion.Document
-	switch read.Kind {
-	case kephalaion.ReadKindNone:
-		item.Status = DocsCreated
-		doc, err = w.store.Create(ctx, name, want)
-	case kephalaion.ReadKindDocument:
-		item.Base = read.Revision
-		if read.Content != nil && *read.Content == want {
-			item.Status, item.Revision = DocsUnchanged, read.Revision
-			return item
-		}
-		item.Status = DocsWritten
-		doc, err = w.store.Write(ctx, name, want, read.Revision)
-	default:
-		item.Status, item.Code, item.Message = DocsFailed, DocCodeInvalidInput, name+" ist ein Verzeichnis"
-		return item
-	}
-	if err != nil {
-		return fail(err)
-	}
-	item.Revision = doc.Revision
-	return item
+	readme := NewDocsReadmes(w.store, w.templates).One(ctx, producer.templateDir(), DocsReadmeOptions{})
+	return DocsPublishItem{Path: docsReadmeName, Ref: readme.Ref, Status: readme.Status, Revision: readme.Revision,
+		Base: readme.Base, Code: readme.Code, Message: readme.Message}
 }

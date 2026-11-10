@@ -467,7 +467,7 @@ func upgradeProject(projectDir string, repairMCP bool) upgradeProjectReport {
 	report.LinksCreated = !project.LinksOK(before) && pending.Empty() && project.LinksOK(setup.Links)
 	report.Changed = setup.RootCreated || setup.RootExtended || setup.RootRefreshed ||
 		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated ||
-		len(setup.ConfigBlocksRemoved) > 0
+		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed()
 
 	if repairMCP {
 		writes, err := project.RepairMCP(projectDir, project.MCPWriteOutdatedAndUnversioned)
@@ -527,11 +527,20 @@ func (r upgradeProjectReport) messages() []string {
 	if len(lines) == 0 {
 		lines = append(lines, "Projekt: nichts zu tun.")
 	}
+	// Der README-Schritt steht immer da, als Hinweis: Er ist kein Teil von
+	// „nichts zu tun“, und ein Fehler darin bricht den Lauf nicht ab.
+	if r.Setup != nil {
+		if note := project.DescribeSetupReadmes(r.Setup.Readmes); note != "" {
+			lines = append(lines, "Projekt: "+note)
+		}
+	}
 	return lines
 }
 
 // checkUpgradeProject meldet aus den Check-Funktionen, was ein Lauf am Projekt
-// täte — kein Trockenlauf von ApplyAssistantSetup, den es nicht gibt.
+// täte — kein Trockenlauf von ApplyAssistantSetup, den es nicht gibt. Die
+// README unter keph:/docs/ übergeht es: fehlende und abweichende meldet
+// /k-docs (k-playbook docs readme --check).
 func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
 	root := project.CheckRootInstructions(projectDir)

@@ -64,7 +64,10 @@ gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der
 behält das alte Programm. `--check` schreibt nichts: `CheckUpdate()` und
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
 `PendingLinkChanges()` und `CheckMCP()` für das, was ein Lauf am Projekt täte — kein
-Trockenlauf-Schalter in `ApplyAssistantSetup()`. Ohne Wirt-Pflege, weil /k-upgrade die
+Trockenlauf-Schalter in `ApplyAssistantSetup()`; die README unter `keph:/docs/`, die ein
+Lauf über `ApplyAssistantSetup()` aus den Vorlagen schreibt (Task 137), übergeht `--check`
+— die meldet `/k-docs`. Ihr Ergebnis steht im Lauf als eigene Zeile `Projekt: README unter
+keph:/docs/: …`, auch nach „nichts zu tun“. Ohne Wirt-Pflege, weil /k-upgrade die
 Ausgabe wörtlich wiedergibt.
 
 `vscode` ist der ausdrückliche Weg zur mitgereisten VS-Code-Erweiterung:
@@ -130,7 +133,8 @@ steht — `project:` eine Datei des Projekts ab seiner Wurzel (`os.DirFS`, eine 
 ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zugang wie
 `OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
 `reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
-Include-Ziele `includes/` und `testdata/`, zusammen `docRefKinds`), lokal vor mitgeliefert —
+Include-Ziele `includes/` und `testdata/` und die README-Vorlagen `docs/`, zusammen
+`docRefKinds`), lokal vor mitgeliefert — `docs/` nur mitgeliefert (`docDistOnlyKinds`) —
 mitgeliefert heißt seit Task 131 aus `<hub>:k-playbook/defaults/` über den Node (siehe „Die
 mitgelieferte Ebene aus `<hub>:k-playbook`“),
 ein Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
@@ -223,9 +227,10 @@ Dokument die Zahl und bei `keph:` die Revision. Die MCP-Werkzeuge `k_playbook_do
 
 `docs checkout|publish <erzeuger> [--discard|--allow-hints] [--json]` holt erzeugte Doku mit
 mehreren Dokumenten in ein Arbeitsverzeichnis und gleicht sie zurück ab (Task 109);
-`docs exclude add <muster>… [--json]` trägt dauerhafte Ausschlüsse für den Code-Scan in
-`docs.exclude` von `K-PLAYBOOK.yaml` ein (Task 116). Einzelheiten unter „Erzeugte Doku:
-checkout und publish“.
+`docs readme [<pfad>] [--check] [--json]` schreibt die `README.md` unter `keph:/docs/` aus
+ihren Vorlagen (Task 137); `docs exclude add <muster>… [--json]` trägt dauerhafte Ausschlüsse
+für den Code-Scan in `docs.exclude` von `K-PLAYBOOK.yaml` ein (Task 116). Einzelheiten unter
+„Erzeugte Doku: checkout und publish“ und „README aus Vorlagen“.
 
 `create` und `rename` tragen je Aufruf von `Client.Create`/`Client.Rename` einen eigenen
 `request_id` (Kephalaion ab v0.3.1; vorher prüft der Client die Version des Nodes per
@@ -422,14 +427,20 @@ installer/
 │   │                            project:/ ab der Projektwurzel, keph:/ über den Node,
 │   │                            k-playbook:/ instructions/…, reviews/…,
 │   │                            guidelines/…, commands/… (der Text, die Hülle liegt beim
-│   │                            Assistenten), includes/…, testdata/… — und der
-│   │                            docIncluder, der Include-Zeilen einsetzt (Task 093)
+│   │                            Assistenten), includes/…, testdata/…, docs/… (nur
+│   │                            mitgeliefert) — und der docIncluder, der Include-Zeilen
+│   │                            einsetzt (Task 093)
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente;
 │   │                            Zugänge OpenKephDocs, OpenInventoryStore
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
 │   ├── docswork.go              Erzeugertabelle DocsProducers, DocsWork: checkout und
 │   │                            publish von docs/generated/<erzeuger>/ über
 │   │                            .k-playbook/work/docs/<erzeuger>/ und die Merkdatei
+│   ├── docsreadme.go            DocsReadmes: die README.md unter keph:/docs/ aus den
+│   │                            Vorlagen k-playbook:/docs/<pfad>/README.md (Task 137),
+│   │                            ListDocsTemplates, der README-Schritt des Einrichtens
+│   ├── inventoryrun.go          RunInventory: inventory.Run, danach die README von
+│   │                            docs/generated/versions/
 │   ├── docs_exclude.go          Block docs: — docs.exclude zeilenweise lesen und prüfen
 │   │                            (context.docs), AddDocsExclude trägt Muster ein
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
@@ -526,7 +537,8 @@ installer/
 │   │                            project.ResolveDocRef) und k_playbook_doc_create/list/
 │   │                            done/reopen (Hüllen über project.UserDocs)
 │   ├── docswork.go              Werkzeuge k_playbook_docs_checkout/publish (Hüllen über
-│   │                            project.DocsWork) und k_playbook_docs_exclude_add
+│   │                            project.DocsWork), k_playbook_docs_readme (Hülle über
+│   │                            project.DocsReadmes) und k_playbook_docs_exclude_add
 │   │                            (Hülle über project.AddDocsExclude)
 │   ├── briefing.go              Werkzeug k_playbook_briefing (Hülle über
 │   │                            project.BuildBriefing)
@@ -2419,8 +2431,9 @@ entfällt für ein Projekt, das kephalaion abgewählt hat, die Führung zum Einr
 
 ## Erzeugte Doku: checkout und publish
 
-Ein Erzeuger mit mehreren Dokumenten — heute `code`, geschrieben von `/k-docs-code` und dem
-Skill `ks-overlay-repo-analyse` — schreibt nicht Dokument für Dokument über Kephalaion,
+Ein Erzeuger mit mehreren Dokumenten — `code`, geschrieben von `/k-docs-code` und dem Skill
+`ks-overlay-repo-analyse`, und `libs`, geschrieben von `/k-docs-tools` — schreibt nicht
+Dokument für Dokument über Kephalaion,
 sondern über ein Arbeitsverzeichnis auf der Platte (Task 109, Workbench 004 Entscheidungen
 14–17): `k-playbook docs checkout <erzeuger>` holt, die Sitzung bearbeitet mit ihren
 Datei-Werkzeugen, `k-playbook docs publish <erzeuger>` gleicht ab. Teil-Scan und zweiter
@@ -2436,9 +2449,10 @@ Die Fachlogik ist `project.DocsWork` (`project/docswork.go`), geöffnet über `O
 setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werkzeuge
 (`mcpserver/docswork.go`) sind Hüllen.
 
-- **Erzeugertabelle.** `project.DocsProducers`: Name, `title`, `description` und ein kurzer
-  Text je Erzeuger. Daraus kommen die erlaubten Werte von `erzeuger` und die `README.md` des
-  Verzeichnisses, die `publish` schreibt, wenn sie abweicht — die KI schreibt sie nie, und im
+- **Erzeugertabelle.** `project.DocsProducers`: nur noch der Name je Erzeuger (Task 137).
+  Daraus kommen die erlaubten Werte von `erzeuger`. Die `README.md` des Verzeichnisses
+  schreibt `publish` aus ihrer Vorlage `k-playbook:/docs/generated/<erzeuger>/README.md`
+  (`DocsReadmes`, unten), wenn sie fehlt oder abweicht — die KI schreibt sie nie, und im
   Arbeitsverzeichnis ist sie nicht erlaubt. Ein Verzeichnis kann mehrere Schreiber haben; die
   Tabelle kennt das Verzeichnis, `generated.by` im Frontmatter den Schreiber. Heute stehen
   darin `code` (`/k-docs-code`, Skill `ks-overlay-repo-analyse`) und `libs` (`/k-docs-tools`,
@@ -2466,7 +2480,10 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   zählt als Änderung — außer mit `--allow-hints`.
 - **Aufräumen.** Arbeitsverzeichnis und Merkdatei verschwinden nur, wenn nichts in Konflikt
   oder fehlgeschlagen ist; sonst trägt die Merkdatei danach den Stand des Veröffentlichten,
-  und ein zweites `publish` schreibt nur den Rest. Ist aufgeräumt (`cleaned`), entfernt
+  und ein zweites `publish` schreibt nur den Rest. Fehlt allein die Vorlage der README
+  (`template_missing`, Versatz Binary/Hub, Task 133), wird trotzdem aufgeräumt: Die
+  Dokumente sind veröffentlicht, ein zweites `publish` hülfe nicht; die CLI endet nach der
+  Ausgabe mit Exit 1. Ist aufgeräumt (`cleaned`), entfernt
   `publish` auch `.k-playbook/work/docs/` und `.k-playbook/work/`, wenn sie danach leer sind
   (`removeEmptyDocsWorkParents`, Task 124) — nur im publish-Pfad, nicht in `removeDocsWork`,
   das auch `checkout --discard` nutzt.
@@ -2491,6 +2508,45 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
 Vertrag der Werkzeuge: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Generated Docs:
 Checkout and Publish“; welche Kephalaion-Aufrufe dahinter stehen:
 [`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
+
+## README aus Vorlagen
+
+Jedes Verzeichnis unter `keph:/docs/`, für das es eine Vorlage gibt, trägt eine immer gleiche
+`README.md` (Task 137). Vorlage für `keph:/docs/<pfad>/README.md` ist
+`k-playbook:/docs/<pfad>/README.md`, die Datei `defaults/docs/<pfad>/README.md` im Quell-Repo;
+`pack-defaults.sh` packt sie mit, der Hub legt sie unter `<hub>:k-playbook/defaults/docs/` ab.
+Die Vorlagen sind englisch (Inhalte unter `docs/` einer Collection sind englisch, die Suche
+von Kephalaion fragt mit `porter`) und tragen `title` und `description`, nie `generated` —
+daran erkennt Kephalaion seine Mahnung, die es nur in ein Verzeichnis ohne `README.md` legt.
+
+- **Lesen.** `docs/` ist in `docRefKinds`, nicht in `docReaderKinds`: auflösbar, aber in keinem
+  Katalog und keinem Briefing. Als einzige Sorte steht es in `docDistOnlyKinds` —
+  `resolveDocFile` liest dort keine lokale Ebene, eine Datei unter `k-playbook-local/docs/`
+  gewinnt nicht und eine leere schaltet nichts ab. `ListDocsTemplates` (`project/docsreadme.go`)
+  listet die Vorlagen aus dem Baum der mitgelieferten Ebene; eine zweite Liste im Code gibt es
+  nicht, `docs/README.md` oben zählt nie.
+- **Schreiben.** `DocsReadmes.One` ist die eine Stelle: Vorlage über `ResolveDocRefWith` lesen
+  und prüfen (Frontmatter mit `title` und `description`, kein `generated`), README lesen, fehlt
+  sie `create`, weicht sie ab `write` mit ihrer Revision, sonst nichts. Fehlt die Vorlage,
+  ist der Eintrag `failed` mit `template_missing`, und nichts entsteht, auch keine leere
+  README. `All` geht über alle Vorlagen; `Check` schreibt nichts und meldet `missing`,
+  `differs` oder `unchanged`. Der Store ist die Schnittstelle `DocsReadmeStore` (`read`,
+  `create`, `write`); `DocsStore` und `inventory.Store` erfüllen sie.
+- **Aufrufer.** `publish` für `generated/<erzeuger>/` (`publishReadme`); das Inventar über
+  `project.RunInventory`, das nach `inventory.Run` die README von `generated/versions/`
+  schreibt — in `internal/project`, weil `internal/inventory` das Paket nicht importieren
+  kann; CLI `inventory` und `POST /api/inventory` rufen es. Das Einrichten
+  (`ApplyAssistantSetup`, damit auch `k-playbook upgrade` und Einrichten/Aktualisieren in der
+  Oberfläche) schreibt am Ende alle über `writeSetupReadmes` — so stehen auch die von
+  `manual/` und `sources/` da, die kein Erzeuger mitschreibt. Das Ergebnis steht im eigenen
+  Feld `AssistantSetup.Readmes`, nicht im Fehlerwert; ohne bereites Kephalaion wird nichts
+  versucht, und der ganze Schritt endet spätestens nach `docsReadmeSetupTimeout` (10 s), auch
+  wenn ein Aufruf ohne Kontext hängt. `upgrade --check` übergeht die READMEs; fehlende und
+  abweichende meldet `/k-docs` über `k-playbook docs readme --check`. Auf Abruf schreibt
+  `k-playbook docs readme [<pfad>]` (MCP `k_playbook_docs_readme`).
+- **Restlücke.** Läuft das Einrichten, bevor Kephalaion bereit ist, steht bis zum nächsten
+  Upgrade oder `/k-docs alle` Kephalaions Mahnung da; k-playbook ersetzt sie dann als
+  abweichend.
 
 ## GitHub CLI
 
@@ -3361,7 +3417,8 @@ Statusquelle, die auch der Sammler, `/k-docs` und das Subkommando benutzen.
 **Nur die Fachlogik.** Die Handler in `webui/inventory.go` rufen ausschließlich
 `internal/inventory` auf — mit dem Store aus `project.OpenInventoryStore`, demselben Zugang
 wie beim Subkommando: `inventory.DocName` für den Ort des Dokuments, `inventory.ReadStatus`
-für den Stand, `inventory.Run` für den Anstoß, `inventory.Body` zum Abtrennen des
+für den Stand, `inventory.Run` für den Anstoß — über `project.RunInventory`, das danach die
+README des Verzeichnisses aus ihrer Vorlage schreibt (Task 137) —, `inventory.Body` zum Abtrennen des
 Frontmatters vor dem Rendern. Es gibt keinen zweiten Parser und keine Sonderbehandlung von
 Pfaden: `GET /api/inventory/file` nimmt keinen Pfad aus der Anfrage entgegen, sondern liest
 genau das eine Dokument. Die Vertrauensgrenze aus `inventory/trust.go` gilt für den Anstoß
@@ -3883,7 +3940,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
 | `GET` | `/api/inventory` | Stand des Versionsinventars aus dem Frontmatter der Inventardatei, dazu der Zustand der Quellenkonfiguration; read-only |
-| `POST` | `/api/inventory` | Erhebung anstoßen über `inventory.Run`; schreibt allein die Inventardatei, und die nur bei inhaltlicher Änderung; antwortet mit Zahlen, Ablehnungen, Ausschlüssen, nicht auswertbaren Quellen, Hinweisen und dem Stand danach |
+| `POST` | `/api/inventory` | Erhebung anstoßen über `project.RunInventory` (`inventory.Run`, danach die README von `docs/generated/versions/` aus ihrer Vorlage); schreibt die Inventardatei nur bei inhaltlicher Änderung, die README nur, wenn sie fehlt oder abweicht; antwortet mit Zahlen, Ablehnungen, Ausschlüssen, nicht auswertbaren Quellen, Hinweisen, `readme` und dem Stand danach |
 | `GET` | `/api/inventory/file` | die Inventardatei als HTML lesen, ohne Frontmatter; fester Pfad, kein Parameter; read-only |
 | `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
 | `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |

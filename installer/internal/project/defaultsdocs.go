@@ -101,11 +101,22 @@ func NewProjectDefaultsSource(projectDir string) DocSource {
 // Fehlt defaults/VERSION, ist der Lieferumfang nicht angekommen: dann ist
 // jeder Zugriff kephalaion_unavailable mit der Abhilfe fetch_release.
 func NewKephDefaultsSource(open func() (DefaultsStore, string, error)) DocSource {
-	return &kephDefaultsSource{open: open}
+	return &kephDefaultsSource{open: open, ctx: context.Background()}
+}
+
+// newProjectDefaultsSourceContext ist NewProjectDefaultsSource, dessen
+// Aufrufe am Node ctx begrenzt — für einen Schritt mit Zeitlimit wie das
+// Schreiben der READMEs beim Einrichten. DocSource selbst kennt keinen
+// Kontext.
+func newProjectDefaultsSourceContext(ctx context.Context, projectDir string) DocSource {
+	return &kephDefaultsSource{open: func() (DefaultsStore, string, error) { return OpenDefaultsStore(projectDir) }, ctx: ctx}
 }
 
 type kephDefaultsSource struct {
 	open func() (DefaultsStore, string, error)
+	// ctx begrenzt List und Read am Node; Hintergrund, wenn niemand eine
+	// Frist setzt.
+	ctx context.Context
 
 	once    sync.Once
 	err     error
@@ -139,7 +150,7 @@ func (s *kephDefaultsSource) index() error {
 				"Abhilfe: Kephalaion einrichten über /k-gui (k-playbook gui, Abschnitt Kephalaion)",
 			address, defaultsDirName, err)
 	}
-	entries, err := store.List(context.Background(), kephalaion.ListRequest{Path: defaultsDirName, Recursive: true})
+	entries, err := store.List(s.ctx, kephalaion.ListRequest{Path: defaultsDirName, Recursive: true})
 	if err != nil {
 		return docRefErrorf(DocCodeKephalaionUnavailable,
 			"die mitgelieferten Texte sind nicht lesbar: %s lässt sich nicht auflisten (%v) — gibt es die Collection "+
@@ -204,8 +215,9 @@ func (s *kephDefaultsSource) List(dir string) ([]DocSourceEntry, error) {
 
 // prefetch liest die Dateien eines gelisteten Verzeichnisses nebeneinander
 // in den Zwischenspeicher — außer README.md und Dotfiles, die keiner der
-// Leser nimmt. Ein Fehler bleibt hier stumm: Das spätere Read fragt noch
-// einmal und meldet ihn.
+// Leser eines ganzen Verzeichnisses nimmt (die Vorlagen README.md unter docs/
+// liest docsreadme.go einzeln). Ein Fehler bleibt hier stumm: Das spätere
+// Read fragt noch einmal und meldet ihn.
 func (s *kephDefaultsSource) prefetch(prefix string, entries []DocSourceEntry) {
 	files := []string{}
 	s.mu.Lock()
@@ -251,7 +263,7 @@ func (s *kephDefaultsSource) Read(file string) ([]byte, error) {
 	if ok {
 		return data, nil
 	}
-	read, err := s.store.Read(context.Background(), defaultsDirName+"/"+file)
+	read, err := s.store.Read(s.ctx, defaultsDirName+"/"+file)
 	if err != nil {
 		mapped := kephError(err)
 		if DocRefErrorCode(mapped) != DocCodeKephalaionUnavailable {

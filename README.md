@@ -230,7 +230,9 @@ running.
 
 In the terminal, `k-playbook upgrade` does both in one go — the pull, the binary when
 the running program is older, Kephalaion when it is missing from the `PATH`, then
-`AGENTS.md`, `CLAUDE.md`, linking and MCP entries —
+`AGENTS.md`, `CLAUDE.md`, linking and MCP entries, and last the `README.md` of the
+directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
+as a hint) —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
 only reports what a run would do.
 

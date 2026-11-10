@@ -238,6 +238,15 @@ function renderRun(data) {
   if (outcome.problem) {
     elements.runMessage.textContent += `\nHinweis zum Bestand: ${outcome.problem}`;
   }
+  // Die README des Verzeichnisses kommt aus ihrer Vorlage; scheitert nur sie,
+  // ist das Inventar trotzdem geschrieben.
+  const readme = data.readme;
+  if (readme && readme.status === "failed") {
+    elements.runPill.className = "pill warn";
+    elements.runMessage.textContent += `\nREADME nicht geschrieben: ${readme.ref} — ${readme.message || readme.code || ""}`;
+  } else if (readme && (readme.status === "created" || readme.status === "written")) {
+    elements.runMessage.textContent += `\nREADME aus der Vorlage geschrieben: ${readme.ref}.`;
+  }
 
   addFact(elements.runFacts, "Ausgewertete Quellen", String(summary.sources || 0));
   addFact(elements.runFacts, "Konfigurierte Zusatzquellen", String(summary.configuredSources || 0));

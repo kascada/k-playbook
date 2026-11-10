@@ -440,7 +440,7 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 			t.Errorf("_shared/docs.md trägt noch %q", stale)
 		}
 	}
-	for _, needle := range []string{"mehrere\n  Schreiber", "k_playbook_docs_checkout", "`hints`", "`questions`", "`publish` aus der Erzeugertabelle", "Indizieren",
+	for _, needle := range []string{"mehrere\n  Schreiber", "k_playbook_docs_checkout", "`hints`", "`questions`", "aus ihrer Vorlage `k-playbook:/docs/<pfad>/README.md`", "`k-playbook docs readme`", "Indizieren",
 		"`docs.exclude`", "`context.docs.exclude`", "`k_playbook_docs_exclude_add`"} {
 		if !strings.Contains(shared, needle) {
 			t.Errorf("_shared/docs.md nennt %q nicht", needle)
@@ -613,7 +613,7 @@ func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
 		t.Errorf("Hülle ohne Verweis auf den Text, noch abgeschaltet oder mit dem alten Ablauf:\n%s", hull)
 	}
 	for _, tool := range []string{"WebFetch", "mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
-		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_exclude_add",
+		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_readme", "mcp__k-playbook__k_playbook_docs_exclude_add",
 		"mcp__kephalaion__list", "mcp__kephalaion__read"} {
 		if !strings.Contains(hull, tool) {
 			t.Errorf("Hülle erlaubt %s nicht", tool)
@@ -641,6 +641,9 @@ func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
 		"`recursive: true`, `frontmatter: true`", "`generated.stats`", "alter Kopf", "`alle`",
 		"nacheinander `inventory`, `code`, `tools`, in genau dieser Reihenfolge", "Es wurde nichts geschrieben",
 		"kephalaion_unavailable", "/k-upgrade",
+		// Task 137: README gegen die Vorlagen — read-only im Statuslauf, geschrieben mit alle.
+		"`k_playbook_docs_readme`", "`check: true`", "`k-playbook docs readme --check --json`", "`missing`", "`differs`",
+		"ohne `check` (ersatzweise `k-playbook docs readme --json`)", "Verzeichnisse ohne Vorlage",
 	} {
 		if !strings.Contains(file, needle) {
 			t.Errorf("k-docs.md nennt %q nicht", needle)

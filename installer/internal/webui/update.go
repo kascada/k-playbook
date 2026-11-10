@@ -203,13 +203,19 @@ func restartAfterPull(running string, result project.UpdateResult) bool {
 // CLAUDE.md über „Aktualisieren" für immer unverändert.
 //
 // Ein Fehler dabei lässt das Update selbst gültig: der Pull ist durch, und
-// die Verlinkung kann über die Assistenten-Karte nachgeholt werden.
+// die Verlinkung kann über die Assistenten-Karte nachgeholt werden. Den
+// README-Schritt (Task 137) meldet auch dieser Zweig: Er steht neben dem
+// Fehlerwert im Ergebnis und ist auch dann gelaufen.
 func relinkAfterUpdate(projectDir string, message string) (project.LinkChanges, string) {
 	changes := project.PendingLinkChanges(project.CheckLinks(projectDir))
 
 	setup, err := project.ApplyAssistantSetup(projectDir)
 	if err != nil {
-		return changes, message + " Die Verlinkung konnte nicht nachgezogen werden: " + err.Error()
+		text := message + " Die Verlinkung konnte nicht nachgezogen werden: " + err.Error()
+		if note := project.DescribeSetupReadmes(setup.Readmes); note != "" {
+			text += " " + note
+		}
+		return changes, text
 	}
 
 	parts := []string{message}

@@ -327,6 +327,8 @@ Between the two steps, commands, the prompt block in `AGENTS.md`, and the MCP re
 
 For the new commands to reach the assistant, restart it afterwards: Claude Code and OpenCode discover them at startup.
 
+**READMEs of the project documentation.** Setup and update — the interface buttons and `k-playbook upgrade` — end by writing the `README.md` of every directory under `keph:/docs/` that has a template `k-playbook:/docs/<path>/README.md`, when it is missing or differs (task 137). These READMEs are the same in every project and come from the hub's delivery; one changed by hand is overwritten. Without a ready Kephalaion nothing is attempted, a slow hub holds the step up for at most 10 seconds, and a missing template is only a hint: none of it stops setup or update. `k-playbook docs readme` writes them on demand, `k-playbook docs readme --check` only reports.
+
 ### A project's own conversion script
 
 `/k-upgrade` runs one script that belongs to the project: if `scripts/k-upgrade-umbau.sh` exists in the project root, the session runs it with `bash scripts/k-upgrade-umbau.sh` from the project root, right after `k-playbook upgrade` and before the conversions 3.0 to 3.4. It runs without asking, also when the binary changed and the command then stops for a restart. Its output is passed on unchanged. If it ends with an exit code other than 0, the session names the code and asks whether the conversions should run anyway. If the file is missing, nothing is said about it.

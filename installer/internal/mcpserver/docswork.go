@@ -18,15 +18,22 @@ import (
 //
 // Dazu k_playbook_docs_exclude_add (Task 116): Hülle über
 // project.AddDocsExclude wie `k-playbook docs exclude add`. Ein Command trägt
-// damit dauerhafte Ausschlüsse ein, ohne K-PLAYBOOK.yaml selbst zu lesen.
+// damit dauerhafte Ausschlüsse ein, ohne K-PLAYBOOK.yaml selbst zu lesen. Und
+// k_playbook_docs_readme (Task 137): Hülle über project.DocsReadmes wie
+// `k-playbook docs readme`.
 const (
 	docsToolCheckout   = "k_playbook_docs_checkout"
 	docsToolPublish    = "k_playbook_docs_publish"
+	docsToolReadme     = "k_playbook_docs_readme"
 	docsToolExcludeAdd = "k_playbook_docs_exclude_add"
 )
 
-// openDocsWork ist austauschbar, damit Tests den Node nicht fragen.
-var openDocsWork = project.OpenDocsWork
+// openDocsWork und openDocsReadmes sind austauschbar, damit Tests den Node
+// nicht fragen.
+var (
+	openDocsWork    = project.OpenDocsWork
+	openDocsReadmes = project.OpenDocsReadmes
+)
 
 type docsCheckoutInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
@@ -38,6 +45,20 @@ type docsPublishInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 	Producer   string `json:"erzeuger" jsonschema:"Pflicht. Der Erzeuger, wie beim checkout."`
 	AllowHints bool   `json:"allow_hints,omitempty" jsonschema:"hints ändern, ein Dokument mit hints löschen oder neu anlegen — nur nach Bestätigung durch den Nutzer. Die Antwort nennt jedes solche Dokument unter hintsChanged."`
+}
+
+type docsReadmeInput struct {
+	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
+	Path       string `json:"pfad,omitempty" jsonschema:"Ein Verzeichnis unter docs/, relativ zu docs/ (etwa generated/code) oder als Verweis keph:/docs/generated/code/; leer für alle Vorlagen."`
+	Check      bool   `json:"check,omitempty" jsonschema:"Nichts schreiben, nur je Vorlage melden: missing, differs oder unchanged."`
+}
+
+type docsReadmeEnvelope struct {
+	OK         bool   `json:"ok"`
+	Tool       string `json:"tool"`
+	ProjectDir string `json:"projectDir"`
+	*project.DocsReadmeResult
+	Error *errorEnvelope `json:"error,omitempty"`
 }
 
 type docsExcludeAddInput struct {
@@ -112,14 +133,28 @@ func addDocsWorkTools(server *mcp.Server) {
 			"mit Frontmatter title und description (invalid_input); hints unverändert, und kein Dokument mit hints " +
 			"gelöscht oder neu angelegt — sonst hints_changed, außer mit allow_hints nach Bestätigung durch den Nutzer. " +
 			"Ein Dokument, das seit dem checkout in Kephalaion geändert, angelegt oder gelöscht wurde, wird nicht " +
-			"geschrieben, sondern als conflict gemeldet. Danach schreibt publish die README.md des Verzeichnisses selbst, " +
-			"wenn sie abweicht. Antwort: docs und readme je mit path, ref, status (created, written, deleted, unchanged, " +
+			"geschrieben, sondern als conflict gemeldet. Danach schreibt publish die README.md des Verzeichnisses aus ihrer " +
+			"Vorlage k-playbook:/docs/generated/<erzeuger>/README.md, wenn sie fehlt oder abweicht; fehlt die Vorlage auf " +
+			"dem Hub, ist readme failed mit template_missing, nichts davon geschrieben, aufgeräumt wird trotzdem. Antwort: docs und readme je mit path, ref, status (created, written, deleted, unchanged, " +
 			"conflict, failed), revision, base (Revision beim checkout), bei conflict und failed code und message; " +
 			"hintsChanged, open (offene Dateien) und cleaned. Arbeitsverzeichnis und Merkdatei werden nur entfernt, wenn " +
 			"nichts offen ist; ein zweites publish schreibt dann nur den Rest. failed mit outcome_unknown: kann " +
 			"angekommen sein — nicht noch einmal veröffentlichen, sondern nachsehen. not_checked_out: kein checkout. " +
 			"kephalaion_unavailable: nichts geschrieben. Hülle über `k-playbook docs publish`.",
 	}, docsPublishTool)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: docsToolReadme,
+		Description: "Schreibt die README.md der Verzeichnisse unter keph:/docs/ aus ihren Vorlagen " +
+			"k-playbook:/docs/<pfad>/README.md, die mit dem Hub ausgeliefert werden (nur mitgeliefert, keine lokale " +
+			"Fassung): je Vorlage die README, die fehlt oder inhaltlich abweicht — anlegen, sonst schreiben mit ihrer " +
+			"Revision, sonst nichts. Eine von Hand geänderte README wird überschrieben; Verzeichnisse ohne Vorlage und " +
+			"docs/README.md ganz oben bleiben unberührt (dort mahnt Kephalaion). Ohne pfad alle Vorlagen, mit pfad die " +
+			"eine. check: true schreibt nichts und meldet je Vorlage missing, differs oder unchanged. Antwort: readmes je " +
+			"mit dir, ref, template, status (created, written, unchanged, failed; mit check missing, differs, unchanged), " +
+			"revision, base, bei failed code und message — template_missing: die Vorlage fehlt auf dem Hub, nichts " +
+			"geschrieben; outcome_unknown: kann angekommen sein, nachsehen —; hint, wenn es keine Vorlagen gibt. " +
+			"kephalaion_unavailable: nichts geschrieben, kein Rückfall auf die Platte. Hülle über `k-playbook docs readme`.",
+	}, docsReadmeTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: docsToolExcludeAdd,
 		Description: "Trägt Muster dauerhaft in den Block docs.exclude von .k-playbook/K-PLAYBOOK.yaml ein — was die " +
@@ -154,6 +189,39 @@ func docsExcludeAddTool(_ context.Context, _ *mcp.CallToolRequest, input docsExc
 	// Verworfene Muster sind kein Fehler des Werkzeugs: Die Antwort nennt sie
 	// unter rejected, die gültigen sind trotzdem eingetragen.
 	return jsonToolResult(docsExcludeEnvelope{OK: true, Tool: docsToolExcludeAdd, ProjectDir: projectDir, DocsExcludeResult: &result}, false), nil, nil
+}
+
+func docsReadmeTool(ctx context.Context, _ *mcp.CallToolRequest, input docsReadmeInput) (*mcp.CallToolResult, any, error) {
+	fail := func(dir string, code string, err error) *mcp.CallToolResult {
+		return jsonToolResult(docsReadmeEnvelope{OK: false, Tool: docsToolReadme, ProjectDir: dir,
+			Error: &errorEnvelope{Code: code, Message: err.Error()}}, true)
+	}
+	projectDir, err := resolveProjectDir(input.ProjectDir)
+	if err != nil {
+		return fail(projectDir, projectDirErrorCode(err), err), nil, nil
+	}
+	dir := ""
+	if strings.TrimSpace(input.Path) != "" {
+		if dir, err = project.CleanDocsDir(input.Path); err != nil {
+			return fail(projectDir, docErrorCode(err), err), nil, nil
+		}
+	}
+	readmes, err := openDocsReadmes(projectDir)
+	if err != nil {
+		return fail(projectDir, docErrorCode(err), err), nil, nil
+	}
+	options := project.DocsReadmeOptions{Check: input.Check}
+	var result project.DocsReadmeResult
+	if dir == "" {
+		if result, err = readmes.All(ctx, options); err != nil {
+			return fail(projectDir, docErrorCode(err), err), nil, nil
+		}
+	} else {
+		result = project.DocsReadmeResult{Check: input.Check, Readmes: []project.DocsReadmeItem{readmes.One(ctx, dir, options)}}
+	}
+	// Eine README mit failed ist kein Fehler des Werkzeugs: Die Antwort trägt
+	// je README den Zustand.
+	return jsonToolResult(docsReadmeEnvelope{OK: true, Tool: docsToolReadme, ProjectDir: projectDir, DocsReadmeResult: &result}, false), nil, nil
 }
 
 func docsCheckoutTool(ctx context.Context, _ *mcp.CallToolRequest, input docsCheckoutInput) (*mcp.CallToolResult, any, error) {

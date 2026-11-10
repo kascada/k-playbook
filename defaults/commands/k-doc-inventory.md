@@ -16,6 +16,9 @@ Produces:
 - `keph:/docs/generated/versions/inventory.md` — das Inventar, geschrieben vom Subkommando
   in die Collection des Projekts, nicht von Hand. Ein Lauf ohne inhaltliche Änderung lässt
   das Dokument byte-identisch stehen, Zeitstempel und Revision eingeschlossen.
+- `keph:/docs/generated/versions/README.md` — die Beschreibung des Verzeichnisses, die das
+  Subkommando nach dem Inventar aus ihrer Vorlage `k-playbook:/docs/generated/versions/README.md`
+  schreibt, wenn sie fehlt oder abweicht.
 - `k-playbook-local/version-sources.yaml` — **nur** nach ausdrücklicher Bestätigung des
   Nutzers und ausschließlich ergänzend (Schritt 4).
 
@@ -157,8 +160,10 @@ Die Ausgabe des Laufs trägt: ausgewertete Quellen, konfigurierte Zusatzquellen,
 Abweichungen (davon widersprüchliche), abgelehnte Quellen, nicht durchsuchte Quellen, nicht
 auswertbare Quellen und Hinweise, dazu jede Ablehnung, jeden greifenden Ausschluss, jede
 nicht auswertbare Quelle und jeden Hinweis im Wortlaut, und am Ende `Geschrieben:` oder
-`Unverändert:` mit dem `keph:`-Verweis, dem Erhebungszeitpunkt und der Revision.
-Übernimm sie unverändert in den Abschluss; **keine Ablehnung** wird dabei weggelassen.
+`Unverändert:` mit dem `keph:`-Verweis, dem Erhebungszeitpunkt und der Revision. Danach
+steht eine Zeile `README: <zustand> keph:/docs/generated/versions/README.md` — `created`,
+`written`, `unchanged` oder `failed` mit Code und Meldung. Übernimm sie unverändert in den
+Abschluss; **keine Ablehnung** wird dabei weggelassen.
 
 Das Dokument selbst wird danach nicht nachbearbeitet. Fällt am Ergebnis etwas auf, ist das
 ein Befund für den Erzeuger, keine Korrektur von Hand — beim nächsten Lauf wäre sie ohnehin
@@ -178,6 +183,7 @@ Kompakte Zusammenfassung:
 - `keph:/docs/generated/versions/inventory.md`: neu geschrieben (mit Erhebungszeitpunkt und
   Revision) oder unverändert, weil die Erhebung inhaltlich dieselbe ist. Beides ist ein
   erfolgreicher Lauf.
+- Die Zeile `README:` — und, wenn sie `failed` meldet, Code und Meldung.
 - Jede abgelehnte Quelle mit angefragtem Pfad, aufgelöstem Pfad und Grund. Eine Ablehnung
   ist eine Lücke im Inventar; eine Lücke, die niemand sieht, ist schlimmer als ein Fehler.
 - Ausdrücklich: außerhalb von `keph:/docs/generated/versions/` wurde nichts geschrieben —
@@ -210,6 +216,11 @@ Kompakte Zusammenfassung:
   die aufgeschriebene.
 - `k-playbook inventory` meldet `unbekanntes Kommando` → die Installation ist älter als
   dieser Command. Melden, `/k-upgrade` nennen, und die Erhebung **nicht** von Hand nachbauen.
+- Die Zeile `README:` meldet `failed`, und das Kommando endet mit einem Fehler → gescheitert
+  ist nur die README des Verzeichnisses, das Inventar ist geschrieben. `template_missing`
+  heißt: Der Lieferumfang auf dem Hub ist älter als das Programm und trägt die Vorlage noch
+  nicht. Im Abschluss nennen; die README nicht von Hand schreiben — `k-playbook docs readme`
+  holt sie nach, sobald die Vorlage da ist.
 - Das Kommando meldet abgelehnte Quellen → das ist kein Fehlschlag: der Lauf geht weiter,
   die Ablehnungen stehen im Inventar und im Abschluss. Sie zu übergehen ist der Fehler.
 - Das Inventar ist da, sein Frontmatter defekt → das Kommando meldet es als Befund und
@@ -237,5 +248,6 @@ Kompakte Zusammenfassung:
 - **Still filtern.** Ein Ausschluss wird vorgeschlagen und bestätigt, nie nebenbei
   eingetragen — und er steht danach im Inventar. Ein Bereich, der lautlos verschwindet, ist
   eine Lücke, die niemand sieht.
-- **`README.md` oder `index.md` anfassen.** Sie erzeugt Kephalaion; eine hier eingefügte
-  Zeile ist beim nächsten Erzeugen weg.
+- **`README.md` oder `index.md` von Hand anfassen.** Die README schreibt das Programm aus
+  ihrer Vorlage, `index.md` erzeugt Kephalaion; eine hier eingefügte Zeile ist beim nächsten
+  Schreiben weg.

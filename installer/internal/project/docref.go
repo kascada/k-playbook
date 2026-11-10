@@ -26,6 +26,7 @@ import (
 // Projekts ab seiner Wurzel, keph: ein Dokument der Projekt-Collection über
 // den Node; beide haben eine Ebene, ohne Überlagerung und Zusammenbau.
 // k-playbook: löst die Sorten in docRefKinds auf; dahinter stehen zwei Ebenen
+// (bei docs/ nur die mitgelieferte, docDistOnlyKinds)
 // — die mitgelieferte und die lokale —, die über eine austauschbare Quelle
 // gelesen werden: die mitgelieferte aus der öffentlichen Collection
 // <hub>:k-playbook unter defaults/ (defaultsdocs.go), die lokale von der
@@ -78,10 +79,23 @@ const docTestdataRoot = "testdata"
 // Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
 var docReaderKinds = []string{docInstructionsRoot, "reviews", "guidelines", docCommandsRoot}
 
+// docDocsRoot ist die Sorte docs/: die Vorlagen der README.md unter
+// keph:/docs/ der Projekt-Collection (Task 137) — k-playbook:/docs/<pfad>/README.md
+// ist die Vorlage für keph:/docs/<pfad>/README.md (docsreadme.go). Sie gibt es
+// nur mitgeliefert: keine lokale Ebene darüber, auch kein Abschalten durch eine
+// leere Datei, weil die README in jedem Projekt gleich ist und aus einer
+// Quelle kommt. Wie includes/ in keinem Katalog und keinem Briefing.
+const docDocsRoot = "docs"
+
 // docRefKinds sind alle Sorten, die ResolveDocRef auflöst: die Lesersorten
-// und dazu includes/ und testdata/, die in keinem Katalog, keinem Briefing
-// und keiner Hilfe erscheinen.
-var docRefKinds = append(append([]string{}, docReaderKinds...), docIncludesRoot, docTestdataRoot)
+// und dazu includes/, testdata/ und docs/, die in keinem Katalog und keinem
+// Briefing erscheinen.
+var docRefKinds = append(append([]string{}, docReaderKinds...), docIncludesRoot, docTestdataRoot, docDocsRoot)
+
+// docDistOnlyKinds sind die Sorten ohne lokale Ebene: ResolveDocRef liest
+// sie nur aus der mitgelieferten, eine Datei unter k-playbook-local/ gewinnt
+// dort nicht und schaltet nichts ab.
+var docDistOnlyKinds = []string{docDocsRoot}
 
 // docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
 // zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
@@ -601,7 +615,17 @@ func resolveDocRefFull(ctx context.Context, layers DocLayers, ref DocRef, opts D
 
 // isDocRefKind meldet, ob ein Pfad in einer Sorte aus docRefKinds liegt.
 func isDocRefKind(refPath string) bool {
-	for _, kind := range docRefKinds {
+	return inDocKinds(refPath, docRefKinds)
+}
+
+// isDistOnlyDocRef meldet, ob ein Pfad in einer Sorte ohne lokale Ebene
+// liegt (docDistOnlyKinds).
+func isDistOnlyDocRef(refPath string) bool {
+	return inDocKinds(refPath, docDistOnlyKinds)
+}
+
+func inDocKinds(refPath string, kinds []string) bool {
+	for _, kind := range kinds {
 		if refPath == kind || strings.HasPrefix(refPath, kind+"/") {
 			return true
 		}
@@ -672,12 +696,17 @@ func assembledDocDirsText() string {
 
 // resolveDocFile liefert eine Einzeldatei: lokal vor mitgeliefert, Inhalt
 // unverändert mit Frontmatter. Eine leere lokale Datei schaltet ab — kein
-// Fehler, sondern leerer Inhalt mit disabled.
+// Fehler, sondern leerer Inhalt mit disabled. Eine Sorte aus
+// docDistOnlyKinds liest nur die mitgelieferte Ebene.
 func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 	result := DocResult{Ref: ref.String(), Parts: []DocPart{}, Problems: []string{}}
 	name := path.Base(ref.Path)
 
-	local, localErr := readDocLayer(layers.Local, ref)
+	var local []byte
+	localErr := error(fs.ErrNotExist)
+	if !isDistOnlyDocRef(ref.Path) {
+		local, localErr = readDocLayer(layers.Local, ref)
+	}
 	if localErr != nil && !errors.Is(localErr, fs.ErrNotExist) {
 		return DocResult{}, localErr
 	}
@@ -705,6 +734,9 @@ func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 	case distFound:
 		result.Content = string(dist)
 		result.Parts = append(result.Parts, DocPart{Name: name, Origin: DocOriginDist})
+	case isDistOnlyDocRef(ref.Path):
+		return DocResult{}, docRefErrorf(DocCodeNotFound,
+			"%s ist unbekannt: mitgeliefert nicht vorhanden (eine lokale Fassung gibt es hier nicht)", result.Ref)
 	default:
 		return DocResult{}, docRefErrorf(DocCodeNotFound,
 			"%s ist unbekannt: weder lokal noch mitgeliefert vorhanden", result.Ref)

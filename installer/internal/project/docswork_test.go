@@ -16,7 +16,7 @@ import (
 
 // Die Erzeugertabelle ist gültig und trägt in diesem Stand code und libs
 // (Task 120); ein unbekannter Erzeuger ist invalid_input und nennt die
-// erlaubten.
+// erlaubten. README-Texte trägt sie seit Task 137 nicht mehr.
 func TestDocsProducersTabelle(t *testing.T) {
 	if err := ValidateDocsProducers(DocsProducers); err != nil {
 		t.Fatalf("Tabelle ungültig: %v", err)
@@ -38,23 +38,15 @@ func TestDocsProducersTabelle(t *testing.T) {
 	if libs.Ref() != "keph:/docs/generated/libs/" || libs.docName("python-celery.md") != "docs/generated/libs/python-celery.md" {
 		t.Errorf("Orte: %s, %s", libs.Ref(), libs.docName("python-celery.md"))
 	}
-	for _, needle := range []string{"/k-docs-tools", "keph:/docs/generated/versions/inventory.md", "`sources`", "`hints`",
-		"`k-playbook docs checkout libs`", "`k-playbook docs publish libs`"} {
-		if !strings.Contains(libs.Description+libs.Text, needle) {
-			t.Errorf("libs nennt %q nicht", needle)
-		}
-	}
 	_, err = DocsProducerByName("tools")
 	if DocRefErrorCode(err) != DocCodeInvalidInput || !strings.Contains(err.Error(), "code, libs") {
 		t.Errorf("unbekannter Erzeuger: %v (%s)", err, DocRefErrorCode(err))
 	}
 
 	for _, bad := range [][]DocsProducer{
-		{{Name: "Code", Title: "T", Description: "D", Text: "X"}},
-		{{Name: "a.b", Title: "T", Description: "D", Text: "X"}},
-		{{Name: "code", Title: "T", Description: "D", Text: "X"}, {Name: "code", Title: "T", Description: "D", Text: "X"}},
-		{{Name: "code", Title: "", Description: "D", Text: "X"}},
-		{{Name: "code", Title: "T", Description: "D\nE", Text: "X"}},
+		{{Name: "Code"}},
+		{{Name: "a.b"}},
+		{{Name: "code"}, {Name: "code"}},
 	} {
 		if err := ValidateDocsProducers(bad); err == nil {
 			t.Errorf("Tabelle %+v gilt als gültig", bad)
@@ -62,17 +54,22 @@ func TestDocsProducersTabelle(t *testing.T) {
 	}
 }
 
-// Die README aus der Tabelle hat Frontmatter mit title und description, das
-// publish selbst als gültig ansähe, und den kurzen Text.
-func TestDocsProducerReadme(t *testing.T) {
+// Jeder Erzeuger hat seine README-Vorlage unter defaults/docs/generated/ —
+// publish schreibt sie von dort. Die Vorlage von libs/ nennt, was die alte
+// Tabelle nannte.
+func TestDocsProducerVorlagen(t *testing.T) {
+	layers := repoDefaultsLayers(t)
 	for _, producer := range DocsProducers {
-		readme := producer.readme()
-		meta, problems := parseDocsMeta([]byte(readme))
-		if len(problems) != 0 || meta.Title != producer.Title || meta.Description != producer.Description {
-			t.Errorf("%s: README-Frontmatter %+v, Probleme %v:\n%s", producer.Name, meta, problems, readme)
+		if producer.templateDir() != "generated/"+producer.Name {
+			t.Errorf("%s: Vorlagenverzeichnis %q", producer.Name, producer.templateDir())
 		}
-		if !strings.Contains(readme, strings.TrimRight(producer.Text, "\n")+"\n") {
-			t.Errorf("%s: README ohne Text:\n%s", producer.Name, readme)
+		mustResolveDoc(t, layers, DocsTemplateRef(producer.templateDir()))
+	}
+	libs := readRepoDefault(t, "docs/generated/libs/README.md")
+	for _, needle := range []string{"/k-docs-tools", "keph:/docs/generated/versions/inventory.md", "`sources`", "`hints`",
+		"`k-playbook docs checkout libs`", "`k-playbook docs publish libs`"} {
+		if !strings.Contains(libs, needle) {
+			t.Errorf("Vorlage libs nennt %q nicht", needle)
 		}
 	}
 }
@@ -232,7 +229,7 @@ func docsWorkFixture(t *testing.T) (string, *kephtest.Store, *DocsWork) {
 	t.Helper()
 	root := t.TempDir()
 	store := kephtest.New()
-	work := NewDocsWork(root, store, "vm:projekt")
+	work := NewDocsWork(root, store, "vm:projekt").WithTemplates(repoDefaultsSource(t))
 	work.now = func() time.Time { return time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC) }
 	return root, store, work
 }
@@ -521,8 +518,8 @@ func TestDocsPublishAbgleich(t *testing.T) {
 	if _, ok := store.Content("docs/generated/code/03-weg.md"); ok {
 		t.Error("03-weg.md nicht gelöscht")
 	}
-	code, _ := DocsProducerByName("code")
-	if content, _ := store.Content("docs/generated/code/README.md"); content != code.readme() {
+	codeReadme := readRepoDefault(t, "docs/generated/code/README.md")
+	if content, _ := store.Content("docs/generated/code/README.md"); content != codeReadme {
 		t.Errorf("README: %q", content)
 	}
 	if result.Readme.Status != DocsCreated || result.Readme.Revision == 0 || !result.Cleaned || len(result.Open) != 0 || len(result.HintsChanged) != 0 {
@@ -556,8 +553,39 @@ func TestDocsPublishAbgleich(t *testing.T) {
 	if err != nil || result.Readme.Status != DocsWritten {
 		t.Errorf("README abweichend: %+v, %v", result.Readme, err)
 	}
-	if content, _ := store.Content("docs/generated/code/README.md"); content != code.readme() {
+	if content, _ := store.Content("docs/generated/code/README.md"); content != codeReadme {
 		t.Errorf("README: %q", content)
+	}
+}
+
+// Fehlt die Vorlage auf dem Hub (Versatz Binary/Hub, Task 133), scheitert nur
+// der README-Schritt: Die Dokumente sind veröffentlicht, die README ist
+// failed mit template_missing, keine leere README entsteht, und aufgeräumt
+// wird trotzdem.
+func TestDocsPublishOhneVorlage(t *testing.T) {
+	root, store, work, _ := checkoutFixture(t)
+	empty, _, _ := docTree(t, map[string]string{"reviews/review-x.md": "x"}, nil)
+	work.WithTemplates(empty.Dist)
+	writeWorkFile(t, root, "02-aendern.md", docsDoc("Geändert"))
+
+	result, err := work.Publish(context.Background(), "code", DocsPublishOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := statuses(result); got["02-aendern.md"] != DocsWritten {
+		t.Errorf("Zustände: %v", got)
+	}
+	if result.Readme.Status != DocsFailed || result.Readme.Code != DocCodeTemplateMissing || result.Readme.Ref != "keph:/docs/generated/code/README.md" {
+		t.Errorf("README: %+v", result.Readme)
+	}
+	if _, ok := store.Content("docs/generated/code/README.md"); ok {
+		t.Error("README ohne Vorlage angelegt")
+	}
+	if !result.Cleaned || len(result.Open) != 0 {
+		t.Errorf("nicht aufgeräumt: %+v", result)
+	}
+	if _, err := os.Stat(DocsWorkDir(root, "code")); !os.IsNotExist(err) {
+		t.Errorf("Arbeitsverzeichnis liegt noch: %v", err)
 	}
 }
 

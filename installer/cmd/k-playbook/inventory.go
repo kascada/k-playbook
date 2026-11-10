@@ -20,6 +20,11 @@ import (
 // die Vertrauensgrenze: sie ist einmal definiert und gilt für jeden Aufrufweg
 // gleich, das Kommando öffnet keine Quelle an ihr vorbei.
 //
+// Nach dem Inventar schreibt es die README von docs/generated/versions/ aus
+// ihrer Vorlage (project.RunInventory, Task 137); scheitert nur sie, ist das
+// Inventar trotzdem geschrieben, und der Lauf endet nach dem Bericht mit
+// Exit 1.
+//
 // Den Zugang holt es wie die Todos über project.OpenInventoryStore. Ist
 // Kephalaion für das Projekt nicht bereit, bricht der Lauf mit
 // kephalaion_unavailable und dem Grund aus der Anbindung ab, bevor eine Quelle
@@ -49,13 +54,33 @@ func runInventory(args []string) error {
 		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
 	}
 
-	result, outcome, err := inventory.Run(context.Background(), store, options)
+	result, outcome, readme, err := project.RunInventory(context.Background(), environment.ProjectDir, store, options)
 	if err != nil {
 		return docError(err)
 	}
 
 	printInventory(os.Stdout, options, result, outcome)
+	printInventoryReadme(os.Stdout, readme)
+	if readme != nil && readme.Failed() {
+		return fmt.Errorf("Inventar geschrieben, aber %s nicht: %s (%s)", readme.Ref, readme.Message, readme.Code)
+	}
 	return nil
+}
+
+// printInventoryReadme nennt, was mit der README des Verzeichnisses geschah:
+// eine Zeile, wie docs readme sie schreibt.
+func printInventoryReadme(out io.Writer, readme *project.DocsReadmeItem) {
+	if readme == nil {
+		return
+	}
+	text := fmt.Sprintf("README: %s %s", readme.Status, readme.Ref)
+	if readme.Revision != 0 {
+		text += fmt.Sprintf(" (Revision %d)", readme.Revision)
+	}
+	if readme.Code != "" {
+		text += fmt.Sprintf(" — %s: %s", readme.Code, readme.Message)
+	}
+	fmt.Fprintln(out, text)
 }
 
 // printInventory schreibt den Bericht eines Laufs.

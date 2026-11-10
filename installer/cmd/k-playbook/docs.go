@@ -13,15 +13,20 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// openDocsWork ist austauschbar, damit Tests den Node nicht fragen.
-var openDocsWork = project.OpenDocsWork
+// openDocsWork und openDocsReadmes sind austauschbar, damit Tests den Node
+// nicht fragen.
+var (
+	openDocsWork    = project.OpenDocsWork
+	openDocsReadmes = project.OpenDocsReadmes
+)
 
 // runDocs holt erzeugte Doku aus der Projekt-Collection in ein
 // Arbeitsverzeichnis und veröffentlicht sie wieder (Task 109): k-playbook
 // docs checkout|publish <erzeuger> — dieselbe Fachlogik, die die
 // MCP-Werkzeuge k_playbook_docs_checkout und k_playbook_docs_publish als
 // Hülle anbieten. docs exclude add trägt dauerhafte Ausschlüsse für den
-// Code-Scan ein (Task 116, runDocsExclude).
+// Code-Scan ein (Task 116, runDocsExclude); docs readme schreibt die README.md
+// unter keph:/docs/ aus den Vorlagen (Task 137, runDocsReadme).
 //
 // Ohne --json steht auf stdout eine knappe Zeile je Dokument; mit --json die
 // Antwort als JSON. Ein Fehler endet mit Exit 1 und nennt seinen Code; ein
@@ -39,6 +44,8 @@ func runDocs(args []string) error {
 	case "checkout", "publish":
 	case "exclude":
 		return runDocsExclude(rest)
+	case "readme":
+		return runDocsReadme(rest)
 	default:
 		printDocsUsage(os.Stderr)
 		return fmt.Errorf("unbekannter Unterbefehl: docs %s", sub)
@@ -117,6 +124,12 @@ func runDocs(args []string) error {
 		}
 		return fmt.Errorf("nicht alles veröffentlicht, offen: %s — Arbeitsverzeichnis und Merkdatei bleiben", strings.Join(open, ", "))
 	}
+	if result.Readme.Status == project.DocsFailed {
+		// Nur die Vorlage fehlt: Die Dokumente sind veröffentlicht und
+		// aufgeräumt, gescheitert ist allein der README-Schritt.
+		return fmt.Errorf("Dokumente veröffentlicht, aber %s nicht geschrieben: %s (%s)",
+			result.Readme.Ref, result.Readme.Message, result.Readme.Code)
+	}
 	return nil
 }
 
@@ -181,6 +194,93 @@ func runDocsExclude(args []string) error {
 		return fmt.Errorf("verworfen, nicht eingetragen: %s", strings.Join(rejected, ", "))
 	}
 	return nil
+}
+
+// runDocsReadme ist `k-playbook docs readme [<pfad>] [--check] [--json]`:
+// schreibt die README.md unter keph:/docs/ aus den Vorlagen unter
+// k-playbook:/docs/ (project.DocsReadmes) — ohne Pfad alle, mit Pfad die eine;
+// dieselbe Fachlogik wie das MCP-Werkzeug k_playbook_docs_readme. --check
+// schreibt nichts und meldet je Vorlage missing, differs oder unchanged. Eine
+// README mit failed endet nach der Ausgabe mit Exit 1.
+func runDocsReadme(args []string) error {
+	const usage = "docs readme [<pfad>] [--check] [--json]"
+	var asJSON, check bool
+	var positional []string
+	for _, arg := range args {
+		switch {
+		case arg == "--json":
+			asJSON = true
+		case arg == "--check":
+			check = true
+		case arg == "-h" || arg == "--help" || arg == "help":
+			printDocsUsage(os.Stdout)
+			return nil
+		case strings.HasPrefix(arg, "-"):
+			return fmt.Errorf("unbekannte Option %s — erwartet wird %s", arg, usage)
+		default:
+			positional = append(positional, arg)
+		}
+	}
+	if len(positional) > 1 {
+		return fmt.Errorf("höchstens ein Pfad — erwartet wird %s", usage)
+	}
+	dir := ""
+	if len(positional) == 1 {
+		cleaned, err := project.CleanDocsDir(positional[0])
+		if err != nil {
+			return docError(err)
+		}
+		dir = cleaned
+	}
+
+	projectDir, err := todoProjectDir()
+	if err != nil {
+		return err
+	}
+	readmes, err := openDocsReadmes(projectDir)
+	if err != nil {
+		return docError(err)
+	}
+	ctx := context.Background()
+	options := project.DocsReadmeOptions{Check: check}
+	var result project.DocsReadmeResult
+	if dir == "" {
+		result, err = readmes.All(ctx, options)
+		if err != nil {
+			return docError(err)
+		}
+	} else {
+		result = project.DocsReadmeResult{Check: check, Readmes: []project.DocsReadmeItem{readmes.One(ctx, dir, options)}}
+	}
+	if asJSON {
+		if err := printDocsJSON(result); err != nil {
+			return err
+		}
+	} else {
+		printDocsReadme(os.Stdout, result)
+	}
+	if failed := result.Failed(); failed > 0 {
+		return fmt.Errorf("%d README nicht geschrieben", failed)
+	}
+	return nil
+}
+
+// printDocsReadme schreibt die Antwort von docs readme ohne --json: je README
+// Zustand, Verweis und Revision, bei failed Code und Meldung.
+func printDocsReadme(out io.Writer, result project.DocsReadmeResult) {
+	for _, item := range result.Readmes {
+		text := fmt.Sprintf("%s\t%s\t%d", item.Status, item.Ref, item.Revision)
+		if item.Code != "" {
+			text += fmt.Sprintf("\t%s: %s", item.Code, item.Message)
+		}
+		fmt.Fprintln(out, text)
+	}
+	if result.Hint != "" {
+		fmt.Fprintf(out, "Nichts zu tun: %s.\n", result.Hint)
+	}
+	if result.Check {
+		fmt.Fprintln(out, "Geprüft, nichts geschrieben.")
+	}
 }
 
 // printDocsExclude schreibt die Antwort von docs exclude add ohne --json.
@@ -267,6 +367,7 @@ func printDocsUsage(out io.Writer) {
 Aufruf:
   k-playbook docs checkout <erzeuger> [--discard] [--json]
   k-playbook docs publish <erzeuger> [--allow-hints] [--json]
+  k-playbook docs readme [<pfad>] [--check] [--json]
   k-playbook docs exclude add <muster>… [--json]
 
 Erzeuger: %s. Jeder hat ein Verzeichnis keph:/docs/generated/<erzeuger>/ in
@@ -288,10 +389,23 @@ der Projekt-Collection.
             --allow-hints (nach Bestätigung durch den Nutzer). Eine Ablehnung
             schreibt nichts. Was inzwischen in Kephalaion geändert ist, wird
             als conflict gemeldet, nicht geschrieben. Danach schreibt publish
-            die README.md des Verzeichnisses, wenn sie abweicht.
-            Arbeitsverzeichnis und Merkdatei werden nur entfernt, wenn nichts
-            in Konflikt oder fehlgeschlagen ist; ein zweites publish schreibt
-            dann nur noch den Rest.
+            die README.md des Verzeichnisses aus ihrer Vorlage, wenn sie
+            fehlt oder abweicht (wie docs readme). Arbeitsverzeichnis und
+            Merkdatei werden nur entfernt, wenn nichts in Konflikt oder
+            fehlgeschlagen ist; ein zweites publish schreibt dann nur noch
+            den Rest. Fehlt nur die Vorlage der README (template_missing),
+            wird trotzdem aufgeräumt; der Aufruf endet mit Exit 1.
+
+  readme    Schreibt die README.md unter keph:/docs/ aus den Vorlagen
+            k-playbook:/docs/<pfad>/README.md, die mit dem Hub ausgeliefert
+            werden: je Verzeichnis mit Vorlage die README, die fehlt oder
+            inhaltlich abweicht — anlegen, sonst schreiben mit ihrer Revision,
+            sonst nichts. Eine von Hand geänderte README wird überschrieben.
+            Ohne <pfad> alle Vorlagen, mit <pfad> die eine: relativ zu docs/
+            (generated/code) oder als Verweis (keph:/docs/generated/code/).
+            Verzeichnisse ohne Vorlage und docs/README.md ganz oben fasst es
+            nicht an. --check schreibt nichts und meldet je Vorlage missing,
+            differs oder unchanged.
 
   exclude add
             Trägt Muster in den Block docs.exclude von .k-playbook/K-PLAYBOOK.yaml
@@ -308,18 +422,24 @@ der Projekt-Collection.
 
 Ausgabe von publish: je Dokument Zustand (created, written, deleted,
 unchanged, conflict, failed), Verweis und Revision, durch Tabulatoren
-getrennt. Bleibt etwas offen, endet der Aufruf mit Exit 1.
+getrennt. Bleibt etwas offen, endet der Aufruf mit Exit 1. docs readme
+gibt je README dieselbe Zeile aus (created, written, unchanged, failed; mit
+--check missing, differs, unchanged); --json: readmes (dir, ref, template,
+status, revision, base, code, message), check, hint. Eine README mit failed
+endet mit Exit 1.
 
 Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts; gebraucht wird
 eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok) und für
-publish ein Node ab v0.3.1; exclude add braucht keine. Dasselbe wie die
-MCP-Werkzeuge k_playbook_docs_checkout, k_playbook_docs_publish und
-k_playbook_docs_exclude_add.
+publish und readme ein Node ab v0.3.1; exclude add braucht keine. Dasselbe
+wie die MCP-Werkzeuge k_playbook_docs_checkout, k_playbook_docs_publish,
+k_playbook_docs_readme und k_playbook_docs_exclude_add.
 
 Fehlercodes stehen in Klammern am Ende der Meldung. kephalaion_unavailable:
 beim Hub ist nichts angekommen, nichts geschrieben. invalid_input: unbekannter
 Erzeuger, Ablehnung im Arbeitsverzeichnis oder exclude add ohne Muster. hints_changed: hints geändert
-ohne --allow-hints. not_checked_out: publish ohne checkout. Bei einem Dokument
-mit outcome_unknown nicht noch einmal veröffentlichen, sondern nachsehen.
+ohne --allow-hints. not_checked_out: publish ohne checkout. template_missing:
+die Vorlage einer README fehlt auf dem Hub (Lieferumfang älter als das
+Programm); nichts geschrieben. Bei einem Dokument mit outcome_unknown nicht
+noch einmal veröffentlichen, sondern nachsehen.
 `, strings.Join(project.DocsProducerNames(), ", "))
 }

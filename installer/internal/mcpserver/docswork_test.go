@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -23,9 +24,10 @@ func newDocsWorkProject(t *testing.T) (string, *kephtest.Store) {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 	store := kephtest.New()
+	templates := repoDocsTemplates(t)
 	original := openDocsWork
 	openDocsWork = func(projectDir string) (*project.DocsWork, error) {
-		return project.NewDocsWork(projectDir, store, "vm:projekt"), nil
+		return project.NewDocsWork(projectDir, store, "vm:projekt").WithTemplates(templates), nil
 	}
 	t.Cleanup(func() { openDocsWork = original })
 	return root, store
@@ -244,5 +246,64 @@ func TestDocsExcludeAddToolVerwirftZeilenumbruch(t *testing.T) {
 	}
 	if strings.Join(built.Docs.Exclude, ",") != strings.Join(added.Exclude, ",") || len(built.Docs.Problems) != 0 {
 		t.Errorf("context.docs = %+v; gemeldet %q", built.Docs, added.Exclude)
+	}
+}
+
+// repoDocsTemplates ist das defaults/ des Repos als mitgelieferte Ebene.
+func repoDocsTemplates(t *testing.T) project.DocSource {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("Ort der Testdatei unbekannt")
+	}
+	store, err := kephtest.Defaults(filepath.Join(filepath.Dir(file), "..", "..", "..", "defaults"))
+	if err != nil {
+		t.Fatalf("defaults/ des Repos laden: %v", err)
+	}
+	return project.NewKephDefaultsSource(func() (project.DefaultsStore, string, error) { return store, "test:k-playbook", nil })
+}
+
+// k_playbook_docs_readme: check meldet ohne zu schreiben, ohne pfad alle,
+// mit pfad die eine; ein ungültiger pfad und ein Projekt ohne Anbindung sind
+// Fehler mit Code.
+func TestDocsReadmeTool(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatal(err)
+	}
+	store := kephtest.New()
+	templates := repoDocsTemplates(t)
+	original := openDocsReadmes
+	openDocsReadmes = func(string) (*project.DocsReadmes, error) { return project.NewDocsReadmes(store, templates), nil }
+	t.Cleanup(func() { openDocsReadmes = original })
+	ctx := context.Background()
+
+	result, _, _ := docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root, Check: true})
+	envelope := decodeDocsWork[docsReadmeEnvelope](t, result)
+	if result.IsError || !envelope.OK || envelope.Tool != docsToolReadme || envelope.DocsReadmeResult == nil || !envelope.Check ||
+		len(envelope.Readmes) != 6 || envelope.Readmes[0].Status != project.DocsReadmeMissing || len(store.Names()) != 0 {
+		t.Fatalf("check: %+v", envelope)
+	}
+	result, _, _ = docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root, Path: "generated/code"})
+	envelope = decodeDocsWork[docsReadmeEnvelope](t, result)
+	if result.IsError || len(envelope.Readmes) != 1 || envelope.Readmes[0].Status != project.DocsCreated {
+		t.Fatalf("eine: %+v", envelope)
+	}
+	result, _, _ = docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root})
+	envelope = decodeDocsWork[docsReadmeEnvelope](t, result)
+	if result.IsError || len(envelope.Readmes) != 6 || len(store.Names()) != 6 {
+		t.Fatalf("alle: %+v, %v", envelope, store.Names())
+	}
+
+	result, _, _ = docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root, Path: "keph:/docs/README.md"})
+	if envelope := decodeDocsWork[docsReadmeEnvelope](t, result); !result.IsError || envelope.Error.Code != project.DocCodeInvalidInput {
+		t.Errorf("docs/README.md: %+v", envelope)
+	}
+	// Ohne Anbindung im Projekt: der echte Zugang meldet kephalaion_unavailable,
+	// ohne den Node zu fragen.
+	openDocsReadmes = project.OpenDocsReadmes
+	result, _, _ = docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root})
+	if envelope := decodeDocsWork[docsReadmeEnvelope](t, result); !result.IsError || envelope.Error.Code != project.DocCodeKephalaionUnavailable {
+		t.Errorf("ohne Anbindung: %+v", envelope)
 	}
 }

@@ -131,7 +131,7 @@ What each prefix answers:
   `commands/` (`docReaderKinds` in `docref.go`; `reviews` and `guidelines` since task 086,
   `commands` since task 092; the former kind for rules is gone since task 135 and is
   `unsupported` like any other path outside these kinds) and, as targets of includes, `includes/` and
-  `testdata/` (see below). A `k-playbook:` path outside these kinds is refused as
+  `testdata/`, plus the README templates in `docs/` (see below). A `k-playbook:` path outside these kinds is refused as
   `unsupported` -- `k-playbook:/checks/check_x.sh` is a valid reference whose kind is not
   resolved: checks are scripts that run, skills live with the assistant; nobody reads them
   through a reference. The message names only the reader kinds. Commands lie with the
@@ -154,6 +154,19 @@ Two kinds exist only as targets: **`includes/`** holds text blocks for include l
 disables), and **`testdata/`** holds fixed test cases that come out the same on every
 installation (`defaults/testdata/`). Both are resolved like `instructions/`, but appear in no
 catalog, no briefing and no help text: nobody reads them for their own sake.
+
+A third kind outside the catalogs is **`docs/`** (task 137): `k-playbook:/docs/<path>/README.md`
+is the template for `keph:/docs/<path>/README.md` in the project collection
+(`defaults/docs/<path>/README.md` in the source repo, on the hub under
+`<hub>:k-playbook/defaults/`). It is the one kind with **no local version**: only the shipped
+layer is read (`docDistOnlyKinds` in `docref.go`), a file under `k-playbook-local/docs/` does
+not win and an empty one does not disable, because the README is the same in every project
+and comes from one source. A missing template is `not_found`. The tree under `docs/` is the
+list of templates -- there is no second list in the code; `docs/README.md` at the top has no
+template, it belongs to Kephalaion. `k-playbook docs readme` (MCP `k_playbook_docs_readme`)
+writes the READMEs from these templates ([mcp.md](mcp.md#generated-docs-checkout-and-publish)).
+`docs/` appears in no catalog and no briefing; `k-playbook read` and `k_playbook_doc_read` name
+it as resolvable.
 
 ## Includes
 
@@ -238,7 +251,7 @@ Two layers, compared by name:
 | Layer | Directory | Origin |
 |---|---|---|
 | shipped | the public collection `<hub>:k-playbook` under `defaults/` — what the hub fetched from the latest release; every kind is read there, with the same path below `defaults/` | `dist` |
-| local | `k-playbook-local/`; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129 | `local`, or `override` when it replaces a shipped file of the same name |
+| local | `k-playbook-local/`; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; never for `docs/`, the README templates (task 137) | `local`, or `override` when it replaces a shipped file of the same name |
 
 The shipped layer is read from Kephalaion since task 131 (`NewKephDefaultsSource` in
 `defaultsdocs.go`): the hub is the one of the project binding, the collection is always

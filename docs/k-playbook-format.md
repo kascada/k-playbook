@@ -95,7 +95,10 @@ The docs producers no longer write to disk: `/k-docs-code` and the
 `k-playbook docs checkout|publish libs` into `keph:/docs/generated/libs/` (task 120).
 Within `docs/`, the directory reveals the origin: a tool writes exclusively to
 directories of its own origin, and the frontmatter field `generated.by` identifies which
-tool wrote an individual file.
+tool wrote an individual file. The `README.md` of each directory that has a template
+`k-playbook:/docs/<path>/README.md` (`defaults/docs/` in the source repo, shipped to the hub)
+is written by the program from that template, the same in every project — by `publish`,
+the inventory, setup and `k-playbook upgrade`, and `k-playbook docs readme` (task 137).
 
 The former knowledge directories on disk, with their search index, are gone since task
 123; nothing writes there any more. In an existing project `/k-upgrade` 3.0 clears what

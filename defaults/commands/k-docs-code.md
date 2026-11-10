@@ -14,7 +14,7 @@ Produces:
 Dazu verschiebt der Lauf nach einem erfolgreichen `publish` die Doku-Aufträge aus dem
 Preflight nach `keph:/queue/docs/done/` (Abschnitt „Doku-Aufträge“ der Docs-Ablage).
 
-Nichts sonst. Die `README.md` des Verzeichnisses schreibt `publish` selbst; das
+Nichts sonst. Die `README.md` des Verzeichnisses schreibt `publish` aus ihrer Vorlage; das
 Arbeitsverzeichnis unter `.k-playbook/work/docs/code/` entfernt `publish` nach einem
 vollständigen Abgleich. Einzige Ausnahme: Bestätigt der Nutzer in Schritt 7, die im
 Preflight ergänzten Ausschlüsse zu speichern, trägt `k_playbook_docs_exclude_add` sie in

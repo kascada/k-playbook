@@ -127,6 +127,10 @@ ab dem Arbeitsverzeichnis aufwärts.
             Frontmatter — dieselbe Überlagerung wie catalogs in k-playbook
             context. Eine leere lokale Datei schaltet ab: kein Inhalt, ein
             Hinweis auf stderr, Exit 0.
+  k-playbook:/docs/<pfad>/README.md
+            Die Vorlage für keph:/docs/<pfad>/README.md (k-playbook docs
+            readme). Nur mitgeliefert: eine lokale Fassung gibt es nicht,
+            auch kein Abschalten durch eine leere Datei.
   k-playbook:/instructions/always/
             Ein Verzeichnis (mit / am Ende): alle Teile mit Ziffer vorn aus
             beiden Ebenen, numerisch sortiert, ohne Frontmatter zu einem Text
@@ -162,7 +166,7 @@ JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled),
 problems, includes (ref, origin, depth, disabled — die eingesetzten Ziele
 in Lesereihenfolge), totalLines (Zeilen des ganzen Inhalts) und bei keph:
 revision. Ein unbekannter Verweis ist ein Fehler (not_found);
-k-playbook: außerhalb von instructions/, reviews/, guidelines/ und commands/
-wird nicht aufgelöst (unsupported).
+k-playbook: außerhalb von instructions/, reviews/, guidelines/, commands/
+und docs/ wird nicht aufgelöst (unsupported).
 `)
 }

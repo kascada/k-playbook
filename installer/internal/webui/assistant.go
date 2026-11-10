@@ -122,6 +122,9 @@ func describeSetup(setup project.AssistantSetup) string {
 	// Ein Block, der sich nicht abgrenzen ließ (Root.Hint), steht nicht hier:
 	// er kommt als Fehler aus ApplyAssistantSetup und damit ohnehin in den
 	// Text; beim Lesen der Karte zeigt ihn der Zustand der Wurzeldatei.
+	if note := project.DescribeSetupReadmes(setup.Readmes); note != "" {
+		parts = append(parts, note)
+	}
 
 	return strings.Join(parts, " ")
 }
