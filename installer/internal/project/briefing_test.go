@@ -278,16 +278,22 @@ func TestBriefingEigeneArbeit(t *testing.T) {
 	store := newFakeDocStore("kamran",
 		"user/kamran/tasks/100-briefing.md",
 		"user/kamran/tasks/101-ohne-titel.md",
+		"user/kamran/tasks/102-kaputt.md",
 		"user/kamran/tasks/done/099-alt.md",
 		"user/hp/tasks/102-fremd.md",
 		"user/kamran/workbench/001-umbau.md",
+		"user/kamran/workbench/003-todo.md",
 		"user/kamran/workbench/done/002-fertig.md",
 		"queue/findings/001-a.md",
 		"queue/findings/002-b.md",
 		"queue/findings/003-c.md",
 	)
 	store.docs["user/kamran/tasks/100-briefing.md"].title = "Briefing bauen"
+	// Ein Frontmatter, das der Node nicht lesen konnte (Task 136), kommt mit
+	// seinem Problem ins Briefing, nicht still mit dem Dateinamen als Titel.
+	store.docs["user/kamran/tasks/102-kaputt.md"].frontmatterError = "YAML ungültig: mapping values are not allowed in this context"
 	store.docs["user/kamran/workbench/001-umbau.md"].title = "Umbau auf Kephalaion"
+	store.docs["user/kamran/workbench/003-todo.md"].title = "Offene Punkte (Todo"
 	stubBriefingDocs(t, func(string) (*UserDocs, error) { return newTestUserDocs(t, store, DocKinds), nil })
 
 	briefing, err := BuildBriefing(context.Background(), root)
@@ -301,12 +307,16 @@ func TestBriefingEigeneArbeit(t *testing.T) {
 	wantTasks := []BriefingDoc{
 		{Ref: "keph:/user/kamran/tasks/100-briefing.md", Title: "Briefing bauen", Updated: "2026-10-14T11:00:00.000Z"},
 		{Ref: "keph:/user/kamran/tasks/101-ohne-titel.md", Title: "101-ohne-titel.md", Updated: "2026-10-14T11:00:00.000Z"},
+		{Ref: "keph:/user/kamran/tasks/102-kaputt.md", Title: "102-kaputt.md", Updated: "2026-10-14T11:00:00.000Z",
+			Problem: "Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context"},
 	}
 	if !reflect.DeepEqual(work.Tasks, wantTasks) {
 		t.Errorf("tasks: %+v", work.Tasks)
 	}
 	wantWorkbench := []BriefingDoc{
 		{Ref: "keph:/user/kamran/workbench/001-umbau.md", Title: "Umbau auf Kephalaion", Updated: "2026-10-14T11:00:00.000Z"},
+		{Ref: "keph:/user/kamran/workbench/003-todo.md", Title: "Offene Punkte (Todo", Updated: "2026-10-14T11:00:00.000Z",
+			Problem: "Titel vermutlich an ‚ #‘ abgeschnitten (YAML-Kommentar); Titel in doppelte Anführungszeichen setzen"},
 	}
 	if !reflect.DeepEqual(work.Workbench, wantWorkbench) {
 		t.Errorf("workbench: %+v", work.Workbench)

@@ -79,7 +79,12 @@ in between comes back as `stale_revision` and is reported as a conflict, not ove
   `updated` change.
 - **`list` with `recursive`** returns documents only, each with its full name, `created`
   and `updated` (`at`, `by`); with `frontmatter` also the parsed frontmatter of `.md`
-  documents. `created.by` is the user who created the document — the source of the user
+  documents, or `frontmatter_error` instead when the node could not parse it (its message,
+  e.g. `YAML ungültig: mapping values are not allowed in this context` for an unquoted
+  `: ` in a value; an unquoted ` #` is no error, YAML reads it as a comment and the value
+  ends there). `k_playbook_doc_list`, `k-playbook doc list` and the briefing pass the error
+  through as `problem` and keep the file name as title (task 136). `created.by` is the user
+  who created the document — the source of the user
   field for kinds without a user area (`queue/findings/`). A directory that does not
   exist yields an empty list, not an error.
 - **`read` answers from the replica**, without the network, like `list`: the state of the

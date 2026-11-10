@@ -663,6 +663,41 @@ type DocListItem struct {
 	Created string `json:"created"`
 	Updated string `json:"updated"`
 	Done    bool   `json:"done"`
+	// Problem nennt, was am Frontmatter nicht stimmt (Task 136): Kephalaion
+	// konnte es nicht lesen (frontmatter_error des Nodes, Title ist dann der
+	// Dateiname), oder der Titel ist vermutlich an „ #“ abgeschnitten
+	// (docTitleTruncated). Leer, wenn nichts auffiel. Gemeldet, nicht
+	// repariert: Das Dokument gehört der Sitzung.
+	Problem string `json:"problem,omitempty"`
+}
+
+// docProblemFrontmatter leitet DocListItem.Problem ein, wenn Kephalaion das
+// Frontmatter nicht lesen konnte; dahinter steht frontmatter_error des Nodes
+// wörtlich, etwa „YAML ungültig: mapping values are not allowed in this
+// context“ — die Spur eines unquotierten „: “ im Titel.
+const docProblemFrontmatter = "Frontmatter nicht lesbar: "
+
+// docProblemTitleTruncated steht in DocListItem.Problem, wenn das Frontmatter
+// lesbar ist, der Titel aber nach docTitleTruncated an „ #“ abgeschnitten
+// wurde.
+const docProblemTitleTruncated = "Titel vermutlich an ‚ #‘ abgeschnitten (YAML-Kommentar); " +
+	"Titel in doppelte Anführungszeichen setzen"
+
+// docTitleTruncated sagt, ob ein gelesener Titel mit großer Wahrscheinlichkeit
+// an „ #“ abgeschnitten wurde (Task 136): YAML liest ein unquotiertes „ #“
+// als Kommentar, der Rest der Zeile fehlt dann im Wert. Ohne den Rohtext ist
+// das nicht sicher erkennbar; die Heuristik ist bewusst eng, damit sie keine
+// Fehlalarme erzeugt: Sie schlägt nur an, wenn ein Paar (…), […], „…“ oder
+// «…» mehr öffnende als schließende Zeichen hat, wie bei „(Todo“ — der
+// gemessene Fall. Ein „ #“ innerhalb eines Anführungszeichenpaars ist kein
+// Treffer, weil das Paar geschlossen ist.
+func docTitleTruncated(title string) bool {
+	for _, pair := range [][2]string{{"(", ")"}, {"[", "]"}, {"„", "“"}, {"«", "»"}} {
+		if strings.Count(title, pair[0]) > strings.Count(title, pair[1]) {
+			return true
+		}
+	}
+	return false
 }
 
 // DocList ist die Antwort von List.
@@ -712,8 +747,20 @@ func (u *UserDocs) List(ctx context.Context, opts DocListOptions) (DocList, erro
 			continue
 		}
 		item := DocListItem{Ref: DocSchemeKeph + ":/" + entry.Name, Title: m.file, User: m.user, Done: m.done}
+		titled := false
 		if title, ok := entry.Frontmatter["title"].(string); ok && strings.TrimSpace(title) != "" {
-			item.Title = strings.TrimSpace(title)
+			item.Title, titled = strings.TrimSpace(title), true
+		}
+		// Ein Frontmatter, das der Node nicht lesen konnte, kommt ohne
+		// Frontmatter und mit frontmatter_error; der Titel bleibt der Dateiname,
+		// das Problem steht daneben. Erst wenn das Frontmatter lesbar war, wird
+		// der Titel auf ein Abschneiden an „ #“ geprüft — ein Dateiname als
+		// Titel trägt keine Paare, die Heuristik gilt nur dem gelesenen Wert.
+		switch {
+		case entry.FrontmatterError != "":
+			item.Problem = docProblemFrontmatter + entry.FrontmatterError
+		case titled && docTitleTruncated(item.Title):
+			item.Problem = docProblemTitleTruncated
 		}
 		if entry.Created != nil {
 			item.Created = entry.Created.At

@@ -48,7 +48,8 @@ Sieh das Gespräch durch nach:
 ## Schritt 4 — Entwurf schreiben und bestätigen lassen
 
 Schreibe den Entwurf nach dem Abschnitt „Aufbau“ von
-`k-playbook:/instructions/on-demand/tasks.md`: Frontmatter mit `title`, Überschrift
+`k-playbook:/instructions/on-demand/tasks.md`: Frontmatter mit `title` in doppelten
+Anführungszeichen (Regel dort unter „Kopf“, inneres `"` als `\"`), Überschrift
 `# Task <NNN> — <Titel>`, ein Satz zum Ergebnis, dann `## Intent` (Intent-Regel dort, Verweise
 darin mit Präfix), `## Referenzen`, `## Tools`, `## Ziel`, `## Kontext`, `## Zu bauen` mit
 `### Etappe N — Titel`, wenn die Arbeit in Etappen zerfällt. Leere oder nicht zutreffende

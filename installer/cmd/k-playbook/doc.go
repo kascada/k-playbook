@@ -142,6 +142,10 @@ func runDoc(args []string) error {
 				if item.Done {
 					fields = append(fields, "done")
 				}
+				// Das Frontmatter-Problem als letztes Feld, nur wenn es eines gibt.
+				if item.Problem != "" {
+					fields = append(fields, item.Problem)
+				}
 				fmt.Println(strings.Join(fields, "\t"))
 			}
 		}

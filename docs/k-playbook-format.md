@@ -193,6 +193,12 @@ always `dist`, nothing is overlaid and nothing disabled, and a leftover
 otherwise notes that what lies there no longer runs. A new form for project-owned checks
 is still open.
 
+`k-playbook-local/tmp/` was never created by the setup: sessions laid it out by hand as a
+scratch pad in the days of the knowledge store, with the managed `.gitignore` and a README
+that promised a cleaner which never existed. Nothing reads it and nothing cleans it;
+`/k-upgrade` 3.4 removes it once it is empty and otherwise says so — notes and interim
+states belong in `priv/`.
+
 Project-owned commands and skills live in `.k-playbook/` since task 129, versioned next to
 the configuration; the former place `k-playbook-local/commands/` and
 `k-playbook-local/skills/` is no longer read, neither by the linking nor by

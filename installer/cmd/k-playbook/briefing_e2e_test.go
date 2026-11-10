@@ -264,3 +264,32 @@ func TestBriefingOhneMitgelieferteEbeneEndetMitFehler(t *testing.T) {
 		t.Errorf("Ausgabe trotz Fehler:\n%s", stdout)
 	}
 }
+
+// Ein Dokument mit unlesbarem Frontmatter (Task 136) steht im Klartext mit
+// seinem Problem hinter dem Titel — dort, wo die Sitzung ohnehin hinsieht;
+// ein sauberes Dokument bleibt eine Zeile aus Verweis und Titel.
+func TestBriefingKlartextNenntFrontmatterProblem(t *testing.T) {
+	briefing := project.Briefing{Work: project.BriefingWork{Available: true, User: "kamran",
+		Tasks: []project.BriefingDoc{
+			{Ref: "keph:/user/kamran/tasks/100-sauber.md", Title: "Sauber"},
+			{Ref: "keph:/user/kamran/tasks/101-kaputt.md", Title: "101-kaputt.md",
+				Problem: "Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context"},
+		},
+		Workbench: []project.BriefingDoc{
+			{Ref: "keph:/user/kamran/workbench/001-todo.md", Title: "Offene Punkte (Todo",
+				Problem: "Titel vermutlich an ‚ #‘ abgeschnitten (YAML-Kommentar); Titel in doppelte Anführungszeichen setzen"},
+		}}}
+	var out strings.Builder
+	if err := writeBriefingText(&out, briefing); err != nil {
+		t.Fatal(err)
+	}
+	want := "Eigene Arbeit (kamran):\n" +
+		"  Offene Tasks:\n" +
+		"    keph:/user/kamran/tasks/100-sauber.md  Sauber\n" +
+		"    keph:/user/kamran/tasks/101-kaputt.md  101-kaputt.md — Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context\n" +
+		"  Aktive Arbeitsstände:\n" +
+		"    keph:/user/kamran/workbench/001-todo.md  Offene Punkte (Todo — Titel vermutlich an ‚ #‘ abgeschnitten (YAML-Kommentar); Titel in doppelte Anführungszeichen setzen\n"
+	if !strings.Contains(out.String(), want) {
+		t.Errorf("Klartext ohne die Probleme:\n%s", out.String())
+	}
+}

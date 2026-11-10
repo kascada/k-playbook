@@ -117,7 +117,13 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 				return
 			}
 			for _, doc := range list {
-				fmt.Fprintf(&b, "    %s  %s\n", doc.Ref, doc.Title)
+				fmt.Fprintf(&b, "    %s  %s", doc.Ref, doc.Title)
+				// Ein Frontmatter-Problem steht hinter dem Titel, dort, wo die
+				// Sitzung ohnehin hinsieht — nicht still der Dateiname als Titel.
+				if doc.Problem != "" {
+					fmt.Fprintf(&b, " — %s", doc.Problem)
+				}
+				b.WriteString("\n")
 			}
 		}
 		docs("Offene Tasks", work.Tasks)

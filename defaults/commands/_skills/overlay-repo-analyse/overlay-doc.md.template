@@ -1,6 +1,6 @@
 ---
-title: <Overlay-Repo-Name>
-description: <Ein Satz: was dieses Overlay ist und über welcher Base es liegt.>
+title: "<Overlay-Repo-Name>"
+description: "<Ein Satz: was dieses Overlay ist und über welcher Base es liegt.>"
 generated: { by: ks-overlay-repo-analyse, at: <GENERATED_AT> }
 hints: [ <unverändert übernommen; das Feld fehlt, wenn das Dokument keine hatte> ]
 questions: [ "<Frage, die genau dieses Dokument beantwortet>", … ]

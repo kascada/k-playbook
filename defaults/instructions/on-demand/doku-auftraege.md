@@ -33,17 +33,20 @@ nicht was in der Doku stehen soll.
 
 ```markdown
 ---
-title: <was nachzuziehen ist, in einem Satz>
+title: "<was nachzuziehen ist, in einem Satz>"
 erzeuger: code | tools
 pfade:
   - <pfad relativ zu project.repoRoot>
-anlass: <warum, in einem Satz>
+anlass: "<warum, in einem Satz>"
 sitzung: <session aus dem Briefing>
 entstanden: <context.now.date>
 ---
 ```
 
-- `title` zeigen `k_playbook_doc_list` und `/k-docs` an.
+- `title` zeigen `k_playbook_doc_list` und `/k-docs` an; der Wert steht wie jeder Wert in freiem
+  Text (auch `anlass`) in doppelten Anführungszeichen, ein `"` im Wert wird `\"`, damit jeder
+  YAML-Leser genau diesen Text liest, auch bei „: “ oder „ #“. `erzeuger`, `pfade`, `sitzung`
+  und `entstanden` bleiben, wie die Vorlage sie zeigt.
 - `erzeuger` ist `code` für `keph:/docs/generated/code/` (`/k-docs-code`) und `tools` für
   `keph:/docs/generated/libs/` (`/k-docs-tools`). Ein Wert, kein zweiter: Wer beides braucht,
   legt zwei Aufträge an. Die Zeile steht genau so im Kopf, `erzeuger: code` bzw.

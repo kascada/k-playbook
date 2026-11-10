@@ -48,7 +48,8 @@ func addBriefingTool(server *mcp.Server) {
 			"onDemand, reviews, guidelines — lokal und " +
 			"mitgeliefert schon gegeneinander aufgelöst, je Eintrag ref, title, description und origin (dist, local, " +
 			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
-			"mit Titel und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
+			"mit Titel — und problem, wenn das Frontmatter nicht lesbar oder der Titel vermutlich an ‚ #‘ abgeschnitten " +
+			"ist — und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
 			"ist Kephalaion nicht nutzbar, steht available false mit message. projectDocs: der Einstieg der " +
 			"Projektdoku, der Verzeichnis-Verweis keph:/docs/ in der Collection des Projekts — gelesen mit " +
 			"Kephalaion list auf docs/ (recursive, frontmatter), nicht mit k_playbook_doc_read; zuerst docs/index.md, " +

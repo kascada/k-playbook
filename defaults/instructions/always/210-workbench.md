@@ -33,6 +33,8 @@ Wie:
   Inhalt schreiben mit Kephalaion `write`, lesen mit `k_playbook_doc_read`.
 - Die Datei zeigt den aktuellen Stand, nicht die Geschichte: Du überschreibst sie ganz, mit
   `base_revision` aus dem letzten `read`, damit keine andere Sitzung still überschrieben wird.
-- Frontmatter: `title` ist Pflicht, das Briefing zeigt ihn. Der erste Absatz sagt in zwei
-  Sätzen, wo das Vorhaben steht. Danach frei und kurz: Stand, offene Punkte, nächster Schritt.
+- Frontmatter: `title` ist Pflicht, in doppelten Anführungszeichen (ein `"` im Wert wird `\"`,
+  so bleibt er auch mit „: “ oder „ #“ lesbar); das Briefing zeigt ihn. Der erste Absatz sagt in
+  zwei Sätzen, wo das Vorhaben steht. Danach frei und kurz: Stand, offene Punkte, nächster
+  Schritt.
 - Nenne in deiner Antwort das Thema, das du angelegt oder nachgeführt hast.

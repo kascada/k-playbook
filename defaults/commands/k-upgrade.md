@@ -413,9 +413,10 @@ Für jede Datei prüfst du vorher:
 (`k-playbook:/instructions/on-demand/tasks.md`, „Kopf“). Fehlt es der Datei, bildest du es
 aus der ersten Überschrift `# Task <n> — <Titel>`: `title` ist `<Titel>`, ohne „Task <n> —“.
 Fehlt auch die, ist `title` der Dateiname ohne Nummer und `.md`, mit Leerzeichen statt
-Bindestrichen. Der übrige Inhalt bleibt Byte für Byte; das Frontmatter kommt davor. Trägt die
-Datei schon ein Frontmatter ohne `title`, kommt die Zeile `title: <Titel>` als erste Zeile in
-diesen Block — kein zweiter Block. Trägt sie ein Frontmatter mit `title`, bleibt sie ganz
+Bindestrichen. Der eingesetzte Titel steht in doppelten Anführungszeichen, ein inneres `"` als
+`\"` (Regel in „Kopf“). Der übrige Inhalt bleibt Byte für Byte; das Frontmatter kommt davor.
+Trägt die Datei schon ein Frontmatter ohne `title`, kommt die Zeile `title: "<Titel>"` als
+erste Zeile in diesen Block — kein zweiter Block. Trägt sie ein Frontmatter mit `title`, bleibt sie ganz
 unverändert.
 
 **Fortschritt.** Ein Task mit einer alten Tabelle `## Fortschritt` und ohne Kennzeile
@@ -547,8 +548,12 @@ sie nicht mehr als fehlend: Der Inhalt der ersten fünf liegt in der Projekt-Col
 `<context.project.dir>/.k-playbook/skills/`. Der Inhalt von `rules/` hat keinen Nachfolger in
 der Collection: Die Sorte gibt es nicht mehr, k-playbook liest dort nichts. Auch der Inhalt von
 `checks/` hat keinen Nachfolger: `k-check` führt nur noch die mitgelieferten Checks aus,
-projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen. In einem bestehenden
-Projekt liegen die Verzeichnisse noch, oft nur mit ihrer README.
+projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen. Dazu kommt `tmp/`, das
+das Einrichten nie angelegt hat: Sitzungen legten es zur Zeit der Wissensablage von Hand als
+Schmierzettel an, mit der verwalteten `.gitignore` und einer README, die einen Aufräumer
+versprach, den es nie gab. Nichts liest dort, nichts räumt dort auf; Notizen und Zwischenstände
+gehören nach `priv/` (`k-playbook:/guidelines/betrieb.md`). In einem bestehenden Projekt
+liegen die Verzeichnisse noch, oft nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
 Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
 Sie läuft nach 3.0 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
@@ -563,6 +568,7 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `skills/`
 - `rules/`
 - `checks/`
+- `tmp/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
 die Collection nicht.
@@ -638,6 +644,10 @@ Für `checks/` nennt die Zeile `bleibt:` ebenso höchstens fünf Pfade und dazu 
 diese Checks nicht mehr laufen: `k-check` führt nur noch die mitgelieferten aus. 3.4 zieht
 nichts um und fragt nicht.
 
+Für `tmp/` nennt die Zeile `bleibt:` ebenso höchstens fünf Pfade und dazu als Hinweis, dass
+dort niemand liest und niemand aufräumt: Was bleiben soll, gehört nach `priv/`, das Übrige
+löscht der Nutzer von Hand. 3.4 zieht nichts um und fragt nicht.
+
 ```text
 Aufräumen in k-playbook-local/
   docs/        gelöscht: README.md
@@ -652,6 +662,7 @@ Aufräumen in k-playbook-local/
     forelle/         → .k-playbook/skills/forelle/
   rules/       gelöscht: README.md
   checks/      gelöscht: README.md
+  tmp/         gelöscht: README.md
 ```
 
 Liegt in `rules/` mehr als die README, lautet seine Zeile etwa:
@@ -664,6 +675,12 @@ Liegt in `checks/` mehr als die README, lautet seine Zeile etwa:
 
 ```text
   checks/      bleibt: README.md, check_eigen.sh — läuft nicht mehr; k-check führt nur noch die mitgelieferten Checks aus
+```
+
+Liegt in `tmp/` mehr als README und verwaltete `.gitignore`, lautet seine Zeile etwa:
+
+```text
+  tmp/         bleibt: README.md, notizen.md — liest und räumt niemand; Bleibendes nach priv/, Übriges von Hand löschen
 ```
 
 Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:

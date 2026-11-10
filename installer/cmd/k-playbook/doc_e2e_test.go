@@ -17,6 +17,11 @@ import (
 // cliDocStore ist ein Kephalaion im Speicher für die Tests des Subkommandos.
 type cliDocStore struct {
 	docs map[string]string
+	// titles und frontmatterErrors liefert list mit Frontmatter: den Titel
+	// als gelesenes Frontmatter, oder frontmatter_error wie der Node, wenn
+	// sich das Frontmatter nicht lesen ließ.
+	titles            map[string]string
+	frontmatterErrors map[string]string
 	// writeFail lässt create, write und rename mit diesem Fehler scheitern.
 	writeFail error
 	// content und revs tragen Inhalt und Revision je Dokument, rev die
@@ -69,9 +74,18 @@ func (s *cliDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kep
 	var out []kephalaion.Entry
 	for name, by := range s.docs {
 		if strings.HasPrefix(name, req.Path+"/") {
-			out = append(out, kephalaion.Entry{Kind: "document", Name: name,
+			entry := kephalaion.Entry{Kind: "document", Name: name,
 				Created: &kephalaion.Stamp{At: "2026-10-14T10:00:00.000Z", By: by},
-				Updated: &kephalaion.Stamp{At: "2026-10-14T11:00:00.000Z", By: by}})
+				Updated: &kephalaion.Stamp{At: "2026-10-14T11:00:00.000Z", By: by}}
+			if req.Frontmatter {
+				switch {
+				case s.frontmatterErrors[name] != "":
+					entry.FrontmatterError = s.frontmatterErrors[name]
+				case s.titles[name] != "":
+					entry.Frontmatter = map[string]any{"title": s.titles[name]}
+				}
+			}
+			out = append(out, entry)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -110,7 +124,8 @@ func (s *cliDocStore) Rename(_ context.Context, name, newName string) (kephalaio
 
 func useCLIDocs(t *testing.T, names ...string) *cliDocStore {
 	t.Helper()
-	store := &cliDocStore{docs: map[string]string{}, content: map[string]string{}, revs: map[string]int64{}}
+	store := &cliDocStore{docs: map[string]string{}, content: map[string]string{}, revs: map[string]int64{},
+		titles: map[string]string{}, frontmatterErrors: map[string]string{}}
 	for _, name := range names {
 		store.docs[name] = "anna"
 	}
@@ -405,5 +420,36 @@ func TestDocSubkommandoDoneMitRevision(t *testing.T) {
 	stdout, _, err = runDocCaptured(t, "reopen", moved.Ref)
 	if err != nil || stdout != "keph:/user/kamran/tasks/100-a.md\n" {
 		t.Fatalf("reopen ohne --json bleibt der Verweis: %q %v", stdout, err)
+	}
+}
+
+// `doc list` hängt ein Frontmatter-Problem (Task 136) als letztes Feld an die
+// Zeile und trägt es im JSON als problem; ein sauberes Dokument bleibt ohne
+// das Feld.
+func TestDocSubkommandoListMeldetFrontmatterProblem(t *testing.T) {
+	todoProject(t)
+	store := useCLIDocs(t, "user/kamran/tasks/100-sauber.md", "user/kamran/tasks/101-kaputt.md", "user/kamran/tasks/102-todo.md")
+	store.titles["user/kamran/tasks/100-sauber.md"] = "Sauber"
+	store.frontmatterErrors["user/kamran/tasks/101-kaputt.md"] = "YAML ungültig: mapping values are not allowed in this context"
+	store.titles["user/kamran/tasks/102-todo.md"] = "Offene Punkte (Todo"
+
+	stdout, _, err := runDocCaptured(t, "list", "tasks")
+	want := "keph:/user/kamran/tasks/100-sauber.md\tSauber\tkamran\t2026-10-14T11:00:00.000Z\n" +
+		"keph:/user/kamran/tasks/101-kaputt.md\t101-kaputt.md\tkamran\t2026-10-14T11:00:00.000Z\t" +
+		"Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context\n" +
+		"keph:/user/kamran/tasks/102-todo.md\tOffene Punkte (Todo\tkamran\t2026-10-14T11:00:00.000Z\t" +
+		"Titel vermutlich an ‚ #‘ abgeschnitten (YAML-Kommentar); Titel in doppelte Anführungszeichen setzen\n"
+	if err != nil || stdout != want {
+		t.Fatalf("list: %q %v", stdout, err)
+	}
+
+	stdout, _, err = runDocCaptured(t, "list", "tasks", "--json")
+	var list project.DocList
+	if err != nil || json.Unmarshal([]byte(stdout), &list) != nil || len(list.Items) != 3 {
+		t.Fatalf("list --json: %q %v", stdout, err)
+	}
+	if list.Items[0].Problem != "" || list.Items[1].Problem != "Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context" ||
+		!strings.HasPrefix(list.Items[2].Problem, "Titel vermutlich an ‚ #‘ abgeschnitten") || strings.Count(stdout, `"problem"`) != 2 {
+		t.Errorf("problem im JSON: %+v\n%s", list.Items, stdout)
 	}
 }

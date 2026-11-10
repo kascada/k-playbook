@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"strings"
 	"testing"
@@ -13,6 +14,10 @@ import (
 type fakeDoc struct {
 	by    string
 	title string
+	// frontmatterError lässt list das Dokument wie der Node melden, wenn
+	// sich das Frontmatter nicht lesen ließ: frontmatter_error statt
+	// frontmatter.
+	frontmatterError string
 	// hidden fehlt in der Replica (list), lebt aber am Hub (create) — der
 	// Rückstand der Replica.
 	hidden   bool
@@ -124,8 +129,13 @@ func (s *fakeDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]ke
 		entry := kephalaion.Entry{Kind: "document", Name: name,
 			Created: &kephalaion.Stamp{At: "2026-10-14T10:00:00.000Z", By: doc.by},
 			Updated: &kephalaion.Stamp{At: "2026-10-14T11:00:00.000Z", By: doc.by}}
-		if req.Frontmatter && doc.title != "" {
-			entry.Frontmatter = map[string]any{"title": doc.title}
+		if req.Frontmatter {
+			switch {
+			case doc.frontmatterError != "":
+				entry.FrontmatterError = doc.frontmatterError
+			case doc.title != "":
+				entry.Frontmatter = map[string]any{"title": doc.title}
+			}
 		}
 		out = append(out, entry)
 	}
@@ -699,5 +709,63 @@ func TestDocKindTodosNurUeberEigeneWerkzeuge(t *testing.T) {
 	wantCode(t, err, DocCodeInvalidInput)
 	if len(store.creates) != 0 || len(store.renames) != 0 || len(store.lists) != 0 {
 		t.Fatalf("doc-Werkzeuge haben Todos angefasst: %v %v %v", store.creates, store.renames, store.lists)
+	}
+}
+
+// Ein Frontmatter, das Kephalaion nicht lesen konnte (Task 136), wird
+// gemeldet, nicht repariert: frontmatter_error des Nodes steht hinter
+// „Frontmatter nicht lesbar: “ unter Problem, der Titel bleibt der Dateiname.
+// Ein sauberes Dokument trägt kein problem im JSON.
+func TestDocListMeldetUnlesbaresFrontmatter(t *testing.T) {
+	store := newFakeDocStore("kamran", "user/kamran/tasks/100-sauber.md", "user/kamran/tasks/101-kaputt.md",
+		"user/kamran/tasks/102-todo.md")
+	store.docs["user/kamran/tasks/100-sauber.md"].title = "Sauber (mit Klammerpaar)"
+	store.docs["user/kamran/tasks/101-kaputt.md"].frontmatterError = "YAML ungültig: mapping values are not allowed in this context"
+	store.docs["user/kamran/tasks/102-todo.md"].title = "Offene Punkte (Todo"
+	docs := newTestUserDocs(t, store, DocKinds)
+
+	list, err := docs.List(context.Background(), DocListOptions{Kind: "tasks"})
+	if err != nil || len(list.Items) != 3 {
+		t.Fatalf("%+v %v", list, err)
+	}
+	if sauber := list.Items[0]; sauber.Title != "Sauber (mit Klammerpaar)" || sauber.Problem != "" {
+		t.Errorf("sauber: %+v", sauber)
+	}
+	kaputt := list.Items[1]
+	if kaputt.Title != "101-kaputt.md" || kaputt.Problem != "Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context" {
+		t.Errorf("kaputt: %+v", kaputt)
+	}
+	// Lesbares Frontmatter, Titel an „ #“ abgeschnitten: der Hinweis, nicht
+	// der Dateiname.
+	if todo := list.Items[2]; todo.Title != "Offene Punkte (Todo" || todo.Problem != docProblemTitleTruncated {
+		t.Errorf("todo: %+v", todo)
+	}
+	data, err := json.Marshal(list.Items)
+	if err != nil || strings.Count(string(data), `"problem":`) != 2 {
+		t.Errorf("problem steht nicht genau zweimal im JSON: %s %v", data, err)
+	}
+}
+
+// Ein lesbares Frontmatter, dessen Titel an „ #“ abgeschnitten wurde (Task
+// 136), ist ohne Rohtext nicht sicher erkennbar; die Heuristik schlägt nur
+// bei einem ungleichen Paar an — „(Todo“, der gemessene Fall —, nicht bei
+// einem sauberen Paar und nicht bei „ #“ innerhalb eines
+// Anführungszeichenpaars.
+func TestDocTitleTruncated(t *testing.T) {
+	for title, want := range map[string]bool{
+		"Offene Punkte (Todo":                        true,
+		"Befund „Node liest":                         true,
+		"Liste [1":                                   true,
+		"Zitat «ohne Ende":                           true,
+		"Offene Punkte (Todo #12)":                   false,
+		"Issue „ #12“ prüfen":                        false,
+		"Ein Titel ohne Klammern":                    false,
+		"Englisch “quoted” und (geschlossen) [auch]": false,
+		"Frontmatter-Titel: Vorlagen quotieren":      false,
+		"":                                           false,
+	} {
+		if got := docTitleTruncated(title); got != want {
+			t.Errorf("docTitleTruncated(%q) = %v, erwartet %v", title, got, want)
+		}
 	}
 }

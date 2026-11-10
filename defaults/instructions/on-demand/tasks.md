@@ -47,13 +47,19 @@ gestützt Code ändert, prüft den Verweis, bevor er etwas schreibt oder Code ä
 ### Kopf
 
 Frontmatter mit `title`: der Titel ohne „Task <n> —“. Das Briefing (`work.tasks`) und
-`k_playbook_doc_list` zeigen ihn. Sonst ist nichts Pflicht und nichts vorgesehen. Der Zustand
-eines Tasks steht nicht im Kopf: offen oder erledigt sagt der Ort (`done/`), alles Weitere
-sagen die Kennzeilen im Rumpf.
+`k_playbook_doc_list` zeigen ihn. `title` und andere Werte in freiem Text (etwa `description`,
+`thema`, `anlass`) stehen in doppelten Anführungszeichen, ein `"` im Wert wird `\"`; so liest
+jeder YAML-Leser genau diesen Text, auch bei „: “ oder „ #“. Unquotiert macht „: “ das
+Frontmatter unlesbar, und „ #“ beginnt einen Kommentar, der den Rest des Titels abschneidet;
+`k_playbook_doc_list` und das Briefing melden das unlesbare Frontmatter unter `problem`, den
+abgeschnittenen Titel nur, soweit er erkennbar ist. Aufzählungs- und Strukturwerte (etwa
+`sicherheit`, `erzeuger`, `generated`, `pfade`) bleiben, wie die Vorlage sie zeigt. Sonst ist
+nichts Pflicht und nichts vorgesehen. Der Zustand eines Tasks steht nicht im Kopf: offen oder
+erledigt sagt der Ort (`done/`), alles Weitere sagen die Kennzeilen im Rumpf.
 
 ```markdown
 ---
-title: <Titel>
+title: "<Titel>"
 ---
 ```
 
@@ -61,7 +67,7 @@ title: <Titel>
 
 ```markdown
 ---
-title: <Titel>
+title: "<Titel>"
 ---
 
 # Task <NNN> — <Titel>

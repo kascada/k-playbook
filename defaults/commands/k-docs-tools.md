@@ -252,8 +252,8 @@ Command ihn belegt:
 
 ```markdown
 ---
-title: <Name, wie das Projekt ihn nennt>
-description: Projektrelevante Pitfalls und Idiome für <Name>.
+title: "<Name, wie das Projekt ihn nennt>"
+description: "Projektrelevante Pitfalls und Idiome für <Name>."
 generated: { by: k-docs-tools, at: <GENERATED_AT> }
 hints: [ <unverändert übernommen; das Feld fehlt, wenn das Dokument keine hatte> ]
 questions: [ "<Frage, die genau dieser Steckbrief beantwortet>", … ]

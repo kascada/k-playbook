@@ -815,7 +815,9 @@ func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
 // k-playbook-local/ ab: leer wird gelöscht, sonst je Eintrag mit Ziel unter
 // .k-playbook/ genannt; umgezogen wird nur auf ausdrücklichen Zuruf. rules/
 // (Task 135) und checks/ (Task 134) haben keinen Nachfolger und werden nur
-// gemeldet, wenn sie bleiben. Die Hülle nennt alle Verzeichnisse in ihrer
+// gemeldet, wenn sie bleiben. tmp/ hat das Einrichten nie angelegt — ein
+// handgemachter Schmierzettel aus der Zeit der Wissensablage —, es wird wie
+// rules/ und checks/ behandelt. Die Hülle nennt alle Verzeichnisse in ihrer
 // description.
 func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
@@ -827,7 +829,10 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	for _, needle := range []string{
 		"legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
 		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/` - `rules/` - `checks/`",
+		"- `material/` - `commands/` - `skills/` - `rules/` - `checks/` - `tmp/`",
+		"Dazu kommt `tmp/`, das das Einrichten nie angelegt hat",
+		"dort niemand liest und niemand aufräumt",
+		"tmp/ gelöscht: README.md",
 		"Der Inhalt von `rules/` hat keinen Nachfolger in der Collection",
 		"dass diese Regeln nicht mehr gelesen werden",
 		"Auch der Inhalt von `checks/` hat keinen Nachfolger",
@@ -861,7 +866,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks)", "mit seinem Ziel unter .k-playbook/"} {
+	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/"} {
 		if !strings.Contains(string(hull), needle) {
 			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
 		}
@@ -1039,5 +1044,54 @@ func TestDefaultsRegelnAnwenden(t *testing.T) {
 	if !strings.Contains(string(danke), "Der Ausgang **„eingereiht“** zählt als erledigt") ||
 		!strings.Contains(string(danke), "Auffangnetz") {
 		t.Error("k-danke.md zählt „eingereiht“ nicht als erledigt oder ist kein Auffangnetz mehr")
+	}
+}
+
+// Frontmatter-Titel in den Vorlagen (Task 136): Jede mitgelieferte Vorlage,
+// die ein Frontmatter mit title zeigt, zeigt den Wert in doppelten
+// Anführungszeichen — ein Titel mit „: “ macht das Frontmatter sonst
+// unlesbar, „ #“ schneidet ihn ab —, und die Anweisung dazu nennt die Regel
+// einmal. Die Needles halten die Vorlagen davon ab, still auf `title: <…>`
+// zurückzufallen.
+func TestDefaultsFrontmatterTitelQuotiert(t *testing.T) {
+	templates := map[string][]string{
+		"instructions/on-demand/tasks.md":                               {`title: "<Titel>"`},
+		"instructions/on-demand/befunde.md":                             {`title: "<der Befund in einem Satz>"`, `thema: "<`},
+		"instructions/on-demand/doku-auftraege.md":                      {`title: "<was nachzuziehen ist, in einem Satz>"`, `anlass: "<`},
+		"commands/_shared/docs.md":                                      {`title: "<Titel>"`, `description: "<Ein Satz: was dieses Dokument erklärt.>"`},
+		"commands/k-docs-code.md":                                       {`title: "<Titel>"`, `description: "<Ein Satz: was dieses Dokument erklärt.>"`},
+		"commands/k-docs-tools.md":                                      {`title: "<Name, wie das Projekt ihn nennt>"`, `description: "Projektrelevante Pitfalls und Idiome für <Name>."`},
+		"commands/_skills/overlay-repo-analyse/overlay-doc.md.template": {`title: "<Overlay-Repo-Name>"`, `description: "<`},
+		"commands/k-upgrade.md":                                         {`title: "<Titel>"`},
+	}
+	for rel, needles := range templates {
+		file := readRepoDefault(t, rel)
+		for _, needle := range needles {
+			if !strings.Contains(file, needle) {
+				t.Errorf("%s zeigt %q nicht", rel, needle)
+			}
+		}
+		for _, stale := range []string{"title: <", "description: <"} {
+			if strings.Contains(file, stale) {
+				t.Errorf("%s zeigt noch einen unquotierten Platzhalter %q", rel, stale)
+			}
+		}
+	}
+	// Die beiden Vorlagen in tasks.md — „Kopf“ und „Aufbau“ — sind beide quotiert.
+	if tasks := readRepoDefault(t, "instructions/on-demand/tasks.md"); strings.Count(tasks, "---\ntitle: \"<Titel>\"\n---\n") != 2 {
+		t.Errorf("tasks.md zeigt die quotierte Vorlage nicht zweimal")
+	}
+	// Der Satz zur Regel steht einmal je Anweisung, die den Kopf beschreibt.
+	for rel, needle := range map[string]string{
+		"instructions/on-demand/tasks.md":          "stehen in doppelten Anführungszeichen, ein `\"` im Wert wird `\\\"`",
+		"instructions/on-demand/befunde.md":        "in doppelten Anführungszeichen, ein `\"` im Wert wird `\\\"`",
+		"instructions/on-demand/doku-auftraege.md": "in doppelten Anführungszeichen, ein `\"` im Wert wird `\\\"`",
+		"instructions/always/210-workbench.md":     "`title` ist Pflicht, in doppelten Anführungszeichen",
+		"commands/k-task-create.md":                "Frontmatter mit `title` in doppelten\nAnführungszeichen",
+		"commands/k-upgrade.md":                    "Der eingesetzte Titel steht in doppelten Anführungszeichen, ein inneres `\"` als\n`\\\"`",
+	} {
+		if !strings.Contains(readRepoDefault(t, rel), needle) {
+			t.Errorf("%s nennt die Quotierregel nicht: %q", rel, needle)
+		}
 	}
 }

@@ -56,8 +56,8 @@ auf keinen Blick wie ein fertiges Dokument der Wissensablage aussehen.
 
 ```markdown
 ---
-title: <der Befund in einem Satz>
-thema: <wenige Worte, unter denen verwandte Befunde zusammengehören>
+title: "<der Befund in einem Satz>"
+thema: "<wenige Worte, unter denen verwandte Befunde zusammengehören>"
 sicherheit: bestaetigt | unbestaetigt | widerlegt
 sitzung: <session aus dem Briefing>
 entstanden: arbeit | k-danke | migration
@@ -65,7 +65,10 @@ ziel:
 ---
 ```
 
-- `title` zeigen `k_playbook_doc_list` und das Briefing an.
+- `title` zeigen `k_playbook_doc_list` und das Briefing an; der Wert steht wie jeder Wert in
+  freiem Text (auch `thema`) in doppelten Anführungszeichen, ein `"` im Wert wird `\"`, damit
+  jeder YAML-Leser genau diesen Text liest, auch bei „: “ oder „ #“. `sicherheit`, `entstanden`
+  und `ziel` bleiben, wie die Vorlage sie zeigt.
 - `thema` gruppiert. Verwende dasselbe Thema wie ein vorhandener Befund, wenn es dieselbe
   Frage ist; die Übernahme bündelt danach.
 - `sitzung` ist die Kennung deiner Sitzung, das Feld `session` des Briefings (im Klartext die

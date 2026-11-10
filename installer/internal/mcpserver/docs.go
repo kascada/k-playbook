@@ -213,7 +213,9 @@ func addUserDocTools(server *mcp.Server) {
 		Description: "Listet die nummerierten Dokumente einer Sorte (" + kinds + ") aus der Replica: standardmäßig " +
 			"nur die eigenen, mit user * alle, mit done auch die Erledigten. Bei Sorten ohne Userbereich greift user " +
 			"nicht; der User kommt dann aus den Autor-Metadaten. Jeder Eintrag trägt ref, title (Frontmatter title, " +
-			"sonst Dateiname), user, created, updated, done. Was ein anderer Rechner gerade angelegt hat, kann fehlen, " +
+			"sonst Dateiname), user, created, updated, done — und problem, wenn Kephalaion das Frontmatter nicht lesen " +
+			"konnte (title ist dann der Dateiname) oder der Titel vermutlich an ‚ #‘ abgeschnitten ist; gemeldet, nicht " +
+			"repariert, Abhilfe: Titel in doppelte Anführungszeichen setzen. Was ein anderer Rechner gerade angelegt hat, kann fehlen, " +
 			"bis die Replica abgeglichen ist; Eigenes steht sofort da. Hülle über " +
 			"`k-playbook doc list`.",
 	}, docListTool)

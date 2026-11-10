@@ -157,8 +157,8 @@ genutzt wurden.
 
 ```markdown
 ---
-title: <Titel>
-description: <Ein Satz: was dieses Dokument erklärt.>
+title: "<Titel>"
+description: "<Ein Satz: was dieses Dokument erklärt.>"
 generated: { by: k-docs-code, at: <GENERATED_AT> }
 hints: [ <unverändert übernommen; das Feld fehlt, wenn das Dokument keine hatte> ]
 questions: [ "<Frage, die ein Neuer in der ersten Woche stellt>", … ]

@@ -67,8 +67,8 @@ Kephalaion indiziert alles zusammen. Die Felder in dieser Reihenfolge:
 
 ```yaml
 ---
-title: <Titel>
-description: <Ein Satz: was dieses Dokument erklärt.>
+title: "<Titel>"
+description: "<Ein Satz: was dieses Dokument erklärt.>"
 generated: { by: <erzeuger>, at: <GENERATED_AT>, stats: { … } }
 hints: [ "<worauf der nächste Lauf achten soll>", … ]
 questions: [ "<Frage, die genau dieses Dokument beantwortet>", … ]

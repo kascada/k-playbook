@@ -150,6 +150,9 @@ type BriefingDoc struct {
 	Ref     string `json:"ref"`
 	Title   string `json:"title"`
 	Updated string `json:"updated,omitempty"`
+	// Problem ist DocListItem.Problem: unlesbares Frontmatter oder ein
+	// vermutlich abgeschnittener Titel; leer, wenn nichts auffiel.
+	Problem string `json:"problem,omitempty"`
 }
 
 // BriefingContext ist der Übergangsabschnitt context des Briefings: die
@@ -567,7 +570,7 @@ func briefingDocs(ctx context.Context, docs *UserDocs, kind string) ([]BriefingD
 	}
 	items := make([]BriefingDoc, 0, len(list.Items))
 	for _, item := range list.Items {
-		items = append(items, BriefingDoc{Ref: item.Ref, Title: item.Title, Updated: item.Updated})
+		items = append(items, BriefingDoc{Ref: item.Ref, Title: item.Title, Updated: item.Updated, Problem: item.Problem})
 	}
 	return items, nil
 }
