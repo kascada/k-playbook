@@ -82,11 +82,44 @@ func upgradeProjectDir(t *testing.T, version string) string {
 			t.Fatal(err)
 		}
 	}
-	// Ob kephalaion im PATH liegt, hängt sonst am Rechner des Laufs.
+	// Ob kephalaion im PATH liegt und was es antwortet, hängt sonst am
+	// Rechner des Laufs.
 	stubKephalaion(t, kephalaionVorhanden, func(string) (program.KephalaionResult, error) {
 		return program.KephalaionResult{Path: "/opt/bin/kephalaion"}, nil
 	})
+	stubKephalaionUpgrade(t, kephalaionAutoAktuell, kephalaionCheckAktuell)
 	return root
+}
+
+func kephalaionAutoAktuell(string) (program.KephalaionAuto, error) {
+	return program.KephalaionAuto{Outcome: program.KephalaionCurrent, From: "v0.4.1", To: "v0.4.1"}, nil
+}
+
+func kephalaionCheckAktuell(string) (program.KephalaionCheck, error) {
+	return program.KephalaionCheck{State: "ok", Version: "v0.4.1", Latest: "v0.4.1"}, nil
+}
+
+// stubKephalaionUpgrade ersetzt die Aufrufe von kephalaion upgrade --auto und
+// --check.
+func stubKephalaionUpgrade(t *testing.T, auto func(string) (program.KephalaionAuto, error), check func(string) (program.KephalaionCheck, error)) {
+	t.Helper()
+	beforeAuto, beforeCheck := upgradeAutoKephalaion, upgradeCheckKephalaion
+	t.Cleanup(func() { upgradeAutoKephalaion, upgradeCheckKephalaion = beforeAuto, beforeCheck })
+	upgradeAutoKephalaion, upgradeCheckKephalaion = auto, check
+}
+
+// fakeKephalaionUpgrade legt ein kephalaion an, das upgrade --auto und
+// --check spielt und seine Aufrufe festhält, und lässt den Lauf es über die
+// echten Aufrufe aus internal/program finden. Installiert werden darf nichts.
+func fakeKephalaionUpgrade(t *testing.T) *kephtest.FakeUpgrade {
+	t.Helper()
+	fake := kephtest.NewFakeUpgrade(t)
+	stubKephalaion(t, func() (string, bool) { return fake.Path, true }, func(string) (program.KephalaionResult, error) {
+		t.Error("kephalaion ist da und wurde trotzdem installiert")
+		return program.KephalaionResult{}, nil
+	})
+	stubKephalaionUpgrade(t, program.KephalaionAutoUpgrade, program.KephalaionCheckUpgrade)
+	return fake
 }
 
 func kephalaionVorhanden() (string, bool) { return "/opt/bin/kephalaion", true }

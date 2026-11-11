@@ -17,19 +17,31 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// k-playbook upgrade — der eine Nachzug für Programm und Projekt, den /k-upgrade
-// aufruft.
+// k-playbook upgrade — der eine Nachzug für Kephalaion, Programm und Projekt,
+// den /k-upgrade aufruft.
 //
-// Drei Schritte, je Schritt eine Meldung: (1) das Programm — `git pull` im
-// Clone, danach das Binary über den Bootstrap des Clones, aber nur, wenn das
-// laufende Programm älter ist als der Clone (Regel aus restartAfterPull in
-// webui/update.go: nie „ungleich", sonst stufte das Entwicklungsrepo sein
-// neueres Programm herab); Kephalaion — fehlt es im PATH, installiert es
-// bin/install-kephalaion des Clones. Das ist ein eigener Schritt, weil
-// bin/install nur bei „älter" läuft: Ein aktuelles k-playbook ohne Kephalaion
-// bliebe sonst ohne. Er läuft im aufrufenden Prozess, nicht im neuen Programm
-// nach einem Binärwechsel; dort hat bin/install ihn schon getan; (2) das
-// Projekt — zuerst der Umzug der Anbindung aus der alten
+// Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
+//
+// (0) Kephalaion — zuerst, weil k-playbook von Kephalaion abhängt und nicht
+// umgekehrt: neue k-playbook-Releases setzen neue Kephalaion-Fähigkeiten
+// voraus, Projektschritt und /k-upgrade brauchen den Node, und ein Neustart
+// des Nodes ist so am Anfang erledigt und von Kephalaion selbst geprüft. Fehlt
+// kephalaion, installiert es bin/install-kephalaion des Clones (ohne Clone nur
+// eine Meldung). Liegt es da, ruft der Schritt `kephalaion upgrade --auto
+// --json` auf und meldet allein nach dessen Antwort; ob ein Upgrade gefahrlos
+// ist (Hub, globale Installation, dev build, zu alter Hub, DevContainer),
+// entscheidet Kephalaion. Kennt das Binary --auto nicht (Exit 2), meldet der
+// Schritt den Report von `upgrade --check --json`. Bei `upgraded` oder einem
+// Neustart des Nodes verlangt der Lauf den Neustart der Sitzung. Der Schritt
+// läuft im aufrufenden Prozess, vor dem Pull; das neue Programm nach einem
+// Binärwechsel fasst Kephalaion nicht noch einmal an.
+//
+// (1) das Programm — `git pull` im Clone, danach das Binary über den
+// Bootstrap des Clones, aber nur, wenn das laufende Programm älter ist als der
+// Clone (Regel aus restartAfterPull in webui/update.go: nie „ungleich", sonst
+// stufte das Entwicklungsrepo sein neueres Programm herab).
+//
+// (2) das Projekt — zuerst der Umzug der Anbindung aus der alten
 // k-playbook-local/K-PLAYBOOK.local.yaml in den Block kephalaion: von
 // K-PLAYBOOK.yaml (project.MigrateKephalaionBinding, Task 138), dann
 // ApplyAssistantSetup, also
@@ -37,7 +49,9 @@ import (
 // entfernen, Verlinkung; die MCP-Einträge repariert der Pull schon
 // (UpdateResult.MCPRepaired), ein eigenes RepairMCP läuft nur, wenn der Pull
 // entfiel. Am Ende der Hinweis auf den Neustart der Sitzung, wenn das Binary
-// gewechselt hat: der MCP-Server der Sitzung behält das alte Programm.
+// gewechselt hat — der MCP-Server der Sitzung behält das alte Programm — und
+// ein eigener, wenn Kephalaion aktualisiert oder sein Node neu gestartet
+// wurde.
 //
 // Hat Schritt (1) das Binary ersetzt, führt dieser — noch alte — Prozess
 // Schritt (2) nicht selbst aus: er hätte alte Vorlagen und alte Erkennung.
@@ -47,7 +61,8 @@ import (
 // sind. Die Oberfläche braucht das nicht, weil sie neu startet; upgrade hat
 // keinen Neustart.
 //
-// `--check` schreibt nichts: es meldet den Programm-Stand (CheckUpdate plus
+// `--check` schreibt nichts: es meldet den Kephalaion-Stand (nur
+// `upgrade --check --json`, nie --auto), den Programm-Stand (CheckUpdate plus
 // Vergleich mit der laufenden Version) und baut die Projektprüfung aus den
 // Check-Funktionen — es meldet, was ein Lauf täte.
 
@@ -60,9 +75,12 @@ var (
 	upgradeUpdate  = project.Update
 	upgradeInstall = program.Install
 	upgradeReexec  = reexecProjectStep
-	// Die Suche nach kephalaion im PATH (--check) und seine Installation.
+	// Die Suche nach kephalaion, seine Installation und die Aufrufe von
+	// kephalaion upgrade --auto bzw. --check.
 	upgradeFindKephalaion    = kephalaion.FindBinary
 	upgradeInstallKephalaion = program.InstallKephalaion
+	upgradeAutoKephalaion    = program.KephalaionAutoUpgrade
+	upgradeCheckKephalaion   = program.KephalaionCheckUpgrade
 )
 
 // upgradeOptions sind die Schalter des Aufrufs.
@@ -84,13 +102,13 @@ type upgradeReport struct {
 	Check         bool   `json:"check"`
 	// Program ist Schritt (1); fehlt bei --project-only.
 	Program *upgradeProgramReport `json:"program,omitempty"`
-	// Kephalaion ist der Schritt zwischen (1) und (2); fehlt bei
-	// --project-only.
+	// Kephalaion ist der erste Schritt, vor (1); fehlt bei --project-only.
 	Kephalaion *upgradeKephalaionReport `json:"kephalaion,omitempty"`
 	// Project ist Schritt (2): upgradeProjectReport, oder — nach einem
 	// Binärwechsel — die Antwort des neuen Programms, so wie sie kam.
 	Project any `json:"project,omitempty"`
-	// RestartRequired: das Binary hat gewechselt, die Sitzung muss neu
+	// RestartRequired: das Binary hat gewechselt, oder Kephalaion wurde
+	// aktualisiert bzw. sein Node neu gestartet — die Sitzung muss neu
 	// gestartet werden.
 	RestartRequired bool `json:"restartRequired"`
 	// Messages sind die Meldungen je Schritt, in der Reihenfolge des Laufs.
@@ -132,7 +150,21 @@ type upgradeKephalaionReport struct {
 	// Installed: bin/install-kephalaion ist gelaufen (nicht bei --check).
 	Installed bool   `json:"installed,omitempty"`
 	Output    string `json:"output,omitempty"`
-	Error     string `json:"error,omitempty"`
+	// Auto ist die Antwort von `kephalaion upgrade --auto --json`.
+	Auto *program.KephalaionAuto `json:"auto,omitempty"`
+	// AutoUnsupported: das installierte kephalaion kennt --auto noch nicht
+	// (Exit 2); Check ist dann der Report von --check.
+	AutoUnsupported bool `json:"autoUnsupported,omitempty"`
+	// Check ist der Report von `kephalaion upgrade --check --json` — bei
+	// --check und wo --auto fehlt.
+	Check *program.KephalaionCheck `json:"check,omitempty"`
+	// OutcomeUnknown: der Aufruf wurde nach Fristablauf beendet; was er
+	// getan hat, ist offen.
+	OutcomeUnknown bool `json:"outcomeUnknown,omitempty"`
+	// RestartRequired: Kephalaion wurde aktualisiert oder der Node neu
+	// gestartet.
+	RestartRequired bool   `json:"restartRequired,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 // upgradeProjectReport ist Schritt (2).
@@ -225,13 +257,13 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	}
 
 	if options.check {
-		programReport, lines := checkUpgradeProgram(environment)
-		report.Program = &programReport
+		kephalaionReport, lines := checkUpgradeKephalaion(environment)
+		report.Kephalaion = &kephalaionReport
 		report.Messages = append(report.Messages, lines...)
 		emit(lines)
 
-		kephalaionReport, lines := checkUpgradeKephalaion(environment)
-		report.Kephalaion = &kephalaionReport
+		programReport, lines := checkUpgradeProgram(environment)
+		report.Program = &programReport
 		report.Messages = append(report.Messages, lines...)
 		emit(lines)
 
@@ -242,13 +274,16 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		return report
 	}
 
-	programReport, lines, target := upgradeProgram(environment)
-	report.Program = &programReport
+	// Kephalaion zuerst: k-playbook hängt von Kephalaion ab, nicht umgekehrt,
+	// und Programm- wie Projektschritt brauchen den Node. Ein Neustart des
+	// Nodes ist so am Anfang erledigt und von --auto selbst geprüft.
+	kephalaionReport, lines := upgradeKephalaion(environment)
+	report.Kephalaion = &kephalaionReport
 	report.Messages = append(report.Messages, lines...)
 	emit(lines)
 
-	kephalaionReport, lines := upgradeKephalaion(environment)
-	report.Kephalaion = &kephalaionReport
+	programReport, lines, target := upgradeProgram(environment)
+	report.Program = &programReport
 	report.Messages = append(report.Messages, lines...)
 	emit(lines)
 
@@ -275,6 +310,12 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	if programReport.Installed {
 		report.RestartRequired = true
 		line := "Das Programm hat gewechselt: die Sitzung neu starten — der MCP-Server der Sitzung behält das alte Programm, bis der Assistent ihn neu startet."
+		report.Messages = append(report.Messages, line)
+		emit([]string{line})
+	}
+	if kephalaionReport.RestartRequired {
+		report.RestartRequired = true
+		line := "Kephalaion wurde aktualisiert oder sein Node neu gestartet: die Sitzung neu starten. Auch andere offene Sitzungen an diesem Node können ihre Verbindung zu Kephalaion verloren haben."
 		report.Messages = append(report.Messages, line)
 		emit([]string{line})
 	}
@@ -407,13 +448,46 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 	return report, lines
 }
 
-// upgradeKephalaion ist der Schritt Kephalaion: fehlt kephalaion im PATH, läuft
-// bin/install-kephalaion des Clones. Ein Fehlschlag hält den Lauf nicht auf;
-// das Projekt wird trotzdem nachgezogen.
+// upgradeKephalaion ist der Schritt Kephalaion, drei Wege:
+//
+//  1. kephalaion fehlt: bin/install-kephalaion des Clones; danach kein
+//     --auto. Ohne Clone nur die Meldung mit der Installation von Hand.
+//  2. kephalaion da: `kephalaion upgrade --auto --json`; je outcome eine
+//     Meldung. Was gefahrlos ist, entscheidet Kephalaion, nicht k-playbook.
+//  3. kephalaion kennt --auto nicht (Exit 2): `upgrade --check --json` und
+//     die Meldung, ob ein neueres Release da ist.
+//
+// Weg 2 und 3 brauchen den Clone nicht. Kein Weg hält den Lauf auf.
 func upgradeKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
-	if !environment.PlaybookPresent {
-		return checkUpgradeKephalaion(environment)
+	path, ok := upgradeFindKephalaion()
+	if !ok {
+		if !environment.PlaybookPresent {
+			return upgradeKephalaionReport{}, []string{missingKephalaionWithoutClone()}
+		}
+		return installKephalaion(environment)
 	}
+
+	report := upgradeKephalaionReport{Present: true, Path: path}
+	auto, err := upgradeAutoKephalaion(path)
+	if errors.Is(err, program.ErrKephalaionAutoUnsupported) {
+		report.AutoUnsupported = true
+		check, lines := checkKephalaionRelease(path, &report)
+		report.Check = check
+		if check != nil {
+			lines = describeKephalaionWithoutAuto(*check)
+		}
+		return report, lines
+	}
+	if err != nil {
+		return report, kephalaionCallFailed(&report, err)
+	}
+	report.Auto = &auto
+	report.RestartRequired = auto.Outcome == program.KephalaionUpgraded || auto.NodeRestarted()
+	return report, describeKephalaionAuto(auto)
+}
+
+// installKephalaion ist Weg 1: bin/install-kephalaion des Clones.
+func installKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
 	report := upgradeKephalaionReport{}
 	result, err := upgradeInstallKephalaion(environment.ProjectDir)
 	report.Path, report.Installed, report.Output = result.Path, result.Installed, result.Output
@@ -437,20 +511,146 @@ func upgradeKephalaion(environment project.Environment) (upgradeKephalaionReport
 	return report, []string{"Kephalaion: vorhanden (" + result.Path + ")."}
 }
 
-// checkUpgradeKephalaion meldet, ob kephalaion im PATH liegt, ohne zu
-// installieren. Ohne Clone gibt es kein bin/install-kephalaion; dann nennt die
-// Meldung die Installation aus dem README von Kephalaion.
+// checkUpgradeKephalaion meldet, was ein Lauf versuchen würde, ohne etwas zu
+// ändern: fehlt kephalaion, die Installation; sonst der Report von
+// `upgrade --check --json`. --auto ruft es nie auf.
 func checkUpgradeKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
 	path, ok := upgradeFindKephalaion()
-	if ok {
-		return upgradeKephalaionReport{Present: true, Path: path}, []string{"Kephalaion: vorhanden (" + path + ")."}
+	if !ok {
+		if !environment.PlaybookPresent {
+			return upgradeKephalaionReport{}, []string{missingKephalaionWithoutClone()}
+		}
+		return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH; ein Lauf installiert es über " +
+			project.KephalaionInstallCommand + "."}
 	}
-	if !environment.PlaybookPresent {
-		return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH, und ohne die Installation " +
-			project.PlaybookDirName + "/ installiert dieser Lauf es nicht. Von Hand: " + kephalaion.InstallCommand + "."}
+	report := upgradeKephalaionReport{Present: true, Path: path}
+	check, lines := checkKephalaionRelease(path, &report)
+	report.Check = check
+	if check == nil {
+		return report, lines
 	}
-	return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH; ein Lauf installiert es über " +
-		project.KephalaionInstallCommand + "."}
+	switch {
+	case check.State != "ok":
+		return report, describeKephalaionCheckFailed(*check)
+	case check.DevBuild:
+		return report, []string{"Kephalaion: " + check.Version + " ist ein selbst gebautes Binary; ein Lauf ruft kephalaion upgrade --auto auf, das es nicht ersetzt."}
+	case check.UpdateAvailable:
+		return report, []string{fmt.Sprintf("Kephalaion: %s installiert, %s verfügbar; ein Lauf ruft kephalaion upgrade --auto auf — ob es aktualisiert, entscheidet Kephalaion (Weg laut Kephalaion: %s).",
+			check.Version, check.Latest, check.Hint)}
+	}
+	return report, []string{"Kephalaion: " + check.Version + " ist aktuell."}
+}
+
+// checkKephalaionRelease ruft `upgrade --check --json` auf. Ohne Report
+// kommen die Zeilen zum Fehlschlag zurück, und report trägt den Fehler.
+func checkKephalaionRelease(path string, report *upgradeKephalaionReport) (*program.KephalaionCheck, []string) {
+	check, err := upgradeCheckKephalaion(path)
+	if err != nil {
+		return nil, kephalaionCallFailed(report, err)
+	}
+	return &check, nil
+}
+
+// kephalaionNextStep ist der Prüfschritt von Hand nach einem Aufruf ohne
+// verwertbare Antwort.
+const kephalaionNextStep = "Nächster Schritt: kephalaion status, dann kephalaion upgrade --check von Hand."
+
+// kephalaionCallFailed meldet einen Aufruf ohne verwertbare Antwort: kein
+// JSON, nicht startbar oder nach Fristablauf beendet. Kein Abbruch.
+func kephalaionCallFailed(report *upgradeKephalaionReport, err error) []string {
+	report.Error = err.Error()
+	var unknown *program.KephalaionUnknownOutcomeError
+	if errors.As(err, &unknown) {
+		report.OutcomeUnknown = true
+		return []string{"Kephalaion: " + strings.TrimSuffix(err.Error(), ".") +
+			". Prüfen: kephalaion status — wurde der Node neu gestartet, die Sitzung neu starten."}
+	}
+	return []string{"Kephalaion: " + strings.TrimSuffix(err.Error(), ".") + ". " + kephalaionNextStep}
+}
+
+// describeKephalaionAuto formuliert die Antwort von --auto.
+func describeKephalaionAuto(auto program.KephalaionAuto) []string {
+	lines := []string{}
+	switch auto.Outcome {
+	case program.KephalaionUpgraded:
+		line := "Kephalaion: von " + auto.From + " auf " + auto.To + " aktualisiert"
+		if auto.Restarted {
+			line += ", Dienst neu gestartet"
+		}
+		lines = append(lines, line+".")
+	case program.KephalaionCurrent:
+		version := auto.From
+		if version == "" && auto.Check != nil {
+			version = auto.Check.Version
+		}
+		lines = append(lines, "Kephalaion: "+displayVersion(version)+" ist aktuell.")
+	case program.KephalaionSkipped:
+		line := "Kephalaion: "
+		if auto.To != "" {
+			line += auto.To + " verfügbar, "
+		}
+		line += "nicht automatisch aktualisiert (" + auto.Reason + ")"
+		if auto.Hint != "" {
+			line += " — " + auto.Hint
+		}
+		lines = append(lines, strings.TrimSuffix(line, ".")+".")
+	case program.KephalaionFailed:
+		line := "Kephalaion: Upgrade gescheitert (" + auto.Reason + ")"
+		if auto.Error != "" {
+			line += " — " + auto.Error
+		}
+		lines = append(lines, strings.TrimSuffix(line, ".")+".")
+		if auto.Reason == program.KephalaionReasonRestart {
+			switch {
+			case auto.RolledBack != nil && *auto.RolledBack:
+				lines = append(lines, "  Der Node wurde neu gestartet; das alte Binary ist zurück und läuft wieder.")
+			default:
+				lines = append(lines, "  Der Node wurde neu gestartet; das alte Binary ist nicht zurückgesetzt.")
+			}
+		}
+		if auto.Hint != "" {
+			lines = append(lines, "  "+auto.Hint)
+		}
+	default:
+		lines = append(lines, "Kephalaion: unbekannter Ausgang „"+auto.Outcome+"“ von kephalaion upgrade --auto. "+kephalaionNextStep)
+	}
+	for _, warning := range auto.Warnings {
+		lines = append(lines, "  "+warning)
+	}
+	return lines
+}
+
+// describeKephalaionWithoutAuto ist Weg 3: der Report von --check eines
+// kephalaion, das --auto noch nicht kennt.
+func describeKephalaionWithoutAuto(check program.KephalaionCheck) []string {
+	switch {
+	case check.State != "ok":
+		return describeKephalaionCheckFailed(check)
+	case check.UpdateAvailable:
+		line := "Kephalaion: " + check.Version + " installiert, " + check.Latest + " verfügbar"
+		if check.Hint != "" {
+			line += " — " + check.Hint
+		}
+		return []string{line + "; dieses Kephalaion aktualisiert sich noch nicht selbst über k-playbook."}
+	case check.DevBuild:
+		return []string{"Kephalaion: " + check.Version + " ist ein selbst gebautes Binary; k-playbook aktualisiert es nicht."}
+	}
+	return []string{"Kephalaion: " + check.Version + " ist aktuell."}
+}
+
+// describeKephalaionCheckFailed: --check hat geantwortet, die Frage an
+// GitHub ist gescheitert.
+func describeKephalaionCheckFailed(check program.KephalaionCheck) []string {
+	reason := check.Error
+	if reason == "" {
+		reason = "state " + check.State
+	}
+	return []string{"Kephalaion: Prüfung auf ein neueres Release gescheitert — " + strings.TrimSuffix(reason, ".") + ". " + kephalaionNextStep}
+}
+
+func missingKephalaionWithoutClone() string {
+	return "Kephalaion: fehlt im PATH, und ohne die Installation " +
+		project.PlaybookDirName + "/ installiert dieser Lauf es nicht. Von Hand: " + kephalaion.InstallCommand + "."
 }
 
 // upgradeProject ist Schritt (2): derselbe Ablauf wie „Einrichten" in der
@@ -732,13 +932,25 @@ func isDir(path string) bool {
 }
 
 func printUpgradeUsage(out io.Writer) {
-	fmt.Fprint(out, `k-playbook upgrade — Programm aktualisieren und das Projekt nachziehen
+	fmt.Fprint(out, `k-playbook upgrade — Kephalaion und Programm aktualisieren, das Projekt nachziehen
 
 Aufruf:
   k-playbook upgrade [--check] [--json]
 
-Drei Schritte, je Schritt eine Meldung:
+Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
 
+  0. Kephalaion: zuerst, weil k-playbook von Kephalaion abhängt und die
+     Schritte danach den Node brauchen. Liegt kein kephalaion im PATH,
+     installiert es k-playbook/bin/install-kephalaion über das install.sh
+     des neuesten Kephalaion-Releases (ohne Clone: nur eine Meldung). Liegt
+     es da, ruft der Schritt kephalaion upgrade --auto --json auf:
+     Kephalaion aktualisiert sich selbst und startet seinen Node neu, wenn
+     es das für gefahrlos hält; einen Hub, eine globale Installation, einen
+     dev build oder einen Node vor einem zu alten Hub fasst es nicht an und
+     nennt den Weg von Hand. Kennt das installierte kephalaion --auto noch
+     nicht, meldet der Schritt nach kephalaion upgrade --check --json, ob ein
+     neueres Release da ist. Scheitert der Schritt, eine Meldung, und die
+     Schritte danach laufen trotzdem.
   1. Programm: git pull --ff-only im Clone k-playbook/, danach das Binary über
      k-playbook/bin/install — aber nur, wenn das laufende Programm älter ist
      als die VERSION des Clones; gleich oder neuer bleibt stehen. Ohne Clone
@@ -749,11 +961,6 @@ Drei Schritte, je Schritt eine Meldung:
      öffentlichen Repos (git@github.com:kascada/k-playbook), stellt der Lauf
      sie vor dem Pull auf https://github.com/kascada/k-playbook.git um; ein
      Alias-Host aus ~/.ssh/config bleibt stehen.
-     Kephalaion: liegt kein kephalaion im PATH, installiert es
-     k-playbook/bin/install-kephalaion über das install.sh des neuesten
-     Kephalaion-Releases. Ein vorhandenes bleibt unangetastet (aktualisieren:
-     kephalaion upgrade). Scheitert es, eine Meldung, und Schritt 2 läuft
-     trotzdem.
   2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen, einen veralteten
      Anstoß auf k-playbook briefing bringen, die abgelösten Session-Memory-
      und Befunde-Blöcke entfernen), CLAUDE.md als Include-Datei, die
@@ -761,14 +968,16 @@ Drei Schritte, je Schritt eine Meldung:
      Pull, ohne Pull dieser Schritt. Projekt-Prosa in AGENTS.md und
      k-playbook-local/ bleiben unangetastet.
 
-Am Ende, wenn das Binary gewechselt hat: der Hinweis, die Sitzung neu zu
-starten — der MCP-Server der Sitzung behält das alte Programm.
+Am Ende der Hinweis, die Sitzung neu zu starten: wenn das Binary gewechselt
+hat — der MCP-Server der Sitzung behält das alte Programm —, und wenn
+Kephalaion aktualisiert oder sein Node neu gestartet wurde; das kann auch
+andere offene Sitzungen an diesem Node treffen.
 
---check schreibt nichts: es meldet den Stand des Clones gegenüber dem Remote
-(bei der SSH-Adresse des öffentlichen Repos über HTTPS gefragt),
-den Stand des laufenden Programms gegenüber dem Clone, ob kephalaion im PATH
-liegt und, was ein Lauf am Projekt täte. --json gibt den Bericht als JSON aus
-(schemaVersion, check, program, kephalaion, project, restartRequired,
-messages).
+--check schreibt nichts: es meldet nach kephalaion upgrade --check --json, ob
+ein neueres Kephalaion da ist (--auto ruft es nie auf), den Stand des Clones
+gegenüber dem Remote (bei der SSH-Adresse des öffentlichen Repos über HTTPS
+gefragt), den Stand des laufenden Programms gegenüber dem Clone und, was ein
+Lauf am Projekt täte. --json gibt den Bericht als JSON aus (schemaVersion,
+check, kephalaion, program, project, restartRequired, messages).
 `)
 }
