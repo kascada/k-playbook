@@ -33,10 +33,14 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"reviews", "results", "guidelines", "priv"} {
+	for _, name := range []string{"reviews", "results", "priv"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
 		}
+	}
+	// Projekteigene Guidelines liegen unter keph:/docs/guidelines/ (Todo #40).
+	if pathExists(filepath.Join(local, "guidelines")) {
+		t.Errorf("guidelines angelegt")
 	}
 	// Projekteigene Commands und Skills liegen in .k-playbook/ (Task 129);
 	// angelegt wird weder der alte noch der neue Ort.

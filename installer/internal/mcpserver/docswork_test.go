@@ -281,7 +281,7 @@ func TestDocsReadmeTool(t *testing.T) {
 	result, _, _ := docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root, Check: true})
 	envelope := decodeDocsWork[docsReadmeEnvelope](t, result)
 	if result.IsError || !envelope.OK || envelope.Tool != docsToolReadme || envelope.DocsReadmeResult == nil || !envelope.Check ||
-		len(envelope.Readmes) != 6 || envelope.Readmes[0].Status != project.DocsReadmeMissing || len(store.Names()) != 0 {
+		len(envelope.Readmes) != 7 || envelope.Readmes[0].Status != project.DocsReadmeMissing || len(store.Names()) != 0 {
 		t.Fatalf("check: %+v", envelope)
 	}
 	result, _, _ = docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root, Path: "generated/code"})
@@ -291,7 +291,7 @@ func TestDocsReadmeTool(t *testing.T) {
 	}
 	result, _, _ = docsReadmeTool(ctx, nil, docsReadmeInput{ProjectDir: root})
 	envelope = decodeDocsWork[docsReadmeEnvelope](t, result)
-	if result.IsError || len(envelope.Readmes) != 6 || len(store.Names()) != 6 {
+	if result.IsError || len(envelope.Readmes) != 7 || len(store.Names()) != 7 {
 		t.Fatalf("alle: %+v, %v", envelope, store.Names())
 	}
 

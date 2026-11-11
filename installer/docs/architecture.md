@@ -1436,7 +1436,10 @@ rufen sie — dieselbe Sorte kommt über jeden Weg gleich heraus (Test
 `TestDocRefUndKatalogeStimmenUeberein`). Die Sorte `guidelines` hängt bewusst nicht in
 `catalogKinds()` (`guidelinesKind`): für Verweise und Briefing ist sie überlagert, das Feld
 `guidelines` der Kontextausgabe liest bis zu deren Umstellung weiter nur lokal — die eine
-benannte Ausnahme (Task 086).
+benannte Ausnahme (Task 086). Die lokale Ebene `k-playbook-local/guidelines/` legt das
+Einrichten nicht mehr an, und `/k-upgrade` löscht sie: Projekteigene Guidelines liegen unter
+`keph:/docs/guidelines/`. Überlagerung und Kontextfeld bleiben bis zum Umbau aus Todo #40
+im Code und liefern ohne das Verzeichnis nichts.
 
 Zwei Sorten, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 135 entfallen:
 

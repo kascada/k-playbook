@@ -10,13 +10,10 @@ findet sie hier.
 
 ## Zusammenführung
 
-Die Dateien hier werden ausgeliefert und gelten in jedem Projekt. Daneben steht
-`k-playbook-local/guidelines/` für das, was nur ein Projekt betrifft.
-
-Gelesen wird zuerst die mitgelieferte Datei, danach die projekteigene. Eine
-gleichnamige projekteigene Datei **ersetzt** die mitgelieferte vollständig — dieselbe
-Overlay-Regel wie bei `reviews/`. Eine leere projekteigene
-Datei schaltet die mitgelieferte ab; ihr Inhalt darf dann den Grund nennen.
+Die Dateien hier werden ausgeliefert und gelten in jedem Projekt. Was nur ein Projekt
+betrifft, steht als Guideline in der Projekt-Collection unter `keph:/docs/guidelines/`.
+Das frühere `k-playbook-local/guidelines/` entfällt; `/k-upgrade` löscht es. Wie
+mitgelieferte und projekteigene Guidelines zusammenspielen, ist noch offen (Todo #40).
 
 ## Dateien
 

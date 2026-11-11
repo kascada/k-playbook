@@ -382,7 +382,7 @@ func TestDocsReadmeSubkommando(t *testing.T) {
 	}
 
 	stdout, _, err = runDocsCaptured(t, "readme")
-	if err != nil || strings.Count(stdout, "created\t") != 5 || !strings.Contains(stdout, "unchanged\tkeph:/docs/manual/README.md") {
+	if err != nil || strings.Count(stdout, "created\t") != 6 || !strings.Contains(stdout, "unchanged\tkeph:/docs/manual/README.md") {
 		t.Fatalf("readme alle: %q %v", stdout, err)
 	}
 

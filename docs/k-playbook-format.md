@@ -57,7 +57,7 @@ locations derive from the project root, the directory that holds
 | tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs`, not under `k-playbook-local/` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
 | manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |
-| project-owned guidelines | `k-playbook-local/guidelines/` |
+| project-owned guidelines | `keph:/docs/guidelines/` — in the project collection. Setup no longer creates `k-playbook-local/guidelines/`; `/k-upgrade` 3.4 deletes a leftover one even with content and names every file (todo #40) |
 | project-owned instructions | `k-playbook-local/instructions/always/`, `k-playbook-local/instructions/on-demand/` |
 | open tasks | `keph:/user/<user>/tasks/` — in the project collection, not under `k-playbook-local/`; form in `k-playbook:/instructions/on-demand/tasks.md` |
 | completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; a `k-playbook-local/tasks/` from before is moved by `/k-upgrade` 3.3 and removed by 3.4 once empty |
@@ -287,7 +287,10 @@ and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `re
 (`k-playbook:/guidelines/<name>.md`) and the briefing resolve it that way. The field
 `guidelines` of the context output is the one named exception: it still lists only
 the project-owned files until the context output is switched (see the next section);
-`catalogs` does not list the kind.
+`catalogs` does not list the kind. The local layer is on its way out: setup no longer
+creates `k-playbook-local/guidelines/`, `/k-upgrade` deletes it, and project-owned
+guidelines live in `keph:/docs/guidelines/`. The overlay code stays until todo #40 and
+yields nothing without the directory.
 
 Nothing below `k-playbook/` may be written, including by commands that read
 recipes or checks there. An update replaces the directory completely.

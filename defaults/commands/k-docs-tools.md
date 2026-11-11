@@ -140,10 +140,39 @@ dieses Commands; das Inventar weist sie selbst aus.
 **Nutzung im Code** zählst du je Kandidat mit Grep, innerhalb des Scope aus Schritt 1 —
 der Scope begrenzt nur dieses Zählen, nicht die Liste. Gesucht wird nach dem Import, passend
 zur Sprache (Python `import <name>|from <name>`, JavaScript `require\(['"]<name>|from
-['"]<name>`, Go `"<pfad>"` im `import`, …):
+['"]<name>`, Go nach der Regel unten, …):
 
 - `file_count` — wie viele Dateien importieren,
 - `import_count` — Vorkommen insgesamt.
+
+**Go** zählst du importgenau, ohne `go` vorauszusetzen:
+
+- **Importzeile.** Gezählt werden nur Zeilen, die aus nichts bestehen als einem optionalen
+  `import`, einem optionalen Alias (`_`, `.` oder Bezeichner), dem Pfad in Anführungszeichen
+  und einem optionalen Kommentar — die Einzelform `import "<p>"` und die Zeilen eines Blocks
+  `import ( … )`. Eine Zeichenkette sonst im Code zählt nicht. Grenze: Ob die Zeile in einem
+  Importblock steht, prüft Grep nicht; eine Zeile dieser Form außerhalb, etwa eine einzelne
+  Zeichenkette in einem mehrzeiligen Literal, zählt mit. Das ist hingenommen.
+- **Zugehörigkeit.** Ein Importpfad gehört zu einem Modul, wenn er gleich dem Modulpfad ist
+  oder mit `<modulpfad>/` beginnt. So zählen Unterpakete mit (`…/go-sdk/mcp` für
+  `github.com/modelcontextprotocol/go-sdk`), und ein Modul zählt nicht für ein anderes, das
+  nur mit denselben Zeichen beginnt (`github.com/yuin/goldmark` nicht für
+  `github.com/yuin/goldmark-emoji`).
+- **Muster.** `<modulpfad>` ist der Gegenstand ohne `go/`, Punkte als `\.` maskiert:
+
+  ```text
+  ^[[:space:]]*(import[[:space:]]+)?([A-Za-z_.][A-Za-z0-9_]*[[:space:]]+)?"<modulpfad>(/[^"]*)?"[[:space:]]*(//.*)?$
+  ```
+
+  `grep -rHE --include='*.go' '<muster>' <scope>` liefert die Treffer als `datei:zeile`;
+  `import_count` ist die Zahl der Treffer, `file_count` die Zahl der verschiedenen Dateien
+  davor.
+- **Verschachtelte Module.** Beginnt der Pfad eines anderen Go-Kandidaten mit
+  `<modulpfad>/` (`cloud.google.com/go/storage` unter `cloud.google.com/go`), zählt eine
+  Importzeile nur für das längste passende Modul. Für das kürzere ziehst du deshalb vor dem
+  Zählen die Treffer ab, die auch das Muster des längeren trifft — je längerem Modul ein
+  `grep -vE '"<längerer modulpfad>(/[^"]*)?"'` hinter dem Grep oben. Eine Datei, von der danach
+  kein Treffer bleibt, zählt nicht für das kürzere.
 
 Bei Gegenständen ohne Import — `image`, `chart`, `chart-dependency`, `action`, `runtime` —
 entfällt die Zählung; die Liste zeigt dort `—`.

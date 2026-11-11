@@ -820,8 +820,10 @@ func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
 // (Task 135) und checks/ (Task 134) haben keinen Nachfolger und werden nur
 // gemeldet, wenn sie bleiben. tmp/ hat das Einrichten nie angelegt — ein
 // handgemachter Schmierzettel aus der Zeit der Wissensablage —, es wird wie
-// rules/ und checks/ behandelt. Die Hülle nennt alle Verzeichnisse in ihrer
-// description.
+// rules/ und checks/ behandelt. guidelines/ löscht 3.4 immer, auch mit
+// Inhalt, und nennt jede Datei: projekteigene Guidelines liegen unter
+// keph:/docs/guidelines/ (Todo #40). Die Hülle nennt alle Verzeichnisse in
+// ihrer description.
 func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
 	start, end := strings.Index(file, "### 3.4 — "), strings.Index(file, "## Schritt 4 — ")
@@ -830,9 +832,12 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"legt neun Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
+		"legt zehn Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
 		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/` - `rules/` - `checks/` - `tmp/`",
+		"- `material/` - `commands/` - `skills/` - `rules/` - `checks/` - `guidelines/` - `tmp/`",
+		"**Ausnahme für `guidelines/`.** Es wird gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
+		"nennt die Meldung jede gelöschte Datei, ohne die Grenze von fünf Pfaden",
+		"guidelines/ gelöscht: README.md, stil.md",
 		"Dazu kommt `tmp/`, das das Einrichten nie angelegt hat",
 		"dort niemand liest und niemand aufräumt",
 		"tmp/ gelöscht: README.md",
@@ -859,7 +864,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 			t.Errorf("3.4 nennt %q nicht", needle)
 		}
 	}
-	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse"} {
+	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse"} {
 		if strings.Contains(section, stale) {
 			t.Errorf("3.4 zählt noch %s", stale)
 		}
@@ -869,7 +874,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/"} {
+	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt"} {
 		if !strings.Contains(string(hull), needle) {
 			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
 		}

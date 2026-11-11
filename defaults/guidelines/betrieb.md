@@ -124,6 +124,5 @@ benutzt. Ein Ort, den nur ein Command-Text kennt, ist für jeden anderen unsicht
 der zweite Command legt dann etwas Ähnliches woanders ab, und ab da gibt es zwei
 Wahrheiten.
 
-Braucht ein Projekt einen anderen Ort, ersetzt es diese Datei durch eine gleichnamige
-unter `k-playbook-local/guidelines/betrieb.md`. Einzelne Zeilen daraus zu übernehmen
-ist nicht vorgesehen — die Datei gilt als Ganzes.
+Eine projekteigene Fassung unter `k-playbook-local/guidelines/` gibt es nicht mehr;
+projekteigene Guidelines liegen unter `keph:/docs/guidelines/`.

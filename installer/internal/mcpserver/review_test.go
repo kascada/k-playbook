@@ -1726,7 +1726,7 @@ func triageStatus(t *testing.T, root string, run string) map[string]any {
 }
 
 // TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag schickt jedes
-// mitgelieferte Rezept aus reviews/ an der Repo-Wurzel durch den Katalog
+// mitgelieferte Rezept aus defaults/reviews/ durch den Katalog
 // (project) und den Audit-Parser (readAIRecipeMetadata, ValidateAuditContract)
 // und prüft, dass beide es auswählbar führen.
 //
@@ -1735,12 +1735,12 @@ func triageStatus(t *testing.T, root string, run string) map[string]any {
 // kopiert die Rezepte deshalb in ein temporäres Projekt und ruft Katalog und
 // Auswahl nur dort auf.
 func TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag(t *testing.T) {
-	sources, err := filepath.Glob(filepath.Join("..", "..", "..", "reviews", "review-*.md"))
+	sources, err := filepath.Glob(filepath.Join("..", "..", "..", "defaults", "reviews", "review-*.md"))
 	if err != nil {
-		t.Fatalf("reviews/ lesen: %v", err)
+		t.Fatalf("defaults/reviews/ lesen: %v", err)
 	}
 	if len(sources) == 0 {
-		t.Fatal("kein Rezept unter reviews/ an der Repo-Wurzel")
+		t.Fatal("kein Rezept unter defaults/reviews/")
 	}
 
 	root := newReviewProject(t)

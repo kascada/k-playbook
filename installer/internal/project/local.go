@@ -58,7 +58,9 @@ type LocalEntry struct {
 // .k-playbook/commands/ und .k-playbook/skills/ (registry.go), die das
 // Einrichten nicht anlegt. rules hat Task 135 entfernt, checks Task 134:
 // projekteigene Checks gibt es bis zu ihrer neuen Form nicht, k-check führt
-// nur die mitgelieferten aus. /k-upgrade räumt die leeren Verzeichnisse eines
+// nur die mitgelieferten aus. guidelines ebenso nicht (Todo #40):
+// projekteigene Guidelines liegen unter keph:/docs/guidelines/, /k-upgrade
+// löscht das alte Verzeichnis auch mit Inhalt. /k-upgrade räumt die leeren Verzeichnisse eines
 // Bestandsprojekts ab, dazu die Reste der früheren Wissensablage auf der
 // Platte (Task 123).
 func LocalStructure() []LocalEntry {
@@ -81,7 +83,6 @@ func LocalStructure() []LocalEntry {
 				"committet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore allein\n" +
 				"wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in der Historie.",
 		},
-		{Path: "guidelines", Purpose: "Projektvorgaben, auf die Commands und Reviews sich beziehen."},
 		{
 			Path:    "priv",
 			Purpose: "Platz für eigene Notizen, Zwischenstände und alles, was nur dich angeht.\n\nDer Inhalt wird ganz normal mitversioniert. Ob er das soll, entscheidet das\nProjekt: Der Block „Lokale Einstellungen\" in der Oberfläche zeigt den gemessenen\nIst-Zustand dieses Verzeichnisses und schaltet ihn um — er legt die .gitignore\nan und nimmt bereits versionierte Dateien aus dem Index.\n\nVon Hand geht es genauso: eine .gitignore in diesem Verzeichnis mit diesem\nInhalt:\n\n    *\n    !.gitignore\n    !README.md\n\nDann bleibt der Inhalt draußen und das Verzeichnis selbst sichtbar. Was bereits\ncommittet ist, nimmt erst ein `git rm --cached` wieder heraus — eine .gitignore\nallein wirkt auf getrackte Dateien nicht. Und was schon gepusht wurde, bleibt in\nder Historie; das macht kein Schalter rückgängig.",
