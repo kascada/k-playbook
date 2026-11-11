@@ -7,8 +7,10 @@ set -euo pipefail
 # Installiert wird über das install.sh aus dem neuesten Kephalaion-Release:
 # Asset-Namen, Plattformen und Prüfsumme bleiben damit Sache von Kephalaion,
 # und hier ist nichts nachzuziehen, wenn sie sich ändern. Ein vorhandenes
-# Kephalaion bleibt unangetastet — aktuell hält es sich selbst
-# (kephalaion upgrade), und herabgestuft wird nie.
+# Kephalaion bleibt unangetastet, herabgestuft wird nie: Das Skript
+# installiert nur. Aktualisiert wird über `k-playbook upgrade`, das
+# `kephalaion upgrade --auto` aufruft — ob ein Upgrade gefahrlos ist,
+# entscheidet Kephalaion selbst.
 #
 # Nur das Binary. node init, service install und Token gehören nicht hierher:
 # Im DevContainer kommt die config read-only vom Host, und der Node ist der des
@@ -29,7 +31,8 @@ Verwendung: k-playbook/bin/install-kephalaion
 Installiert Kephalaion nach ~/.local/bin/kephalaion, wenn kein kephalaion im
 PATH liegt — über das install.sh des neuesten Kephalaion-Releases, das Binary
 und SHA256SUMS lädt und die Prüfsumme prüft. Ein vorhandenes Kephalaion bleibt
-unangetastet; aktualisiert wird es mit kephalaion upgrade.
+unangetastet; das Skript installiert nur. Aktualisiert wird über k-playbook
+upgrade, das kephalaion upgrade --auto aufruft (von Hand: kephalaion upgrade).
 EOF
 }
 

@@ -535,8 +535,11 @@ func checkUpgradeKephalaion(environment project.Environment) (upgradeKephalaionR
 	case check.DevBuild:
 		return report, []string{"Kephalaion: " + check.Version + " ist ein selbst gebautes Binary; ein Lauf ruft kephalaion upgrade --auto auf, das es nicht ersetzt."}
 	case check.UpdateAvailable:
-		return report, []string{fmt.Sprintf("Kephalaion: %s installiert, %s verfügbar; ein Lauf ruft kephalaion upgrade --auto auf — ob es aktualisiert, entscheidet Kephalaion (Weg laut Kephalaion: %s).",
-			check.Version, check.Latest, check.Hint)}
+		line := "Kephalaion: " + check.Version + " installiert, " + check.Latest + " verfügbar"
+		if check.Hint != "" {
+			line += " — " + check.Hint
+		}
+		return report, []string{line + "; ein Lauf ruft kephalaion upgrade --auto auf, ob es aktualisiert, entscheidet Kephalaion."}
 	}
 	return report, []string{"Kephalaion: " + check.Version + " ist aktuell."}
 }

@@ -1,9 +1,11 @@
 # k-upgrade
 
-Zieht Programm und Projekt auf den aktuellen Stand von k-playbook. Zuerst das, was das
-Programm allein kann: das Binary, wenn das laufende älter ist als die Installation, danach
-`AGENTS.md` (Anstoß, abgelöste Blöcke), `CLAUDE.md`, die Verlinkung der Commands und Skills
-und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
+Zieht Kephalaion, Programm und Projekt auf den aktuellen Stand von k-playbook. Zuerst das, was
+das Programm allein kann, in dieser Reihenfolge: Kephalaion — `kephalaion upgrade --auto`
+aktualisiert es und startet seinen Node neu, soweit Kephalaion das selbst für gefahrlos hält,
+sonst steht in der Ausgabe, was zu tun ist —, dann das Binary, wenn das laufende älter ist als
+die Installation, dann `AGENTS.md` (Anstoß, abgelöste Blöcke), `CLAUDE.md`, die Verlinkung der
+Commands und Skills und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
 dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Briefing danach
 den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
 nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
@@ -48,11 +50,12 @@ Projekt laufen zu lassen, entscheidet der Nutzer. Fehlt die Datei, meldest du ni
 Schritt 3 stellt seinen Bestand erst danach fest, also nach dem, was das Skript gelöscht
 oder verschoben hat.
 
-Steht in der Ausgabe, dass das Programm gewechselt hat und die Sitzung neu zu starten ist,
-endet der Command hier mit genau diesem Hinweis: Der laufende MCP-Server behält das alte
-Binary, bis der Assistent ihn neu startet. Füge hinzu, dass die Umstellungen aus Schritt 3
-danach mit einem zweiten Lauf von `/k-upgrade` folgen; sie brauchen die Werkzeuge des neuen
-Programms.
+Steht in der Ausgabe, dass die Sitzung neu zu starten ist — weil das Programm gewechselt hat
+oder weil Kephalaion aktualisiert bzw. sein Node neu gestartet wurde —, endet der Command hier
+mit genau diesem Hinweis: Der laufende MCP-Server behält das alte Binary, bis der Assistent ihn
+neu startet, und die Verbindung zu einem neu gestarteten Node ist danach nicht verlässlich.
+Füge hinzu, dass die Umstellungen aus Schritt 3 danach mit einem zweiten Lauf von `/k-upgrade`
+folgen; sie brauchen die Werkzeuge des neuen Programms und einen erreichbaren Node.
 
 ## Schritt 3 — Umstellungen
 

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -524,8 +526,9 @@ func TestUpgradeInstalliertFehlendesKephalaion(t *testing.T) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
 		}
 	}
-	if strings.Index(stdout, "Kephalaion:") > strings.Index(stdout, "Verlinkung eingerichtet") {
-		t.Errorf("Kephalaion steht nicht vor dem Projektschritt:\n%s", stdout)
+	if strings.Index(stdout, "Kephalaion:") > strings.Index(stdout, "Programm-Stand") ||
+		strings.Index(stdout, "Kephalaion:") > strings.Index(stdout, "Verlinkung eingerichtet") {
+		t.Errorf("Kephalaion steht nicht vor Programm- und Projektschritt:\n%s", stdout)
 	}
 }
 
@@ -691,5 +694,362 @@ func TestUpgradeZiehtAnbindungUm(t *testing.T) {
 	}
 	if final, _ := os.ReadFile(project.ConfigPath(root)); string(final) != changed {
 		t.Fatalf("vorhandener Block verändert:\n%s", final)
+	}
+}
+
+// --- Schritt Kephalaion: kephalaion upgrade --auto (Task 141) ---
+
+var (
+	upgradeAutoArgs  = []string{"upgrade", "--auto", "--json"}
+	upgradeCheckArgs = []string{"upgrade", "--check", "--json"}
+)
+
+func pointerTo(value bool) *bool { return &value }
+
+// runUpgradeJSON führt den Lauf mit --json aus und liest den Bericht.
+func runUpgradeJSON(t *testing.T, args ...string) upgradeReport {
+	t.Helper()
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade(append(args, "--json")); err != nil {
+			t.Errorf("upgrade %v: %v", args, err)
+		}
+	})
+	var report upgradeReport
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("Bericht ist kein JSON: %v\n%s", err, stdout)
+	}
+	if report.Kephalaion == nil {
+		t.Fatalf("Bericht ohne kephalaion:\n%s", stdout)
+	}
+	return report
+}
+
+// assertOrder prüft, dass die Teile in dieser Reihenfolge in text stehen.
+func assertOrder(t *testing.T, text string, parts ...string) {
+	t.Helper()
+	last := -1
+	for _, part := range parts {
+		index := strings.Index(text, part)
+		if index < 0 {
+			t.Errorf("%q fehlt in:\n%s", part, text)
+			return
+		}
+		if index < last {
+			t.Errorf("%q steht nicht nach dem Vorigen in:\n%s", part, text)
+			return
+		}
+		last = index
+	}
+}
+
+// Kephalaion ist der erste Schritt, vor Programm und Projekt; der Lauf ruft
+// genau einmal upgrade --auto --json auf.
+func TestUpgradeKephalaionVorProgrammUndProjekt(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	fake := fakeKephalaionUpgrade(t)
+	fake.SetAuto(t, kephtest.JSON(t, program.KephalaionAuto{Outcome: "current", From: "v0.4.1", To: "v0.4.1"}), "", 0)
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("upgrade: %v", err)
+		}
+	})
+	assertOrder(t, stdout, "Kephalaion: v0.4.1 ist aktuell.", "Programm-Stand: nichts zu tun", "Verlinkung eingerichtet")
+	if calls := fake.Calls(t); !reflect.DeepEqual(calls, [][]string{upgradeAutoArgs}) {
+		t.Errorf("Aufrufe von kephalaion = %q, erwartet genau upgrade --auto --json", calls)
+	}
+	if strings.Contains(stdout, "neu starten") {
+		t.Errorf("bei current kein Neustart-Hinweis:\n%s", stdout)
+	}
+}
+
+// --check ruft nur upgrade --check --json auf, nie --auto, und meldet
+// Kephalaion vor dem Programm.
+func TestUpgradeCheckRuftKeinAuto(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	fake := fakeKephalaionUpgrade(t)
+	fake.SetAuto(t, kephtest.JSON(t, program.KephalaionAuto{Outcome: "upgraded", From: "v0.4.1", To: "v0.5.0", Restarted: true}), "", 0)
+	fake.SetCheck(t, kephtest.JSON(t, program.KephalaionCheck{State: "ok", Version: "v0.4.1", Latest: "v0.5.0", UpdateAvailable: true, Hint: "kephalaion upgrade"}), "", 0)
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade([]string{"--check"}); err != nil {
+			t.Errorf("upgrade --check: %v", err)
+		}
+	})
+	assertOrder(t, stdout, "Kephalaion: v0.4.1 installiert, v0.5.0 verfügbar", "Programm-Stand: nichts zu tun")
+	if calls := fake.Calls(t); !reflect.DeepEqual(calls, [][]string{upgradeCheckArgs}) {
+		t.Errorf("Aufrufe von kephalaion = %q, erwartet nur upgrade --check --json", calls)
+	}
+	if strings.Contains(stdout, "neu starten") {
+		t.Errorf("--check verlangt keinen Neustart:\n%s", stdout)
+	}
+}
+
+// restartRequired folgt dem Neustart des Nodes: bei upgraded (auch ohne
+// Programmwechsel) und bei failed mit Neustart und Rückweg, nicht bei failed
+// ohne Neustart. Programm- und Projektschritt laufen in jedem Fall.
+func TestUpgradeKephalaionNeustartDerSitzung(t *testing.T) {
+	for _, fall := range []struct {
+		name     string
+		auto     program.KephalaionAuto
+		exit     int
+		restart  bool
+		erwartet []string
+	}{
+		{
+			name:    "upgraded",
+			auto:    program.KephalaionAuto{Outcome: "upgraded", From: "v0.4.1", To: "v0.5.0", Restarted: true, Warnings: []string{"VS Code: Erweiterung nicht erneuert"}},
+			restart: true,
+			erwartet: []string{
+				"Kephalaion: von v0.4.1 auf v0.5.0 aktualisiert, Dienst neu gestartet.",
+				"  VS Code: Erweiterung nicht erneuert",
+			},
+		},
+		{
+			name:     "upgraded ohne Dienst",
+			auto:     program.KephalaionAuto{Outcome: "upgraded", From: "v0.4.1", To: "v0.5.0"},
+			restart:  true,
+			erwartet: []string{"Kephalaion: von v0.4.1 auf v0.5.0 aktualisiert."},
+		},
+		{
+			name:    "failed restart mit Rückweg",
+			auto:    program.KephalaionAuto{Outcome: "failed", Reason: "restart", From: "v0.4.1", To: "v0.5.0", Restarted: true, RolledBack: pointerTo(true), Error: "Node antwortete nicht mit v0.5.0", Hint: "kephalaion status"},
+			exit:    1,
+			restart: true,
+			erwartet: []string{
+				"Kephalaion: Upgrade gescheitert (restart) — Node antwortete nicht mit v0.5.0.",
+				"  Der Node wurde neu gestartet; das alte Binary ist zurück und läuft wieder.",
+				"  kephalaion status",
+			},
+		},
+		{
+			name:     "failed ohne Neustart",
+			auto:     program.KephalaionAuto{Outcome: "failed", Reason: "download", From: "v0.4.1", To: "v0.5.0", Error: "Prüfsumme falsch"},
+			exit:     1,
+			erwartet: []string{"Kephalaion: Upgrade gescheitert (download) — Prüfsumme falsch."},
+		},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			upgradeProjectDir(t, "v0.16.8")
+			setOwnVersion(t, "v0.16.8")
+			fake := fakeKephalaionUpgrade(t)
+			fake.SetAuto(t, kephtest.JSON(t, fall.auto), "", fall.exit)
+
+			report := runUpgradeJSON(t)
+			if report.RestartRequired != fall.restart || report.Kephalaion.RestartRequired != fall.restart {
+				t.Errorf("restartRequired = %v (kephalaion %v), erwartet %v", report.RestartRequired, report.Kephalaion.RestartRequired, fall.restart)
+			}
+			if report.Kephalaion.Auto == nil || report.Kephalaion.Auto.Outcome != fall.auto.Outcome {
+				t.Errorf("kephalaion.auto = %+v, erwartet outcome %s", report.Kephalaion.Auto, fall.auto.Outcome)
+			}
+			messages := strings.Join(report.Messages, "\n")
+			for _, erwartet := range fall.erwartet {
+				if !strings.Contains(messages, erwartet) {
+					t.Errorf("%q fehlt in:\n%s", erwartet, messages)
+				}
+			}
+			hinweis := "Kephalaion wurde aktualisiert oder sein Node neu gestartet: die Sitzung neu starten."
+			if strings.Contains(messages, hinweis) != fall.restart {
+				t.Errorf("Neustart-Zeile da = %v, erwartet %v:\n%s", !fall.restart, fall.restart, messages)
+			}
+			if strings.Contains(messages, "Das Programm hat gewechselt") {
+				t.Errorf("ohne Programmwechsel keine Zeile dazu:\n%s", messages)
+			}
+			assertOrder(t, messages, "Kephalaion:", "Programm-Stand: nichts zu tun", "Verlinkung eingerichtet")
+		})
+	}
+}
+
+// Ein gescheiterter Schritt Kephalaion — skipped, Weg 3 ohne --auto, kein
+// JSON, Ausgang unbekannt — hält Programm- und Projektschritt nicht auf.
+func TestUpgradeKephalaionOhneErfolgHaeltNichtAuf(t *testing.T) {
+	for _, fall := range []struct {
+		name     string
+		setup    func(t *testing.T, fake *kephtest.FakeUpgrade)
+		calls    [][]string
+		erwartet []string
+		report   func(t *testing.T, report upgradeReport)
+	}{
+		{
+			name: "skipped hub_older",
+			setup: func(t *testing.T, fake *kephtest.FakeUpgrade) {
+				fake.SetAuto(t, kephtest.JSON(t, program.KephalaionAuto{Outcome: "skipped", Reason: "hub_older", From: "v0.4.1", To: "v0.5.0", Hint: "erst den Hub vm auf v0.5.0 bringen"}), "", 0)
+			},
+			calls:    [][]string{upgradeAutoArgs},
+			erwartet: []string{"Kephalaion: v0.5.0 verfügbar, nicht automatisch aktualisiert (hub_older) — erst den Hub vm auf v0.5.0 bringen."},
+		},
+		{
+			name: "Weg 3 mit neuerem Release",
+			setup: func(t *testing.T, fake *kephtest.FakeUpgrade) {
+				fake.SetCheck(t, kephtest.JSON(t, program.KephalaionCheck{State: "ok", Version: "v0.4.0", Latest: "v0.4.1", UpdateAvailable: true, Hint: "kephalaion upgrade"}), "", 0)
+			},
+			calls:    [][]string{upgradeAutoArgs, upgradeCheckArgs},
+			erwartet: []string{"Kephalaion: v0.4.0 installiert, v0.4.1 verfügbar — kephalaion upgrade; dieses Kephalaion aktualisiert sich noch nicht selbst über k-playbook."},
+			report: func(t *testing.T, report upgradeReport) {
+				if !report.Kephalaion.AutoUnsupported || report.Kephalaion.Check == nil || report.Kephalaion.Check.Latest != "v0.4.1" {
+					t.Errorf("kephalaion = %+v, erwartet autoUnsupported und den Report von --check", report.Kephalaion)
+				}
+			},
+		},
+		{
+			name: "Weg 3 aktuell",
+			setup: func(t *testing.T, fake *kephtest.FakeUpgrade) {
+				fake.SetCheck(t, kephtest.JSON(t, program.KephalaionCheck{State: "ok", Version: "v0.4.0", Latest: "v0.4.0"}), "", 0)
+			},
+			calls:    [][]string{upgradeAutoArgs, upgradeCheckArgs},
+			erwartet: []string{"Kephalaion: v0.4.0 ist aktuell."},
+		},
+		{
+			name: "Weg 3, --check scheitert",
+			setup: func(t *testing.T, fake *kephtest.FakeUpgrade) {
+				fake.SetCheck(t, kephtest.JSON(t, program.KephalaionCheck{State: "failed", Version: "v0.4.0", Error: "GitHub nicht erreichbar"}), "", 1)
+			},
+			calls:    [][]string{upgradeAutoArgs, upgradeCheckArgs},
+			erwartet: []string{"Kephalaion: Prüfung auf ein neueres Release gescheitert — GitHub nicht erreichbar. " + kephalaionNextStep},
+		},
+		{
+			name: "kein JSON",
+			setup: func(t *testing.T, fake *kephtest.FakeUpgrade) {
+				fake.SetAuto(t, "panic: kaputt\n", "Fehler beim Start\n", 1)
+			},
+			calls:    [][]string{upgradeAutoArgs},
+			erwartet: []string{"lieferte kein lesbares JSON (Exit-Code 1): Fehler beim Start", kephalaionNextStep},
+			report: func(t *testing.T, report upgradeReport) {
+				if report.Kephalaion.Error == "" || report.Kephalaion.OutcomeUnknown || report.RestartRequired {
+					t.Errorf("kephalaion = %+v", report.Kephalaion)
+				}
+			},
+		},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			upgradeProjectDir(t, "v0.16.8")
+			setOwnVersion(t, "v0.16.8")
+			fake := fakeKephalaionUpgrade(t)
+			fall.setup(t, fake)
+
+			report := runUpgradeJSON(t)
+			messages := strings.Join(report.Messages, "\n")
+			for _, erwartet := range fall.erwartet {
+				if !strings.Contains(messages, erwartet) {
+					t.Errorf("%q fehlt in:\n%s", erwartet, messages)
+				}
+			}
+			assertOrder(t, messages, "Kephalaion:", "Programm-Stand: nichts zu tun", "Verlinkung eingerichtet")
+			if report.RestartRequired {
+				t.Errorf("kein Neustart erwartet:\n%s", messages)
+			}
+			if calls := fake.Calls(t); !reflect.DeepEqual(calls, fall.calls) {
+				t.Errorf("Aufrufe von kephalaion = %q, erwartet %q", calls, fall.calls)
+			}
+			if fall.report != nil {
+				fall.report(t, report)
+			}
+		})
+	}
+
+	// Ausgang unbekannt: der Aufruf wurde nach Fristablauf beendet. Den
+	// Ablauf selbst prüft internal/program; hier zählt die Meldung.
+	t.Run("Ausgang unbekannt", func(t *testing.T) {
+		upgradeProjectDir(t, "v0.16.8")
+		setOwnVersion(t, "v0.16.8")
+		stubKephalaionUpgrade(t, func(path string) (program.KephalaionAuto, error) {
+			return program.KephalaionAuto{}, &program.KephalaionUnknownOutcomeError{Command: path + " upgrade --auto --json", Timeout: program.KephalaionAutoTimeout}
+		}, func(string) (program.KephalaionCheck, error) {
+			t.Error("nach Ausgang unbekannt kein --check")
+			return program.KephalaionCheck{}, nil
+		})
+
+		report := runUpgradeJSON(t)
+		messages := strings.Join(report.Messages, "\n")
+		for _, erwartet := range []string{"Ausgang unbekannt", "Prüfen: kephalaion status"} {
+			if !strings.Contains(messages, erwartet) {
+				t.Errorf("%q fehlt in:\n%s", erwartet, messages)
+			}
+		}
+		if strings.Contains(messages, "nichts geändert") || !report.Kephalaion.OutcomeUnknown {
+			t.Errorf("Ausgang unbekannt nicht als solcher gemeldet: %+v\n%s", report.Kephalaion, messages)
+		}
+		assertOrder(t, messages, "Kephalaion:", "Programm-Stand: nichts zu tun", "Verlinkung eingerichtet")
+	})
+}
+
+// Nach einem Binärwechsel führt das neue Programm nur upgrade --project-only
+// aus; das fasst Kephalaion nicht noch einmal an.
+func TestUpgradeProjectOnlyFasstKephalaionNichtAn(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	fake := fakeKephalaionUpgrade(t)
+	fake.SetAuto(t, kephtest.JSON(t, program.KephalaionAuto{Outcome: "upgraded", From: "v0.4.1", To: "v0.5.0", Restarted: true}), "", 0)
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade([]string{"--project-only"}); err != nil {
+			t.Errorf("upgrade --project-only: %v", err)
+		}
+	})
+	if calls := fake.Calls(t); len(calls) != 0 {
+		t.Errorf("--project-only hat kephalaion gerufen: %q", calls)
+	}
+	if strings.Contains(stdout, "Kephalaion:") || !strings.Contains(stdout, "Verlinkung eingerichtet") {
+		t.Errorf("--project-only meldet Kephalaion oder zieht das Projekt nicht nach:\n%s", stdout)
+	}
+}
+
+// removeClone nimmt dem Projekt die Installation k-playbook/ — Binary-only.
+func removeClone(t *testing.T, root string) {
+	t.Helper()
+	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Ohne Clone geht der Schritt Kephalaion trotzdem über --auto, wenn
+// kephalaion da ist.
+func TestUpgradeOhneCloneRuftAuto(t *testing.T) {
+	root := upgradeProjectDir(t, "v0.16.8")
+	removeClone(t, root)
+	setOwnVersion(t, "v0.16.8")
+	fake := fakeKephalaionUpgrade(t)
+	fake.SetAuto(t, kephtest.JSON(t, program.KephalaionAuto{Outcome: "current", From: "v0.4.1", To: "v0.4.1"}), "", 0)
+
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("upgrade: %v", err)
+		}
+	})
+	assertOrder(t, stdout, "Kephalaion: v0.4.1 ist aktuell.", "Programm: die Installation "+project.PlaybookDirName+"/ fehlt")
+	if calls := fake.Calls(t); !reflect.DeepEqual(calls, [][]string{upgradeAutoArgs}) {
+		t.Errorf("Aufrufe von kephalaion = %q, erwartet genau upgrade --auto --json", calls)
+	}
+}
+
+// Ohne Clone und ohne kephalaion bleibt es bei der Meldung mit der
+// Installation von Hand; installiert wird nichts.
+func TestUpgradeOhneCloneOhneKephalaion(t *testing.T) {
+	root := upgradeProjectDir(t, "v0.16.8")
+	removeClone(t, root)
+	setOwnVersion(t, "v0.16.8")
+	stubKephalaion(t, kephalaionFehlt, func(string) (program.KephalaionResult, error) {
+		t.Error("ohne Clone installiert")
+		return program.KephalaionResult{}, nil
+	})
+	stubKephalaionUpgrade(t, func(string) (program.KephalaionAuto, error) {
+		t.Error("ohne kephalaion --auto gerufen")
+		return program.KephalaionAuto{}, nil
+	}, func(string) (program.KephalaionCheck, error) {
+		t.Error("ohne kephalaion --check gerufen")
+		return program.KephalaionCheck{}, nil
+	})
+
+	for _, args := range [][]string{nil, {"--check"}} {
+		stdout := captureStdout(t, func() {
+			if err := runUpgrade(args); err != nil {
+				t.Errorf("upgrade %v: %v", args, err)
+			}
+		})
+		if !strings.Contains(stdout, missingKephalaionWithoutClone()) {
+			t.Errorf("upgrade %v: Meldung ohne Clone fehlt:\n%s", args, stdout)
+		}
 	}
 }

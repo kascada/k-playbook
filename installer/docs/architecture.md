@@ -46,7 +46,8 @@ Subkommando, weil ihn niemand von Hand aufruft — `webui.Serve()` ohne Wirt-Pfl
 ohne Browser, die Ausgaben gehen ins Log.
 
 `upgrade` ist der eine Nachzug im Terminal, das Gegenstück zu /k-upgrade
-(`cmd/k-playbook/upgrade.go`): erst das Programm — `project.Update()` im Clone, danach
+(`cmd/k-playbook/upgrade.go`): zuerst Kephalaion (Absatz „Kephalaion“ unter
+„Direktinstallation“), dann das Programm — `project.Update()` im Clone, danach
 `program.Install()`, aber nur, wenn das laufende Programm älter ist als die `VERSION` des
 Clones (`program.CheckStatus()`, dieselbe Regel wie `restartAfterPull()`; im
 Entwicklungsrepo ist das Programm regelmäßig neuer, und herabgestuft wird nie) —, dann
@@ -64,7 +65,9 @@ Starts. Ob der Pull entfiel, weiß nur der alte Prozess; er gibt es dem Subproze
 `--repair-mcp` mit, damit das neue Programm dieselbe Regel anwendet. Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
 Abbruchs, ein gescheiterter Download oder Install eine eigene; am Ende, wenn das Binary
 gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
-behält das alte Programm. `--check` schreibt nichts: `CheckUpdate()` und
+behält das alte Programm, und ein eigener, wenn Kephalaion aktualisiert oder sein Node neu
+gestartet wurde. `--check` schreibt nichts: `kephalaion upgrade --check --json` für
+Kephalaion (nie `--auto`), `CheckUpdate()` und
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
 `PendingLinkChanges()`, `CheckMCP()` und `MigrateKephalaionBinding()` mit `check` für das,
 was ein Lauf am Projekt täte — kein
@@ -1606,15 +1609,45 @@ er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
 **Kephalaion.** Am Ende ruft `bin/install` `bin/install-kephalaion` auf: Liegt kein
 `kephalaion` im PATH, lädt das Skript das `install.sh` des neuesten Kephalaion-Releases und
 führt es aus; Asset-Namen, Plattformen und Prüfsumme bleiben damit Sache von Kephalaion. Ein
-vorhandenes `kephalaion` bleibt stehen, aktuell hält es sich mit `kephalaion upgrade`.
-Installiert wird nur das Binary, nicht Node, Dienst oder Token — im DevContainer kommt die
+vorhandenes `kephalaion` lässt das Skript stehen; aktualisiert wird es über `k-playbook
+upgrade` (unten). Installiert wird nur das Binary, nicht Node, Dienst oder Token — im DevContainer kommt die
 config read-only vom Host, und der Node ist der des Hosts. Scheitert der Schritt, endet
 `bin/install` trotzdem mit 0: `program.Install()` misst den Erfolg des Programm-Updates an
 diesem Exit-Code, und Oberfläche wie `k-playbook upgrade` meldeten sonst ein gescheitertes
-Update, das es nicht gab. `k-playbook upgrade` ruft dasselbe Skript in einem eigenen Schritt
-zwischen Programm und Projekt (`program.InstallKephalaion()`), weil `bin/install` nur bei
-„älter" läuft. Der Schritt läuft im aufrufenden Prozess, nicht im neuen Programm nach einem
-Binärwechsel; dort hat `bin/install` ihn schon getan. `healthKephalaion()` nennt die
+Update, das es nicht gab.
+
+`k-playbook upgrade` hat für Kephalaion einen eigenen, ersten Schritt (Task 141), vor Programm
+und Projekt: k-playbook hängt von Kephalaion ab, nicht umgekehrt — neue k-playbook-Releases
+setzen neue Kephalaion-Fähigkeiten voraus (zuletzt `node client --format 1`), während
+Kephalaion alte Clients über `--format` trägt —, Projektschritt und `/k-upgrade` brauchen den
+Node, und ein Neustart des Nodes ist so einmal am Anfang erledigt. Drei Wege
+(`upgradeKephalaion()`): Fehlt `kephalaion`, läuft `bin/install-kephalaion`
+(`program.InstallKephalaion()`), weil `bin/install` nur bei „älter" läuft; ohne Clone nur
+eine Meldung. Liegt es da, ruft der Schritt `kephalaion upgrade --auto --json`
+(`program.KephalaionAutoUpgrade()`) und meldet allein nach dessen Antwort (`outcome`,
+`reason`, `from`, `to`, `restarted`, `rolled_back`, `warnings`, `error`, `hint`): Ob ein
+Upgrade gefahrlos ist — Hub, globale config, dev build, Hub noch nicht so neu, DevContainer —,
+entscheidet Kephalaion, k-playbook hat dafür keine eigene Regel. Kennt das Binary `--auto`
+nicht (Exit 2), folgt `upgrade --check --json` (`program.KephalaionCheckUpgrade()`) und die
+Meldung, ob ein neueres Release da ist. Weg 2 und 3 laufen auch ohne Clone. `--check` ruft
+nur `--check --json`. Die Frist für `--auto` ist `KephalaionAutoTimeout` (3 Minuten), für
+`--check` `KephalaionCheckTimeout` (30 s); stdout (JSON) und stderr werden getrennt gelesen.
+Bei Fristablauf bekommt der Prozess SIGTERM und `KephalaionStopGrace` Zeit, kein sofortiges
+SIGKILL (`cmd.Cancel`, `cmd.WaitDelay`): ein SIGKILL mitten im Ersetzen, Neustart oder
+Rückweg hebelte die Zusicherungen von Kephalaion aus. Die Meldung ist dann „Ausgang
+unbekannt“ mit `kephalaion status` als Prüfschritt, nie „nichts geändert“. Kein Weg hält den
+Lauf auf. Bei `upgraded` und immer, wenn der Node neu gestartet wurde (`restarted`, bei
+`failed` mit `reason` `restart` auch ohne das Feld), setzt der Schritt `restartRequired` und
+die Ausgabe verlangt den Neustart der Sitzung — das trifft auch andere Sitzungen am selben
+Node. Im JSON stehen `auto`, `check`, `autoUnsupported`, `outcomeUnknown` und
+`restartRequired` unter `kephalaion`, additiv bei `schemaVersion` 1.
+
+Der Schritt läuft im aufrufenden Prozess, vor dem Pull; das neue Programm nach einem
+Binärwechsel führt nur `upgrade --project-only` aus und fasst Kephalaion nicht an. Einmal beim
+Übergang von einem Binary vor Task 141 arbeitet der alte Prozess noch in alter Reihenfolge
+(Programm, dann nur die Installation von Kephalaion): Dieser erste Lauf ruft kein `--auto`,
+Kephalaion folgt erst im zweiten `/k-upgrade`, den der Programmwechsel ohnehin verlangt.
+`healthKephalaion()` nennt die
 Installation als Abhilfe, solange `kephalaion` fehlt und die Anbindung nicht ok ist; bei ok
 schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein.
 

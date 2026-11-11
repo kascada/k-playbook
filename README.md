@@ -77,7 +77,7 @@ attached as assets to the release named by `VERSION` in the root directory.
 Kephalaion release into `~/.local/bin/kephalaion`. Only the binary: setting up the node,
 the service and the token stays with Kephalaion (`kephalaion node init`, see its README);
 inside a devcontainer the node is usually the host's. An existing `kephalaion` is left
-alone — `kephalaion upgrade` updates it. If this step fails, `bin/install` still succeeds,
+alone by `bin/install`; `k-playbook upgrade` updates it (see below). If this step fails, `bin/install` still succeeds,
 because k-playbook itself is installed, and names the command to catch up.
 
 The last call opens the web interface in the browser. On first run it finds no
@@ -230,15 +230,21 @@ of the button, because a program installed there would not be the one the next c
 If only commands, instructions or recipes are new, `VERSION` does not change and the service keeps
 running.
 
-In the terminal, `k-playbook upgrade` does both in one go — the pull, the binary when
-the running program is older, Kephalaion when it is missing from the `PATH`, then
+In the terminal, `k-playbook upgrade` does both in one go — first Kephalaion (installed when
+missing from the `PATH`, otherwise updated through `kephalaion upgrade --auto` where
+Kephalaion considers that safe, with its node restarted; a hub, a global installation or an
+older `kephalaion` without `--auto` are only reported), then the pull, the binary when
+the running program is older, then
 moving hub and collection out of an old `k-playbook-local/K-PLAYBOOK.local.yaml` into the
 block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`,
 `AGENTS.md`, `CLAUDE.md`, linking and MCP entries, and last the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
 as a hint) —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
-only reports what a run would do.
+only reports what a run would do. Kephalaion comes first because k-playbook depends on it and
+the later steps need its node. After a Kephalaion upgrade or node restart, as after a program
+change, the session has to be restarted. Once, when coming from a binary that predates this
+order, the first run does not update Kephalaion yet; the second `/k-upgrade` does.
 
 The linking for the assistants catches up by itself afterwards — on the next
 `k-playbook briefing`, the call at the start of every session, or on the next look at the
