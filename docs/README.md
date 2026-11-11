@@ -100,6 +100,7 @@ questions and the ordered work list.
 - `briefing` / `k-playbook briefing` / `k_playbook_briefing` / `what applies` / `session start` -> [`mcp.md`](./mcp.md#briefing-contract), [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`knowledge-aktuell.md`](./knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
 - `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`k-playbook-format.md`](./k-playbook-format.md#remediation)
 - `results` -> [`code-review.md`](./code-review.md)
+- `keph:/results/` / `keeping results` / `presenting results` -> [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](./review-runs.md#assessing-with-review-scan-triage), [`commands.md`](./commands.md#review-flow)
 - `/k-task-refine` / `task hardening` -> [`task-flow.md`](./task-flow.md)
 - `review-input` / `merge` / `consolidation` -> [`review-runs.md`](./review-runs.md#consolidating-with-k-playbook-merge)

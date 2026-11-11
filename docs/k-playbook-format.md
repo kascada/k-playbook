@@ -52,6 +52,7 @@ locations derive from the project root, the directory that holds
 | project-owned review recipes | `k-playbook-local/reviews/` |
 | project-owned checks | none since task 134: `k-check` runs only the shipped checks from `k-playbook/checks/`; `/k-upgrade` 3.4 removes a leftover `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
+| results kept to present | `keph:/results/` — in the project collection, project-wide, `.md` only, names start with the date (`<YYYY-MM-DD>-<name>.md`); written only when the user asks or a command provides for it, never as a duty, and cleaned up by the user. The rules are `k-playbook:/instructions/on-demand/ergebnisse.md`. Not the same as `k-playbook-local/results/`, which `/k-review` and `/k-audit` still use |
 | project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` and `/k-docs-tools` to `keph:/docs/generated/libs/`, both through `k-playbook docs checkout|publish` |
 | tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs`, not under `k-playbook-local/` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
