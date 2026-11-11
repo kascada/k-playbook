@@ -25,6 +25,9 @@ type Config struct {
 	// verworfenen mit Grund (docs_exclude.go). Ohne Block sind beide leer.
 	DocsExclude  []string             `json:"docsExclude,omitempty"`
 	DocsProblems []DocsExcludeProblem `json:"docsProblems,omitempty"`
+	// Kephalaion ist der Block kephalaion: — Hub-Alias und Collection der
+	// Anbindung (kephalaion_block.go). Ohne Block ist er leer.
+	Kephalaion ConfigKephalaion `json:"kephalaion"`
 }
 
 // SchemaStatus benennt, wie die gefundene schema_version zum Werkzeug steht.
@@ -105,8 +108,9 @@ const resetHint = "`k-playbook gui` starten, der Block „Projektkonfiguration\"
 
 // ReadConfig liest die Konfiguration eines Projekts.
 //
-// Bewusst kein YAML-Parser: gelesen werden nur wenige Skalare und die Liste
-// docs.exclude (parseDocsExclude, ebenfalls zeilenweise), und der
+// Bewusst kein YAML-Parser: gelesen werden nur wenige Skalare, die Liste
+// docs.exclude (parseDocsExclude) und der Block kephalaion:
+// (parseKephalaionBlock), beide ebenfalls zeilenweise, und der
 // zeilenweise Zugriff lässt Kommentare, Reihenfolge und unbekannte Blöcke
 // unangetastet, wenn später zurückgeschrieben wird.
 func ReadConfig(projectDir string) (Config, error) {
@@ -147,6 +151,7 @@ func ReadConfig(projectDir string) (Config, error) {
 		}
 	}
 	config.DocsExclude, config.DocsProblems = parseDocsExclude(string(data))
+	config.Kephalaion = parseKephalaionBlock(string(data))
 	return config, nil
 }
 

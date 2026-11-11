@@ -398,8 +398,9 @@ func (s inventoryStore) Write(ctx context.Context, name, content string, baseRev
 }
 
 // openKephClient ist der Zugang je Projekt: Status prüfen (kephalaion.ok),
-// Anbindung lesen, Umgebung laden, Client bauen. Zurück kommen der Client
-// und der User hinter dem Account.
+// Hub und Collection aus K-PLAYBOOK.yaml, Account und Token aus der Auskunft
+// von Kephalaion, Client bauen. Zurück kommen der Client und der User hinter
+// dem Account.
 func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
 	return openKephClientFor(projectDir, "")
 }
@@ -413,18 +414,28 @@ func openKephClientFor(projectDir string, collection string) (*kephalaion.Client
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable,
 			"Kephalaion ist für dieses Projekt nicht bereit (%s): %s", status.State, status.Message)
 	}
-	binding, _, err := kephalaion.ReadBinding(LocalDir(projectDir))
+	binding, err := ProjectBinding(projectDir)
 	if err != nil {
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "Anbindung nicht lesbar: %v", err)
 	}
 	if collection != "" {
 		binding.Collection = collection
 	}
-	client, err := kephalaion.NewClient(binding, kephalaion.DefaultEnv())
+	access, err := kephalaionAccess(binding.Hub)
+	if err != nil {
+		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "%v", err)
+	}
+	client, err := kephalaion.NewClient(binding, access)
 	if err != nil {
 		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable, "%v", err)
 	}
 	return client, status.User, nil
+}
+
+// kephalaionAccess holt den Zugang zu einem Hub aus der Auskunft von
+// Kephalaion; austauschbar, damit Tests das Binary nicht starten.
+var kephalaionAccess = func(hub string) (kephalaion.Access, error) {
+	return kephalaion.ResolveAccess(context.Background(), hub)
 }
 
 // kind sucht eine Sorte nach Namen, für die doc-Werkzeuge: Eine Sorte mit

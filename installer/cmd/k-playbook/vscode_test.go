@@ -208,29 +208,20 @@ func TestVSCodeStatusNenntAbweichendeZweitfassung(t *testing.T) {
 	}
 }
 
-// vscodeProjekt legt ein Projekt mit K-PLAYBOOK.yaml an und, wenn local nicht
-// leer ist, k-playbook-local/K-PLAYBOOK.local.yaml mit diesem Inhalt.
-func vscodeProjekt(t *testing.T, local string) string {
+// vscodeProjekt legt ein Projekt mit K-PLAYBOOK.yaml an; block steht darin
+// hinter schema_version, etwa der Block kephalaion:.
+func vscodeProjekt(t *testing.T, block string) string {
 	t.Helper()
 	root := t.TempDir()
 	t.Setenv("HOME", root)
-	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n")
-	if local != "" {
-		dir := filepath.Join(root, "k-playbook-local")
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, "K-PLAYBOOK.local.yaml"), []byte(local), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\n"+block)
 	return root
 }
 
 // Aus einem Unterverzeichnis heraus: Die Erweiterung ruft mit dem
 // Projektordner als Arbeitsverzeichnis, ein Aufruf von Hand aber von überall.
 func TestVSCodeCollectionsAusDerAnbindung(t *testing.T) {
-	root := vscodeProjekt(t, "kephalaion:\n  hub: vm\n  collection: omni\n  account: kamran-wsl\n")
+	root := vscodeProjekt(t, "kephalaion:\n  hub: vm\n  collection: omni\n")
 	sub := filepath.Join(root, "src")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
@@ -257,7 +248,7 @@ func TestVSCodeCollectionsNichtEingerichtet(t *testing.T) {
 			t.Fatalf("%s: Antwort = %+v", name, answer)
 		}
 	}
-	if answer := collectWorkspaceFolders(ohne); !strings.Contains(answer.Message, "K-PLAYBOOK.local.yaml") {
+	if answer := collectWorkspaceFolders(ohne); !strings.Contains(answer.Message, ".k-playbook/K-PLAYBOOK.yaml") {
 		t.Fatalf("Meldung nennt die Datei nicht: %s", answer.Message)
 	}
 }

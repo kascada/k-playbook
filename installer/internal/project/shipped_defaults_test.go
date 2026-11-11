@@ -876,6 +876,53 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	}
 }
 
+// /k-upgrade 3.5 löscht seit Task 138 die alte K-PLAYBOOK.local.yaml — nach
+// Bestätigung und nur, wenn eine Zeile von k-playbook upgrade sagt, dass der
+// Block kephalaion: in K-PLAYBOOK.yaml steht; einen dort genannten Account
+// wiederholt die Rückfrage samt kephalaion node account default. Die Zeilen
+// sind der Vertrag mit KephalaionMigration.Messages.
+func TestDefaultsKUpgradeAlteAnbindung(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.5 — "), strings.Index(file, "## Schritt 4 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.5 nicht gefunden")
+	}
+	section := squashSpace(file[start:end])
+	for _, needle := range []string{
+		"`<context.local.dir>/K-PLAYBOOK.local.yaml`",
+		"`Projekt: Anbindung umgezogen`",
+		"`Projekt: Anbindung — der Block kephalaion:`",
+		"`Projekt: Anbindung nicht umgezogen`",
+		"`context.kephalaion` taugt hier nicht als Beleg",
+		"`Projekt: Account — …`",
+		"`kephalaion node account default <hub> <account>`",
+		"Gelöscht wird erst nach Bestätigung",
+		"Den Befehl für den Account führst du nicht aus",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.5 nennt %q nicht", needle)
+		}
+	}
+
+	// Die Zeilen, auf die 3.5 wartet, schreibt der Umzug genau so.
+	written := strings.Join(KephalaionMigration{Legacy: true, Written: true, Old: kephalaion.LegacyBinding{Hub: "vm", Collection: "c"}}.Messages(), "\n")
+	standing := strings.Join(KephalaionMigration{Legacy: true, Block: ConfigKephalaion{Present: true, Hub: "vm", Collection: "c"}}.Messages(), "\n")
+	failed := strings.Join(KephalaionMigration{Legacy: true, Error: "kaputt"}.Messages(), "\n")
+	if !strings.HasPrefix("Projekt: "+written, "Projekt: Anbindung umgezogen") ||
+		!strings.HasPrefix("Projekt: "+standing, "Projekt: Anbindung — der Block kephalaion:") ||
+		!strings.HasPrefix("Projekt: "+failed, "Projekt: Anbindung nicht umgezogen") {
+		t.Errorf("Zeilen des Umzugs:\n%s\n%s\n%s", written, standing, failed)
+	}
+
+	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(hull), "löscht er nach Rückfrage die alte k-playbook-local/K-PLAYBOOK.local.yaml") {
+		t.Error("Hülle von /k-upgrade nennt die alte Anbindung nicht")
+	}
+}
+
 // Die Doku-Aufträge (Task 124): Die Anweisung doku-auftraege.md beschreibt
 // Kopf und Lebenslauf, /k-docs
 // zählt die offenen Aufträge, und die beiden Erzeuger listen sie im Preflight

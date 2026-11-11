@@ -19,8 +19,9 @@
                die Prüfung oder fehlt der Eintrag, blendet status.js ihn ein:
                Der Einstieg führt so zuerst dorthin, der Rest der Oberfläche
                bleibt darunter erreichbar. Die Auswahl entsteht aus
-               /api/kephalaion/candidates; eingetragen wird erst nach einem
-               bestandenen Test derselben Auswahl. -->
+               /api/kephalaion/candidates (Hubs und Accounts aus der Auskunft
+               kephalaion node client); eingetragen werden Hub und Collection
+               erst nach einem bestandenen Test derselben Auswahl. -->
           <section class="card hidden" id="kephalaion-setup-card">
             <div class="section-head">
               <div>
@@ -30,14 +31,15 @@
             </div>
             <p class="hint">
               Dieses Projekt arbeitet mit einer eigenen Collection in Kephalaion. Gewählt werden Hub und
-              Account dieses Rechners und die Collection; eingetragen wird erst nach einem bestandenen Test,
-              in <code id="kephalaion-local-file">k-playbook-local/K-PLAYBOOK.local.yaml</code>. Das Token
-              bleibt in Kephalaions eigener Datei.
+              Collection; den Account dieses Rechners nennt Kephalaion selbst (kephalaion node client).
+              Eingetragen wird erst nach einem bestandenen Test, in den Block <code>kephalaion:</code> von
+              <code id="kephalaion-config-file">.k-playbook/K-PLAYBOOK.yaml</code>. Die Datei ist versioniert:
+              Die Änderung danach committen. Das Token bleibt in Kephalaions eigener Datei.
             </p>
             <p id="kephalaion-setup-reason" class="message"></p>
             <div id="kephalaion-setup-form" hidden>
-              <h3 class="kephalaion-step">1. Hub und Account</h3>
-              <div id="kephalaion-pairs" class="choices"></div>
+              <h3 class="kephalaion-step">1. Hub</h3>
+              <div id="kephalaion-hubs" class="choices"></div>
               <h3 class="kephalaion-step">2. Collection</h3>
               <div id="kephalaion-collections" class="choices"></div>
               <div class="kephalaion-actions">

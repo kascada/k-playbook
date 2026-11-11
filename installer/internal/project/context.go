@@ -87,9 +87,10 @@ type Context struct {
 	// Das Feld ist ein Zeiger mit omitempty, damit eine Installation, die es
 	// noch nicht füllt, dieselbe Ausgabe erzeugt wie bisher.
 	VersionSources *VersionSources `json:"versionSources,omitempty"`
-	// Kephalaion ist die Anbindung des Projekts an seine Collection: Hub,
-	// Collection und Account aus k-playbook-local/K-PLAYBOOK.local.yaml und
-	// das Ergebnis der Prüfung über MCP am Node dieses Rechners. Ein Fehler
+	// Kephalaion ist die Anbindung des Projekts an seine Collection: Hub und
+	// Collection aus dem Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml,
+	// Account samt Herkunft (choice) aus der Auskunft kephalaion node client
+	// und das Ergebnis der Prüfung über MCP am Node dieses Rechners. Ein Fehler
 	// ist ein Zustand, kein Abbruch. Gefüllt wird das Feld von ContextForDir,
 	// nicht von BuildContext — siehe KephalaionStatus.
 	Kephalaion *kephalaion.Status `json:"kephalaion,omitempty"`

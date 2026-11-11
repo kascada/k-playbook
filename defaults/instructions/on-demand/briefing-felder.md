@@ -45,7 +45,7 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.baseTools` | Die Werkzeuge, die k-playbook selbst aufruft, und was davon fehlt: `matrix`, `present`, `missing` (je `name`, `role`, `methods`), `ok`, `installCommand`. |
 | `context.catalogs.checks` | Die Checks — nur die mitgelieferten, `origin` immer `dist`; projekteigene Checks gibt es nicht. Reviews stehen nicht hier, sondern unter `documents.reviews`. |
 | `context.versionSources` | Zustand der Quellenkonfiguration des Versionsinventars `<local.dir>/version-sources.yaml`: ob sie da ist, welche Wurzeln außerhalb des Projekts sie öffnet, welche Zusatzquellen sie nennt, welche Bereiche sie ausschließt und welche Helm-Werte sie ausdrücklich nennt. Von hier lesen — nie die Datei selbst. Einzelheiten unten. |
-| `context.kephalaion` | Die Anbindung des Projekts an seine Collection: `address`, `ok`, `user`, `message` u. a. `keph:`-Verweise sind nur erreichbar, wenn `ok` wahr ist. |
+| `context.kephalaion` | Die Anbindung des Projekts an seine Collection: `address`, `ok`, `user`, `message` u. a.; Hub und Collection aus dem Block `kephalaion:` von `.k-playbook/K-PLAYBOOK.yaml`, `account` und seine Herkunft `choice` (`override`, `default`, `only`) aus der Auskunft von Kephalaion. `keph:`-Verweise sind nur erreichbar, wenn `ok` wahr ist. |
 | `context.links` | Die Selbstheilung der Assistenten-Verknüpfungen: `healed`, `open`, `note`. Nur da, wenn es etwas zu melden gab; `note` sagt, was das für diese Sitzung heißt. |
 | `context.github` | Welcher Dienst der persönlichen GitHub-Zugangsdatei zum Repo des Arbeitsverzeichnisses gehört und welche Zugänge `k-playbook github run` dafür wählt: `file`, `present`, `problems`, `remote`, `repo`, `projectServices`, `services`. Im Klartext eine eigene Zeile `GitHub:` nach `Projektdoku:`. Einzelheiten unten. |
 
@@ -69,7 +69,9 @@ vollständige Vertrag steht in `<playbook.dir>/docs/version-inventory.md`.
 Felder `context.kephalaion`, `context.baseTools` und `context.versionSources`
 stehen weiter unverändert da. Die Einträge heute: Die Anbindung an Kephalaion ist eingetragen,
 aber nicht `ok` — `error`, denn `keph:`-Verweise und `work` sind dann nicht erreichbar; sie
-ist nicht eingetragen — ebenfalls `error`. Ohne Anbindung gibt es auch kein Briefing: Es
+ist nicht eingetragen — ebenfalls `error`. Steht im Block `kephalaion:` ein `account:` oder
+liegt noch die alte `k-playbook-local/K-PLAYBOOK.local.yaml` mit Block `kephalaion:` —
+`warning`. Ohne Anbindung gibt es auch kein Briefing: Es
 scheitert mit `kephalaion_unavailable`, weil die mitgelieferten Texte aus der Collection
 kommen. Je fehlendem Basis-Werkzeug
 (`context.baseTools.missing`) — `warning`. Die Quellenkonfiguration des Versionsinventars

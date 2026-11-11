@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
@@ -28,7 +29,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	cleanupDefaults := isolateDefaults()
+	// Kein Test fragt das echte kephalaion dieses Rechners (Task 138).
+	cleanupBinary := kephtest.IsolateBinary()
 	code := m.Run()
+	cleanupBinary()
 	cleanupDefaults()
 	cleanupGitHub()
 	cleanup()

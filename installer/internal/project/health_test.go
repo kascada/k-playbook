@@ -47,7 +47,7 @@ func TestHealthOhneProblemeIstLeer(t *testing.T) {
 // nennt die Oberfläche und sagt, was fehlt.
 func TestHealthKephalaionNichtEingetragenIstFehler(t *testing.T) {
 	root := healthProject(t)
-	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen: In K-PLAYBOOK.local.yaml fehlt der Block kephalaion:."})
+	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen: In .k-playbook/K-PLAYBOOK.yaml fehlt der Block kephalaion:."})
 
 	problems := healthKephalaion(context.Background(), root)
 	if len(problems) != 1 {

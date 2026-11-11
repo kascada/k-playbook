@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -128,7 +129,7 @@ func newToolNode(t *testing.T, reply func(call toolCall) (isError bool, structur
 
 func newTestClient(t *testing.T, endpoint string) *Client {
 	t.Helper()
-	client, err := NewClient(goodBinding, testEnv(t, endpoint))
+	client, err := NewClient(goodBinding, testAccess(t, endpoint))
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -307,15 +308,20 @@ func TestClientNodeNichtErreichbar(t *testing.T) {
 }
 
 func TestNewClientOhneTokenOderAdresse(t *testing.T) {
-	env := testEnv(t, "http://127.0.0.1:1/mcp")
-	if _, err := NewClient(Binding{Hub: "vm", Collection: "k-playbook", Account: "fremd"}, env); ErrorCode(err) != CodeNodeUnreachable {
+	access := testAccess(t, "http://127.0.0.1:1/mcp")
+	if _, err := NewClient(Binding{Hub: "anders", Collection: "k-playbook"}, access); ErrorCode(err) != CodeNodeUnreachable {
+		t.Fatalf("Zugang für einen anderen Hub: %v", err)
+	}
+	broken := access
+	broken.tokenFile = filepath.Join(t.TempDir(), "fehlt.token")
+	if _, err := NewClient(goodBinding, broken); ErrorCode(err) != CodeNodeUnreachable {
 		t.Fatalf("ohne Token: %v", err)
 	}
-	env.Endpoint = ""
-	if _, err := NewClient(goodBinding, env); ErrorCode(err) != CodeNodeUnreachable {
+	access.Endpoint = ""
+	if _, err := NewClient(goodBinding, access); ErrorCode(err) != CodeNodeUnreachable {
 		t.Fatalf("ohne Adresse: %v", err)
 	}
-	if _, err := NewClient(Binding{Hub: "../vm", Collection: "k", Account: "a"}, env); err == nil {
+	if _, err := NewClient(Binding{Hub: "../vm", Collection: "k"}, access); err == nil {
 		t.Fatal("ungültige Anbindung angenommen")
 	}
 }

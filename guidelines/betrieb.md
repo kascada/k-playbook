@@ -49,6 +49,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
 | Notiz, Zwischenstand, Privates | `priv/` | von Hand |
 | Quellen des Versionsinventars | `version-sources.yaml` | nur nach ausdrücklicher Bestätigung |
+| Anbindung an die Kephalaion-Collection | Block `kephalaion:` mit `hub` und `collection` in `.k-playbook/K-PLAYBOOK.yaml` unter `project.dir`, nicht unter `local.dir` — versioniert und für alle Nutzer des Projekts gleich; den Account wählt Kephalaion je Rechner (`kephalaion node client`), eine `K-PLAYBOOK.local.yaml` gibt es nicht mehr | der Einrichtungsschritt der Oberfläche nach bestandenem Test, `k-playbook upgrade` beim Umzug aus der alten Datei, sonst von Hand; danach committen |
 | Projekteigenes Rezept | `reviews/` | von Hand |
 | Projekteigener Command | `.k-playbook/commands/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command | von Hand |
 | Projekteigener Skill | `.k-playbook/skills/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |

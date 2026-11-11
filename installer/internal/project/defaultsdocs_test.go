@@ -212,10 +212,8 @@ func TestOpenDefaultsStoreOhneBereiteAnbindung(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Pfade der Anbindung")
 	}
-	root := t.TempDir()
-	writeDocTree(t, filepath.Join(root, "k-playbook-local"), map[string]string{
-		kephalaion.LocalFileName: "kephalaion:\n  hub: vm\n  collection: projekt\n  account: kamran-wsl\n",
-	})
+	root := newContextProject(t)
+	withKephalaionBlock(t, root, "kephalaion:\n  hub: vm\n  collection: projekt\n")
 	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateNodeUnreachable, Message: "Node nicht erreichbar."})
 	_, address, err := realOpenDefaultsStore(root)
 	if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {

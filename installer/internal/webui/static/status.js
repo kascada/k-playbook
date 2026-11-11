@@ -16,7 +16,9 @@ const KEPHALAION_STATE_LABELS = {
   "not-configured": "Nicht eingetragen",
   "invalid-entry": "Eintrag ungültig",
   "kephalaion-missing": "Kephalaion fehlt",
+  "client-failed": "Auskunft fehlt",
   "node-address": "Node-Adresse",
+  "account-choice-missing": "Account nicht gewählt",
   "node-unreachable": "Node antwortet nicht",
   "token-missing": "Token fehlt",
   "hub-unknown": "Hub unbekannt",
@@ -25,6 +27,13 @@ const KEPHALAION_STATE_LABELS = {
   "login-missing": "Anmeldung fehlt",
   "replica-unreadable": "Replica nicht lesbar",
   "collection-unreadable": "Collection nicht lesbar",
+};
+
+// Woher der Account kommt (choice der Auskunft kephalaion node client).
+const KEPHALAION_CHOICE_LABELS = {
+  "override": "Überschreibung",
+  "default": "Standard",
+  "only": "einzige Token-Datei",
 };
 
 // Beschriftungen der Umgebungsprüfung: Stufe und Bereich kommen vom Server
@@ -57,10 +66,10 @@ const kephalaionElements = {
   change: document.getElementById("kephalaion-change"),
   card: document.getElementById("kephalaion-setup-card"),
   setupPill: document.getElementById("kephalaion-setup-pill"),
-  localFile: document.getElementById("kephalaion-local-file"),
+  configFile: document.getElementById("kephalaion-config-file"),
   reason: document.getElementById("kephalaion-setup-reason"),
   form: document.getElementById("kephalaion-setup-form"),
-  pairs: document.getElementById("kephalaion-pairs"),
+  hubs: document.getElementById("kephalaion-hubs"),
   collections: document.getElementById("kephalaion-collections"),
   test: document.getElementById("kephalaion-test"),
   save: document.getElementById("kephalaion-save"),
@@ -70,13 +79,13 @@ const kephalaionElements = {
   message: document.getElementById("kephalaion-setup-message"),
 };
 
-// Der Stand des Einrichtungsschritts: die Kandidaten, die Auswahl und die
-// Auswahl, für die zuletzt ein Test bestanden wurde. Eintragen geht nur für
-// genau diese.
+// Der Stand des Einrichtungsschritts: die Hubs aus der Auskunft, die Auswahl
+// und die Auswahl, für die zuletzt ein Test bestanden wurde. Eintragen geht
+// nur für genau diese. Einen Account wählt hier niemand: Er kommt von
+// Kephalaion.
 const kephalaionSetup = {
-  pairs: [],
+  hubs: [],
   hub: "",
-  account: "",
   collection: "",
   passed: "",
   current: null,
@@ -255,8 +264,8 @@ function renderKephalaionStatus(data) {
   }
   const status = data.status;
   kephalaionSetup.current = status;
-  if (data.localFile) {
-    els.localFile.textContent = data.localFile;
+  if (data.configFile) {
+    els.configFile.textContent = data.configFile;
   }
   els.statusPill.className = kephalaionPillClass(status.state);
   els.statusPill.textContent = kephalaionLabel(status.state);
@@ -268,6 +277,9 @@ function renderKephalaionStatus(data) {
   let account = status.account || "–";
   if (status.user) {
     account += ` (User ${status.user})`;
+  }
+  if (status.choice) {
+    account += ` · ${KEPHALAION_CHOICE_LABELS[status.choice] || status.choice}`;
   }
   addStatusFact(els.statusFacts, "Account", account);
   if (status.ok) {
@@ -323,7 +335,7 @@ async function loadKephalaionCandidates() {
   const els = kephalaionElements;
   els.form.hidden = true;
   els.admin.hidden = true;
-  renderKephalaionLoading(els.message, "Hub und Accounts dieses Rechners werden gesucht...");
+  renderKephalaionLoading(els.message, "Hubs und Accounts dieses Rechners werden bei Kephalaion erfragt...");
   let data;
   try {
     const response = await fetch("/api/kephalaion/candidates", { cache: "no-store" });
@@ -343,41 +355,38 @@ function renderKephalaionCandidates(data) {
     els.message.textContent = data.message || "";
     return;
   }
+  if (data.configFile) {
+    els.configFile.textContent = data.configFile;
+  }
+  if (data.clientProblem) {
+    // Ohne Auskunft gibt es weder Hubs noch Accounts; der Satz nennt die
+    // Abhilfe (Installation, kephalaion upgrade oder den Grund).
+    els.message.textContent = data.clientProblem;
+    return;
+  }
+  const config = data.configPath ? `${data.configPath} (Quelle ${data.configSource})` : "keine";
+  notes.push(`Kephalaion auf diesem Rechner: config ${config} · Node ${data.nodeUrl || "–"} · Token-Verzeichnis ${data.tokensDir || "–"}.`);
   if (data.configProblem) {
-    notes.push(data.configProblem);
-  } else if (!data.endpoint) {
-    notes.push(`Keine zulässige Adresse des Nodes: ${data.addressProblem || "unbekannt"}`);
-  }
-  if (data.configPresent && !data.configProblem && data.configSource && data.configSource !== "user") {
-    // Die config gilt nicht beim User, die Tokens liegen aber dort: Beide
-    // Orte getrennt nennen, damit niemand die Tokens neben der globalen
-    // config sucht.
-    const source = data.configSource === "env" ? "aus KEPHALAION_CONFIG" : "global";
-    notes.push(`Es gilt die config ${data.configPath} (${source}); die Token-Dateien liegen beim User unter ${data.tokensDir || "~/.config/kephalaion/tokens"}.`);
-  }
-  for (const pending of data.pending || []) {
-    notes.push(`Für Account ${pending.account} am Hub ${pending.hub} liegt nur ein Token, das noch auf den Tausch wartet: `
-      + `kephalaion node account check ${pending.hub} ${pending.account}`);
+    notes.push(`Die config ist nicht lesbar (${data.configProblem}); für den Node gilt die Standardadresse.`);
   }
 
-  kephalaionSetup.pairs = data.pairs || [];
+  kephalaionSetup.hubs = data.hubs || [];
   const preselect = data.preselect || {};
   kephalaionSetup.hub = preselect.hub || "";
-  kephalaionSetup.account = preselect.account || "";
   kephalaionSetup.collection = preselect.collection || "";
   kephalaionSetup.passed = "";
   kephalaionSetup.projectName = data.projectName || "";
 
-  const usable = kephalaionSetup.pairs.some((pair) => pair.state === "ok");
+  const usable = kephalaionSetup.hubs.some((hub) => hub.state === "ok");
   // Antwortet der Node nicht, fehlt nichts am Hub: dann ist der Dienst zu
   // starten, nicht ein Admin zu fragen.
-  const nodeDown = kephalaionSetup.pairs.length > 0
-    && kephalaionSetup.pairs.every((pair) => pair.state === "node-unreachable");
+  const nodeDown = kephalaionSetup.hubs.length > 0
+    && kephalaionSetup.hubs.every((hub) => hub.state === "node-unreachable");
   if (nodeDown) {
     notes.push("Der Node dieses Rechners antwortet nicht. Kephalaion starten (kephalaion serve oder der eingerichtete "
       + "User-Dienst), dann die Seite neu laden.");
   }
-  if (kephalaionSetup.pairs.length === 0 || (!usable && !nodeDown)) {
+  if (kephalaionSetup.hubs.length === 0 || (!usable && !nodeDown)) {
     els.admin.hidden = false;
     els.adminSteps.replaceChildren();
     for (const step of data.adminSteps || []) {
@@ -386,21 +395,21 @@ function renderKephalaionCandidates(data) {
       els.adminSteps.append(item);
     }
   }
-  if (kephalaionSetup.pairs.length > 0) {
+  if (kephalaionSetup.hubs.length > 0) {
     els.form.hidden = false;
-    renderKephalaionPairs();
+    renderKephalaionHubs();
   } else {
     notes.push(`Keine Token-Datei unter ${data.tokensDir || "~/.config/kephalaion/tokens"}/<hub>/<account>.token gefunden.`);
   }
   els.message.textContent = notes.join("\n");
 }
 
-function selectedPair() {
-  return kephalaionSetup.pairs.find((pair) => pair.hub === kephalaionSetup.hub && pair.account === kephalaionSetup.account);
+function selectedHub() {
+  return kephalaionSetup.hubs.find((hub) => hub.hub === kephalaionSetup.hub);
 }
 
 function selectionKey() {
-  return `${kephalaionSetup.hub}/${kephalaionSetup.account}/${kephalaionSetup.collection}`;
+  return `${kephalaionSetup.hub}/${kephalaionSetup.collection}`;
 }
 
 function makeChoice(name, value, selected, title, description, onChange) {
@@ -424,24 +433,24 @@ function makeChoice(name, value, selected, title, description, onChange) {
   return label;
 }
 
-function renderKephalaionPairs() {
+function renderKephalaionHubs() {
   const els = kephalaionElements;
-  els.pairs.replaceChildren();
-  for (const pair of kephalaionSetup.pairs) {
-    const selected = pair.hub === kephalaionSetup.hub && pair.account === kephalaionSetup.account;
-    const description = pair.message;
-    els.pairs.append(makeChoice("kephalaion-pair", `${pair.hub}/${pair.account}`, selected,
-      `Hub ${pair.hub} · Account ${pair.account}`, description, () => {
-        kephalaionSetup.hub = pair.hub;
-        kephalaionSetup.account = pair.account;
-        const names = (pair.collections || []).map((c) => c.collection);
-        if (!names.includes(kephalaionSetup.collection)) {
-          kephalaionSetup.collection = names.includes(kephalaionSetup.projectName)
-            ? kephalaionSetup.projectName
-            : names.length === 1 ? names[0] : "";
-        }
-        renderKephalaionPairs();
-      }));
+  els.hubs.replaceChildren();
+  for (const hub of kephalaionSetup.hubs) {
+    const selected = hub.hub === kephalaionSetup.hub;
+    const who = hub.account
+      ? `Account ${hub.account} (${KEPHALAION_CHOICE_LABELS[hub.choice] || hub.choice || "gewählt"})`
+      : "kein Account gewählt";
+    els.hubs.append(makeChoice("kephalaion-hub", hub.hub, selected, `Hub ${hub.hub} · ${who}`, hub.message, () => {
+      kephalaionSetup.hub = hub.hub;
+      const names = (hub.collections || []).map((c) => c.collection);
+      if (!names.includes(kephalaionSetup.collection)) {
+        kephalaionSetup.collection = names.includes(kephalaionSetup.projectName)
+          ? kephalaionSetup.projectName
+          : names.length === 1 ? names[0] : "";
+      }
+      renderKephalaionHubs();
+    }));
   }
   renderKephalaionCollections();
 }
@@ -449,14 +458,14 @@ function renderKephalaionPairs() {
 function renderKephalaionCollections() {
   const els = kephalaionElements;
   els.collections.replaceChildren();
-  const pair = selectedPair();
-  const collections = pair ? pair.collections || [] : [];
+  const hub = selectedHub();
+  const collections = hub ? hub.collections || [] : [];
   if (collections.length === 0) {
     const empty = document.createElement("p");
     empty.className = "hint";
-    empty.textContent = pair && pair.state === "ok"
+    empty.textContent = hub && hub.state === "ok"
       ? "Dieser Account kann keine Collection lesen. Ein Admin gibt sie ihm am Hub."
-      : "Für dieses Paar meldet der Node keine lesbaren Collections.";
+      : "Für diesen Hub meldet der Node keine lesbaren Collections.";
     els.collections.append(empty);
   }
   for (const collection of collections) {
@@ -476,14 +485,14 @@ function renderKephalaionCollections() {
 
 function updateKephalaionButtons() {
   const els = kephalaionElements;
-  const complete = kephalaionSetup.hub && kephalaionSetup.account && kephalaionSetup.collection;
+  const complete = kephalaionSetup.hub && kephalaionSetup.collection;
   els.test.disabled = !complete;
   els.save.disabled = !complete || kephalaionSetup.passed !== selectionKey();
   els.save.classList.toggle("attention-highlight", !els.save.disabled);
 }
 
 // Testen schreibt nichts; Eintragen testet am Server erneut und schreibt nur
-// bei ok. Beide schicken nur die drei Namen.
+// bei ok. Beide schicken nur Hub und Collection; den Account nennt Kephalaion.
 async function submitKephalaion(action) {
   const els = kephalaionElements;
   const key = selectionKey();
@@ -497,7 +506,6 @@ async function submitKephalaion(action) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         hub: kephalaionSetup.hub,
-        account: kephalaionSetup.account,
         collection: kephalaionSetup.collection,
       }),
     });

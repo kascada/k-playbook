@@ -6,12 +6,15 @@ the part of their contract k-playbook relies on.
 
 ## The route
 
-k-playbook talks to the Kephalaion **node** on this machine, never to a hub directly. The
-node answers MCP on its loopback address (`node.listen` in Kephalaion's `config.yaml`);
-k-playbook opens a session with `initialize`, then sends `tools/call` with the header pair
-`X-Keph-Account-<hub>`/`X-Keph-Token-<hub>` from the project's binding. The token comes
-from Kephalaion's own token file, goes only to the loopback address and never appears in
-a result or an error. How the binding is found and checked: [`installation.md`](./installation.md#kephalaion-collection)
+k-playbook talks to the Kephalaion **node** on this machine, never to a hub directly. Hub
+alias and collection come from the block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`;
+the node's address, the account and its token file come from Kephalaion's client
+information, `kephalaion node client --json --format 1 --no-probe --hub <alias>`
+(`installer/internal/kephalaion/clientinfo.go`). The node answers MCP on its loopback
+address (`node.url` of that answer); k-playbook opens a session with `initialize`, then
+sends `tools/call` with the header pair `X-Keph-Account-<hub>`/`X-Keph-Token-<hub>`. The
+token comes from Kephalaion's own token file, goes only to the loopback address and never
+appears in a result or an error. How the binding is found and checked: [`installation.md`](./installation.md#kephalaion-collection)
 and `installer/docs/architecture.md`, section "Kephalaion-Anbindung".
 
 All calls address the project's collection, `kephalaion.address` (`<hub>:<collection>`)

@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 	"github.com/kascada/k-playbook/installer/internal/health"
@@ -41,59 +42,100 @@ func init() {
 // gibt es keine mitgelieferten Texte (k-playbook:, das Briefing; Task 131),
 // keine keph:-Verweise und keine eigene Arbeit im Briefing. Was
 // kephalaion.Check am Node fragt, bleibt wie es ist; der Satz ist dessen
-// Message, die nie ein Token trägt.
+// Message, die nie ein Token trägt. Nennt die Message ihre Abhilfe
+// („Abhilfe: …“), wird sie dort geteilt: Satz davor, Abhilfe als Hint.
 //
-// Fehlt kephalaion im PATH, ist das die Abhilfe vor jeder anderen: Ohne Binary
-// lässt sich weder ein Node einrichten noch eine Anbindung prüfen. Bei ok
-// schweigt die Prüfung auch ohne Binary — der Node kann der eines anderen
-// Rechners sein, etwa der des Hosts aus einem DevContainer.
+// Fehlt kephalaion an allen Orten der Suche, ist das die Abhilfe vor jeder
+// anderen: Ohne Binary gibt es keine Auskunft und damit keine Anbindung.
+//
+// Dazu je eine Warnung, wenn im Block kephalaion: von K-PLAYBOOK.yaml ein
+// account: steht — er wird nicht gelesen (Task 138), der Account kommt von
+// Kephalaion — und wenn die alte k-playbook-local/K-PLAYBOOK.local.yaml noch
+// einen Block kephalaion: trägt; den Umzug macht /k-upgrade.
 func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
+	var problems []health.Problem
+	if config, err := ReadConfig(projectDir); err == nil && config.Kephalaion.AccountSet {
+		problems = append(problems, health.Problem{
+			Level: health.LevelWarning,
+			Area:  health.AreaKephalaion,
+			Message: "Im Block kephalaion: von " + ConfigDisplayName + " steht ein account:; k-playbook liest ihn nicht, " +
+				"der Account kommt von Kephalaion (kephalaion node client).",
+			Hint: "Die Zeile account: aus dem Block entfernen und committen; welcher Account auf diesem Rechner gilt, " +
+				"legt kephalaion node account default <hub> <account> fest.",
+		})
+	}
+	if _, present, err := kephalaion.ReadLegacyBinding(LocalDir(projectDir)); err != nil || present {
+		message := "In " + LegacyKephalaionDisplay + " steht noch ein Block kephalaion:; k-playbook liest die Anbindung " +
+			"nicht mehr von dort, sondern aus dem Block kephalaion: von " + ConfigDisplayName + "."
+		if err != nil {
+			message = LegacyKephalaionDisplay + " liegt noch, ist aber nicht lesbar (" + err.Error() + "); k-playbook liest " +
+				"die Anbindung nicht mehr von dort, sondern aus dem Block kephalaion: von " + ConfigDisplayName + "."
+		}
+		problems = append(problems, health.Problem{
+			Level:   health.LevelWarning,
+			Area:    health.AreaKephalaion,
+			Message: message,
+			Hint: "/k-upgrade ausführen: k-playbook upgrade zieht Hub und Collection in den Block um, danach löscht " +
+				"/k-upgrade die alte Datei nach Rückfrage.",
+		})
+	}
 	status := kephalaionCheck(projectDir)
 	if status.OK {
-		return nil
+		return problems
 	}
-	_, binary := kephalaionBinary()
-	if !status.Configured {
-		hint := "Die Anbindung in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion); " +
-			"ohne sie gibt es keine mitgelieferten Texte (k-playbook:, das Briefing), und keph:-Verweise, " +
-			"Workbench und die eigene Arbeit sind nicht erreichbar."
-		if !binary {
-			hint = kephalaionMissingHint
-		}
-		return []health.Problem{{
-			Level:   health.LevelError,
-			Area:    health.AreaKephalaion,
-			Message: status.Message,
-			Hint:    hint,
-		}}
+	message, hint := splitRemedy(status.Message)
+	if hint == "" || status.State == kephalaion.StateNotConfigured {
+		// Nicht eingetragen: Die Abhilfe nennt dazu, was ohne Block fehlt.
+		hint = kephalaionHint(status.State)
 	}
-	hint := kephalaionHint(status.State)
-	if !binary {
+	if _, binary := kephalaionBinary(); !binary {
 		hint = kephalaionMissingHint
 	}
-	return []health.Problem{{
+	return append(problems, health.Problem{
 		Level:   health.LevelError,
 		Area:    health.AreaKephalaion,
-		Message: status.Message,
+		Message: message,
 		Hint:    hint,
-	}}
+	})
 }
 
-// kephalaionMissingHint ist die Abhilfe, wenn kephalaion nicht im PATH liegt.
-const kephalaionMissingHint = "Kephalaion ist auf diesem Rechner nicht installiert (kein " + kephalaion.BinaryName +
-	" im PATH). Installieren mit " + InstalledCommandName + " upgrade oder " + KephalaionInstallCommand +
-	"; danach die Anbindung einrichten (kephalaion status, k-playbook gui, Abschnitt Kephalaion)."
+// splitRemedy teilt eine Meldung an ihrer ersten „Abhilfe: “ in Satz und
+// Abhilfe; ohne sie bleibt die Abhilfe leer.
+func splitRemedy(message string) (sentence, remedy string) {
+	before, after, found := strings.Cut(message, "Abhilfe: ")
+	if !found {
+		return message, ""
+	}
+	return strings.TrimSpace(before), strings.TrimSpace(after)
+}
 
-// kephalaionHint nennt je Zustand den nächsten Schritt.
+// kephalaionMissingHint ist die Abhilfe, wenn kephalaion nirgends liegt.
+const kephalaionMissingHint = "Kephalaion ist auf diesem Rechner nicht installiert (kein " + kephalaion.BinaryName +
+	" im PATH, unter ~/.local/bin oder unter /usr/local/bin). Installieren mit " + InstalledCommandName + " upgrade oder " +
+	KephalaionInstallCommand + "; danach die Anbindung prüfen (kephalaion status, k-playbook context)."
+
+// kephalaionHint nennt je Zustand den nächsten Schritt, wenn die Meldung
+// keine eigene Abhilfe trägt.
 func kephalaionHint(state kephalaion.State) string {
 	switch state {
+	case kephalaion.StateNotConfigured:
+		return "Den Block kephalaion: mit hub und collection in " + ConfigDisplayName +
+			" eintragen und committen oder in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion); " +
+			"ohne ihn gibt es keine mitgelieferten Texte (k-playbook:, das Briefing), und keph:-Verweise, " +
+			"Workbench und die eigene Arbeit sind nicht erreichbar."
 	case kephalaion.StateInvalidEntry:
-		return "Den Block kephalaion: in " + LocalDirName + "/" + kephalaion.LocalFileName +
+		return "Den Block kephalaion: in " + ConfigDisplayName +
 			" prüfen oder die Anbindung in der Oberfläche neu einrichten (k-playbook gui, Abschnitt Kephalaion)."
-	case kephalaion.StateNoKephalaion, kephalaion.StateNodeAddress, kephalaion.StateNodeUnreachable:
+	case kephalaion.StateNoKephalaion:
+		return "Kephalaion aktualisieren: kephalaion upgrade; k-playbook braucht kephalaion node client im Format 1."
+	case kephalaion.StateClientFailed:
+		return "Die Auskunft von Hand prüfen: kephalaion node client --json --format 1 --no-probe."
+	case kephalaion.StateNodeAddress, kephalaion.StateNodeUnreachable:
 		return "Kephalaion auf diesem Rechner prüfen: kephalaion status; der Node muss laufen und unter seiner Loopback-Adresse antworten."
+	case kephalaion.StateAccountChoiceMissing:
+		return "Einen Standard-Account setzen: kephalaion node account default <hub> <account>; im DevContainer auf dem Host."
 	case kephalaion.StateTokenMissing, kephalaion.StateLoginInvalid, kephalaion.StateLoginMissing:
-		return "Token-Datei und Anmeldung des Accounts prüfen (kephalaion status) oder in der Oberfläche einen anderen Account wählen (k-playbook gui, Abschnitt Kephalaion)."
+		return "Token-Datei und Anmeldung des Accounts prüfen: kephalaion node account list, kephalaion status."
 	case kephalaion.StateHubUnknown, kephalaion.StateHubNeverSynced, kephalaion.StateReplicaUnreadable:
 		return "Den Hub am Node prüfen und abgleichen: kephalaion status, kephalaion node sync."
 	case kephalaion.StateCollectionUnreadable:

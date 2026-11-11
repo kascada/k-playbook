@@ -9,7 +9,7 @@ import (
 // Die öffentliche Collection k-playbook gehört nicht in den Workspace; ihr
 // Inhalt kommt über k-playbook selbst.
 func TestWorkspaceFoldersNurDieDesProjekts(t *testing.T) {
-	folders, err := WorkspaceFolders(Binding{Hub: "vm", Collection: "omni", Account: "kamran-wsl"})
+	folders, err := WorkspaceFolders(Binding{Hub: "vm", Collection: "omni"})
 	if err != nil {
 		t.Fatal(err)
 	}

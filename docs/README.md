@@ -71,7 +71,7 @@ questions and the ordered work list.
 - `enforcement` / `docs follow-up` / `/k-enforcement` -> [`commands.md`](./commands.md), [`manual.md`](./manual.md#docs-follow-up-and-checks)
 - `queue/docs/` / `documentation orders` / `Doku-Aufträge` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`commands.md`](./commands.md)
 - `findings` / `status values` -> [`code-review.md`](./code-review.md#status-model)
-- `Kephalaion` / `collection` / `K-PLAYBOOK.local.yaml` / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
+- `Kephalaion` / `collection` / `kephalaion:` block / `kephalaion node client` / `choice` / `K-PLAYBOOK.local.yaml` (old binding) / `whoami` -> [`installation.md`](./installation.md#kephalaion-collection), [`k-playbook-format.md`](./k-playbook-format.md#kephalaion), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
 - `Kephalaion client` / `name_taken` / `rename` / `replica lag` / `request_id` / `replayed` / `outcome_unknown` / `kephalaion_unavailable` -> [`kephalaion-client.md`](./kephalaion-client.md)
 - `user area` / `user/<name>/` / `workbench` / `queue/findings/` / `k_playbook_doc_create` / `k_playbook_doc_list` / `k_playbook_doc_done` / `k_playbook_doc_reopen` / `k-playbook doc` -> [`mcp.md`](./mcp.md#document-tools-in-the-collection), [`knowledge-aktuell.md`](./knowledge-aktuell.md)
 - `k_playbook_doc_append` / `k_playbook_doc_replace` / `k_playbook_doc_set_field` / `k_playbook_doc_grep` / `since_revision` / `foreign_change` / `k-playbook doc append` -> [`mcp.md`](./mcp.md#changing-and-searching-documents)

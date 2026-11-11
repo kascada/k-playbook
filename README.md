@@ -114,7 +114,7 @@ project/
 ├── .opencode/      │
 │   └── commands/ ──┤
 ├── .k-playbook/    │
-│   ├── K-PLAYBOOK.yaml   the anchor
+│   ├── K-PLAYBOOK.yaml   the anchor; its block kephalaion: names hub and collection
 │   ├── share     ←─┤     -> ~/.local/share/k-playbook: shipped commands and skills,
 │   │               │        unpacked by the binary once per machine; not versioned
 │   ├── commands/ ←─┤     project-owned commands, committed (only when used)
@@ -133,8 +133,10 @@ project/
     └── version-sources.yaml   version sources of the version inventory, hand-maintained
 ```
 
-Tasks, todos and the project documentation live in the project's Kephalaion collection,
-so setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes
+Tasks, todos and the project documentation live in the project's Kephalaion collection.
+Its hub and name stand in the block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`, committed
+with the project; the account of each machine, its token and the node's address come from
+Kephalaion itself (`kephalaion node client`). Setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes
 them from an existing project once they hold nothing but their README. The former
 rule directory is gone as well (task 135); `/k-upgrade` removes it once empty or warns
 that what is left there is no longer read. The same goes for the former directory of
@@ -230,6 +232,8 @@ running.
 
 In the terminal, `k-playbook upgrade` does both in one go — the pull, the binary when
 the running program is older, Kephalaion when it is missing from the `PATH`, then
+moving hub and collection out of an old `k-playbook-local/K-PLAYBOOK.local.yaml` into the
+block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`,
 `AGENTS.md`, `CLAUDE.md`, linking and MCP entries, and last the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
 as a hint) —

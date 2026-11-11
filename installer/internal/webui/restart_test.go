@@ -15,6 +15,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
@@ -80,7 +81,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	cleanupDefaults := defaultstest.Isolate()
+	// Kein Test fragt das echte kephalaion dieses Rechners (Task 138).
+	cleanupBinary := kephtest.IsolateBinary()
 	code := m.Run()
+	cleanupBinary()
 	cleanupDefaults()
 	_ = os.Chdir(packageDir)
 	_ = os.RemoveAll(workDir)

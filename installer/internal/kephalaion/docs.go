@@ -210,34 +210,40 @@ type ReadResult struct {
 // Client ruft Werkzeuge des Nodes für eine Collection auf. Er hält das Token
 // unexportiert; es gelangt in keine Antwort.
 type Client struct {
-	endpoint  string
-	candidate Candidate
-	token     string
-	address   string
+	endpoint string
+	hub      string
+	account  string
+	token    string
+	address  string
 }
 
-// NewClient baut einen Client für die Collection einer Anbindung. Geprüft
-// werden die Namen, die Adresse des Nodes und das Token des Kandidaten; der
-// Node wird hier nicht gefragt. Ob die Anbindung trägt, sagt Check.
-func NewClient(binding Binding, env Env) (*Client, error) {
+// NewClient baut einen Client für die Collection einer Anbindung mit dem
+// Zugang aus der Auskunft (ResolveAccess) für denselben Hub. Geprüft werden
+// die Namen, die Adresse des Nodes und das Token aus der Token-Datei des
+// Zugangs; der Node wird hier nicht gefragt. Ob die Anbindung trägt, sagt
+// Check. Ein Account der Anbindung wird nicht gelesen.
+func NewClient(binding Binding, access Access) (*Client, error) {
 	fail := func(format string, args ...any) error {
 		return &ToolError{Tool: "Anbindung", Code: CodeNodeUnreachable, Message: fmt.Sprintf(format, args...)}
 	}
 	if err := ValidateBinding(binding); err != nil {
 		return nil, fail("Eintrag ungültig: %v", err)
 	}
-	if env.Endpoint == "" {
+	if access.Hub != binding.Hub {
+		return nil, fail("kein Zugang für den Hub %s", binding.Hub)
+	}
+	if access.Endpoint == "" {
 		return nil, fail("keine zulässige Adresse des Nodes")
 	}
-	candidate, ok := env.FindCandidate(binding.Hub, binding.Account)
-	if !ok {
-		return nil, fail("keine Token-Datei für Account %s am Hub %s", binding.Account, binding.Hub)
+	if checkAccountName(access.Account) != nil {
+		return nil, fail("kein Account für den Hub %s", binding.Hub)
 	}
-	token, err := candidate.readToken()
+	token, err := access.readToken()
 	if err != nil {
-		return nil, fail("Token-Datei für Account %s am Hub %s unbrauchbar", binding.Account, binding.Hub)
+		return nil, fail("Token-Datei für Account %s am Hub %s unbrauchbar", access.Account, binding.Hub)
 	}
-	return &Client{endpoint: env.Endpoint, candidate: candidate, token: token, address: binding.Address()}, nil
+	return &Client{endpoint: access.Endpoint, hub: binding.Hub, account: access.Account, token: token,
+		address: binding.Address()}, nil
 }
 
 // Address ist die Adresse der Collection, <hub>:<collection>.
@@ -245,7 +251,7 @@ func (c *Client) Address() string { return c.address }
 
 // open meldet sich am Node an.
 func (c *Client) open(ctx context.Context, tool string) (*toolSession, error) {
-	session, err := openSession(ctx, newRPC(c.endpoint, maxToolResponseBytes, toolTimeout), c.candidate, c.token)
+	session, err := openSession(ctx, newRPC(c.endpoint, maxToolResponseBytes, toolTimeout), c.hub, c.account, c.token)
 	if err != nil {
 		return nil, c.transportError(tool, err)
 	}

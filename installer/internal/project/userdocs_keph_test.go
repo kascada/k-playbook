@@ -7,12 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 )
 
 // kephCall ist ein create oder rename, wie der gefälschte Node es bekommt.
@@ -101,22 +101,12 @@ func newKephClient(t *testing.T, node *kephNode) *kephalaion.Client {
 	}))
 	t.Cleanup(server.Close)
 
-	dir := t.TempDir()
-	for name, content := range map[string]string{
-		"config.yaml":                "node:\n  db: sqlite:///x\n",
-		"tokens/vm/kamran-wsl.token": "keph_USERDOCSLEAKCANARYabcdefghijklmnopqrstu1234\n",
-	} {
-		path := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	tokens := kephtest.Token(t, filepath.Join(t.TempDir(), "tokens"), "vm", "kamran-wsl", "keph_USERDOCSLEAKCANARYabcdefghijklmnopqrstu1234")
+	access, err := kephalaion.ResolveInfo(kephtest.Info(server.URL+"/mcp", tokens, kephtest.Hub(tokens, "vm", "kamran-wsl")), "vm")
+	if err != nil {
+		t.Fatalf("Zugang: %v", err)
 	}
-	env := kephalaion.LoadEnv(dir)
-	env.Endpoint = server.URL + "/mcp"
-	client, err := kephalaion.NewClient(kephalaion.Binding{Hub: "vm", Collection: "k-playbook", Account: "kamran-wsl"}, env)
+	client, err := kephalaion.NewClient(kephalaion.Binding{Hub: "vm", Collection: "k-playbook"}, access)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}

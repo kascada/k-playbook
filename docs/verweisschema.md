@@ -42,8 +42,9 @@ More examples:
 - **A reference k-playbook does not know is an error.** The tool reports it with an error
   code; it does not fall back to reading from disk, and the session reports it instead of
   searching for the file on its own.
-- **A `keph:` reference names neither hub nor collection.** Both are machine-local in
-  `k-playbook-local/K-PLAYBOOK.local.yaml` and can differ from machine to machine. k-playbook
+- **A `keph:` reference names neither hub nor collection.** Both stand in the block
+  `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml` and are the same for everyone working on the
+  project; the account of this machine is chosen by Kephalaion. k-playbook
   supplies them as `kephalaion.address` in `k-playbook context` and uses them itself when
   it resolves a `keph:` reference. If `kephalaion.ok` is not `true` there, `keph:`
   references are unreachable (`kephalaion_unavailable`), and a session says so rather than

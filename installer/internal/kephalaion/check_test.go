@@ -73,19 +73,21 @@ func sse(body string) string {
 	return "event: message\ndata: " + out.String() + "\n\n"
 }
 
-// testEnv legt eine config mit dem Endpunkt des Nodes und eine Token-Datei
-// für vm/kamran-wsl an.
-func testEnv(t *testing.T, endpoint string) Env {
-	t.Helper()
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "config.yaml"), "node:\n  db: sqlite:///x\n")
-	writeFile(t, filepath.Join(dir, "tokens", "vm", "kamran-wsl.token"), testToken+"\n")
-	env := LoadEnv(dir)
-	env.Endpoint = endpoint
-	return env
-}
+var goodBinding = Binding{Hub: "vm", Collection: "k-playbook"}
 
-var goodBinding = Binding{Hub: "vm", Collection: "k-playbook", Account: "kamran-wsl"}
+// testAccess baut einen Zugang, wie die Auskunft ihn ergibt: Node unter
+// endpoint, die einzige Token-Datei für vm/kamran-wsl.
+func testAccess(t *testing.T, endpoint string) Access {
+	t.Helper()
+	tokens := tokensWith(t)
+	info := infoFor(tokens, hubWith(tokens, "vm", "kamran-wsl", ChoiceOnly))
+	info.Node.URL = endpoint
+	access, err := ResolveInfo(info, "vm")
+	if err != nil {
+		t.Fatalf("Zugang: %v", err)
+	}
+	return access
+}
 
 const okHub = `{"hub":"vm","login":"ok","node":"wsl-kleist","account":"kamran-wsl","user":"kamran",
  "sync":{"last_success":"2026-10-09T18:30:31Z","revision":41},
@@ -100,7 +102,7 @@ func TestCheckBindingStates(t *testing.T) {
 		want       State
 	}{
 		{"ok", goodBinding, `{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`, StateOK},
-		{"collection", Binding{Hub: "vm", Collection: "fremd", Account: "kamran-wsl"},
+		{"collection", Binding{Hub: "vm", Collection: "fremd"},
 			`{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`, StateCollectionUnreadable},
 		{"unknown hub", goodBinding, `{"version":"v0.2.4","hubs":[],"unknown_hubs":["vm"]}`, StateHubUnknown},
 		{"hub fehlt in hubs", goodBinding, `{"version":"v0.2.4","hubs":[{"hub":"anders","login":"missing","node":"n","sync":{}}],"unknown_hubs":[]}`, StateHubUnknown},
@@ -115,7 +117,7 @@ func TestCheckBindingStates(t *testing.T) {
 			node := newFakeNode(t, func(http.Header) (int, string, string) {
 				return 200, "application/json", whoamiBody(c.structured)
 			})
-			status := CheckBinding(context.Background(), c.binding, testEnv(t, node.server.URL+"/mcp"))
+			status := checkAccess(context.Background(), c.binding, testAccess(t, node.server.URL+"/mcp"))
 			if status.State != c.want {
 				t.Fatalf("Zustand %s, erwartet %s (%s)", status.State, c.want, status.Message)
 			}
@@ -133,9 +135,9 @@ func TestCheckBindingOKCarriesRightsScopesAndSync(t *testing.T) {
 	node := newFakeNode(t, func(http.Header) (int, string, string) {
 		return 200, "application/json", whoamiBody(`{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`)
 	})
-	env := testEnv(t, node.server.URL+"/mcp")
+	access := testAccess(t, node.server.URL+"/mcp")
 
-	status := CheckBinding(context.Background(), goodBinding, env)
+	status := checkAccess(context.Background(), goodBinding, access)
 	if status.Address != "vm:k-playbook" || status.User != "kamran" {
 		t.Fatalf("%+v", status)
 	}
@@ -146,7 +148,10 @@ func TestCheckBindingOKCarriesRightsScopesAndSync(t *testing.T) {
 		t.Fatalf("Abgleich: %+v", status.Sync)
 	}
 
-	withScopes := CheckBinding(context.Background(), Binding{Hub: "vm", Collection: "test", Account: "kamran-wsl"}, env)
+	if status.Account != "kamran-wsl" || status.Choice != ChoiceOnly {
+		t.Fatalf("Account und Herkunft: %+v", status)
+	}
+	withScopes := checkAccess(context.Background(), Binding{Hub: "vm", Collection: "test"}, access)
 	if strings.Join(withScopes.Scopes, ",") != "vendor/k-playbook,dir docs/" {
 		t.Fatalf("%+v", withScopes)
 	}
@@ -163,34 +168,76 @@ func TestCheckBindingOKCarriesRightsScopesAndSync(t *testing.T) {
 }
 
 func TestCheckStatesBeforeTheNode(t *testing.T) {
-	local := t.TempDir()
-	env := Env{UserDir: t.TempDir()}
-	if s := Check(context.Background(), local, env); s.State != StateNotConfigured || s.Configured {
+	fake := newFakeClient(t)
+	const configFile = ".k-playbook/K-PLAYBOOK.yaml"
+	if s := Check(context.Background(), Binding{}, configFile); s.State != StateNotConfigured || s.Configured ||
+		!strings.Contains(s.Message, configFile) || !strings.Contains(s.Message, "kephalaion:") || !strings.Contains(s.Message, "Abhilfe") {
 		t.Fatalf("nicht eingetragen: %+v", s)
 	}
-
-	writeFile(t, LocalFilePath(local), "kephalaion:\n  hub: ../vm\n  collection: k-playbook\n  account: kamran-wsl\n")
-	if s := Check(context.Background(), local, env); s.State != StateInvalidEntry || s.Address != "" {
+	if s := Check(context.Background(), Binding{Hub: "../vm", Collection: "k-playbook"}, configFile); s.State != StateInvalidEntry || s.Address != "" {
 		t.Fatalf("ungültig: %+v", s)
 	}
-
-	writeFile(t, LocalFilePath(local), "kephalaion:\n  hub: vm\n  collection: k-playbook\n  account: kamran-wsl\n")
-	if s := Check(context.Background(), local, env); s.State != StateNoKephalaion {
-		t.Fatalf("keine config: %+v", s)
+	if s := Check(context.Background(), Binding{Hub: "vm"}, configFile); s.State != StateInvalidEntry {
+		t.Fatalf("ohne Collection: %+v", s)
+	}
+	if fake.argsOrNil(t) != nil {
+		t.Fatal("Auskunft vor der Prüfung der Namen gefragt")
 	}
 
-	writeFile(t, filepath.Join(env.UserDir, "config.yaml"), "node:\n  listen: 10.1.2.3:7433\n")
-	if s := Check(context.Background(), local, LoadEnv(env.UserDir)); s.State != StateNodeAddress {
+	tokens := tokensWith(t)
+	info := infoFor(tokens, hubWith(tokens, "vm", "kamran-wsl", ChoiceOnly))
+	info.Node.URL = "http://10.1.2.3:7433/mcp"
+	fake.setInfo(t, info)
+	if s := Check(context.Background(), goodBinding, configFile); s.State != StateNodeAddress || s.Address != "vm:k-playbook" {
 		t.Fatalf("fremde Adresse: %+v", s)
 	}
-	writeFile(t, filepath.Join(env.UserDir, "config.yaml"), "hub:\n  db: x\n")
-	if s := Check(context.Background(), local, LoadEnv(env.UserDir)); s.State != StateNodeAddress {
-		t.Fatalf("kein Node: %+v", s)
-	}
 
-	writeFile(t, filepath.Join(env.UserDir, "config.yaml"), "node:\n  listen: 127.0.0.1:7433\n")
-	if s := Check(context.Background(), local, LoadEnv(env.UserDir)); s.State != StateTokenMissing {
+	info = infoFor(tokens, ClientHub{Alias: "vm", Choice: ChoiceMissing, Candidates: []string{}, Pending: []string{}})
+	fake.setInfo(t, info)
+	if s := Check(context.Background(), goodBinding, configFile); s.State != StateTokenMissing {
 		t.Fatalf("ohne Token: %+v", s)
+	}
+	info = infoFor(tokens, ClientHub{Alias: "vm", Choice: ChoiceMissing, Candidates: []string{"a", "b"}, Pending: []string{}})
+	fake.setInfo(t, info)
+	if s := Check(context.Background(), goodBinding, configFile); s.State != StateAccountChoiceMissing {
+		t.Fatalf("Wahl fehlt: %+v", s)
+	}
+	fake.set(t, "", "", 2)
+	if s := Check(context.Background(), goodBinding, configFile); s.State != StateNoKephalaion {
+		t.Fatalf("zu altes Binary: %+v", s)
+	}
+}
+
+// Der ganze Weg: Auskunft über das Ersatz-Binary, whoami am Ersatz-Node.
+// Account und Herkunft kommen aus der Auskunft, nicht aus der Anbindung; ein
+// offenes rotate und ein Problem der config stehen hinter der Meldung.
+func TestCheckBindingTakesAccountFromTheClientInfo(t *testing.T) {
+	node := newFakeNode(t, func(http.Header) (int, string, string) {
+		return 200, "application/json", whoamiBody(`{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`)
+	})
+	fake := newFakeClient(t)
+	tokens := tokensWith(t)
+	hub := hubWith(tokens, "vm", "kamran-wsl", ChoiceDefault, "kamran-wsl", "zweit")
+	hub.Pending = []string{"kamran-wsl"}
+	info := infoFor(tokens, hub)
+	info.Node.URL = node.server.URL + "/mcp"
+	info.Config.Problem = ptr("kein lesbares YAML")
+	fake.setInfo(t, info)
+
+	status := Check(context.Background(), goodBinding, "K-PLAYBOOK.yaml")
+	if status.State != StateOK || status.Account != "kamran-wsl" || status.Choice != ChoiceDefault {
+		t.Fatalf("%+v", status)
+	}
+	if node.seen[0].Get("X-Keph-Account-vm") != "kamran-wsl" {
+		t.Fatalf("Account am Node: %q", node.seen[0].Get("X-Keph-Account-vm"))
+	}
+	for _, want := range []string{"Angemeldet als kamran-wsl", "kephalaion node account check vm kamran-wsl --token-file", "kein lesbares YAML"} {
+		if !strings.Contains(status.Message, want) {
+			t.Errorf("Meldung ohne %q: %s", want, status.Message)
+		}
+	}
+	if got := fake.args(t); got != "node client --json --format 1 --no-probe --hub vm" {
+		t.Fatalf("Aufruf: %q", got)
 	}
 }
 
@@ -204,7 +251,7 @@ func TestCheckNodeUnreachable(t *testing.T) {
 	listener.Close()
 
 	start := time.Now()
-	status := CheckBinding(context.Background(), goodBinding, testEnv(t, "http://"+addr+"/mcp"))
+	status := checkAccess(context.Background(), goodBinding, testAccess(t, "http://"+addr+"/mcp"))
 	if status.State != StateNodeUnreachable {
 		t.Fatalf("%+v", status)
 	}
@@ -226,7 +273,7 @@ func TestCheckHangingNodeHitsTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	status := CheckBinding(ctx, goodBinding, testEnv(t, server.URL+"/mcp"))
+	status := checkAccess(ctx, goodBinding, testAccess(t, server.URL+"/mcp"))
 	if status.State != StateNodeUnreachable {
 		t.Fatalf("%+v", status)
 	}
@@ -243,7 +290,7 @@ func TestCheckDoesNotFollowRedirects(t *testing.T) {
 		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
 	}))
 	t.Cleanup(node.Close)
-	status := CheckBinding(context.Background(), goodBinding, testEnv(t, node.URL+"/mcp"))
+	status := checkAccess(context.Background(), goodBinding, testAccess(t, node.URL+"/mcp"))
 	if status.State != StateNodeUnreachable || redirected {
 		t.Fatalf("%+v redirected=%v", status, redirected)
 	}
@@ -278,15 +325,22 @@ func TestTokenNeverLeaks(t *testing.T) {
 			return 200, "text/event-stream", sse(whoamiBody(`{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`))
 		},
 	}
+	fake := newFakeClient(t)
 	for i, reply := range replies {
 		node := newFakeNode(t, reply)
-		env := testEnv(t, node.server.URL+"/mcp")
-		status := CheckBinding(context.Background(), goodBinding, env)
-		pairs := ProbePairs(context.Background(), env)
+		access := testAccess(t, node.server.URL+"/mcp")
+		status := checkAccess(context.Background(), goodBinding, access)
+		info := infoFor(access.TokensDir, hubWith(access.TokensDir, "vm", "kamran-wsl", ChoiceOnly))
+		info.Node.URL = node.server.URL + "/mcp"
+		fake.setInfo(t, info)
+		_, probes, err := ProbeHubs(context.Background())
+		if err != nil {
+			t.Fatalf("Antwort %d: %v", i, err)
+		}
 		data, _ := json.Marshal(struct {
 			S Status
-			P []Pair
-		}{status, pairs})
+			P []HubProbe
+		}{status, probes})
 		if strings.Contains(string(data), testToken) || strings.Contains(string(data), "TOKENLEAKCANARY") {
 			t.Fatalf("Antwort %d: Token im Ergebnis: %s", i, data)
 		}
@@ -303,44 +357,79 @@ func TestEventStreamReplyIsRead(t *testing.T) {
 	node := newFakeNode(t, func(http.Header) (int, string, string) {
 		return 200, "text/event-stream", sse(whoamiBody(`{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`))
 	})
-	if s := CheckBinding(context.Background(), goodBinding, testEnv(t, node.server.URL+"/mcp")); s.State != StateOK {
+	if s := checkAccess(context.Background(), goodBinding, testAccess(t, node.server.URL+"/mcp")); s.State != StateOK {
 		t.Fatalf("%+v", s)
 	}
 }
 
-func TestProbePairs(t *testing.T) {
+// ProbeHubs nimmt die Hubs und Accounts allein aus der Auskunft: je Hub mit
+// Account die lesbaren Collections, ein Hub ohne gewählten Account mit dem
+// Zustand der Auskunft.
+func TestProbeHubs(t *testing.T) {
 	node := newFakeNode(t, func(h http.Header) (int, string, string) {
 		if h.Get("X-Keph-Account-vm") == "kamran-wsl" {
 			return 200, "application/json", whoamiBody(`{"version":"v0.2.4","hubs":[` + okHub + `],"unknown_hubs":[]}`)
 		}
 		return 200, "application/json", whoamiBody(`{"version":"v0.2.4","hubs":[{"hub":"vm","login":"missing","node":"n","sync":{}}],"unknown_hubs":["privat"]}`)
 	})
-	env := testEnv(t, node.server.URL+"/mcp")
-	writeFile(t, filepath.Join(env.UserDir, "tokens", "privat", "alice.token"), testToken)
+	fake := newFakeClient(t)
+	tokens := tokensWith(t)
+	writeFile(t, filepath.Join(tokens, "privat", "alice.token"), testToken)
+	writeFile(t, filepath.Join(tokens, "zwei", "a.token"), testToken)
+	writeFile(t, filepath.Join(tokens, "zwei", "b.token"), testToken)
+	info := infoFor(tokens,
+		hubWith(tokens, "privat", "alice", ChoiceOnly),
+		hubWith(tokens, "vm", "kamran-wsl", ChoiceDefault),
+		ClientHub{Alias: "zwei", Choice: ChoiceMissing, Candidates: []string{"a", "b"}, Pending: []string{}},
+		ClientHub{Alias: "../x", Choice: ChoiceMissing, Candidates: []string{}, Pending: []string{}})
+	info.Node.URL = node.server.URL + "/mcp"
+	fake.setInfo(t, info)
 
-	pairs := ProbePairs(context.Background(), env)
-	if len(pairs) != 2 {
-		t.Fatalf("%+v", pairs)
+	got, probes, err := ProbeHubs(context.Background())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if pairs[0].Hub != "privat" || pairs[0].State != StateHubUnknown {
-		t.Fatalf("privat: %+v", pairs[0])
+	if got.TokensDir != tokens {
+		t.Fatalf("Auskunft: %+v", got)
 	}
-	if pairs[1].State != StateOK || len(pairs[1].Collections) != 2 || pairs[1].Collections[1].Address != "vm:test" {
-		t.Fatalf("vm: %+v", pairs[1])
+	if fake.args(t) != "node client --json --format 1 --no-probe" {
+		t.Fatalf("Aufruf: %q", fake.args(t))
+	}
+	if len(probes) != 3 {
+		t.Fatalf("%+v", probes)
+	}
+	if probes[0].Hub != "privat" || probes[0].State != StateHubUnknown {
+		t.Fatalf("privat: %+v", probes[0])
+	}
+	if probes[1].State != StateOK || probes[1].Choice != ChoiceDefault || len(probes[1].Collections) != 2 || probes[1].Collections[1].Address != "vm:test" {
+		t.Fatalf("vm: %+v", probes[1])
+	}
+	if probes[2].State != StateAccountChoiceMissing || !strings.Contains(probes[2].Message, "kephalaion node account default zwei a") {
+		t.Fatalf("zwei: %+v", probes[2])
 	}
 }
 
-func TestProbePairsStopsWaitingWhenNodeIsDown(t *testing.T) {
+func TestProbeHubsStopsWaitingWhenNodeIsDown(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	addr := listener.Addr().String()
 	listener.Close()
-	env := testEnv(t, "http://"+addr+"/mcp")
-	writeFile(t, filepath.Join(env.UserDir, "tokens", "privat", "alice.token"), testToken)
-	pairs := ProbePairs(context.Background(), env)
-	if len(pairs) != 2 || pairs[0].State != StateNodeUnreachable || pairs[1].State != StateNodeUnreachable {
-		t.Fatalf("%+v", pairs)
+	fake := newFakeClient(t)
+	tokens := tokensWith(t)
+	writeFile(t, filepath.Join(tokens, "privat", "alice.token"), testToken)
+	info := infoFor(tokens, hubWith(tokens, "privat", "alice", ChoiceOnly), hubWith(tokens, "vm", "kamran-wsl", ChoiceOnly))
+	info.Node.URL = "http://" + addr + "/mcp"
+	fake.setInfo(t, info)
+	_, probes, err := ProbeHubs(context.Background())
+	if err != nil || len(probes) != 2 || probes[0].State != StateNodeUnreachable || probes[1].State != StateNodeUnreachable {
+		t.Fatalf("%+v %v", probes, err)
+	}
+
+	// Ohne Auskunft gibt es keine Hubs, sondern den Zustand der Auskunft.
+	fake.set(t, "", "", 2)
+	if _, _, err := ProbeHubs(context.Background()); err == nil || !strings.Contains(err.Error(), "kephalaion upgrade") {
+		t.Fatalf("zu altes Binary: %v", err)
 	}
 }

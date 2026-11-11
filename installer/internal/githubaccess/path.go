@@ -45,7 +45,7 @@ const (
 // Path nennt den Ort der Datei: der Override EnvConfig, wie er gesetzt ist;
 // sonst $XDG_CONFIG_HOME/k-playbook/github.yaml, wenn die Variable einen
 // absoluten Pfad trägt; sonst ~/.config/k-playbook/github.yaml — dieselbe
-// XDG-Regel wie kephalaion.DefaultConfigDir.
+// XDG-Regel, die Kephalaion für seine config nimmt.
 func Path() (string, error) {
 	if v := os.Getenv(EnvConfig); v != "" {
 		return v, nil

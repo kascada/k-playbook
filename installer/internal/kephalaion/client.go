@@ -126,10 +126,10 @@ type toolSession struct {
 }
 
 // openSession meldet sich mit initialize an und bestätigt es. initialize
-// geht ohne Anmeldung; das Header-Paar des Kandidaten steht nur an
+// geht ohne Anmeldung; das Header-Paar aus Account und Token steht nur an
 // tools/call. Fehler sind noch nicht um das Token bereinigt — das macht der
 // Aufrufer mit redact.
-func openSession(ctx context.Context, rpc *rpcConn, candidate Candidate, token string) (*toolSession, error) {
+func openSession(ctx context.Context, rpc *rpcConn, hub, account, token string) (*toolSession, error) {
 	initParams := map[string]any{
 		"protocolVersion": protocolVersion,
 		"capabilities":    map[string]any{},
@@ -153,8 +153,8 @@ func openSession(ctx context.Context, rpc *rpcConn, candidate Candidate, token s
 	return &toolSession{
 		rpc: rpc, version: init.ProtocolVersion, session: session, nextID: 2,
 		headers: map[string]string{
-			"X-Keph-Account-" + candidate.Hub: candidate.Account,
-			"X-Keph-Token-" + candidate.Hub:   token,
+			"X-Keph-Account-" + hub: account,
+			"X-Keph-Token-" + hub:   token,
 		},
 	}, nil
 }
@@ -195,14 +195,14 @@ func (s *toolSession) call(ctx context.Context, name string, args map[string]any
 	return toolResult{IsError: result.IsError, Structured: result.StructuredContent, Text: strings.Join(parts, " ")}, nil
 }
 
-// callWhoami fragt den Node unter endpoint nach whoami, mit dem Header-Paar des
-// Kandidaten. Jeder Fehlertext läuft durch redact, bevor er das Paket
+// callWhoami fragt den Node unter endpoint nach whoami, mit dem Header-Paar
+// aus Hub, Account und Token. Jeder Fehlertext läuft durch redact, bevor er das Paket
 // verlässt.
-func callWhoami(ctx context.Context, endpoint string, candidate Candidate, token string) (*whoamiOutput, error) {
+func callWhoami(ctx context.Context, endpoint, hub, account, token string) (*whoamiOutput, error) {
 	redactErr := func(format string, args ...any) error {
 		return &probeError{text: redact(fmt.Sprintf(format, args...), token)}
 	}
-	session, err := openSession(ctx, newRPC(endpoint, maxResponseBytes, DefaultTimeout), candidate, token)
+	session, err := openSession(ctx, newRPC(endpoint, maxResponseBytes, DefaultTimeout), hub, account, token)
 	if err != nil {
 		return nil, redactErr("%v", err)
 	}

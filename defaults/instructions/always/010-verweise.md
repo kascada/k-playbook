@@ -35,9 +35,10 @@ Regeln:
   liest die Dokumente darin einzeln.
 - **Ein Verweis, den k-playbook nicht kennt, ist ein Fehler.** Melde ihn und such die Datei
   nicht auf eigene Faust.
-- **Ein `keph:`-Verweis nennt weder Hub noch Collection.** Beides steht rechnerlokal in der
-  Konfiguration und kann je Rechner anders sein. Steht `kephalaion.ok` nicht auf `true`, sind
-  `keph:`-Verweise nicht erreichbar. Sag das, statt auszuweichen.
+- **Ein `keph:`-Verweis nennt weder Hub noch Collection.** Beide stehen im Block `kephalaion:`
+  von `.k-playbook/K-PLAYBOOK.yaml` und gelten für alle Nutzer des Projekts; den Account dieses
+  Rechners wählt Kephalaion. Steht `kephalaion.ok` nicht auf `true`, sind `keph:`-Verweise
+  nicht erreichbar. Sag das, statt auszuweichen.
 - **Die öffentliche Collection `<hub>:k-playbook` sprichst du nicht direkt an.** Ihr Inhalt
   ist das Mitgelieferte und kommt über `k-playbook:`.
 - **`~` als Pfadteil steht für dich**, genauer für deinen Kephalaion-User. In

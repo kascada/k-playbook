@@ -32,7 +32,8 @@ binding the Kephalaion collections only acts when the Kephalaion extension is in
 
 The Kephalaion extension shows a collection as a folder of a multi-root workspace
 (`keph://<hub>/<collection>`). One of them belongs in every window of a project: the
-project's own collection, on the hub named in `k-playbook-local/K-PLAYBOOK.local.yaml`. The
+project's own collection, on the hub named in the block `kephalaion:` of
+`.k-playbook/K-PLAYBOOK.yaml`. The
 public collection `k-playbook` is not bound in; its content reaches the session through
 k-playbook itself. The extension binds the project's collection in by itself on every
 window start (`activationEvents: ["onStartupFinished"]`); the command

@@ -1,8 +1,8 @@
 package webui
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -18,14 +18,14 @@ import (
 //
 // Sicherheitsvertrag der vier Endpunkte. Task 082 lässt einen Seitenaufruf
 // nur dann messen, wenn kein Wert aus Anfrage oder Projektdatei in die
-// Messung einfließt. Hier fließen Hub und Account aus
-// K-PLAYBOOK.local.yaml oder aus der Anfrage in einen Dateipfad und in
-// Header; die Bedingung ist deshalb so gefasst: Hub und Account bestehen die
-// Namensregel und entsprechen genau einem Kandidaten aus dem
-// Token-Verzeichnis; gelesen wird dessen Pfad, nie ein Pfad aus den rohen
-// Werten. Die Collection besteht die Namensregel und wird nur mit der
-// Antwort von whoami verglichen. Gesendet wird nur an die Loopback-Adresse
-// aus der config von Kephalaion. Das alles erzwingt das Paket kephalaion.
+// Messung einfließt. Hier fließen Hub und Collection aus K-PLAYBOOK.yaml oder
+// aus der Anfrage in die Auskunft kephalaion node client (der Hub als
+// Argument) und in Header; die Bedingung ist deshalb so gefasst: Hub und
+// Collection bestehen die Namensregel. Account, Token-Datei und Adresse des
+// Nodes kommen allein aus der Auskunft; gelesen wird ein Token nur aus der
+// Datei <tokensDir>/<hub>/<account>.token, die sie nennt. Die Collection wird
+// nur mit der Antwort von whoami verglichen. Gesendet wird nur an die
+// Loopback-Adresse aus der Auskunft. Das alles erzwingt das Paket kephalaion.
 //
 // Die GET-Endpunkte nehmen keinen Wert aus der Anfrage; sie messen beim
 // Öffnen der Seite, weil die Anzeige dort der Zweck ist. Werte aus der Anfrage
@@ -33,17 +33,13 @@ import (
 // sameOrigin (server.go): Jeder lokale Prozess des Nutzers erreicht diese
 // Endpunkte. Das ist tragbar, weil ein solcher Prozess die Token-Dateien
 // ohnehin selbst lesen kann; er erfährt hier nichts, was er nicht schon hat,
-// und bekommt nie ein Token zu sehen.
+// und bekommt nie ein Token zu sehen. Eingetragen werden nur Hub und
+// Collection, nie ein Account.
 
 // kephalaionCacheTTL ist, wie lange ein Ergebnis der Prüfung gilt. Die
 // Statusseite fragt beim Öffnen; ohne Zwischenspeicher fragte jeder
 // Seitenwechsel den Node.
 const kephalaionCacheTTL = 30 * time.Second
-
-// kephalaionEnv liefert die Kephalaion-Einrichtung dieses Rechners, in
-// derselben Reihenfolge gesucht wie von Kephalaion selbst; austauschbar für
-// Tests.
-var kephalaionEnv = kephalaion.DefaultEnv
 
 // kephalaionCache hält das letzte Ergebnis der Prüfung je Projekt.
 var kephalaionCache struct {
@@ -64,7 +60,7 @@ func cachedKephalaionStatus(projectDir string) (kephalaion.Status, time.Time) {
 	}
 	kephalaionCache.mu.Unlock()
 
-	status := kephalaion.Check(context.Background(), project.LocalDir(projectDir), kephalaionEnv())
+	status := project.KephalaionStatus(projectDir)
 	at := time.Now()
 	kephalaionCache.mu.Lock()
 	kephalaionCache.projectDir, kephalaionCache.status, kephalaionCache.at = projectDir, status, at
@@ -83,8 +79,9 @@ func dropKephalaionCache() {
 type kephalaionResponse struct {
 	Available bool               `json:"available"`
 	Status    *kephalaion.Status `json:"status,omitempty"`
-	// LocalFile ist der Ort von K-PLAYBOOK.local.yaml in Anzeigeform.
-	LocalFile string `json:"localFile,omitempty"`
+	// ConfigFile ist der Ort von K-PLAYBOOK.yaml in Anzeigeform; dort steht
+	// der Block kephalaion:.
+	ConfigFile string `json:"configFile,omitempty"`
 	// CheckedAt ist der Zeitpunkt der Prüfung (RFC 3339).
 	CheckedAt string `json:"checkedAt,omitempty"`
 	Message   string `json:"message,omitempty"`
@@ -100,130 +97,143 @@ func kephalaionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	status, at := cachedKephalaionStatus(environment.ProjectDir)
 	writeJSON(w, http.StatusOK, kephalaionResponse{
-		Available: true,
-		Status:    &status,
-		LocalFile: project.DisplayPath(kephalaion.LocalFilePath(project.LocalDir(environment.ProjectDir))),
-		CheckedAt: at.Format(time.RFC3339),
+		Available:  true,
+		Status:     &status,
+		ConfigFile: project.DisplayPath(project.ConfigPath(environment.ProjectDir)),
+		CheckedAt:  at.Format(time.RFC3339),
 	})
 }
 
 // kephalaionSelection ist die Vorauswahl des Einrichtungsschritts.
 type kephalaionSelection struct {
 	Hub        string `json:"hub"`
-	Account    string `json:"account"`
 	Collection string `json:"collection"`
 }
 
 type kephalaionCandidatesResponse struct {
 	Available bool `json:"available"`
-	// ConfigPresent sagt, ob es eine config von Kephalaion gibt.
-	ConfigPresent bool `json:"configPresent"`
-	// ConfigPath ist die config, die gilt, in Anzeigeform; ohne config der
-	// Ort beim User, an dem kephalaion init sie anlegt.
+	// ClientState und ClientProblem: Die Auskunft kephalaion node client ist
+	// nicht zu haben (Binary fehlt oder ist zu alt, Exit 1, Zeitgrenze); der
+	// Satz nennt die Abhilfe. Dann sind die übrigen Angaben leer.
+	ClientState   kephalaion.State `json:"clientState,omitempty"`
+	ClientProblem string           `json:"clientProblem,omitempty"`
+	// ConfigPath ist die config von Kephalaion, die gilt, in Anzeigeform;
+	// leer, wenn es keine gibt (ConfigSource none).
 	ConfigPath string `json:"configPath"`
-	// ConfigSource sagt, woher sie kommt: env (KEPHALAION_CONFIG), user
-	// oder system (/etc/kephalaion/config.yaml).
-	ConfigSource kephalaion.ConfigSource `json:"configSource"`
-	// ConfigProblem ist der Satz, wenn die config fehlt oder nicht lesbar
-	// ist; er nennt die gesuchten bzw. gelesenen Pfade.
+	// ConfigSource sagt, woher sie kommt: flag, env (KEPHALAION_CONFIG),
+	// user, system oder none.
+	ConfigSource string `json:"configSource"`
+	// ConfigProblem ist der Satz, wenn die config nicht lesbar ist; der Node
+	// hat dann die Standardadresse.
 	ConfigProblem string `json:"configProblem,omitempty"`
-	// TokensDir ist das Token-Verzeichnis des Users in Anzeigeform — auch
-	// bei globaler config.
+	// NodeURL ist die Adresse von /mcp am Node aus der Auskunft.
+	NodeURL string `json:"nodeUrl"`
+	// TokensDir ist das Token-Verzeichnis in Anzeigeform.
 	TokensDir string `json:"tokensDir"`
-	// Endpoint ist die Adresse von /mcp am Node; leer, wenn unzulässig.
-	Endpoint string `json:"endpoint"`
-	// AddressProblem erklärt einen fehlenden Endpoint.
-	AddressProblem string `json:"addressProblem,omitempty"`
-	// Pairs sind die Kandidaten mit ihren lesbaren Collections.
-	Pairs []kephalaion.Pair `json:"pairs"`
-	// Pending sind Paare, deren Token noch auf den Tausch am Node wartet.
-	Pending []kephalaion.Pending `json:"pending"`
+	// Hubs sind die Hubs aus der Auskunft, je mit dem gewählten Account, der
+	// Herkunft der Wahl und den lesbaren Collections.
+	Hubs []kephalaion.HubProbe `json:"hubs"`
+	// ConfigFile ist der Ort, an dem eingetragen wird: K-PLAYBOOK.yaml.
+	ConfigFile string `json:"configFile"`
 	// ProjectName ist der Name des Projektverzeichnisses; die gleichnamige
 	// Collection wird vorgewählt, wenn es sie gibt.
 	ProjectName string              `json:"projectName"`
 	Preselect   kephalaionSelection `json:"preselect"`
-	// AdminSteps sind die Schritte am Hub, in der festgelegten Reihenfolge,
-	// für den Fall, dass kein Paar trägt.
+	// AdminSteps sind die Schritte am Hub und auf diesem Rechner, in der
+	// festgelegten Reihenfolge, für den Fall, dass kein Hub trägt.
 	AdminSteps []string `json:"adminSteps"`
 	Message    string   `json:"message,omitempty"`
 }
 
 // kephalaionAdminSteps ist der Ablauf für ein neues Projekt (Entscheidung
-// vom 2026-10-09): Das macht ein Admin in Kephalaion, danach trägt
-// k-playbook den Namen der Collection ein.
+// vom 2026-10-09, Task 138): Das Einrichten in Kephalaion macht ein Admin,
+// den Account auf diesem Rechner der Nutzer mit dem Einrichtungstoken; danach
+// trägt k-playbook Hub und Collection ein.
 func kephalaionAdminSteps(projectName string) []string {
 	return []string{
-		"Einen Kephalaion-Hub finden und auf diesem Rechner einen Node einrichten, der ihn abgleicht (kephalaion status zeigt den Alias).",
+		"Einen Kephalaion-Hub finden; ist Kephalaion auf diesem Rechner noch nicht eingerichtet: kephalaion node setup <code>.",
 		"Am Hub die Collection des Projekts anlegen, meist nach dem Projekt benannt: " + projectName + ".",
-		"Am Hub für diesen Rechner einen eigenen Account anlegen und ihm die Collection geben (mindestens read; write zum Schreiben).",
-		"Den User eintragen, der diesen Rechner bedient, und das Token des Accounts am Node ablegen (tokens/<hub>/<account>.token).",
-		"Danach hier die Collection wählen, testen und eintragen.",
+		"Am Hub für diesen Rechner einen eigenen Account anlegen und ihm die Collection geben (mindestens read; write zum Schreiben); " +
+			"der Admin gibt dafür ein Einrichtungstoken aus (kephalaion hub account add bzw. kephalaion hub account token).",
+		"Auf diesem Rechner den Account mit dem Einrichtungstoken einrichten: kephalaion node account setup <hub> <account>; " +
+			"gibt es für den Hub mehrere Accounts, einen als Standard setzen: kephalaion node account default <hub> <account>.",
+		"Danach hier die Collection wählen, testen und eintragen; eingetragen werden Hub und Collection in " +
+			project.ConfigDisplayName + " (versioniert, danach committen).",
 	}
 }
 
-// kephalaionCandidatesHandler listet die Paare aus dem Token-Verzeichnis mit
-// ihren lesbaren Collections. GET ohne Werte aus der Anfrage; die Paare
-// kommen allein aus Dateinamen, Vertrag siehe oben.
+// kephalaionCandidatesHandler listet die Hubs aus der Auskunft mit dem
+// gewählten Account und seinen lesbaren Collections. GET ohne Werte aus der
+// Anfrage; Hubs und Accounts kommen allein aus der Auskunft, Vertrag siehe
+// oben.
 func kephalaionCandidatesHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, kephalaionCandidatesResponse{
-			Pairs: []kephalaion.Pair{}, Pending: []kephalaion.Pending{},
+			Hubs: []kephalaion.HubProbe{}, AdminSteps: []string{},
 			Message: "Keine " + project.ConfigFileName + " gefunden.",
 		})
 		return
 	}
-	env := kephalaionEnv()
-	_, pending := env.Candidates()
-	if pending == nil {
-		pending = []kephalaion.Pending{}
-	}
 	projectName := filepath.Base(environment.ProjectDir)
 	response := kephalaionCandidatesResponse{
-		Available:      true,
-		ConfigPresent:  env.ConfigPresent,
-		ConfigPath:     project.DisplayPath(env.ConfigPath),
-		ConfigSource:   env.ConfigSource,
-		ConfigProblem:  env.ConfigProblem(),
-		TokensDir:      project.DisplayPath(env.TokensDir()),
-		Endpoint:       env.Endpoint,
-		AddressProblem: env.AddressProblem,
-		Pairs:          kephalaion.ProbePairs(r.Context(), env),
-		Pending:        pending,
-		ProjectName:    projectName,
-		AdminSteps:     kephalaionAdminSteps(projectName),
+		Available:   true,
+		Hubs:        []kephalaion.HubProbe{},
+		ConfigFile:  project.DisplayPath(project.ConfigPath(environment.ProjectDir)),
+		ProjectName: projectName,
+		AdminSteps:  kephalaionAdminSteps(projectName),
 	}
-	current, _, _ := kephalaion.ReadBinding(project.LocalDir(environment.ProjectDir))
-	response.Preselect = preselect(response.Pairs, current, projectName)
+	info, hubs, err := kephalaion.ProbeHubs(r.Context())
+	if err != nil {
+		response.ClientState, response.ClientProblem = kephalaion.StateClientFailed, err.Error()
+		var clientErr *kephalaion.ClientError
+		if errors.As(err, &clientErr) {
+			response.ClientState = clientErr.State
+		}
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+	if info.Config.Path != nil {
+		response.ConfigPath = project.DisplayPath(*info.Config.Path)
+	}
+	response.ConfigSource = info.Config.Source
+	if info.Config.Problem != nil {
+		response.ConfigProblem = *info.Config.Problem
+	}
+	response.NodeURL = info.Node.URL
+	response.TokensDir = project.DisplayPath(info.TokensDir)
+	response.Hubs = hubs
+	current, _ := project.ProjectBinding(environment.ProjectDir)
+	response.Preselect = preselect(hubs, current, projectName)
 	writeJSON(w, http.StatusOK, response)
 }
 
-// preselect wählt Paar und Collection vor: das eingetragene Paar, wenn es
-// unter den Kandidaten ist, sonst das erste angemeldete; als Collection die
+// preselect wählt Hub und Collection vor: den eingetragenen Hub, wenn die
+// Auskunft ihn nennt, sonst den ersten angemeldeten; als Collection die
 // eingetragene, sonst die nach dem Projekt benannte, sonst die einzige.
-func preselect(pairs []kephalaion.Pair, current kephalaion.Binding, projectName string) kephalaionSelection {
-	var chosen *kephalaion.Pair
-	for i := range pairs {
-		if pairs[i].Hub == current.Hub && pairs[i].Account == current.Account {
-			chosen = &pairs[i]
+func preselect(hubs []kephalaion.HubProbe, current kephalaion.Binding, projectName string) kephalaionSelection {
+	var chosen *kephalaion.HubProbe
+	for i := range hubs {
+		if hubs[i].Hub == current.Hub {
+			chosen = &hubs[i]
 			break
 		}
 	}
 	if chosen == nil {
-		for i := range pairs {
-			if pairs[i].State == kephalaion.StateOK {
-				chosen = &pairs[i]
+		for i := range hubs {
+			if hubs[i].State == kephalaion.StateOK {
+				chosen = &hubs[i]
 				break
 			}
 		}
 	}
-	if chosen == nil && len(pairs) > 0 {
-		chosen = &pairs[0]
+	if chosen == nil && len(hubs) > 0 {
+		chosen = &hubs[0]
 	}
 	if chosen == nil {
 		return kephalaionSelection{}
 	}
-	sel := kephalaionSelection{Hub: chosen.Hub, Account: chosen.Account}
+	sel := kephalaionSelection{Hub: chosen.Hub}
 	has := func(name string) bool {
 		for _, c := range chosen.Collections {
 			if c.Collection == name {
@@ -243,31 +253,32 @@ func preselect(pairs []kephalaion.Pair, current kephalaion.Binding, projectName 
 	return sel
 }
 
-// maxKephalaionRequest begrenzt den Rumpf eines POST: drei kurze Namen.
+// maxKephalaionRequest begrenzt den Rumpf eines POST: zwei kurze Namen.
 const maxKephalaionRequest = 4 << 10
 
+// kephalaionRequest ist der Rumpf eines POST. Ein Account darin wird nicht
+// gelesen: Er kommt von Kephalaion.
 type kephalaionRequest struct {
 	Hub        string `json:"hub"`
 	Collection string `json:"collection"`
-	Account    string `json:"account"`
 }
 
 type kephalaionTestResponse struct {
 	Status  kephalaion.Status `json:"status"`
 	Saved   bool              `json:"saved"`
+	Changed bool              `json:"changed,omitempty"`
 	Message string            `json:"message,omitempty"`
 }
 
 // readKephalaionRequest liest und prüft den Rumpf. Ein Name außerhalb der
-// Namensregel endet hier mit 400; ob das Paar ein Kandidat ist, prüft
-// CheckBinding.
+// Namensregel endet hier mit 400.
 func readKephalaionRequest(w http.ResponseWriter, r *http.Request) (kephalaion.Binding, bool) {
 	var request kephalaionRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxKephalaionRequest)).Decode(&request); err != nil {
 		writeJSON(w, http.StatusBadRequest, kephalaionTestResponse{Message: "Anfrage nicht lesbar."})
 		return kephalaion.Binding{}, false
 	}
-	binding := kephalaion.Binding{Hub: request.Hub, Collection: request.Collection, Account: request.Account}
+	binding := kephalaion.Binding{Hub: request.Hub, Collection: request.Collection}
 	if err := kephalaion.ValidateBinding(binding); err != nil {
 		writeJSON(w, http.StatusBadRequest, kephalaionTestResponse{
 			Status:  kephalaion.Status{Configured: true, State: kephalaion.StateInvalidEntry, Message: "Eintrag ungültig: " + err.Error() + "."},
@@ -278,12 +289,12 @@ func readKephalaionRequest(w http.ResponseWriter, r *http.Request) (kephalaion.B
 	return binding, true
 }
 
-// kephalaionTestHandler testet Paar und Collection aus der Anfrage und
+// kephalaionTestHandler testet Hub und Collection aus der Anfrage und
 // schreibt nichts. Messender Endpunkt mit Werten aus der Anfrage: nur per
-// POST hinter sameOrigin; Hub und Account müssen genau einem Kandidaten
-// entsprechen, die Collection wird nur mit whoami verglichen, gesendet wird
-// nur an Loopback. Ein POST ohne Origin kommt durch — von einem lokalen
-// Prozess, der die Token-Dateien ohnehin lesen kann. Vertrag siehe oben.
+// POST hinter sameOrigin; Account und Token kommen aus der Auskunft, die
+// Collection wird nur mit whoami verglichen, gesendet wird nur an Loopback.
+// Ein POST ohne Origin kommt durch — von einem lokalen Prozess, der die
+// Token-Dateien ohnehin lesen kann. Vertrag siehe oben.
 func kephalaionTestHandler(w http.ResponseWriter, r *http.Request) {
 	if !project.Detect().Installed {
 		writeJSON(w, http.StatusConflict, kephalaionTestResponse{Message: "Keine " + project.ConfigFileName + " gefunden."})
@@ -293,16 +304,18 @@ func kephalaionTestHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	status := kephalaion.CheckBinding(r.Context(), binding, kephalaionEnv())
+	status := kephalaion.CheckBinding(r.Context(), binding)
 	writeJSON(w, http.StatusOK, kephalaionTestResponse{Status: status})
 }
 
-// kephalaionSaveHandler testet erneut und trägt nur bei ok ein: Er ersetzt
-// den Block kephalaion: in K-PLAYBOOK.local.yaml und ergänzt, falls Git die
-// Datei sonst nicht ignorierte, k-playbook-local/.gitignore. Schreibender
-// Endpunkt mit Werten aus der Anfrage: derselbe Vertrag wie beim Test, dazu
-// schreibt er nur Namen, die die Namensregel bestehen und gerade getestet
-// wurden. Ein POST ohne Origin kommt durch — siehe oben, warum das tragbar ist.
+// kephalaionSaveHandler testet erneut und trägt nur bei ok ein: Hub und
+// Collection zeilenweise in den Block kephalaion: von K-PLAYBOOK.yaml
+// (project.SetKephalaionBinding), andere Blöcke und Kommentare unberührt, nie
+// ein Account. Die Antwort sagt, dass die Datei versioniert ist und die
+// Änderung committet werden will. Schreibender Endpunkt mit Werten aus der
+// Anfrage: derselbe Vertrag wie beim Test, dazu schreibt er nur Namen, die
+// die Namensregel bestehen und gerade getestet wurden. Ein POST ohne Origin
+// kommt durch — siehe oben, warum das tragbar ist.
 func kephalaionSaveHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
@@ -313,7 +326,7 @@ func kephalaionSaveHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	status := kephalaion.CheckBinding(r.Context(), binding, kephalaionEnv())
+	status := kephalaion.CheckBinding(r.Context(), binding)
 	if !status.OK {
 		writeJSON(w, http.StatusConflict, kephalaionTestResponse{
 			Status:  status,
@@ -321,14 +334,17 @@ func kephalaionSaveHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if err := kephalaion.WriteBinding(project.LocalDir(environment.ProjectDir), binding); err != nil {
+	result, err := project.SetKephalaionBinding(environment.ProjectDir, binding.Hub, binding.Collection)
+	if err != nil {
 		writeJSON(w, http.StatusConflict, kephalaionTestResponse{Status: status, Message: "Nicht eingetragen: " + err.Error() + "."})
 		return
 	}
 	dropKephalaionCache()
-	writeJSON(w, http.StatusOK, kephalaionTestResponse{
-		Status:  status,
-		Saved:   true,
-		Message: "Eingetragen in " + project.DisplayPath(kephalaion.LocalFilePath(project.LocalDir(environment.ProjectDir))) + ".",
-	})
+	where := project.DisplayPath(result.Config)
+	message := "Eingetragen in " + where + " (Block kephalaion:, hub " + binding.Hub + ", collection " + binding.Collection + "). " +
+		project.KephalaionCommitHint
+	if !result.Changed {
+		message = "Steht schon so in " + where + " (Block kephalaion:); nichts geändert."
+	}
+	writeJSON(w, http.StatusOK, kephalaionTestResponse{Status: status, Saved: true, Changed: result.Changed, Message: message})
 }

@@ -2,8 +2,8 @@ package kephalaion
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -14,17 +14,25 @@ import (
 type State string
 
 const (
-	// StateNotConfigured: Datei oder Block kephalaion: fehlt.
+	// StateNotConfigured: Der Block kephalaion: in K-PLAYBOOK.yaml fehlt.
 	StateNotConfigured State = "not-configured"
 	// StateInvalidEntry: Ein Name verstößt gegen die Namensregel, oder die
-	// Datei lässt sich nicht lesen.
+	// Projektkonfiguration lässt sich nicht lesen.
 	StateInvalidEntry State = "invalid-entry"
-	// StateNoKephalaion: Es gibt keine config von Kephalaion.
+	// StateNoKephalaion: Das Binary kephalaion fehlt oder ist zu alt für die
+	// Auskunft im Format 1 (QueryClient).
 	StateNoKephalaion State = "kephalaion-missing"
+	// StateClientFailed: Die Auskunft kephalaion node client ist nicht
+	// entstanden (Exit 1, Zeitgrenze, Absturz) oder nennt den Hub nicht.
+	StateClientFailed State = "client-failed"
 	// StateNodeAddress: Node-Adresse fehlt oder ist keine Loopback-Adresse.
 	StateNodeAddress State = "node-address"
-	// StateTokenMissing: Kein Kandidat passt zu Hub und Account, oder seine
-	// Datei ist unbrauchbar.
+	// StateAccountChoiceMissing: Für den Hub gibt es mehrere Token-Dateien
+	// und keinen Standard (choice missing mit Kandidaten).
+	StateAccountChoiceMissing State = "account-choice-missing"
+	// StateTokenMissing: Für den Hub gibt es keine brauchbare Token-Datei —
+	// keine, nur ein wartendes Token, eine an falschem Ort oder eine
+	// unbrauchbare.
 	StateTokenMissing State = "token-missing"
 	// StateNodeUnreachable: Der Node antwortet nicht oder nicht verständlich.
 	StateNodeUnreachable State = "node-unreachable"
@@ -65,6 +73,9 @@ type Status struct {
 	Hub        string `json:"hub"`
 	Collection string `json:"collection"`
 	Account    string `json:"account"`
+	// Choice sagt, woher der Account kommt (Auskunft kephalaion node
+	// client): override, default, only; leer, solange keiner gewählt ist.
+	Choice Choice `json:"choice,omitempty"`
 	// Address ist <hub>:<collection>, sobald beide Namen gültig sind.
 	Address string `json:"address"`
 	State   State  `json:"state"`
@@ -87,41 +98,68 @@ type Status struct {
 	Sync *Sync `json:"sync,omitempty"`
 }
 
-// Check liest die Anbindung aus localDir und prüft sie gegen den Node, den
-// env beschreibt. Check scheitert nie: Jeder Fehler wird ein Zustand. Die
-// Zeitgrenze DefaultTimeout gilt für die ganze Prüfung.
-func Check(ctx context.Context, localDir string, env Env) Status {
-	binding, configured, err := ReadBinding(localDir)
-	if err != nil {
-		return Status{Configured: true, State: StateInvalidEntry, Message: err.Error() + "."}
+// Check prüft die Anbindung eines Projekts: Hub und Collection aus dem Block
+// kephalaion: seiner Konfiguration (.k-playbook/K-PLAYBOOK.yaml, gelesen von
+// project.ReadConfig). Sind beide leer, fehlt der Block: not-configured, die
+// Meldung nennt den Block und configFile. Sonst CheckBinding. Check scheitert
+// nie: Jeder Fehler wird ein Zustand.
+func Check(ctx context.Context, binding Binding, configFile string) Status {
+	if binding.Hub == "" && binding.Collection == "" {
+		return Status{State: StateNotConfigured, Message: NotConfiguredMessage(configFile)}
 	}
-	if !configured {
-		return Status{State: StateNotConfigured,
-			Message: "Keine Collection eingetragen: In " + LocalFileName + " fehlt der Block kephalaion:."}
-	}
-	return CheckBinding(ctx, binding, env)
+	return CheckBinding(ctx, binding)
 }
 
-// CheckBinding prüft eine Anbindung — aus der Datei oder aus einer Anfrage —
-// gegen den Node, den env beschreibt. Vertrag wie im Paketkommentar: Namen
-// nach der Namensregel, das Paar genau ein Kandidat, das Token aus dessen
-// Pfad, gesendet nur an die Loopback-Adresse aus env.
-func CheckBinding(ctx context.Context, binding Binding, env Env) Status {
-	status := Status{Configured: true}
+// NotConfiguredMessage ist der Satz, wenn der Block kephalaion: in
+// configFile fehlt, samt Abhilfe.
+func NotConfiguredMessage(configFile string) string {
+	return "Keine Collection eingetragen: In " + configFile + " fehlt der Block kephalaion: mit hub und collection. " +
+		"Abhilfe: den Block dort eintragen (hub: <alias>, collection: <name>) und committen, " +
+		"oder in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion)."
+}
+
+// CheckBinding prüft Hub und Collection gegen den Node, den die Auskunft
+// kephalaion node client nennt, mit dem Account, den sie für den Hub wählt.
+// Vertrag wie im Paketkommentar: Namen nach der Namensregel; Account,
+// Token-Datei und Node-Adresse allein aus der Auskunft (ResolveAccess);
+// gesendet nur an die Loopback-Adresse. Ein Account der Anbindung wird nicht
+// gelesen. Die Zeitgrenze ClientTimeout gilt für die Auskunft,
+// DefaultTimeout für die Anfrage am Node.
+func CheckBinding(ctx context.Context, binding Binding) Status {
 	if err := ValidateBinding(binding); err != nil {
-		status.State = StateInvalidEntry
-		status.Message = "Eintrag ungültig: " + err.Error() + "."
+		return Status{Configured: true, State: StateInvalidEntry, Message: "Eintrag ungültig: " + err.Error() + "."}
+	}
+	access, err := ResolveAccess(ctx, binding.Hub)
+	if err != nil {
+		status := Status{Configured: true, Hub: binding.Hub, Collection: binding.Collection, Address: binding.Address()}
+		var clientErr *ClientError
+		if errors.As(err, &clientErr) {
+			status.State, status.Message = clientErr.State, clientErr.Message
+		} else {
+			status.State, status.Message = StateClientFailed, err.Error()
+		}
 		return status
 	}
-	status.Hub, status.Collection, status.Account = binding.Hub, binding.Collection, binding.Account
-	status.Address = binding.Address()
+	return checkAccess(ctx, binding, access)
+}
 
-	reply, early := probe(ctx, binding.Hub, binding.Account, env)
+// checkAccess prüft Hub und Collection mit einem Zugang aus der Auskunft.
+// Ein Hinweis des Zugangs (rotate offen) und ein Problem der config stehen
+// hinter der Meldung, gleich welcher Zustand.
+func checkAccess(ctx context.Context, binding Binding, access Access) Status {
+	status := Status{Configured: true, Hub: binding.Hub, Collection: binding.Collection, Address: binding.Address(),
+		Account: access.Account, Choice: access.Choice}
+	reply, early := probe(ctx, access)
 	if early != nil {
 		status.State, status.Message = early.State, early.Message
-		return status
+	} else {
+		evaluate(&status, binding, reply)
 	}
-	evaluate(&status, binding, reply)
+	for _, extra := range []string{access.Note, access.ConfigProblem} {
+		if extra != "" {
+			status.Message += " " + extra
+		}
+	}
 	return status
 }
 
@@ -131,73 +169,25 @@ type failure struct {
 	Message string
 }
 
-// probe führt die Schritte bis zur Antwort von whoami aus: config, Adresse,
-// Kandidat, Token, Anfrage. Hub und Account müssen schon geprüft sein.
-func probe(ctx context.Context, hub, account string, env Env) (*whoamiOutput, *failure) {
-	if problem := env.ConfigProblem(); problem != "" {
-		return nil, &failure{StateNoKephalaion, problem}
-	}
-	if env.Endpoint == "" {
-		return nil, &failure{StateNodeAddress, "Keine zulässige Adresse des Nodes: " + env.AddressProblem}
-	}
-	candidate, ok := env.FindCandidate(hub, account)
-	if !ok {
-		return nil, &failure{StateTokenMissing, tokenMissingMessage(env, hub, account)}
-	}
-	token, err := candidate.readToken()
+// probe liest das Token des Zugangs und fragt den Node nach whoami.
+func probe(ctx context.Context, access Access) (*whoamiOutput, *failure) {
+	token, err := access.readToken()
 	if err != nil {
 		return nil, &failure{StateTokenMissing, fmt.Sprintf(
-			"Die Token-Datei für Account %s am Hub %s ist unbrauchbar: %v.", account, hub, err)}
+			"Die Token-Datei %s für Account %s am Hub %s ist unbrauchbar: %v. "+
+				"Abhilfe: kephalaion node account list zeigt ihren Zustand; ist sie kaputt, den Account neu einrichten "+
+				"(kephalaion node account setup %s %s mit einem Einrichtungstoken vom Admin).",
+			access.tokenFile, access.Account, access.Hub, err, access.Hub, access.Account)}
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 	defer cancel()
-	reply, err := callWhoami(ctx, env.Endpoint, candidate, token)
+	reply, err := callWhoami(ctx, access.Endpoint, access.Hub, access.Account, token)
 	if err != nil {
 		return nil, &failure{StateNodeUnreachable, redact(
-			fmt.Sprintf("Der Node antwortet nicht unter %s: %v.", env.Endpoint, err), token)}
+			fmt.Sprintf("Der Node antwortet nicht unter %s: %v.", access.Endpoint, err), token)}
 	}
 	return reply, nil
-}
-
-// ConfigProblem sagt in einem Satz, warum die config von Kephalaion nicht
-// trägt — keine da oder nicht lesbar —, mit den Pfaden, an denen gesucht
-// bzw. gelesen wurde; leer, wenn sie gelesen ist. Ein Inhalt der Datei steht
-// nie darin.
-func (e Env) ConfigProblem() string {
-	if !e.ConfigPresent {
-		return "Kephalaion ist auf diesem Rechner nicht eingerichtet: " + e.missingConfig() + "."
-	}
-	if e.ConfigError != "" {
-		return "Die config von Kephalaion unter " + e.ConfigPath + " ist nicht lesbar: " + e.ConfigError + "."
-	}
-	return ""
-}
-
-// missingConfig nennt die Orte, an denen die Suche keine config fand. Bei
-// KEPHALAION_CONFIG ist das nur dieser Pfad: Die Variable schließt die
-// übrigen Orte aus.
-func (e Env) missingConfig() string {
-	if e.ConfigSource == SourceEnv {
-		return "keine config unter " + e.ConfigPath + " (Quelle " + EnvConfigVar + ")"
-	}
-	system := filepath.Clean(SystemConfigPath)
-	if e.UserDir == "" {
-		return "keine config unter " + system + ", und die des Users ist unbekannt, weil das Heimatverzeichnis unbekannt ist"
-	}
-	return "keine config unter " + filepath.Join(e.UserDir, "config.yaml") + " und keine unter " + system
-}
-
-// tokenMissingMessage nennt das Token-Verzeichnis des Users, in dem die
-// Datei des Paars fehlt.
-func tokenMissingMessage(env Env, hub, account string) string {
-	dir := env.TokensDir()
-	if dir == "" {
-		return fmt.Sprintf("Keine Token-Datei für Account %s am Hub %s: Das Token-Verzeichnis ist unbekannt, weil das Heimatverzeichnis unbekannt ist.",
-			account, hub)
-	}
-	return fmt.Sprintf("Keine Token-Datei für Account %s am Hub %s: %s/%s.token fehlt im Token-Verzeichnis %s.",
-		account, hub, hub, account, dir)
 }
 
 // hubState wertet den Eintrag eines Hubs in der Antwort aus: alles bis zur
@@ -298,7 +288,7 @@ func readableList(hub string, collections []whoamiCollection) string {
 	return strings.Join(names, ", ")
 }
 
-// Collection ist eine lesbare Collection eines Paars, wie der
+// Collection ist eine lesbare Collection eines Hubs, wie der
 // Einrichtungsschritt sie anbietet.
 type Collection struct {
 	Collection string   `json:"collection"`
@@ -306,59 +296,83 @@ type Collection struct {
 	Rights     []string `json:"rights"`
 }
 
-// Pair ist ein Kandidat mit dem, was der Node für ihn meldet.
-type Pair struct {
+// HubProbe ist ein Hub aus der Auskunft mit dem Account, den sie für ihn
+// wählt, und dem, was der Node für diesen Account meldet.
+type HubProbe struct {
 	Hub     string `json:"hub"`
-	Account string `json:"account"`
+	Account string `json:"account,omitempty"`
+	Choice  Choice `json:"choice,omitempty"`
 	// State ist StateOK, wenn der Account angemeldet ist; sonst der Zustand,
-	// an dem es scheitert.
+	// an dem es scheitert — auch schon an der Auskunft (Wahl fehlt, kein
+	// Token).
 	State       State        `json:"state"`
 	Message     string       `json:"message"`
 	User        string       `json:"user,omitempty"`
 	Collections []Collection `json:"collections"`
 }
 
-// ProbePairs fragt den Node für jeden Kandidaten nach den lesbaren
-// Collections. Die Kandidaten kommen allein aus dem Token-Verzeichnis; aus
-// einer Anfrage fließt nichts ein. Die Zeitgrenze gilt je Kandidat.
-func ProbePairs(ctx context.Context, env Env) []Pair {
-	candidates, _ := env.Candidates()
-	pairs := make([]Pair, 0, len(candidates))
-	// Antwortet der Node für einen Kandidaten nicht, antwortet er auch für die
-	// übrigen nicht; sie bekommen denselben Zustand, ohne erneut zu warten.
+// ProbeHubs fragt die Auskunft ohne --hub — jeder Hub mit Verzeichnis unter
+// tokens/ — und für jeden Hub, für den sie einen Account mit Token-Datei
+// nennt, den Node nach den lesbaren Collections. Aus einer Anfrage fließt
+// nichts ein. Ein Fehler ist der *ClientError der Auskunft; info trägt dann
+// nichts. Die Zeitgrenze DefaultTimeout gilt je Hub; antwortet der Node für
+// einen nicht, bekommen die übrigen denselben Zustand, ohne erneut zu warten.
+func ProbeHubs(ctx context.Context) (ClientInfo, []HubProbe, error) {
+	info, err := QueryClient(ctx)
+	if err != nil {
+		return ClientInfo{}, nil, err
+	}
+	probes := make([]HubProbe, 0, len(info.Hubs))
 	var unreachable *failure
-	for _, c := range candidates {
-		pair := Pair{Hub: c.Hub, Account: c.Account, Collections: []Collection{}}
-		if unreachable != nil {
-			pair.State, pair.Message = unreachable.State, unreachable.Message
-			pairs = append(pairs, pair)
+	for _, entry := range info.Hubs {
+		if CheckName("Hub", entry.Alias) != nil {
 			continue
 		}
-		reply, early := probe(ctx, c.Hub, c.Account, env)
+		hub := HubProbe{Hub: entry.Alias, Collections: []Collection{}}
+		access, err := ResolveInfo(info, entry.Alias)
+		if err != nil {
+			hub.State, hub.Message = StateClientFailed, err.Error()
+			var clientErr *ClientError
+			if errors.As(err, &clientErr) {
+				hub.State = clientErr.State
+			}
+			probes = append(probes, hub)
+			continue
+		}
+		hub.Account, hub.Choice = access.Account, access.Choice
+		if unreachable != nil {
+			hub.State, hub.Message = unreachable.State, unreachable.Message
+			probes = append(probes, hub)
+			continue
+		}
+		reply, early := probe(ctx, access)
 		if early != nil && early.State == StateNodeUnreachable {
 			unreachable = early
 		}
 		if early != nil {
-			pair.State, pair.Message = early.State, early.Message
-			pairs = append(pairs, pair)
+			hub.State, hub.Message = early.State, early.Message
+			probes = append(probes, hub)
 			continue
 		}
-		entry, state, message := hubState(c.Hub, reply)
-		pair.State, pair.Message = state, message
+		whoami, state, message := hubState(entry.Alias, reply)
+		hub.State, hub.Message = state, message
 		if state == StateOK {
-			pair.User = entry.User
-			pair.Message = fmt.Sprintf("Angemeldet als %s (User %s).", entry.Account, entry.User)
-			for _, col := range entry.Collections {
+			hub.User = whoami.User
+			hub.Message = fmt.Sprintf("Angemeldet als %s (User %s).", whoami.Account, whoami.User)
+			for _, col := range whoami.Collections {
 				if !slices.Contains(col.Rights, "read") {
 					continue
 				}
-				pair.Collections = append(pair.Collections, Collection{
-					Collection: col.Collection, Address: c.Hub + ":" + col.Collection,
+				hub.Collections = append(hub.Collections, Collection{
+					Collection: col.Collection, Address: entry.Alias + ":" + col.Collection,
 					Rights: append([]string{}, col.Rights...),
 				})
 			}
 		}
-		pairs = append(pairs, pair)
+		if access.Note != "" {
+			hub.Message += " " + access.Note
+		}
+		probes = append(probes, hub)
 	}
-	return pairs
+	return info, probes, nil
 }

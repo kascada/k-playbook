@@ -1,51 +1,42 @@
-// Package kephalaion liest die Anbindung eines Projekts an eine
-// Kephalaion-Collection, prüft sie über das MCP-Werkzeug whoami am Node dieses
-// Rechners und schreibt sie nach bestandenem Test.
+// Package kephalaion prüft die Anbindung eines Projekts an seine
+// Kephalaion-Collection über das MCP-Werkzeug whoami am Node dieses Rechners
+// und ruft dort die Werkzeuge der Collection auf.
 //
-// Die Anbindung steht in k-playbook-local/K-PLAYBOOK.local.yaml, Block
-// kephalaion: — Hub-Alias, Collection und Account. Die Datei ist rechnerlokal
-// und nicht versioniert. Ein Token steht nie darin: Es bleibt in Kephalaions
-// eigener Datei tokens/<hub>/<account>.token neben der config des Users.
+// Die Anbindung sind Hub-Alias und Collection aus dem Block kephalaion: der
+// versionierten Projektkonfiguration (.k-playbook/K-PLAYBOOK.yaml, gelesen
+// vom Paket project). Account, Token-Datei und Adresse des Nodes kommen allein
+// aus der Auskunft kephalaion node client (clientinfo.go); eine eigene Suche
+// nach config und Token gibt es nicht. Ein Token steht nie in einer Datei von
+// k-playbook: Es bleibt in Kephalaions eigener Datei
+// <tokensDir>/<hub>/<account>.token.
 //
 // Sicherheitsvertrag, für alle Aufrufer gleich (Kontextausgabe, Oberfläche):
-// Hub und Account kommen aus der Projektdatei oder aus einer Anfrage und
-// fließen in einen Dateipfad und in Header. Deshalb werden sie nach der
-// Namensregel von Kephalaion geprüft und müssen genau einem Kandidaten aus
-// dem Token-Verzeichnis entsprechen; gelesen wird der Pfad des Kandidaten, nie
-// ein aus den rohen Werten gebauter. Die Collection wird nach der Namensregel
-// geprüft und nur mit der Antwort von whoami verglichen. Gesendet wird nur an
-// die Loopback-Adresse des Nodes. Ein Token erscheint in keinem Ergebnis,
-// keinem Fehler und keinem Log.
+// Hub und Collection kommen aus der Projektdatei oder aus einer Anfrage. Der
+// Hub wird ein Argument der Auskunft und ein Header-Name, deshalb werden beide
+// nach der Namensregel von Kephalaion geprüft. Gelesen wird ein Token nur aus
+// der Token-Datei, die die Auskunft nennt, und nur, wenn sie genau
+// <tokensDir>/<hub>/<account>.token ist — eine reguläre Datei, kein Symlink,
+// in der Form eines Tokens. Die Collection wird nur mit der Antwort von
+// whoami verglichen. Gesendet wird nur an die Loopback-Adresse des Nodes aus
+// der Auskunft. Ein Token erscheint in keinem Ergebnis, keinem Fehler und
+// keinem Log.
 //
 // Das Paket hängt nur von der Standardbibliothek und yamllite ab, damit
 // project es für die Kontextausgabe einbinden kann.
 package kephalaion
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
 
-// LocalFileName ist die rechnerlokale Ergänzung zu K-PLAYBOOK.yaml unter
-// k-playbook-local/.
-const LocalFileName = "K-PLAYBOOK.local.yaml"
-
-// BlockName ist der Block in LocalFileName, den dieses Paket liest und
-// schreibt; alles andere in der Datei bleibt unberührt.
-const BlockName = "kephalaion"
-
-// Binding ist der Inhalt des Blocks kephalaion: aus LocalFileName.
+// Binding ist die Anbindung eines Projekts: Hub-Alias und Collection aus dem
+// Block kephalaion: von K-PLAYBOOK.yaml. Der Account gehört nicht dazu; er
+// kommt von Kephalaion.
 type Binding struct {
 	Hub        string `json:"hub"`
 	Collection string `json:"collection"`
-	Account    string `json:"account"`
 }
 
 // Address ist die Adresse der Collection für Clients: <hub>:<collection>.
@@ -54,44 +45,6 @@ func (b Binding) Address() string {
 		return ""
 	}
 	return b.Hub + ":" + b.Collection
-}
-
-// LocalFilePath ist der Ort von LocalFileName unter localDir.
-func LocalFilePath(localDir string) string {
-	return filepath.Join(localDir, LocalFileName)
-}
-
-// ReadBinding liest den Block kephalaion: aus LocalFileName unter localDir.
-//
-// configured ist false, wenn die Datei oder der Block fehlt oder der Block
-// keinen der drei Werte trägt — das ist ein Zustand, kein Fehler. Ein Fehler
-// heißt: Die Datei ist da, lässt sich aber nicht lesen oder nicht als YAML
-// verstehen. Die Namen prüft ReadBinding nicht; das macht ValidateBinding.
-func ReadBinding(localDir string) (binding Binding, configured bool, err error) {
-	data, err := os.ReadFile(LocalFilePath(localDir))
-	if errors.Is(err, fs.ErrNotExist) {
-		return Binding{}, false, nil
-	}
-	if err != nil {
-		return Binding{}, false, fmt.Errorf("%s nicht lesbar: %w", LocalFileName, err)
-	}
-	root, err := yamllite.Parse(data)
-	if err != nil {
-		return Binding{}, false, fmt.Errorf("%s ist kein lesbares YAML (%s)", LocalFileName, describeYAMLError(err))
-	}
-	block := root.Get(BlockName)
-	if block == nil {
-		return Binding{}, false, nil
-	}
-	binding = Binding{
-		Hub:        strings.TrimSpace(block.Get("hub").Str()),
-		Collection: strings.TrimSpace(block.Get("collection").Str()),
-		Account:    strings.TrimSpace(block.Get("account").Str()),
-	}
-	if binding == (Binding{}) {
-		return Binding{}, false, nil
-	}
-	return binding, true, nil
 }
 
 // yamlLinePattern liest die Zeilennummer vom Anfang eines Fehlers von
@@ -180,14 +133,11 @@ func quoteName(name string) string {
 	return "(unzulässiger Wert)"
 }
 
-// ValidateBinding prüft alle drei Namen nach der Namensregel. Der erste Verstoß
-// wird gemeldet.
+// ValidateBinding prüft Hub und Collection nach der Namensregel. Der erste
+// Verstoß wird gemeldet.
 func ValidateBinding(b Binding) error {
 	if err := CheckName("Hub", b.Hub); err != nil {
 		return err
 	}
-	if err := CheckName("Collection", b.Collection); err != nil {
-		return err
-	}
-	return checkAccountName(b.Account)
+	return CheckName("Collection", b.Collection)
 }

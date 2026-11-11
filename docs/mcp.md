@@ -714,8 +714,9 @@ file local before shipped, and as include targets `includes/` and `testdata/`; t
 templates `docs/<pfad>/README.md` only from the shipped layer, without a local version
 (task 137). Only
 `instructions/always/` is assembled. The shipped layer of every kind is read from the public
-collection `<hub>:k-playbook` under `defaults/` through the node's replica (task 131): hub and
-account of the project binding, collection `k-playbook`; without a ready binding, or with an
+collection `<hub>:k-playbook` under `defaults/` through the node's replica (task 131): the hub
+of the project binding, the account Kephalaion chooses for it (`kephalaion node client`),
+collection `k-playbook`; without a ready binding, or with an
 empty `defaults/`, a `k-playbook:` reference is `kephalaion_unavailable`, also when a local file
 exists -- no fallback to the clone `k-playbook/`. For `commands/` that is the text of a command, while
 the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/commands/`) is only the hull the assistant registers (task 092,
@@ -1248,8 +1249,10 @@ is always present, `[]` without a problem. The sources in this version:
 
 | Area | Condition | Level | Hint |
 |---|---|---|---|
-| `kephalaion` | the block `kephalaion:` is in `K-PLAYBOOK.local.yaml`, but the state of `kephalaion.Check` is not `ok` (invalid entry, no Kephalaion on this machine, node unreachable, token missing, login invalid, hub unknown or never synced, collection unreadable …) | `error` | per state: fix the entry, check the node (`kephalaion status`), check the account, sync the hub, or choose a readable collection in the GUI |
-| `kephalaion` | not configured | `error` (a `warning` until task 131) | set up the binding in the GUI; without it there are no shipped texts (`k-playbook:`, the briefing) and `keph:` references, workbench and `work` are out of reach |
+| `kephalaion` | the block `kephalaion:` is in `.k-playbook/K-PLAYBOOK.yaml`, but the state of `kephalaion.Check` is not `ok` (invalid entry, `kephalaion` missing or too old, client information failed, node address not loopback, no account chosen, token missing, node unreachable, login invalid, hub unknown or never synced, collection unreadable …) | `error` | the remedy the state's message names (the part after „Abhilfe:“), otherwise per state: fix the entry, `kephalaion upgrade`, `kephalaion node account default <hub> <account>`, `kephalaion node account setup <hub> <account>`, check the node (`kephalaion status`), sync the hub, or choose a readable collection in the GUI; without any `kephalaion` binary the installation |
+| `kephalaion` | not configured | `error` (a `warning` until task 131) | enter the block `kephalaion:` (hub, collection) in `.k-playbook/K-PLAYBOOK.yaml` and commit it, or set up the binding in the GUI; without it there are no shipped texts (`k-playbook:`, the briefing) and `keph:` references, workbench and `work` are out of reach |
+| `kephalaion` | the block `kephalaion:` in `.k-playbook/K-PLAYBOOK.yaml` carries an `account:` | `warning` | remove the line and commit; the account of this machine is set with `kephalaion node account default <hub> <account>` |
+| `kephalaion` | the old `k-playbook-local/K-PLAYBOOK.local.yaml` still holds a block `kephalaion:` (or is unreadable) | `warning` | run `/k-upgrade`: `k-playbook upgrade` moves hub and collection into the block, then `/k-upgrade` deletes the old file after confirmation |
 | `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
 | `versionSources` | `version-sources.yaml` is present, but unreadable or of an unknown schema version (`versionSources.error` set) | `error` | fix or remove the file; the details are in `context.versionSources.error` |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |

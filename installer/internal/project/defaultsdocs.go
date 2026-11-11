@@ -73,7 +73,7 @@ const defaultsReaders = 8
 // Anbindung, sonst mit dem Platzhalter <hub>.
 func defaultsAddress(projectDir string) string {
 	hub := "<hub>"
-	if binding, configured, err := kephalaion.ReadBinding(LocalDir(projectDir)); err == nil && configured && binding.Hub != "" {
+	if binding, err := ProjectBinding(projectDir); err == nil && kephalaion.CheckName("Hub", binding.Hub) == nil {
 		hub = binding.Hub
 	}
 	return hub + ":" + DefaultsCollectionName

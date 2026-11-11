@@ -403,61 +403,104 @@ It is the same tool for every project. Which project it means derives from the d
 
 Each project works with its own collection in Kephalaion, usually named after the project.
 Setting it up happens in this order: an admin finds a Kephalaion hub, creates the collection
-there, creates one account per machine and grants it the collection, and enters the user who
-operates the machine; the account's token is placed on the machine's node under
-`~/.config/kephalaion/tokens/<hub>/<account>.token`. Then k-playbook names the collection.
+there, creates one account per machine, grants it the collection and hands out a setup token
+(`kephalaion hub account add` or `kephalaion hub account token`). On the machine the account is
+set up with `kephalaion node account setup <hub> <account>`; the token lands in
+`~/.config/kephalaion/tokens/<hub>/<account>.token`. If Kephalaion is not set up on the machine
+at all, `kephalaion node setup <code>` comes first. Then k-playbook names the hub and the
+collection.
 
-The binding is machine-local and lives in `k-playbook-local/K-PLAYBOOK.local.yaml`, which is not
-versioned:
+**The binding is versioned.** Hub alias and collection are the same for everyone working on a
+project, so they live in the block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml` and are
+committed with the project:
 
 ```yaml
 kephalaion:
-  hub: vm                 # alias of the hub entry at this machine's node (kephalaion status)
+  hub: vm                 # alias of the hub entry; Kephalaion hands it out with the setup code
   collection: k-playbook  # address for clients: vm:k-playbook
-  account: kamran-wsl     # this machine's account; one account belongs to one machine
 ```
 
-A token never appears there; it stays in Kephalaion's own token file.
+The block names no account and no token. An `account:` line there is not read; the health check
+warns about it. The machine-local file `k-playbook-local/K-PLAYBOOK.local.yaml` of earlier
+versions is not read either (see "Moving the old binding" below).
 
-**The check.** k-playbook asks the node of this machine over MCP: `initialize` and
+**Account, token file and node come from Kephalaion.** k-playbook does not search for the
+Kephalaion config or the token itself. It asks the client information of the Kephalaion
+binary, `kephalaion node client --json --format 1 --no-probe --hub <alias>`, with a time limit
+of 5 seconds. The binary is looked up in `PATH`, then `~/.local/bin/kephalaion`, then
+`/usr/local/bin/kephalaion`; an MCP server started by a GUI assistant does not always inherit
+`PATH`. From the answer (format 1, see `kephalaion node client --help`) k-playbook takes:
+
+- the node address from `node.url`, accepted only for `127.0.0.1`, `[::1]` or `localhost`; any
+  other address is reported and never contacted;
+- the account from `hubs[].account` and its origin from `choice` — the client's override, the
+  default account (`kephalaion node account default`), or the only token file. k-playbook calls
+  without `--account`; there is no per-project choice of account;
+- the token file from `hubs[].tokenFile`, read only if it is exactly
+  `<tokensDir>/<hub>/<account>.token`, a regular file and not a symlink, holding a token of the
+  form `keph_` plus 43 characters.
+
+`config.source: none` is not an error: without a Kephalaion config the node's default address
+applies. A `config.problem` is named in the message. A token never appears in any output,
+message or log, and it is only sent to the loopback address.
+
+**The check.** With these values k-playbook asks the node over MCP: `initialize` and
 `tools/call whoami` on `/mcp`, with the header pair `X-Keph-Account-<hub>` and
-`X-Keph-Token-<hub>` and the token read from the token file. It passes when the node answers,
-reports `login: ok` for the hub and lists the collection among the readable ones. That shows
-more than the command `kephalaion node whoami`: that the node answers on `/mcp` and that the
-token is valid at the hub. It does not show whether the headers in an assistant's own MCP
-configuration carry the same, still valid token. The address comes from `node.listen` in
-the `config.yaml` that applies, found in the same order Kephalaion uses without `--config`:
-`KEPHALAION_CONFIG`, then the user's config (`$XDG_CONFIG_HOME/kephalaion/config.yaml` or
-`~/.config/kephalaion/config.yaml`) if it exists, then the global
-`/etc/kephalaion/config.yaml` if it exists. Without `listen` Kephalaion's default
-`127.0.0.1:7433` applies. The token files always stay with the user, under
-`~/.config/kephalaion/tokens/` (or `$XDG_CONFIG_HOME/kephalaion/tokens/`), even when the global
-config applies. Only `127.0.0.1`, `[::1]` and `localhost` are accepted; a
-wildcard (`0.0.0.0`, `[::]`) is reached on `127.0.0.1`, any other address is reported and never
-contacted. The whole check takes at most 3 seconds.
+`X-Keph-Token-<hub>`. It passes when the node answers, reports `login: ok` for the hub and
+lists the collection among the readable ones. That shows more than `kephalaion node whoami`:
+that the node answers on `/mcp` and that the token is valid at the hub. It does not show
+whether the headers in an assistant's own MCP configuration carry the same, still valid token.
+The request to the node takes at most 3 seconds.
 
 `k-playbook context` carries the result in the block `kephalaion` (see
-[`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state)); the check never
-makes `context` fail.
+[`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state)), including
+`choice`, the origin of the account; the check never makes `context` fail. Every state in which
+the binding does not work has a message with its remedy:
 
-**The setup step.** The status page of the interface shows the collection, the account and the
-result of the check. When nothing is entered or the check fails, the setup step is shown first:
+| State | Meaning | Remedy in the message |
+|---|---|---|
+| `not-configured` | the block `kephalaion:` is missing in `.k-playbook/K-PLAYBOOK.yaml` | enter the block and commit it, or use the setup step |
+| `invalid-entry` | hub or collection breaks Kephalaion's naming rule, or the file is unreadable | fix the block |
+| `kephalaion-missing` | no `kephalaion` binary, or one without the client information in format 1 (exit 2, no JSON, other `format`) | install Kephalaion, or `kephalaion upgrade` |
+| `client-failed` | the client information could not be produced (exit 1, the reason from stderr), timed out or crashed | the reason; check by hand with `kephalaion node client --json --format 1 --no-probe` |
+| `node-address` | `node.url` is not a loopback address | set `listen` under `node:` in the Kephalaion config to a loopback address |
+| `account-choice-missing` | several token files for the hub and no default | `kephalaion node account default <hub> <account>`; if the token directory is mounted read-only, as in the DevContainer, set the default on the host |
+| `token-missing` | no token file for the hub, only a waiting token (`.pending`), a token file elsewhere, or an unusable one | `kephalaion node account setup <hub> <account>` with a setup token from the admin, or first `kephalaion node setup <code>`; for a lone `.pending` the same `setup` call settles it |
+| `node-unreachable`, `hub-unknown`, `hub-never-synced`, `login-invalid`, `login-missing`, `replica-unreadable`, `collection-unreadable` | what the node or `whoami` reports | `kephalaion status`, `kephalaion node sync`, or another collection |
 
-1. Choose hub and account — the pairs come from the file names under
-   `~/.config/kephalaion/tokens/` (files ending in `.pending` are skipped and mentioned as
-   waiting for their exchange at the node).
-2. Choose the collection — the node lists the readable ones for the chosen pair; the one named
+If a `.pending` lies next to the token file (an open `rotate`), the binding still works and the
+message adds `kephalaion node account check <hub> <account> --token-file <file>` to clean up.
+
+**The setup step.** The status page of the interface shows the collection, the account with the
+origin of its choice and the result of the check. When nothing is entered or the check fails,
+the setup step is shown first. It shows the Kephalaion config, the node address and the token
+directory from the client information, then:
+
+1. Choose the hub — the hubs come from the client information without `--hub`, each with the
+   account Kephalaion chooses for it; a hub without a chosen account shows why.
+2. Choose the collection — the node lists the readable ones for the hub's account; the one named
    like the project directory is preselected.
 3. **Testen** — runs the check for this choice and writes nothing.
 4. **Eintragen** — checks again and writes only when the check passes.
 
-Writing replaces only the `kephalaion:` block of `K-PLAYBOOK.local.yaml` (the file is created
-when missing). Before that, k-playbook makes sure Git ignores the file, measured with
-`git check-ignore`; only if it does not, `/K-PLAYBOOK.local.yaml` is added to
-`k-playbook-local/.gitignore`. If the file is already tracked, nothing is written and the page
-points to `git rm --cached`. Without pairs the page lists the admin steps above; when the node
-does not answer, it says to start Kephalaion. The rest of the interface stays reachable
+Writing touches only the lines `hub:` and `collection:` of the block `kephalaion:` in
+`.k-playbook/K-PLAYBOOK.yaml`; a missing block is appended with a comment, other blocks and
+comments stay byte for byte. No account is written. The file is versioned, so the answer says
+that the change wants to be committed. Without hubs the page lists the admin steps above; when
+the node does not answer, it says to start Kephalaion. The rest of the interface stays reachable
 without a collection. "Collection ändern" on the status page opens the setup step again.
+
+**Moving the old binding.** Earlier versions kept hub, collection and account in
+`k-playbook-local/K-PLAYBOOK.local.yaml`. While that file still holds a `kephalaion:` block, the
+health check warns and points to `/k-upgrade`. The project step of `k-playbook upgrade` moves
+hub and collection into the block of `.k-playbook/K-PLAYBOOK.yaml` without asking, line by line
+as above, if the block is missing there; an existing block stays as it is, and if it differs
+the message names both values. `k-playbook upgrade --check` writes nothing and says what a run
+would do. The account of the old file is written nowhere; if Kephalaion chooses no account or a
+different one for the hub, `k-playbook upgrade` names it together with
+`kephalaion node account default <hub> <account>`. `/k-upgrade` (step 3.5) then deletes the old
+file after confirmation, but only when the output of `k-playbook upgrade` says the block is in
+place.
 
 ## GitHub CLI
 

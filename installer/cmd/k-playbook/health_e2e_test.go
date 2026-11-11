@@ -10,6 +10,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -22,6 +23,9 @@ func healthE2EProject(t *testing.T) string {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
 	accesstest.Empty(t)
+	// kephalaion ist da (ein Ersatz, der nie gefragt wird): Die Abhilfe ist
+	// dann die für den fehlenden Block, nicht die Installation.
+	kephtest.NewFakeClient(t)
 	return todoProjectRoot(t)
 }
 

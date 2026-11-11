@@ -37,9 +37,10 @@ Unterkommandos:
                    Nennt die Kephalaion-Collections, die ein VS-Code-Fenster
                    dieses Projekts eingebunden haben soll: die öffentliche
                    Collection k-playbook und die des Projekts, beide auf dem
-                   Hub aus k-playbook-local/K-PLAYBOOK.local.yaml. Die
-                   Erweiterung fragt das beim Start ab. Ohne Anbindung kein
-                   Fehler, sondern eine Auskunft.
+                   Hub aus dem Block kephalaion: von
+                   .k-playbook/K-PLAYBOOK.yaml. Die Erweiterung fragt das
+                   beim Start ab. Ohne Anbindung kein Fehler, sondern eine
+                   Auskunft.
 `
 
 // runVSCode führt das Unterkommando `vscode` aus.
@@ -237,20 +238,20 @@ func collectWorkspaceFolders(startDir string) vscodeCollections {
 		return answer
 	}
 
-	binding, configured, err := kephalaion.ReadBinding(project.LocalDir(environment.ProjectDir))
+	binding, err := project.ProjectBinding(environment.ProjectDir)
 	if err != nil {
 		answer.Message = err.Error()
 		return answer
 	}
-	if !configured {
-		answer.Message = fmt.Sprintf("keine Anbindung an Kephalaion — Block %s: in %s/%s fehlt",
-			kephalaion.BlockName, project.LocalDirName, kephalaion.LocalFileName)
+	if binding.Hub == "" && binding.Collection == "" {
+		answer.Message = fmt.Sprintf("keine Anbindung an Kephalaion — Block %s: in %s fehlt",
+			project.KephalaionBlockName, project.ConfigDisplayName)
 		return answer
 	}
 
 	folders, err := kephalaion.WorkspaceFolders(binding)
 	if err != nil {
-		answer.Message = fmt.Sprintf("Anbindung in %s/%s: %v", project.LocalDirName, kephalaion.LocalFileName, err)
+		answer.Message = fmt.Sprintf("Anbindung in %s: %v", project.ConfigDisplayName, err)
 		return answer
 	}
 	answer.Configured = true

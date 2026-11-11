@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -54,9 +55,10 @@ func kephFakeNode(t *testing.T) *httptest.Server {
 	return server
 }
 
-// kephProject legt ein Projekt (eigenes Git-Repo) und eine
-// Kephalaion-Einrichtung mit der Token-Datei vm/kamran-wsl an und lenkt die
-// Endpunkte auf den gefälschten Node.
+// kephProject legt ein Projekt (eigenes Git-Repo) an, ein Token-Verzeichnis
+// mit der Token-Datei vm/kamran-wsl und ein Ersatz-Binary, dessen Auskunft
+// den gefälschten Node und die Hubs vm (einzige Token-Datei) und anders (kein
+// Token) nennt.
 func kephProject(t *testing.T) (root string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -74,25 +76,11 @@ func kephProject(t *testing.T) (root string) {
 	}
 	chdir(t, root)
 
-	configDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte("node:\n  db: x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	tokens := filepath.Join(configDir, "tokens", "vm")
-	if err := os.MkdirAll(tokens, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(tokens, "kamran-wsl.token"), []byte(kephToken+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	tokensDir := kephtest.Token(t, filepath.Join(t.TempDir(), "kephalaion", "tokens"), "vm", "kamran-wsl", kephToken)
 	node := kephFakeNode(t)
-	original := kephalaionEnv
-	kephalaionEnv = func() kephalaion.Env {
-		env := kephalaion.LoadEnv(configDir)
-		env.Endpoint = node.URL + "/mcp"
-		return env
-	}
-	t.Cleanup(func() { kephalaionEnv = original; dropKephalaionCache() })
+	anders := kephalaion.ClientHub{Alias: "anders", Choice: kephalaion.ChoiceMissing, Candidates: []string{}, Pending: []string{}, Notes: []string{}}
+	kephtest.NewFakeClient(t).SetInfo(t, kephtest.Info(node.URL+"/mcp", tokensDir, anders, kephtest.Hub(tokensDir, "vm", "kamran-wsl")))
+	t.Cleanup(dropKephalaionCache)
 	dropKephalaionCache()
 	return root
 }
@@ -114,14 +102,33 @@ func kephCall(t *testing.T, method, path, body string, header map[string]string)
 	return recorder.Code, text
 }
 
-const kephGood = `{"hub":"vm","collection":"k-playbook","account":"kamran-wsl"}`
+const kephGood = `{"hub":"vm","collection":"k-playbook"}`
+
+// configText liest K-PLAYBOOK.yaml des Projekts.
+func configText(t *testing.T, root string) string {
+	t.Helper()
+	data, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// appendKephalaionBlock hängt einen Block an K-PLAYBOOK.yaml an.
+func appendKephalaionBlock(t *testing.T, root, block string) {
+	t.Helper()
+	if err := os.WriteFile(project.ConfigPath(root), []byte(configText(t, root)+"\n"+block), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dropKephalaionCache()
+}
 
 func TestKephalaionSaveWritesOnlyAfterPassedTest(t *testing.T) {
 	root := kephProject(t)
-	local := filepath.Join(project.LocalDir(root), kephalaion.LocalFileName)
+	before := configText(t, root)
 
 	code, body := kephCall(t, http.MethodGet, "/api/kephalaion", "", nil)
-	if code != 200 || !strings.Contains(body, `"state":"not-configured"`) {
+	if code != 200 || !strings.Contains(body, `"state":"not-configured"`) || !strings.Contains(body, `"configFile":`) {
 		t.Fatalf("vorher: %d %s", code, body)
 	}
 
@@ -133,70 +140,105 @@ func TestKephalaionSaveWritesOnlyAfterPassedTest(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &candidates); err != nil {
 		t.Fatal(err)
 	}
-	// config und Token-Ort stehen getrennt da; die config trägt.
-	if !candidates.ConfigPresent || candidates.ConfigSource != kephalaion.SourceUser || candidates.ConfigProblem != "" ||
-		filepath.Base(candidates.ConfigPath) != "config.yaml" || filepath.Base(candidates.TokensDir) != "tokens" {
-		t.Fatalf("config und Tokens: %+v", candidates)
+	// config, Node und Token-Verzeichnis kommen aus der Auskunft.
+	if candidates.ConfigSource != "user" || filepath.Base(candidates.ConfigPath) != "config.yaml" ||
+		filepath.Base(candidates.TokensDir) != "tokens" || !strings.HasSuffix(candidates.NodeURL, "/mcp") || candidates.ClientProblem != "" {
+		t.Fatalf("Auskunft: %+v", candidates)
+	}
+	if len(candidates.Hubs) != 2 || candidates.Hubs[0].Hub != "anders" || candidates.Hubs[0].State != kephalaion.StateTokenMissing ||
+		candidates.Hubs[1].Account != "kamran-wsl" || candidates.Hubs[1].Choice != kephalaion.ChoiceOnly {
+		t.Fatalf("Hubs: %+v", candidates.Hubs)
 	}
 	// Das Projektverzeichnis heißt nicht k-playbook; vorgewählt ist dann
 	// keine Collection, weil es zwei gibt.
-	if candidates.Preselect.Hub != "vm" || candidates.Preselect.Account != "kamran-wsl" {
+	if candidates.Preselect.Hub != "vm" || candidates.Preselect.Collection != "" {
 		t.Fatalf("Vorauswahl: %+v", candidates.Preselect)
 	}
 
 	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/test", kephGood, nil)
-	if code != 200 || !strings.Contains(body, `"state":"ok"`) {
+	if code != 200 || !strings.Contains(body, `"state":"ok"`) || !strings.Contains(body, `"account":"kamran-wsl"`) {
 		t.Fatalf("Test: %d %s", code, body)
 	}
-	if _, err := os.Stat(local); !os.IsNotExist(err) {
+	if configText(t, root) != before {
 		t.Fatal("der Test hat geschrieben")
 	}
 
-	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/save",
-		`{"hub":"vm","collection":"fremd","account":"kamran-wsl"}`, nil)
+	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/save", `{"hub":"vm","collection":"fremd"}`, nil)
 	if code != http.StatusConflict || !strings.Contains(body, `"state":"collection-unreadable"`) {
 		t.Fatalf("falsche Collection: %d %s", code, body)
 	}
-	if _, err := os.Stat(local); !os.IsNotExist(err) {
+	if configText(t, root) != before {
 		t.Fatal("trotz gescheitertem Test geschrieben")
 	}
 
-	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/save", kephGood, nil)
-	if code != 200 || !strings.Contains(body, `"saved":true`) {
+	// Ein Account in der Anfrage wird nicht gelesen und nirgends geschrieben.
+	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/save", `{"hub":"vm","collection":"k-playbook","account":"bob"}`, nil)
+	if code != 200 || !strings.Contains(body, `"saved":true`) || !strings.Contains(body, project.KephalaionCommitHint) {
 		t.Fatalf("Eintragen: %d %s", code, body)
 	}
-	if b, configured, err := kephalaion.ReadBinding(project.LocalDir(root)); err != nil || !configured || b.Address() != "vm:k-playbook" {
-		t.Fatalf("eingetragen: %+v %v %v", b, configured, err)
+	after := configText(t, root)
+	if !strings.HasPrefix(after, before) || strings.Contains(after, "account:") || strings.Contains(after, "bob") {
+		t.Fatalf("eingetragen:\n%s", after)
 	}
-	gitignore, _ := os.ReadFile(filepath.Join(project.LocalDir(root), ".gitignore"))
-	if !strings.Contains(string(gitignore), kephalaion.IgnoreLine) {
-		t.Fatalf(".gitignore: %q", gitignore)
+	if config, _ := project.ReadConfig(root); config.Kephalaion.Binding().Address() != "vm:k-playbook" {
+		t.Fatalf("gelesen: %+v", config.Kephalaion)
+	}
+	if _, err := os.Stat(filepath.Join(project.LocalDir(root), kephalaion.LegacyFileName)); !os.IsNotExist(err) {
+		t.Fatal("alte lokale Datei angelegt")
 	}
 
-	// Der Zwischenspeicher ist verworfen: die Anzeige zeigt sofort ok.
+	// Der Zwischenspeicher ist verworfen: die Anzeige zeigt sofort ok, mit
+	// der Herkunft des Accounts.
 	code, body = kephCall(t, http.MethodGet, "/api/kephalaion", "", nil)
-	if code != 200 || !strings.Contains(body, `"state":"ok"`) {
+	if code != 200 || !strings.Contains(body, `"state":"ok"`) || !strings.Contains(body, `"choice":"only"`) {
 		t.Fatalf("nachher: %d %s", code, body)
+	}
+
+	// Ein vorhandener Block: nur hub und collection ändern sich.
+	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/save", `{"hub":"vm","collection":"omni"}`, nil)
+	if code != 200 || !strings.Contains(body, `"changed":true`) {
+		t.Fatalf("Ändern: %d %s", code, body)
+	}
+	if got := configText(t, root); got != strings.Replace(after, "collection: k-playbook", "collection: omni", 1) {
+		t.Fatalf("geändert:\n%s", got)
+	}
+	code, body = kephCall(t, http.MethodPost, "/api/kephalaion/save", `{"hub":"vm","collection":"omni"}`, nil)
+	if code != 200 || strings.Contains(body, `"changed":true`) || !strings.Contains(body, "nichts geändert") {
+		t.Fatalf("unverändert: %d %s", code, body)
 	}
 }
 
-func TestKephalaionRejectsPairsOutsideCandidates(t *testing.T) {
+// Andere Blöcke und Kommentare in K-PLAYBOOK.yaml bleiben beim Eintragen
+// byte-gleich.
+func TestKephalaionSaveKeepsOtherBlocksAndComments(t *testing.T) {
 	root := kephProject(t)
-	local := filepath.Join(project.LocalDir(root), kephalaion.LocalFileName)
-	for _, body := range []string{
-		`{"hub":"vm","collection":"k-playbook","account":"bob"}`,
-		`{"hub":"anders","collection":"k-playbook","account":"kamran-wsl"}`,
-	} {
-		code, text := kephCall(t, http.MethodPost, "/api/kephalaion/save", body, nil)
-		if code != http.StatusConflict || !strings.Contains(text, `"state":"token-missing"`) {
-			t.Fatalf("%s: %d %s", body, code, text)
-		}
+	content := "# Kopf\nschema_version: 3\n\nproject:\n  # Ort\n  repo_root: .\n  vcs: git\n\n# Anbindung\nkephalaion:\n" +
+		"  # eigener Kommentar\n  hub: alt\n  collection: alt\n\n# danach\ndocs:\n  exclude:\n    - x/\n"
+	if err := os.WriteFile(project.ConfigPath(root), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, body := kephCall(t, http.MethodPost, "/api/kephalaion/save", kephGood, nil)
+	if code != 200 || !strings.Contains(body, `"saved":true`) {
+		t.Fatalf("%d %s", code, body)
+	}
+	want := strings.Replace(strings.Replace(content, "hub: alt", "hub: vm", 1), "collection: alt", "collection: k-playbook", 1)
+	if got := configText(t, root); got != want {
+		t.Fatalf("Ergebnis:\n%s", got)
+	}
+}
+
+func TestKephalaionRejectsHubsWithoutAccount(t *testing.T) {
+	root := kephProject(t)
+	before := configText(t, root)
+	code, text := kephCall(t, http.MethodPost, "/api/kephalaion/save", `{"hub":"anders","collection":"k-playbook"}`, nil)
+	if code != http.StatusConflict || !strings.Contains(text, `"state":"token-missing"`) || !strings.Contains(text, "kephalaion node account setup anders") {
+		t.Fatalf("%d %s", code, text)
 	}
 	for _, body := range []string{
-		`{"hub":"../vm","collection":"k-playbook","account":"kamran-wsl"}`,
-		`{"hub":"vm","collection":"k-playbook","account":"../../kamran-wsl"}`,
-		`{"hub":"vm","collection":"a/b","account":"kamran-wsl"}`,
-		`{"hub":"vm","collection":"k-playbook","account":"` + kephToken + `"}`,
+		`{"hub":"../vm","collection":"k-playbook"}`,
+		`{"hub":"--config","collection":"k-playbook"}`,
+		`{"hub":"vm","collection":"a/b"}`,
+		`{"hub":"vm","collection":"` + kephToken + `"}`,
 		`kein json`,
 	} {
 		for _, path := range []string{"/api/kephalaion/test", "/api/kephalaion/save"} {
@@ -206,7 +248,7 @@ func TestKephalaionRejectsPairsOutsideCandidates(t *testing.T) {
 			}
 		}
 	}
-	if _, err := os.Stat(local); !os.IsNotExist(err) {
+	if configText(t, root) != before {
 		t.Fatal("geschrieben")
 	}
 }
@@ -221,49 +263,25 @@ func TestKephalaionPostsRequireSameOrigin(t *testing.T) {
 	}
 }
 
-func TestKephalaionSaveRefusesTrackedFile(t *testing.T) {
-	root := kephProject(t)
-	local := filepath.Join(project.LocalDir(root), kephalaion.LocalFileName)
-	if err := os.WriteFile(local, []byte("# versioniert\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if out, err := exec.Command("git", "-C", root, "add", "--", local).CombinedOutput(); err != nil {
-		t.Fatalf("git add: %v %s", err, out)
-	}
-	code, body := kephCall(t, http.MethodPost, "/api/kephalaion/save", kephGood, nil)
-	if code != http.StatusConflict || !strings.Contains(body, "git rm --cached") {
-		t.Fatalf("%d %s", code, body)
-	}
-	data, _ := os.ReadFile(local)
-	if string(data) != "# versioniert\n" {
-		t.Fatalf("verändert: %q", data)
-	}
-}
-
 func TestKephalaionGetIgnoresRequestValues(t *testing.T) {
 	root := kephProject(t)
-	// Ein falscher Account in der Anfrage ändert nichts: geprüft wird nur,
-	// was in der Datei steht.
-	if err := kephalaion.WriteBinding(project.LocalDir(root), kephalaion.Binding{Hub: "vm", Collection: "omni", Account: "kamran-wsl"}); err != nil {
-		t.Fatal(err)
-	}
+	// Werte in der Anfrage ändern nichts: geprüft wird nur, was in der Datei
+	// steht.
+	appendKephalaionBlock(t, root, "kephalaion:\n  hub: vm\n  collection: omni\n")
 	code, body := kephCall(t, http.MethodGet, "/api/kephalaion?hub=x&account=bob&collection=fremd", "", nil)
 	if code != 200 || !strings.Contains(body, `"address":"vm:omni"`) || !strings.Contains(body, `"state":"ok"`) {
 		t.Fatalf("%d %s", code, body)
 	}
 }
 
-// Eine Zeile in K-PLAYBOOK.local.yaml, die nur aus einem Token besteht,
-// erscheint weder in /api/kephalaion noch in /api/context (kephCall prüft
-// jede Antwort auf das Token).
+// Ein Token im Block kephalaion: von K-PLAYBOOK.yaml — als nackte Zeile oder
+// als Wert — erscheint weder in /api/kephalaion noch in /api/context
+// (kephCall prüft jede Antwort auf das Token).
 func TestKephalaionResponsesDoNotQuoteFileContent(t *testing.T) {
 	root := kephProject(t)
-	local := filepath.Join(project.LocalDir(root), kephalaion.LocalFileName)
-	if err := os.WriteFile(local, []byte("kephalaion:\n  hub: vm\n"+kephToken+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	appendKephalaionBlock(t, root, "kephalaion:\n  hub: vm\n"+kephToken+"\n  collection: "+kephToken+"\n")
 	code, body := kephCall(t, http.MethodGet, "/api/kephalaion", "", nil)
-	if code != 200 || !strings.Contains(body, `"state":"invalid-entry"`) || !strings.Contains(body, "Zeile 3") {
+	if code != 200 || !strings.Contains(body, `"state":"invalid-entry"`) {
 		t.Fatalf("/api/kephalaion: %d %s", code, body)
 	}
 	code, body = kephCall(t, http.MethodGet, "/api/context", "", nil)
@@ -272,49 +290,25 @@ func TestKephalaionResponsesDoNotQuoteFileContent(t *testing.T) {
 	}
 }
 
-// Die Kandidaten nennen config und Token-Ort getrennt: Ohne config steht der
-// Satz mit beiden gesuchten Orten da, mit nur globaler config gilt sie, und
-// die Tokens bleiben beim User.
-func TestKephalaionCandidatesNameConfigAndTokensSeparately(t *testing.T) {
+// Ohne Auskunft — Binary fehlt oder ist zu alt — nennen die Kandidaten den
+// Zustand samt Abhilfe statt Hubs.
+func TestKephalaionCandidatesWithoutClientInfo(t *testing.T) {
 	kephProject(t)
-	xdg := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", xdg)
-	t.Setenv(kephalaion.EnvConfigVar, "")
-	originalPath := kephalaion.SystemConfigPath
-	systemPath := filepath.Join(t.TempDir(), "config.yaml")
-	kephalaion.SystemConfigPath = systemPath
-	kephalaionEnv = kephalaion.DefaultEnv
-	t.Cleanup(func() { kephalaion.SystemConfigPath = originalPath })
-	userDir := filepath.Join(xdg, "kephalaion")
-
-	read := func() kephalaionCandidatesResponse {
-		t.Helper()
-		code, body := kephCall(t, http.MethodGet, "/api/kephalaion/candidates", "", nil)
-		var response kephalaionCandidatesResponse
-		if code != 200 || json.Unmarshal([]byte(body), &response) != nil {
-			t.Fatalf("Kandidaten: %d %s", code, body)
-		}
-		return response
+	kephtest.NoBinary(t)
+	code, body := kephCall(t, http.MethodGet, "/api/kephalaion/candidates", "", nil)
+	var response kephalaionCandidatesResponse
+	if code != 200 || json.Unmarshal([]byte(body), &response) != nil {
+		t.Fatalf("%d %s", code, body)
+	}
+	if response.ClientState != kephalaion.StateNoKephalaion || !strings.Contains(response.ClientProblem, kephalaion.InstallCommand) ||
+		len(response.Hubs) != 0 {
+		t.Fatalf("ohne Binary: %+v", response)
 	}
 
-	none := read()
-	if none.ConfigPresent || !strings.Contains(none.ConfigProblem, filepath.Join(userDir, "config.yaml")) ||
-		!strings.Contains(none.ConfigProblem, systemPath) {
-		t.Fatalf("ohne config: %+v", none)
-	}
-	if none.TokensDir != project.DisplayPath(filepath.Join(userDir, "tokens")) {
-		t.Fatalf("Token-Ort ohne config: %q", none.TokensDir)
-	}
-
-	if err := os.WriteFile(systemPath, []byte("node:\n  listen: 127.0.0.1:7433\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	global := read()
-	if !global.ConfigPresent || global.ConfigSource != kephalaion.SourceSystem || global.ConfigProblem != "" ||
-		global.ConfigPath != project.DisplayPath(systemPath) || global.Endpoint != "http://127.0.0.1:7433/mcp" {
-		t.Fatalf("nur global: %+v", global)
-	}
-	if global.TokensDir != project.DisplayPath(filepath.Join(userDir, "tokens")) {
-		t.Fatalf("Token-Ort bei globaler config: %q", global.TokensDir)
+	fake := kephtest.NewFakeClient(t)
+	fake.Set(t, "", "node client: unbekanntes Kommando\n", 2)
+	code, body = kephCall(t, http.MethodGet, "/api/kephalaion/candidates", "", nil)
+	if code != 200 || !strings.Contains(body, "kephalaion upgrade") {
+		t.Fatalf("zu alt: %d %s", code, body)
 	}
 }

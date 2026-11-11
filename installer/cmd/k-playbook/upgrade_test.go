@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/buildinfo"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
@@ -556,5 +558,105 @@ func TestUpgradeJSON(t *testing.T) {
 	}
 	if strings.Contains(stdout, "Programm-Stand") && !strings.HasPrefix(strings.TrimSpace(stdout), "{") {
 		t.Errorf("JSON-Modus schreibt Klartext davor:\n%s", stdout)
+	}
+}
+
+// Der Projektschritt zieht die Anbindung aus der alten
+// k-playbook-local/K-PLAYBOOK.local.yaml um (Task 138): --check schreibt
+// nichts, ein Lauf schreibt Hub und Collection in den Block kephalaion: von
+// K-PLAYBOOK.yaml — nie den Account — und nennt ihn, wenn Kephalaion für den
+// Hub keinen wählt. Ein vorhandener Block bleibt.
+func TestUpgradeZiehtAnbindungUm(t *testing.T) {
+	root := upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	legacy := filepath.Join(project.LocalDir(root), kephalaion.LegacyFileName)
+	if err := os.WriteFile(legacy, []byte("# Kopf\nkephalaion:\n  hub: vm\n  collection: omni\n  account: kamran-wsl\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tokens := filepath.Join(t.TempDir(), "tokens")
+	kephtest.NewFakeClient(t).SetInfo(t, kephtest.Info("http://127.0.0.1:1/mcp", tokens, kephalaion.ClientHub{
+		Alias: "vm", Choice: kephalaion.ChoiceMissing, Candidates: []string{"a", "b"}, Pending: []string{}, Notes: []string{}}))
+	before, err := os.ReadFile(project.ConfigPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	check := captureStdout(t, func() {
+		if err := runUpgrade([]string{"--check"}); err != nil {
+			t.Errorf("upgrade --check: %v", err)
+		}
+	})
+	for _, want := range []string{
+		"Projekt: Anbindung — ein Lauf schriebe hub vm, collection omni aus k-playbook-local/K-PLAYBOOK.local.yaml in den Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml.",
+		"Projekt: Account — die alte Datei nannte für den Hub vm den Account kamran-wsl; Kephalaion wählt dort keinen.",
+		"kephalaion node account default vm kamran-wsl",
+	} {
+		if !strings.Contains(check, want) {
+			t.Errorf("--check: %q fehlt in:\n%s", want, check)
+		}
+	}
+	if after, _ := os.ReadFile(project.ConfigPath(root)); string(after) != string(before) {
+		t.Fatalf("--check hat geschrieben:\n%s", after)
+	}
+
+	run := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("upgrade: %v", err)
+		}
+	})
+	for _, want := range []string{
+		"Projekt: Anbindung umgezogen — hub vm, collection omni steht jetzt im Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml",
+		project.KephalaionCommitHint,
+		"kephalaion node account default vm kamran-wsl",
+	} {
+		if !strings.Contains(run, want) {
+			t.Errorf("Lauf: %q fehlt in:\n%s", want, run)
+		}
+	}
+	after, _ := os.ReadFile(project.ConfigPath(root))
+	if !strings.HasPrefix(string(after), string(before)) || !strings.Contains(string(after), "  hub: vm\n  collection: omni\n") ||
+		strings.Contains(string(after), "account") || strings.Contains(string(after), "kamran-wsl") {
+		t.Fatalf("K-PLAYBOOK.yaml nach dem Lauf:\n%s", after)
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		t.Fatal("die alte Datei löscht /k-upgrade, nicht k-playbook upgrade")
+	}
+
+	// Der zweite Lauf: Der Block steht und bleibt; die Zeile sagt das.
+	second := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("zweiter Lauf: %v", err)
+		}
+	})
+	if !strings.Contains(second, "Projekt: Anbindung — der Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml steht (hub vm, collection omni)") {
+		t.Errorf("zweiter Lauf:\n%s", second)
+	}
+
+	// Ein abweichender Block bleibt; die Meldung nennt beide Werte. Wählt
+	// Kephalaion einen anderen Account, steht auch der da.
+	changed := strings.Replace(string(after), "collection: omni", "collection: anders", 1)
+	if err := os.WriteFile(project.ConfigPath(root), []byte(changed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(tokens, "vm", "zweit.token")
+	account := "zweit"
+	kephtest.NewFakeClient(t).SetInfo(t, kephtest.Info("http://127.0.0.1:1/mcp", tokens, kephalaion.ClientHub{
+		Alias: "vm", Account: &account, Choice: kephalaion.ChoiceDefault, TokenFile: &other,
+		Candidates: []string{"kamran-wsl", "zweit"}, Pending: []string{}, Notes: []string{}}))
+	third := captureStdout(t, func() {
+		if err := runUpgrade(nil); err != nil {
+			t.Errorf("dritter Lauf: %v", err)
+		}
+	})
+	for _, want := range []string{
+		"steht (hub vm, collection anders) und bleibt; k-playbook-local/K-PLAYBOOK.local.yaml nennt anderes (hub vm, collection omni)",
+		"Kephalaion wählt dort zweit (Standard)",
+	} {
+		if !strings.Contains(third, want) {
+			t.Errorf("abweichend: %q fehlt in:\n%s", want, third)
+		}
+	}
+	if final, _ := os.ReadFile(project.ConfigPath(root)); string(final) != changed {
+		t.Fatalf("vorhandener Block verändert:\n%s", final)
 	}
 }

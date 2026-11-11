@@ -9,7 +9,7 @@ den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Reg
 nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
 `scripts/k-upgrade-umbau.sh`. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
 macht, nicht das Programm, zuletzt das Aufräumen der Verzeichnisse, die das Einrichten nicht
-mehr anlegt. Der Command nimmt kein Argument.
+mehr anlegt, und der alten `K-PLAYBOOK.local.yaml`. Der Command nimmt kein Argument.
 
 ## Schritt 1 — Briefing
 
@@ -712,6 +712,51 @@ einmal aus.
 Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, löscht der nächste Lauf, sobald
 es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3.
 
+### 3.5 — Alte Anbindung in `K-PLAYBOOK.local.yaml`
+
+Bis k-playbook die Anbindung aus der Auskunft von Kephalaion nahm (`kephalaion node client`),
+stand sie rechnerlokal in `<context.local.dir>/K-PLAYBOOK.local.yaml`, Block `kephalaion:` mit
+Hub, Collection und Account. Heute stehen Hub und Collection im Block `kephalaion:` von
+`.k-playbook/K-PLAYBOOK.yaml`, und den Account wählt Kephalaion. Kein Programmteil liest die
+alte Datei mehr. Umgezogen hat sie schon `k-playbook upgrade` in Schritt 2, ohne Rückfrage;
+diese Umstellung löscht sie nur noch. Sie braucht die Collection nicht.
+
+**Anlass:** Die Datei `<context.local.dir>/K-PLAYBOOK.local.yaml` liegt.
+
+**Bedingung:** In der Ausgabe von Schritt 2 steht eine Zeile, die mit
+`Projekt: Anbindung umgezogen` oder mit `Projekt: Anbindung — der Block kephalaion:` beginnt.
+Nur dann steht der Block in `.k-playbook/K-PLAYBOOK.yaml`. Fehlt eine solche Zeile — Schritt 2
+lief mit einem Programm, das den Umzug noch nicht kennt, oder meldet
+`Projekt: Anbindung nicht umgezogen` —, bleibt die Datei liegen: Nenne die Zeile aus Schritt 2
+oder, wenn es keine gibt, dass der Umzug auf das neue Programm wartet, und geh weiter.
+`context.kephalaion` taugt hier nicht als Beleg: Der MCP-Server einer laufenden Sitzung behält
+nach dem Binärwechsel das alte Programm, liest die alte Datei und liefert diesen Text auch ohne
+Block.
+
+**Vorlage.** Lies die Datei und lege gebündelt vor:
+
+- die Datei mit ihrem Pfad und dass sie gelöscht wird;
+- was Schritt 2 zum Block gemeldet hat: umgezogen, steht, oder steht und weicht ab, dann mit
+  beiden Werten aus der Zeile;
+- trägt die Datei neben dem Block `kephalaion:` und Kommentaren weitere Schlüssel auf oberster
+  Ebene, deren Namen, ohne Werte — gelöscht wird sie trotzdem nur als Ganzes;
+- hat Schritt 2 eine Zeile `Projekt: Account — …` gemeldet, diesen Account samt dem Befehl
+  `kephalaion node account default <hub> <account>` aus derselben Zeile: So bleibt er der
+  Account dieses Rechners. Ist das Token-Verzeichnis nur lesend eingebunden, wie im
+  DevContainer, wird der Standard auf dem Host gesetzt.
+
+```text
+Alte Anbindung
+  k-playbook-local/K-PLAYBOOK.local.yaml löschen — der Block kephalaion: steht in .k-playbook/K-PLAYBOOK.yaml (hub vm, collection omni)
+  Account der alten Datei: kamran-wsl — Kephalaion wählt für vm keinen; setzen mit kephalaion node account default vm kamran-wsl
+```
+
+**Löschen.** Gelöscht wird erst nach Bestätigung, die Datei allein. Den Befehl für den Account
+führst du nicht aus; er gehört dem Nutzer, auch weil er im DevContainer auf dem Host laufen
+muss. Die Zeile `/K-PLAYBOOK.local.yaml` in `<context.local.dir>/.gitignore` bleibt stehen;
+sie schadet nicht. Committet wird nicht: Die Änderung an `.k-playbook/K-PLAYBOOK.yaml` aus
+Schritt 2 gehört in den nächsten Commit des Projekts — sag das.
+
 ## Schritt 4 — Schluss
 
 Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist; für
@@ -719,4 +764,6 @@ Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen gebli
 (`keph:`-Verweis, gelöscht oder liegen geblieben), für das Aufräumen die gelöschten
 Verzeichnisse und jede Zeile `bleibt: …`, bei `commands/` und `skills/` mit den Zeilen je
 Eintrag und dem, was e) umgezogen hat — oder bei 3.0 und beim Aufräumen, dass sie auf den
-Binärwechsel warten.
+Binärwechsel warten. Für 3.5: ob die alte `K-PLAYBOOK.local.yaml` gelöscht ist oder warum sie
+liegt, ein genannter Account mit seinem Befehl und dass `.k-playbook/K-PLAYBOOK.yaml` committet
+werden will.

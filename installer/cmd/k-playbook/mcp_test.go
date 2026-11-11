@@ -15,6 +15,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/review"
@@ -36,6 +37,9 @@ func TestMain(m *testing.M) {
 	// öffentlichen Collection k-playbook — auch nicht die abgekoppelten
 	// Server und Kindprozesse unten, darum vor allen Zweigen.
 	cleanupDefaults := defaultstest.Isolate()
+	// Ebenso fragt keiner das echte kephalaion dieses Rechners (Task 138);
+	// der Prozess endet mit os.Exit, ein Aufräumen braucht es nicht.
+	kephtest.IsolateBinary()
 	// Der abgekoppelte Server: spawnServer startet das eigene Binary — im
 	// Test dieses hier — mit der Servermarke. run() nimmt denselben Weg wie im
 	// Betrieb.

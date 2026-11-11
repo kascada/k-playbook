@@ -1,7 +1,7 @@
 // Abfrage der Collections, die ein Fenster des Projekts eingebunden haben
 // soll.
 //
-// Die Erweiterung leitet nichts selbst aus K-PLAYBOOK.local.yaml ab: Welche
+// Die Erweiterung leitet nichts selbst aus K-PLAYBOOK.yaml ab: Welche
 // Collections dazugehören, weiß allein das Programm (`k-playbook vscode
 // collections --json`). So steht die Regel an einer Stelle.
 'use strict';

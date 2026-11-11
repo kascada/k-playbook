@@ -370,13 +370,16 @@ know them; `note` says exactly that. `open` names destinations that cannot be
 resolved automatically: a real project file in the way, or a conflict in
 `CLAUDE.md`.
 
-`kephalaion` is read from the `kephalaion:` block of
-`k-playbook-local/K-PLAYBOOK.local.yaml`, a machine-local file that is not versioned and
-never holds a token. The check asks the node of this machine over MCP (`whoami`, with the
-header pair `X-Keph-Account-<hub>`/`X-Keph-Token-<hub>` and the token from Kephalaion's own
-file `tokens/<hub>/<account>.token`); it runs only when the block is present, takes at most
-3 seconds and never stops `context` — every failure is a `state` with its own `message`:
-`not-configured`, `invalid-entry`, `kephalaion-missing`, `node-address`, `token-missing`,
+`kephalaion` takes hub and collection from the `kephalaion:` block of
+`.k-playbook/K-PLAYBOOK.yaml` (see `kephalaion` under "Fields"); the account, its token file
+and the node's address come from Kephalaion's client information (`kephalaion node client
+--json --format 1 --no-probe --hub <alias>`), and `choice` names where the account comes from
+(`override`, `default` or `only`). The check asks the node of this machine over MCP
+(`whoami`, with the header pair `X-Keph-Account-<hub>`/`X-Keph-Token-<hub>` and the token
+from Kephalaion's own file `<tokensDir>/<hub>/<account>.token`); it runs only when the block
+is present and never stops `context` — every failure is a `state` with its own `message`,
+which names the remedy: `not-configured`, `invalid-entry`, `kephalaion-missing`,
+`client-failed`, `node-address`, `account-choice-missing`, `token-missing`,
 `node-unreachable`, `hub-unknown`, `hub-never-synced`, `login-invalid`, `login-missing`,
 `replica-unreadable`, `collection-unreadable` or `ok`. `sync` carries `lastSuccess`,
 `revision`, `lastError` and `neverSynced` as the node reports them. The field is filled by the
@@ -519,6 +522,10 @@ docs:
   exclude:
     - docs/
     - vendor/
+
+kephalaion:
+  hub: vm
+  collection: app
 
 tools:
   mcp:
@@ -742,6 +749,34 @@ answer is `unsupported` with the line and the reason, and nothing is written. Th
 
 Adding the block does not change `schema_version`.
 
+### `kephalaion`
+
+The project's binding to its Kephalaion collection (task 138). Hub alias and collection are
+the same for everyone working on the project, so the block is versioned with it; Kephalaion
+hands the hub alias out with the setup code, so it reads the same on every machine.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hub` | string | alias of the hub entry at the node (`kephalaion status`) |
+| `collection` | string | the project's collection at that hub; address for clients `<hub>:<collection>` |
+
+Both follow Kephalaion's naming rule (lowercase, `a`–`z`, `0`–`9`, `.`, `_`, `-`, starting
+with a letter or digit, at most 63 characters, no `system` prefix). They are read line by
+line as the direct children of the block; quotes and a comment behind the value are removed.
+Without the block, or with neither field, the binding is `not-configured`. The block names no
+account: the account of this machine, its token file and the node's address come from
+Kephalaion (`kephalaion node client`), see
+[`installation.md`](./installation.md#kephalaion-collection). An `account:` line in the block
+is not read; the health check warns about it.
+
+The block is written by the setup step of the interface after a passed check and by the
+project step of `k-playbook upgrade` when it moves the old machine-local binding. Both write
+only the lines `hub:` and `collection:` -- replaced in place with a comment behind them kept,
+or inserted behind the last indented line of the block -- and append a missing block with a
+comment; every other line stays byte for byte, and no account is ever written. A block with a
+value in its header line, the block twice, or `hub:`/`collection:` twice is not rewritten.
+The file is versioned, so the change wants to be committed.
+
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
@@ -752,10 +787,12 @@ Adding the block does not change `schema_version`.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
 - `docs.exclude` is written only by `k-playbook docs exclude add` and `k_playbook_docs_exclude_add`, after the user confirmed; only lines for new entries are inserted into the `docs:` block, nothing in it is rendered again, and a form that cannot be extended safely is refused (`unsupported`). A missing block is appended; unindented comments before the next block belong to what follows and stay, such as the commented `docs:` example of a new file.
 - Unknown top-level fields remain and are not changed unprompted. Writing occurs line by line so comments and order remain intact.
-- Host-local installation states do not belong in this file. What differs per machine — for
-  now only the Kephalaion binding (hub alias, collection, account) — lives in
-  `k-playbook-local/K-PLAYBOOK.local.yaml`, which is not versioned; the interface writes only
-  its `kephalaion:` block, after a passed check.
+- Host-local installation states do not belong in this file. The Kephalaion binding is not
+  one of them: hub alias and collection are the same for every machine and live in the
+  `kephalaion:` block; the account, which differs per machine, comes from Kephalaion and is
+  written nowhere. The interface writes only the lines `hub:` and `collection:` of that block,
+  after a passed check. The machine-local `k-playbook-local/K-PLAYBOOK.local.yaml` of earlier
+  versions is no longer read; `k-playbook upgrade` moves it and `/k-upgrade` deletes it.
 - Nothing below `k-playbook/` may be written.
 
 ## Filename

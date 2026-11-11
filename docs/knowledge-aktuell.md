@@ -76,6 +76,10 @@ with the token from Kephalaion's token file); `k-playbook context` carries the r
 interface shows it and offers the setup step that tests and then writes. Described in
 [`installation.md`](./installation.md#kephalaion-collection) and
 [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung).
+Changed 2026-11-10 by task 138: hub alias and collection are versioned in the block
+`kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`; account, token file and node address come from
+`kephalaion node client`; `K-PLAYBOOK.local.yaml` is only read as legacy (health warning,
+moved by `k-playbook upgrade`, deleted by `/k-upgrade`).
 
 **The hub fetches a release asset** (2026-10-10). The release workflow packs `defaults/` into
 an archive `k-playbook-defaults.tar.gz` (files at the archive root, no links, reproducible
@@ -1013,11 +1017,10 @@ Added 2026-10-18 (task 092); these come before step 12, in this order:
     directory stays and becomes the place for machine-local, unversioned content;
     everything versioned moves out, to the project collection or to `.k-playbook/`. The
     clone `k-playbook/` goes as planned (item 12). Consequences:
-    - `K-PLAYBOOK.local.yaml` stays where it is. Today Git keeps it out through a line that
-      `WriteBinding` adds to `k-playbook-local/.gitignore`
-      (`installer/internal/kephalaion/write.go`). Once nothing versioned is left, the
-      directory ignores itself as a whole, as `.k-playbook/.gitignore` does for `share`, and
-      the single line goes.
+    - `K-PLAYBOOK.local.yaml` stays where it is. Superseded 2026-11-10 by task 138: the
+      binding moved into the block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`, the
+      account comes from `kephalaion node client`, and nothing writes the file any more
+      (`write.go` is gone); `/k-upgrade` deletes it after confirmation.
     - The anchor `K-PLAYBOOK.yaml` (versioned, `schema_version: 3`) moves out of the project
       root into `.k-playbook/`, as a file and not the bare directory: every installation
       clone carries `.k-playbook/.gitignore`, so a directory anchor would find a project

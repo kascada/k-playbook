@@ -29,7 +29,10 @@ import (
 // bin/install nur bei „älter" läuft: Ein aktuelles k-playbook ohne Kephalaion
 // bliebe sonst ohne. Er läuft im aufrufenden Prozess, nicht im neuen Programm
 // nach einem Binärwechsel; dort hat bin/install ihn schon getan; (2) das
-// Projekt — ApplyAssistantSetup, also
+// Projekt — zuerst der Umzug der Anbindung aus der alten
+// k-playbook-local/K-PLAYBOOK.local.yaml in den Block kephalaion: von
+// K-PLAYBOOK.yaml (project.MigrateKephalaionBinding, Task 138), dann
+// ApplyAssistantSetup, also
 // Einordnen von CLAUDE.md/AGENTS.md, Anstoß ersetzen und Zusatzblöcke
 // entfernen, Verlinkung; die MCP-Einträge repariert der Pull schon
 // (UpdateResult.MCPRepaired), ein eigenes RepairMCP läuft nur, wenn der Pull
@@ -135,6 +138,10 @@ type upgradeKephalaionReport struct {
 // upgradeProjectReport ist Schritt (2).
 type upgradeProjectReport struct {
 	Root project.RootInstructionsState `json:"root"`
+	// Kephalaion ist der Umzug der Anbindung aus der alten
+	// k-playbook-local/K-PLAYBOOK.local.yaml (Task 138); fehlt ohne alte
+	// Datei.
+	Kephalaion *project.KephalaionMigration `json:"kephalaion,omitempty"`
 	// Setup ist das Ergebnis von ApplyAssistantSetup (nicht bei --check).
 	Setup *project.AssistantSetup `json:"setup,omitempty"`
 	// Links ist die Bilanz der Verlinkung: bei --check, was ein Lauf täte,
@@ -451,6 +458,12 @@ func checkUpgradeKephalaion(environment project.Environment) (upgradeKephalaionR
 // veralteten Einträge schon korrigiert, und die Meldung stünde doppelt.
 func upgradeProject(projectDir string, repairMCP bool) upgradeProjectReport {
 	report := upgradeProjectReport{}
+	// Zuerst die Anbindung: Ohne Block kephalaion: ist Kephalaion nicht
+	// bereit, und die Schritte danach (READMEs unter keph:/docs/) brauchen
+	// sie.
+	if migration := project.MigrateKephalaionBinding(projectDir, false); migration.Legacy {
+		report.Kephalaion = &migration
+	}
 	before := project.CheckLinks(projectDir)
 	pending := project.PendingLinkChanges(before)
 
@@ -467,7 +480,8 @@ func upgradeProject(projectDir string, repairMCP bool) upgradeProjectReport {
 	report.LinksCreated = !project.LinksOK(before) && pending.Empty() && project.LinksOK(setup.Links)
 	report.Changed = setup.RootCreated || setup.RootExtended || setup.RootRefreshed ||
 		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated ||
-		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed()
+		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed() ||
+		(report.Kephalaion != nil && report.Kephalaion.Written)
 
 	if repairMCP {
 		writes, err := project.RepairMCP(projectDir, project.MCPWriteOutdatedAndUnversioned)
@@ -490,6 +504,11 @@ func (r upgradeProjectReport) messages() []string {
 			lines = append(lines, "Projekt: "+line)
 		}
 		return lines
+	}
+	if r.Kephalaion != nil {
+		for _, line := range r.Kephalaion.Messages() {
+			lines = append(lines, "Projekt: "+line)
+		}
 	}
 	if r.Setup != nil {
 		setup := r.Setup
@@ -545,6 +564,11 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
 	root := project.CheckRootInstructions(projectDir)
 	report.Root = root
+
+	if migration := project.MigrateKephalaionBinding(projectDir, true); migration.Legacy {
+		report.Kephalaion = &migration
+		report.Pending = append(report.Pending, migration.Messages()...)
+	}
 
 	switch {
 	case !root.Present:

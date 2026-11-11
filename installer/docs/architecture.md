@@ -50,7 +50,10 @@ ohne Browser, die Ausgaben gehen ins Log.
 `program.Install()`, aber nur, wenn das laufende Programm älter ist als die `VERSION` des
 Clones (`program.CheckStatus()`, dieselbe Regel wie `restartAfterPull()`; im
 Entwicklungsrepo ist das Programm regelmäßig neuer, und herabgestuft wird nie) —, dann
-das Projekt über `ApplyAssistantSetup()`. Hat der Bootstrap das Binary ersetzt, führt
+das Projekt: zuerst der Umzug der Anbindung aus einer alten
+`k-playbook-local/K-PLAYBOOK.local.yaml` in den Block `kephalaion:` von `K-PLAYBOOK.yaml`
+(`project.MigrateKephalaionBinding()`, Abschnitt „Altbestand `K-PLAYBOOK.local.yaml`“), dann
+`ApplyAssistantSetup()`. Hat der Bootstrap das Binary ersetzt, führt
 nicht der noch laufende alte Prozess den Projektschritt aus — er hätte alte Vorlagen und
 alte Erkennung —, sondern er startet das neu installierte Programm mit
 `upgrade --project-only` als Subprozess (`reexecProjectStep()`); im Klartext gehen dessen
@@ -63,7 +66,8 @@ Abbruchs, ein gescheiterter Download oder Install eine eigene; am Ende, wenn das
 gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
 behält das alte Programm. `--check` schreibt nichts: `CheckUpdate()` und
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
-`PendingLinkChanges()` und `CheckMCP()` für das, was ein Lauf am Projekt täte — kein
+`PendingLinkChanges()`, `CheckMCP()` und `MigrateKephalaionBinding()` mit `check` für das,
+was ein Lauf am Projekt täte — kein
 Trockenlauf-Schalter in `ApplyAssistantSetup()`; die README unter `keph:/docs/`, die ein
 Lauf über `ApplyAssistantSetup()` aus den Vorlagen schreibt (Task 137), übergeht `--check`
 — die meldet `/k-docs`. Ihr Ergebnis steht im Lauf als eigene Zeile `Projekt: README unter
@@ -405,7 +409,12 @@ installer/
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    gh-Befund dieses Rechners, Zeilenhelfer für verschachtelte Blöcke
 │   ├── gh_legacy.go             alten Block tools.gh beim Einrichten entfernen (Task 128)
-│   ├── kephalaion.go            KephalaionStatus: die Prüfung für ContextForDir
+│   ├── kephalaion.go            KephalaionStatus: die Prüfung für ContextForDir,
+│   │                            ProjectBinding (Hub, Collection aus K-PLAYBOOK.yaml)
+│   ├── kephalaion_block.go      Block kephalaion: zeilenweise lesen und schreiben
+│   │                            (SetKephalaionBinding, nie ein Account)
+│   ├── kephalaion_legacy.go     Umzug aus der alten K-PLAYBOOK.local.yaml für
+│   │                            k-playbook upgrade (MigrateKephalaionBinding)
 │   ├── githubcontext.go         context.github für ContextForDir (Task 119): Load, Judge,
 │   │                            das Remote ab dem Startverzeichnis (publicremote.go:
 │   │                            projectRemoteURL), githubRemoteRepo mit github.SSHAliasOf
@@ -488,7 +497,8 @@ installer/
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
 │   ├── kephalaion.go            Anbindung an die Kephalaion-Collection: Anzeige mit
-│   │                            Zwischenspeicher, Kandidaten, Test, Eintragen
+│   │                            Zwischenspeicher, Hubs aus der Auskunft, Test, Eintragen
+│   │                            von hub und collection in K-PLAYBOOK.yaml
 │   ├── environment.go           GET /api/environment: der Report der Umgebungsprüfung
 │   │                            (health.Check) für die Karte „Umgebung“ der Statusseite
 │   ├── restart.go               Programm aktualisieren und den Dienst daraus neu starten:
@@ -583,10 +593,14 @@ installer/
 │   │                            kleine Leser für TOML, JSON mit Kommentaren, Textzeilen
 │   └── testdata/projekte/       Fixture-Projekte für die Parser
 ├── internal/kephalaion/
-│   ├── binding.go               K-PLAYBOOK.local.yaml lesen (Block kephalaion:),
-│   │                            Namensregel von Kephalaion
-│   ├── env.go                   config von Kephalaion: node.listen → Loopback-Endpunkt,
-│   │                            Token-Kandidaten aus tokens/<hub>/<account>.token
+│   ├── binding.go               Anbindung (Hub, Collection), Namensregel von Kephalaion,
+│   │                            Sicherheitsvertrag im Paketkommentar
+│   ├── binary.go                kephalaion finden: PATH, ~/.local/bin, /usr/local/bin
+│   ├── clientinfo.go            Auskunft kephalaion node client (Format 1) lesen: Account,
+│   │                            Herkunft, Token-Datei, Loopback-Adresse; Zustände samt Abhilfe
+│   ├── token.go                 Token aus der Token-Datei lesen (Form keph_ + 43 Zeichen)
+│   ├── legacy.go                alte k-playbook-local/K-PLAYBOOK.local.yaml lesen, nur als
+│   │                            Altbestand (Warnung, Umzug)
 │   ├── client.go                minimaler Streamable-HTTP-Client: Sitzung, tools/call,
 │   │                            whoami
 │   ├── docs.go                  Client für die Collection: list, read, create, write,
@@ -594,9 +608,9 @@ installer/
 │   │                            outcome_unknown; ToolError mit dem Code von Kephalaion;
 │   │                            Reader (eine Sitzung für viele Lesevorgänge) und
 │   │                            ReaderPool (bis zu n Sitzungen nebeneinander)
-│   ├── kephtest/                Collection im Speicher für Tests (nur Tests)
-│   ├── check.go                 Prüfung und Zustände, lesbare Collections je Kandidat
-│   └── write.go                 nur den Block kephalaion: schreiben, Ignorieren sichern
+│   ├── kephtest/                Collection im Speicher und Ersatz-Binary für die Auskunft
+│   │                            (nur Tests)
+│   └── check.go                 Prüfung und Zustände, lesbare Collections je Hub (ProbeHubs)
 ├── internal/versionsources/
 │   └── versionsources.go        version-sources.yaml lesen — die eine Implementierung,
 │                                benutzt vom Sammler und von project/context.go
@@ -2254,8 +2268,8 @@ Entscheidungen dahinter:
 
 - **Die Regel steht im Programm.** Welche Collections dazugehören, liefert
   `k-playbook vscode collections --json` (`kephalaion.WorkspaceFolders`); die Erweiterung
-  liest `K-PLAYBOOK.local.yaml` nicht selbst. Der Aufruf liest nur die Datei und fragt
-  keinen Node, weil er bei jedem Fensterstart läuft.
+  liest `K-PLAYBOOK.yaml` nicht selbst. Der Aufruf liest nur den Block `kephalaion:` der
+  Datei und fragt keinen Node, weil er bei jedem Fensterstart läuft.
 - **Welche Workspace-Datei, weiß nur die Erweiterung.** Von außen ist nicht zu erkennen,
   welche Datei ein Fenster geöffnet hat; `vscode.workspace.workspaceFile` sagt es je
   Fenster. Bei offener Datei trägt `updateWorkspaceFolders` nach, und VS Code schreibt es
@@ -2281,13 +2295,16 @@ Der Nutzerweg und das Hinzufügen weiterer Aktionen stehen in `docs/vscode.md`.
 
 ## Kephalaion-Anbindung
 
-Jedes Projekt arbeitet mit einer eigenen Collection in Kephalaion. Welche, steht
-rechnerlokal in `k-playbook-local/K-PLAYBOOK.local.yaml`, Block `kephalaion:` mit `hub`
-(Alias des Hub-Eintrags am Node dieses Rechners), `collection` und `account`. Die Datei ist
-nicht versioniert; ein Token steht nie darin, es bleibt in Kephalaions Datei
-`tokens/<hub>/<account>.token` neben der `config.yaml` des Users — auch wenn eine globale
-config gilt (Abschnitt „Die config von Kephalaion“). Das Paket `internal/kephalaion`
-liest, prüft und schreibt die Anbindung; es hängt nur von der Standardbibliothek und
+Jedes Projekt arbeitet mit einer eigenen Collection in Kephalaion. Welche, steht versioniert
+im Block `kephalaion:` von `.k-playbook/K-PLAYBOOK.yaml`: `hub` (Alias des Hub-Eintrags, auf
+jedem Rechner gleich, weil Kephalaion ihn über den setup code verteilt) und `collection`.
+`project.ReadConfig` liest den Block zeilenweise (`project/kephalaion_block.go`) und reicht
+Hub und Collection an das Paket `internal/kephalaion` weiter; ein `account:` dort wird nicht
+gelesen, die Gesundheitsprüfung warnt davor. Account, Token-Datei und Adresse des Nodes kommen
+allein aus der Auskunft `kephalaion node client` (Abschnitt „Die Auskunft von Kephalaion“);
+eine eigene Suche nach config und Token gibt es nicht, auch keinen Rückfall darauf (Task 138).
+Ein Token steht nie in einer Datei von k-playbook; es bleibt in Kephalaions Datei
+`<tokensDir>/<hub>/<account>.token`. Das Paket hängt nur von der Standardbibliothek und
 `yamllite` ab, damit `project` es einbinden kann.
 
 ### Die Prüfung
@@ -2299,26 +2316,27 @@ Anmeldung, `notifications/initialized` und `tools/call whoami` mit dem Header-Pa
 `X-Keph-Account-<hub>`/`X-Keph-Token-<hub>`. Der Node ist zustandslos und antwortet mit JSON;
 eine Antwort als Ereignisstrom wird ebenfalls gelesen. Der HTTP-Client nimmt keinen Proxy aus
 der Umgebung, folgt keiner Weiterleitung (sie trüge die Header an ein anderes Ziel) und hält
-keine Verbindung offen. Die Zeitgrenze `DefaultTimeout` = 3 s gilt für die ganze Prüfung;
-eine abgewiesene Verbindung scheitert sofort.
+keine Verbindung offen. Die Zeitgrenze `DefaultTimeout` = 3 s gilt für die Anfrage am Node,
+`ClientTimeout` = 5 s für die Auskunft davor; eine abgewiesene Verbindung scheitert sofort.
 
-Die Adresse kommt aus `node.listen` der geltenden `config.yaml` (Abschnitt „Die config von
-Kephalaion“). Zulässig sind `127.0.0.1`, `[::1]` und `localhost`, das nicht
-aufgelöst, sondern als `127.0.0.1` verwendet wird; eine Wildcard (`0.0.0.0`, `[::]`, leerer
-Host) wird zu `127.0.0.1` mit demselben Port. Ein `node:`-Abschnitt ohne `listen` gilt wie in
-Kephalaion selbst als `127.0.0.1:7433` — `kephalaion init` schreibt `listen` nur mit
-`--listen`. Fehlt der Abschnitt `node:`, oder ist die Adresse eine andere, ist das ein eigener
+Die Adresse ist `node.url` aus der Auskunft. Zulässig sind `http` mit `127.0.0.1`, `[::1]`
+und `localhost`, das nicht aufgelöst, sondern als `127.0.0.1` verwendet wird, ein Port von 1
+bis 65535, ohne Anmeldedaten, Anfrage oder Fragment. Jede andere Adresse ist ein eigener
 Zustand ohne Verbindungsversuch.
 
-Jeder Fehler wird ein Zustand, je einer mit eigenem Satz in `message`:
+Jeder Fehler wird ein Zustand, je einer mit eigenem Satz in `message`; jeder Zustand, an dem
+die Anbindung vor dem Node scheitert, nennt seine Abhilfe hinter „Abhilfe:“, und die
+Gesundheitsprüfung trennt sie dort in `hint` ab:
 
 | `state` | Bedeutung |
 |---|---|
-| `not-configured` | Datei oder Block `kephalaion:` fehlt |
-| `invalid-entry` | ein Name verstößt gegen die Namensregel, oder die Datei ist kein lesbares YAML |
-| `kephalaion-missing` | keine oder unlesbare `config.yaml`; der Satz nennt die gesuchten Orte bzw. den Pfad der geltenden und bei fehlendem Leserecht „Leserecht für diesen User fehlt“ |
-| `node-address` | kein `node:`-Abschnitt oder keine Loopback-Adresse |
-| `token-missing` | kein Kandidat passt zu Hub und Account, oder seine Datei trägt kein Token der Form `keph_` + 43 Zeichen |
+| `not-configured` | der Block `kephalaion:` in `.k-playbook/K-PLAYBOOK.yaml` fehlt oder trägt weder `hub` noch `collection` |
+| `invalid-entry` | ein Name verstößt gegen die Namensregel, oder `K-PLAYBOOK.yaml` ist nicht lesbar |
+| `kephalaion-missing` | kein Binary an den Orten der Suche (Abhilfe: Installation), oder eines ohne die Auskunft im Format 1: Exit 2, keine JSON-Ausgabe, `format` ≠ 1 (Abhilfe: `kephalaion upgrade`, dazu die erste Zeile von stderr) |
+| `client-failed` | die Auskunft ist nicht entstanden: Exit 1 (Grund aus der ersten Zeile von stderr, ohne `kephalaion upgrade`), Zeitgrenze, Absturz, oder sie nennt den Hub bzw. das Token-Verzeichnis nicht |
+| `node-address` | `node.url` ist keine Loopback-Adresse |
+| `account-choice-missing` | `choice: missing` mit Kandidaten; der Satz nennt sie, `kephalaion node account default <hub> <account>` und fest, dass der Standard bei nur lesend eingebundenem Token-Verzeichnis (DevContainer) auf dem Host gesetzt wird |
+| `token-missing` | `choice: missing` ohne Kandidaten (Abhilfe `kephalaion node account setup <hub> <account>` mit Einrichtungstoken vom Admin, sonst `kephalaion node setup <code>`), nur ein wartendes Token (`.pending` allein: derselbe `setup`-Aufruf klärt sie, sonst `kephalaion hub account token <account>`), ein Account ohne Token-Datei, eine Token-Datei an anderem Ort als `<tokensDir>/<hub>/<account>.token` oder eine ohne Token der Form `keph_` + 43 Zeichen |
 | `node-unreachable` | keine Verbindung, Zeitüberschreitung, HTTP-Fehler oder unlesbare Antwort |
 | `hub-unknown` | der Alias steht in `unknown_hubs` oder fehlt unter `hubs` |
 | `hub-never-synced` | `login: invalid` mit `sync.never_synced` |
@@ -2329,7 +2347,11 @@ Jeder Fehler wird ein Zustand, je einer mit eigenem Satz in `message`:
 | `ok` | angemeldet, Collection lesbar |
 
 Bei `ok` stehen `rights`, `scopes` (`vendor/<name>`, `dir <pfad>/`), `user`, `node`,
-`nodeVersion` und `sync` dabei. Einen Hinweis auf den Scope `vendor/k-playbook` gibt es nicht
+`nodeVersion` und `sync` dabei; `account` und `choice` (Herkunft des Accounts: `override`,
+`default`, `only`) stehen da, sobald die Auskunft einen Account genannt hat. Liegt neben der
+Token-Datei eine `.pending` (rotate offen), trägt die Anbindung trotzdem, und die Meldung nennt
+`kephalaion node account check <hub> <account> --token-file <datei>`; ein `config.problem`
+der Auskunft steht ebenso hinter der Meldung. Einen Hinweis auf den Scope `vendor/k-playbook` gibt es nicht
 mehr: der mitgelieferte Inhalt liegt in der öffentlichen Collection `<hub>:k-playbook`, nicht
 unter `vendor/` in der Projekt-Collection.
 
@@ -2343,44 +2365,58 @@ an, fragt den Node seit Task 131 aber für den Katalog `reviews`: dessen
 mitgelieferte Ebene liegt in `<hub>:k-playbook` (siehe „Die mitgelieferte Ebene aus
 `<hub>:k-playbook`“).
 
-### Die config von Kephalaion
+### Die Auskunft von Kephalaion
 
-`kephalaion.DefaultEnv` sucht die config in der Reihenfolge, in der Kephalaion selbst sie ohne
-`--config` sucht (`config.Locate` dort): `KEPHALAION_CONFIG`, absolut gemacht; sonst die config
-des Users (`$XDG_CONFIG_HOME/kephalaion/config.yaml`, sonst `~/.config/kephalaion/config.yaml`),
-wenn es sie gibt; sonst die globale `/etc/kephalaion/config.yaml`, wenn es sie gibt. Gibt es
-keine, ist der erwartete Ort der des Users. Wie in Kephalaion zählt eine config des Users, auf
-die der Aufrufer nicht zugreifen darf, als nicht vorhanden; eine globale dagegen als
-vorhanden, damit das Lesen den Fehler meldet, statt still eine andere config zu nehmen. Gibt
-es beide nebeneinander, gilt die des Users; den Fehler „zwei Arten auf einem Rechner“ meldet
-`kephalaion status`, k-playbook spiegelt ihn nicht.
+`kephalaion.FindBinary` sucht das Binary an den Orten, die Kephalaion für Clients festlegt:
+`PATH`, `~/.local/bin/kephalaion`, `/usr/local/bin/kephalaion` — ein MCP-Server, den ein
+Assistent mit grafischer Oberfläche startet, erbt `PATH` nicht immer. `QueryClient` ruft
+`kephalaion node client --json --format 1 --no-probe [--hub <alias>]` mit `ClientTimeout`
+und liest genau ein JSON-Objekt von stdout in `ClientInfo`; unbekannte Felder werden
+übergangen. Mit `--hub` steht genau ein Eintrag je Alias da, auch ohne Token-Verzeichnis; ohne
+`--hub` (Einrichtungsschritt der Oberfläche) je Hub mit Verzeichnis unter `tokens/` einer.
+`ResolveInfo` prüft den Eintrag eines Hubs und liefert den Zugang (`Access`: Account,
+Herkunft, Loopback-Adresse, Token-Datei unexportiert). `config.source: none` ist kein Fehler.
+Quelle der Exit-Codes und des Formats ist `kephalaion node client --help` (ab v0.4.0).
 
-`Env` hält die geltende config (`ConfigPath`, `ConfigSource` = `env`, `user` oder `system`)
-getrennt vom Verzeichnis des Users (`UserDir`). Das Token-Verzeichnis ist immer
-`UserDir/tokens`, auch bei globaler config — so liest es auch Kephalaion
-(`assistant.TokensDir`). Ist das Heimatverzeichnis unbekannt, gibt es kein Token-Verzeichnis;
-ein relatives `tokens/` wird nie gelesen. Die Prüfung (`project.KephalaionStatus`), der
-Doc-Client (`userdocs.go`) und die Oberfläche (`webui/kephalaion.go`) holen die Einrichtung
-alle über `DefaultEnv`. Der Ort der globalen config ist die Paketvariable `SystemConfigPath`,
-damit Tests ihn umlenken.
+`project.KephalaionStatus` (Kontextausgabe, Gesundheitsprüfung), der Doc-Client
+(`openKephClientFor` in `userdocs.go`) und die Oberfläche fragen die Auskunft je Aufruf neu;
+ein Zwischenspeicher hielte einen neuen Standard-Account sonst bis zum Neustart des
+MCP-Servers fest. Tests ersetzen das Binary über `kephalaion.LookupBinary` (`kephtest`),
+und `TestMain` der Pakete `project`, `webui`, `mcpserver` und `cmd/k-playbook` lässt die Suche
+nichts finden, damit kein Test das echte Token-Verzeichnis oder den echten Node erreicht.
 
-Die Meldungen nennen je den richtigen Pfad: „nicht eingerichtet“ die gesuchten Orte — bei
-`KEPHALAION_CONFIG` nur diesen Pfad und die Quelle —, „nicht lesbar“ den Pfad der geltenden
-config, „Token fehlt“ das Token-Verzeichnis des Users.
+### Altbestand `K-PLAYBOOK.local.yaml`
+
+Bis Task 138 stand die Anbindung rechnerlokal in `k-playbook-local/K-PLAYBOOK.local.yaml`.
+Als Anbindung liest sie kein Programmteil mehr; `kephalaion.ReadLegacyBinding` liest sie nur
+als Altbestand. Liegt sie mit Block `kephalaion:`, warnt die Gesundheitsprüfung mit Hinweis auf
+`/k-upgrade`. Der Projektschritt von `k-playbook upgrade` zieht Hub und Collection um
+(`project.MigrateKephalaionBinding`), nicht der Text von `/k-upgrade`: den liefert Kephalaion,
+und ohne Block ist er nicht lesbar. Fehlt der Block in `K-PLAYBOOK.yaml`, schreibt der Schritt
+beide ohne Rückfrage zeilenweise hinein; ein vorhandener Block bleibt, eine Abweichung nennt
+beide Werte; `--check` schreibt nichts. Den Account der alten Datei schreibt er nirgends hin;
+wählt die Auskunft für den Hub keinen oder einen anderen, nennt er ihn samt
+`kephalaion node account default <hub> <account>`. Die alte Datei löscht `/k-upgrade` (3.5)
+nach Bestätigung, aber nur nach einer Zeile „Anbindung umgezogen“ bzw. „Anbindung — der Block
+kephalaion: … steht“ aus diesem Schritt: Der MCP-Server einer laufenden Sitzung behält nach dem
+Binärwechsel das alte Programm und liefert den Text auch ohne Block.
 
 ### Sicherheitsvertrag
 
-Hub und Account kommen aus `K-PLAYBOOK.local.yaml` oder aus einer Anfrage und fließen in
-einen Dateipfad und in Header. Für alle Aufrufer gilt deshalb dasselbe, durchgesetzt im
-Paket: Hub und Account bestehen die Namensregel von Kephalaion
-(`^[a-z0-9][a-z0-9._-]{0,62}$`, kein Präfix `system`, als Account nicht `admin`) und
-entsprechen **genau einem** Kandidaten aus dem Token-Verzeichnis; gelesen wird der Pfad des
-Kandidaten, nie ein aus den rohen Werten gebauter. Symlinks und Dateien `*.pending` sind keine
-Kandidaten. Die Collection besteht die Namensregel und wird nur mit der Antwort von `whoami`
-verglichen. Gesendet wird nur an den Loopback-Endpunkt. Ein Token erscheint in keinem
-Ergebnis, keinem Fehler und keinem Log: Fehlertexte nennen nie den Rumpf einer Antwort, und
-jeder Text läuft zuletzt durch eine Schwärzung des Tokens. Kein Unterprozess, also auch kein
-Token in Prozessargumenten.
+Hub und Collection kommen aus `K-PLAYBOOK.yaml` oder aus einer Anfrage; der Hub wird ein
+Argument der Auskunft und ein Header-Name. Für alle Aufrufer gilt deshalb dasselbe,
+durchgesetzt im Paket: Hub und Collection bestehen die Namensregel von Kephalaion
+(`^[a-z0-9][a-z0-9._-]{0,62}$`, kein Präfix `system`), die einen führenden Bindestrich und
+damit eine eingeschleuste Option ausschließt. Account, Token-Datei und Adresse kommen allein
+aus der Auskunft; der Account besteht dieselbe Regel (nicht `admin`), und gelesen wird ein
+Token nur aus der Token-Datei, die genau `<tokensDir>/<hub>/<account>.token` ist — eine
+reguläre Datei, kein Symlink, höchstens 4 KiB, ein Token der Form `keph_` + 43 Zeichen. Die
+Collection wird nur mit der Antwort von `whoami` verglichen. Gesendet wird nur an die
+Loopback-Adresse. Ein Token erscheint in keinem Ergebnis, keinem Fehler und keinem Log:
+Fehlertexte nennen nie den Rumpf einer Antwort, jeder Text läuft zuletzt durch eine
+Schwärzung des Tokens, und Text von außen (stderr der Auskunft, `config.problem`, Pfade)
+wird auf eine Zeile gekürzt und von allem bereinigt, was wie ein Token aussieht. Der einzige
+Unterprozess ist die Auskunft; sie bekommt kein Token, nur den Hub.
 
 Task 082 ließ einen Seitenaufruf nur messen, wenn kein Wert aus Anfrage oder Projektdatei
 einfließt. Für diese Endpunkte ist die Bedingung durch den Vertrag oben ersetzt. Die
@@ -2392,15 +2428,16 @@ Das ist tragbar, weil er die Token-Dateien ohnehin selbst lesen kann. Der Kommen
 
 ### Schreiben
 
-`WriteBinding` ersetzt nur den Block `kephalaion:` — von seiner Zeile bis vor die nächste
-Zeile in Spalte 0, auch ein Kommentar dort gehört schon zum Folgenden — oder hängt ihn an;
-Kopfkommentar und übrige Blöcke bleiben unverändert. Eine fehlende Datei entsteht mit Kopf.
-Geschrieben wird atomar über eine temporäre Datei. Vorher muss Git die Datei ignorieren,
-gemessen mit `git check-ignore` in `k-playbook-local/`: Ignoriert Git sie nicht, wird
-`/K-PLAYBOOK.local.yaml` in `k-playbook-local/.gitignore` ergänzt (die Datei entsteht bei
-Bedarf) und erneut gemessen — die einzige Schreibstelle außerhalb von
-`K-PLAYBOOK.local.yaml`. Ohne Git-Repo entfällt der Schritt. Steht die Datei schon im Index,
-wird nichts geschrieben; die Meldung nennt `git rm --cached`.
+`project.SetKephalaionBinding` schreibt Hub und Collection zeilenweise in den Block
+`kephalaion:` von `K-PLAYBOOK.yaml`, nach dem Muster von `AddDocsExclude`: Fehlt der Block,
+wird er samt Kommentar angehängt; steht er da, werden nur die Zeilen `hub:` und `collection:`
+ersetzt (ein Kommentar dahinter bleibt) oder, wenn eine fehlt, hinter der letzten eingerückten
+Zeile des Blocks eingefügt. Jede andere Zeile — andere Blöcke, Kommentare, ein `account:` —
+bleibt byte-gleich; ohne Änderung wird nicht geschrieben. Ein Account wird nie geschrieben.
+Block mehrfach, ein Wert in der Kopfzeile oder `hub:`/`collection:` mehrfach werden nicht
+umgeschrieben. Geschrieben wird nur nach bestandenem Test (Oberfläche) bzw. beim Umzug aus der
+alten Datei (`k-playbook upgrade`); die Datei ist versioniert, die Antwort sagt, dass die
+Änderung committet werden will (`KephalaionCommitHint`).
 
 ### In der Oberfläche
 
@@ -2408,23 +2445,23 @@ wird nichts geschrieben; die Meldung nennt `git rm --cached`.
 jeder Seitenaufruf den Node fragt; nach dem Eintragen wird er verworfen. `/api/context` nimmt
 den Block aus demselben Zwischenspeicher.
 
-Die Statusseite zeigt im Statusfeld Collection, Account (mit User), Rechte und den Stand des
-Abgleichs, dazu eine Zustandsmarke. Ist die
-Anbindung nicht `ok`, blendet `status.js` den Einrichtungsschritt als erste Karte ein; die
-übrige Oberfläche bleibt erreichbar. Der Schritt lädt `/api/kephalaion/candidates`: je Paar
-aus dem Token-Verzeichnis den Zustand und die lesbaren Collections. Vorgewählt sind das
-eingetragene Paar, sonst das erste angemeldete, und als Collection die eingetragene, sonst die
-nach dem Projektverzeichnis benannte, sonst die einzige. „Testen“ prüft die Auswahl und
-schreibt nichts; „Eintragen“ ist erst für genau die getestete Auswahl frei und prüft am
-Server erneut. Ohne nutzbares Paar zeigt die Karte die Admin-Schritte in der festgelegten
-Reihenfolge (Hub, Collection, Account je Rechner mit der Collection, User und Token);
-antwortet der Node für kein Paar, statt dessen den Hinweis, Kephalaion zu starten. Fehlt die config oder ist sie
-nicht lesbar, steht der Satz aus `configProblem` da; gilt eine config, die nicht die des Users
-ist (global oder aus `KEPHALAION_CONFIG`), nennt der Schritt sie und das Token-Verzeichnis des
-Users getrennt. Ein Paar,
-für das nur eine Datei `*.pending` liegt, erscheint als Hinweis auf
-`kephalaion node account check`. Bei bestehender Anbindung öffnet „Collection ändern“ den
-Schritt erneut, mit „Abbrechen“.
+Die Statusseite zeigt im Statusfeld Collection, Account (mit User und Herkunft der Wahl),
+Rechte und den Stand des Abgleichs, dazu eine Zustandsmarke. Ist die Anbindung nicht `ok`,
+blendet `status.js` den Einrichtungsschritt als erste Karte ein; die übrige Oberfläche bleibt
+erreichbar. Der Schritt lädt `/api/kephalaion/candidates`: die Auskunft ohne `--hub`
+(`kephalaion.ProbeHubs`), je Hub der gewählte Account mit Herkunft, sein Zustand und die
+lesbaren Collections, dazu config, Adresse des Nodes und Token-Verzeichnis aus der Auskunft.
+Ist die Auskunft nicht zu haben, steht nur ihr Satz samt Abhilfe da. Vorgewählt sind der
+eingetragene Hub, sonst der erste angemeldete, und als Collection die eingetragene, sonst die
+nach dem Projektverzeichnis benannte, sonst die einzige. Einen Account wählt dort niemand.
+„Testen“ prüft Hub und Collection und schreibt nichts; „Eintragen“ ist erst für genau die
+getestete Auswahl frei, prüft am Server erneut und schreibt nur `hub` und `collection`
+(Abschnitt „Schreiben“). Ohne nutzbaren Hub zeigt die Karte die Admin-Schritte in der
+festgelegten Reihenfolge (Hub und `kephalaion node setup`, Collection, Account mit
+Einrichtungstoken, `kephalaion node account setup` und bei mehreren Accounts
+`kephalaion node account default`, dann Eintragen und Committen); antwortet der Node für keinen
+Hub, statt dessen den Hinweis, Kephalaion zu starten. Bei bestehender Anbindung öffnet
+„Collection ändern“ den Schritt erneut, mit „Abbrechen“.
 
 Sobald Task 082 die Abwahl liefert (Negativeintrag in `k-playbook-local/mcp-required.yaml`),
 entfällt für ein Projekt, das kephalaion abgewählt hat, die Führung zum Einrichtungsschritt.
@@ -3927,10 +3964,10 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/branches/switch-check` | Vorprüfung für `target` (optional `remote`): jeder Prüfpunkt mit Ergebnis und Begründung, `offered`, genauer git-Befehl und Prüfstempel; nur lesend; 400 bei unzulässigem Namen |
 | `POST` | `/api/branches/switch` | `{target, remote, stamp}`: prüft erneut und führt nur bei passendem Stempel und ohne Blockierendes `git switch` aus; sonst 409 mit der neuen Prüfung; kein force, kein Stash, kein Pull |
 | `GET` | `/api/github/runs/{id}/failure` | Log der fehlgeschlagenen Jobs holen und nach gleicher Meldung gruppieren; eigene Frist von 60 s; ein verworfenes Log ist `log-gone`; nur lesend |
-| `GET` | `/api/kephalaion` | Anbindung an die Kephalaion-Collection aus `K-PLAYBOOK.local.yaml` samt Ergebnis der Prüfung über MCP (`status`), Ort der Datei, Zeitpunkt der Prüfung; Zwischenspeicher 30 s; nimmt keinen Wert aus der Anfrage |
-| `GET` | `/api/kephalaion/candidates` | Paare aus `tokens/<hub>/<account>.token` mit Zustand und lesbaren Collections, Paare mit nur `*.pending`, geltende config (`configPath`, `configSource`, `configProblem`) getrennt vom Token-Verzeichnis (`tokensDir`), Adresse des Nodes, Vorauswahl, Admin-Schritte; nimmt keinen Wert aus der Anfrage |
-| `POST` | `/api/kephalaion/test` | `{hub, account, collection}` prüfen; schreibt nichts; 400 bei Namen außerhalb der Namensregel |
-| `POST` | `/api/kephalaion/save` | prüft erneut und schreibt nur bei `ok` den Block `kephalaion:` (bei Bedarf dazu `k-playbook-local/.gitignore`); 409 mit Zustand bei nicht bestandenem Test oder versionierter Datei; verwirft den Zwischenspeicher |
+| `GET` | `/api/kephalaion` | Anbindung an die Kephalaion-Collection aus dem Block `kephalaion:` von `K-PLAYBOOK.yaml` samt Ergebnis der Prüfung über MCP (`status`, mit `account` und `choice` aus der Auskunft), Ort der Datei (`configFile`), Zeitpunkt der Prüfung; Zwischenspeicher 30 s; nimmt keinen Wert aus der Anfrage |
+| `GET` | `/api/kephalaion/candidates` | Hubs aus der Auskunft `kephalaion node client` ohne `--hub`, je mit Account, Herkunft, Zustand und lesbaren Collections; config (`configPath`, `configSource`, `configProblem`), Adresse des Nodes (`nodeUrl`) und Token-Verzeichnis (`tokensDir`) aus der Auskunft, ohne Auskunft `clientState`/`clientProblem`; Vorauswahl, Admin-Schritte; nimmt keinen Wert aus der Anfrage |
+| `POST` | `/api/kephalaion/test` | `{hub, collection}` prüfen, Account aus der Auskunft; schreibt nichts; 400 bei Namen außerhalb der Namensregel |
+| `POST` | `/api/kephalaion/save` | prüft erneut und schreibt nur bei `ok` `hub` und `collection` zeilenweise in den Block `kephalaion:` von `K-PLAYBOOK.yaml`, nie einen Account; Antwort mit Hinweis auf das Committen; 409 mit Zustand bei nicht bestandenem Test oder einer Form, die sich nicht sicher ändern lässt; verwirft den Zwischenspeicher |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
 | `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt, und zusätzlich, ob das laufende Programm älter ist als die `VERSION` des Clones (`program`, samt PATH-Befund); rein lesend, lädt nie etwas |
@@ -5053,8 +5090,9 @@ Jedes Programm hat zehn Sekunden.
 
 Die Container-Erkennung lag vorher in `webui/browser.go`; sie liegt jetzt in
 `internal/hostenv/`, weil Browser-Start, Chat-Wächter und Meldung dieselbe Antwort
-brauchen. Was bewusst noch fehlt: ein rechnerlokaler Schalter gegen den Ton (sein Platz
-wäre `k-playbook-local/K-PLAYBOOK.local.yaml`), Hooks in den Assistenten, die am Ende
+brauchen. Was bewusst noch fehlt: ein rechnerlokaler Schalter gegen den Ton (einen Platz
+dafür gibt es noch nicht; `k-playbook-local/K-PLAYBOOK.local.yaml` ist seit Task 138
+Altbestand), Hooks in den Assistenten, die am Ende
 eines Turns `k-playbook notify` rufen, und ein Weg vom Devcontainer zum Desktop davor.
 
 ### Browser öffnen
