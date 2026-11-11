@@ -32,4 +32,4 @@ defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot 
 defaults/instructions/always/030-briefing.md	30	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/instructions/always/100-projektwissen-zuerst.md	9	pfad	Ortsangabe: der Pfad ist das Argument von Kephalaion list in der Collection, kein Verweis.
 defaults/guidelines/betrieb.md	20	pfad	Ortsangabe: Beispiel der kurzen Schreibweise in Text für Menschen.
-share/commands/k-audit.md	388	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.
+share/commands/k-audit.md	398	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.

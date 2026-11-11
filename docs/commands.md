@@ -32,9 +32,9 @@ New commands become visible only after linking is in place and the assistant has
 | **Session** | | |
 | `/k-danke` | Close a working session | presents the session's findings in the collection's `queue/findings/`, adds what is missing, sets each finding's `ziel` (`wissen`, `falle`, `regel`, `verwerfen`) after the user confirms it, and checks the docs follow-up via `/k-enforcement` as a safety net -- a documentation order of this session in `keph:/queue/docs/` counts as done; it writes nothing else, the takeover from the queue does the rest. What gets recorded while working is defined by `k-playbook:/instructions/on-demand/befunde.md` and applied by the skill `ks-befunde` |
 | **Code review** | | |
-| `/k-review` | Run review recipes | [`code-review.md`](./code-review.md) |
-| `/k-audit` | Create or continue a complete audit sweep through MCP and triage after the merge | [`review-runs.md`](./review-runs.md) |
-| `/k-remediation` | Bundle findings and turn them into tasks or fixes | [`code-review.md`](./code-review.md) |
+| `/k-review` | Run review recipes — **temporarily unavailable until about 2026-11-13** while the results storage moves; the command only says so | [`code-review.md`](./code-review.md) |
+| `/k-audit` | Create or continue a complete audit sweep through MCP and triage after the merge — **temporarily unavailable until about 2026-11-13** while the results storage moves; the command only says so | [`review-runs.md`](./review-runs.md) |
+| `/k-remediation` | Bundle findings and turn them into tasks or fixes — **temporarily unavailable until about 2026-11-13** while the results storage moves; the command only says so | [`code-review.md`](./code-review.md) |
 | **Task flow** | | |
 | `/k-task-create` | Create a task file from the conversation context | [`task-flow.md`](./task-flow.md) |
 | `/k-task-refine` | Harden task files before execution through a Critic/Editor dialogue | [`task-flow.md`](./task-flow.md) |

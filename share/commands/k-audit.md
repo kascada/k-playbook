@@ -1,11 +1,21 @@
 ---
-description: Führt einen vollständigen Audit-Sweep über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
+description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage, voraussichtlich bis 2026-11-13) — Führt einen vollständigen Audit-Sweep über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
 argument-hint: [YYYY-MM-DD|latest|new]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_review_status, mcp__k-playbook__k_playbook_review_create, mcp__k-playbook__k_playbook_review_scan, mcp__k-playbook__k_playbook_review_merge, mcp__k-playbook__k_playbook_review_write_ai_entry]
 ---
 
 # k-audit
+
+## Vorübergehend nicht verfügbar
+
+Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
+zur Verfügung, voraussichtlich bis zum 13. November 2026. Führe nichts von dem aus, was
+darunter steht — nichts lesen, nichts schreiben, nichts anbieten. Sag dem Nutzer in einem
+Satz, dass `/k-audit` gerade umzieht und voraussichtlich ab dem 13. November 2026 wieder
+geht. Bisherige Läufe unter `k-playbook-local/results/` bleiben unverändert liegen.
+
+Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 
