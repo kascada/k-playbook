@@ -372,7 +372,7 @@ func TestReadKUpgradeAusDefaultsMitInclude(t *testing.T) {
 	if err != nil || stderr != "" {
 		t.Fatalf("read: %v — stderr %q", err, stderr)
 	}
-	for _, want := range []string{"# k-upgrade\n", "Liegt das Briefing in dieser Sitzung vor, nimm es.", "\n    k-playbook upgrade\n"} {
+	for _, want := range []string{"# k-upgrade\n", "Liegt das Briefing in dieser Sitzung vor, nimm es.", "\n    K_PLAYBOOK_VIA_COMMAND=1 k-playbook upgrade\n"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("eingesetzter Text ohne %q:\n%s", want, stdout)
 		}

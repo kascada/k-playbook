@@ -65,9 +65,25 @@ import (
 // `upgrade --check --json`, nie --auto), den Programm-Stand (CheckUpdate plus
 // Vergleich mit der laufenden Version) und baut die Projektprüfung aus den
 // Check-Funktionen — es meldet, was ein Lauf täte.
+//
+// Hinweis auf /k-upgrade: Hat ein Lauf eine neue Version geholt — der Pull hat
+// die VERSION der Installation bewegt oder das Binary wurde ersetzt —, sagt
+// die letzte Zeile, dass /k-upgrade in einer Sitzung die Umstellungen
+// nachzieht, die eine Beurteilung brauchen. `--check` sagt in einer eigenen
+// Vorschauzeile, dass ein Lauf Neues holt. Beide entfallen, wenn
+// K_PLAYBOOK_VIA_COMMAND=1 gesetzt ist: so ruft /k-upgrade selbst das
+// Programm auf (Hülle und Ersatzaufruf in der Shell), und dort stünde der
+// Hinweis mitten im Command. Eine Variable statt eines Schalters, weil ein
+// altes Binary einen unbekannten Schalter abweist und damit die Einbettung
+// der Hülle scheitern ließe; die Variable übergeht es. Der Hinweis kommt nur
+// vom aufrufenden Prozess, nie von `--project-only`.
 
 // upgradeSchemaVersion ist die Fassung der JSON-Antwort.
 const upgradeSchemaVersion = "1"
+
+// viaCommandEnv ist die Umgebungsvariable, die Hülle und Ersatzaufruf von
+// /k-upgrade auf 1 setzen.
+const viaCommandEnv = "K_PLAYBOOK_VIA_COMMAND"
 
 // Austauschbar, damit die Abfolge ohne Netz, Clone und echtes Binary prüfbar
 // ist: der Pull, der Bootstrap und der Aufruf des neu installierten Programms.
@@ -75,6 +91,11 @@ var (
 	upgradeUpdate  = project.Update
 	upgradeInstall = program.Install
 	upgradeReexec  = reexecProjectStep
+	// Der Remote-Stand des Clones bei --check.
+	upgradeCheckUpdate = project.CheckUpdate
+	// upgradeViaCommand sagt, ob /k-upgrade den Lauf ausführt; die eine
+	// Stelle, an der K_PLAYBOOK_VIA_COMMAND gelesen wird.
+	upgradeViaCommand = func() bool { return os.Getenv(viaCommandEnv) == "1" }
 	// Die Suche nach kephalaion, seine Installation und die Aufrufe von
 	// kephalaion upgrade --auto bzw. --check.
 	upgradeFindKephalaion    = kephalaion.FindBinary
@@ -128,6 +149,8 @@ type upgradeProgramReport struct {
 	// Pulled: der Pull im Clone ist gelaufen.
 	Pulled     bool   `json:"pulled,omitempty"`
 	PullOutput string `json:"pullOutput,omitempty"`
+	// VersionChanged: der Pull hat die VERSION der Installation bewegt.
+	VersionChanged bool `json:"versionChanged,omitempty"`
 	// RemoteSwitched: der Upstream trug die SSH-Adresse des offiziellen Repos
 	// und zeigt jetzt auf diese HTTPS-Adresse.
 	RemoteSwitched string `json:"remoteSwitched,omitempty"`
@@ -140,6 +163,11 @@ type upgradeProgramReport struct {
 	// Error nennt, was in diesem Schritt scheiterte; die weiteren Schritte
 	// laufen trotzdem.
 	Error string `json:"error,omitempty"`
+
+	// fetchesNew (nur --check): die Installation ist hinter dem Remote, oder
+	// das laufende Programm ist älter als die Installation und installierbar
+	// — ein Lauf holt Neues.
+	fetchesNew bool
 }
 
 // upgradeKephalaionReport ist der Schritt Kephalaion.
@@ -271,6 +299,12 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		report.Project = &result
 		report.Messages = append(report.Messages, result.messages()...)
 		emit(result.messages())
+
+		if programReport.fetchesNew && !upgradeViaCommand() {
+			line := "Ein Lauf holt Neues; bringt er eine neue Version, zieht danach /k-upgrade in einer Sitzung des Assistenten die Umstellungen nach, die eine Beurteilung brauchen."
+			report.Messages = append(report.Messages, line)
+			emit([]string{line})
+		}
 		return report
 	}
 
@@ -319,6 +353,15 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		report.Messages = append(report.Messages, line)
 		emit([]string{line})
 	}
+	if (programReport.VersionChanged || programReport.Installed) && !upgradeViaCommand() {
+		session := "in einer Sitzung"
+		if report.RestartRequired {
+			session = "in einer neuen Sitzung"
+		}
+		line := "Neue Version geholt: die Umstellungen, die eine Beurteilung brauchen, zieht /k-upgrade nach — " + session + " des Assistenten aufrufen."
+		report.Messages = append(report.Messages, line)
+		emit([]string{line})
+	}
 	return report
 }
 
@@ -354,6 +397,7 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 			}
 		} else {
 			report.Pulled = true
+			report.VersionChanged = result.VersionChanged
 			report.MCPRepaired = result.MCPRepaired
 			if result.VersionChanged {
 				lines = append(lines, "Programm: Installation aktualisiert, VERSION jetzt "+displayVersion(result.Version)+".")
@@ -413,13 +457,14 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 		return report, lines
 	}
 
-	update, err := project.CheckUpdate(environment.ProjectDir)
+	update, err := upgradeCheckUpdate(environment.ProjectDir)
 	switch {
 	case err != nil:
 		report.Error = err.Error()
 		lines = append(lines, "Installation: Prüfung fehlgeschlagen — "+err.Error())
 	case update.Available:
 		report.Update = &update
+		report.fetchesNew = true
 		lines = append(lines, fmt.Sprintf("Installation: hinter dem Remote (%s → %s auf %s); ein Lauf holte den neuen Stand.",
 			shortHash(update.Local), shortHash(update.Remote), update.Branch))
 	case update.Message != "":
@@ -442,6 +487,7 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 	case !status.Installable:
 		lines = append(lines, "Programm-Stand: älter als die Installation, aber "+status.Hint)
 	default:
+		report.fetchesNew = true
 		lines = append(lines, fmt.Sprintf("Programm-Stand: %s ist älter als die Installation (%s); ein Lauf installierte das Programm nach %s, danach wäre die Sitzung neu zu starten.",
 			displayVersion(status.Running), displayVersion(status.Clone), status.Target))
 	}
@@ -974,13 +1020,21 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
 Am Ende der Hinweis, die Sitzung neu zu starten: wenn das Binary gewechselt
 hat — der MCP-Server der Sitzung behält das alte Programm —, und wenn
 Kephalaion aktualisiert oder sein Node neu gestartet wurde; das kann auch
-andere offene Sitzungen an diesem Node treffen.
+andere offene Sitzungen an diesem Node treffen. Hat der Lauf eine neue
+Version geholt (VERSION der Installation bewegt oder Binary ersetzt), sagt
+die letzte Zeile, dass /k-upgrade in einer Sitzung die Umstellungen
+nachzieht, die eine Beurteilung brauchen.
 
 --check schreibt nichts: es meldet nach kephalaion upgrade --check --json, ob
 ein neueres Kephalaion da ist (--auto ruft es nie auf), den Stand des Clones
 gegenüber dem Remote (bei der SSH-Adresse des öffentlichen Repos über HTTPS
 gefragt), den Stand des laufenden Programms gegenüber dem Clone und, was ein
-Lauf am Projekt täte. --json gibt den Bericht als JSON aus (schemaVersion,
-check, kephalaion, program, project, restartRequired, messages).
+Lauf am Projekt täte. Holte ein Lauf Neues, sagt eine letzte Zeile, dass
+danach /k-upgrade die Umstellungen nachzieht. --json gibt den Bericht als
+JSON aus (schemaVersion, check, kephalaion, program, project,
+restartRequired, messages).
+
+Mit K_PLAYBOOK_VIA_COMMAND=1 — so rufen Hülle und Ersatzaufruf von
+/k-upgrade das Programm auf — entfallen beide Hinweise auf /k-upgrade.
 `)
 }

@@ -30,10 +30,12 @@ Steht dort keine Ausgabe von `k-playbook upgrade` — die Zeile ist leer, nennt 
 selbst oder meldet, dass er nicht gefunden oder nicht ausgeführt wurde —, dann hat der
 Assistent die Einbettung nicht ausgeführt. Führe dann in der Shell aus:
 
-    k-playbook upgrade
+    K_PLAYBOOK_VIA_COMMAND=1 k-playbook upgrade
 
 und gib diese Ausgabe nach derselben Regel wieder. Nenne dazu in einer Zeile, dass die Hülle
-den Aufruf nicht ausgeführt hat.
+den Aufruf nicht ausgeführt hat. Hülle und Ersatzaufruf setzen `K_PLAYBOOK_VIA_COMMAND=1`,
+damit der Hinweis entfällt, den `k-playbook upgrade` im Terminal nach einer neuen Version
+gibt — `/k-upgrade` aufzurufen —; hier läuft `/k-upgrade` schon.
 
 **Projekteigener Umbau.** Liegt im Projekt die Datei
 `<context.project.dir>/scripts/k-upgrade-umbau.sh`, führst du sie direkt danach aus, mit

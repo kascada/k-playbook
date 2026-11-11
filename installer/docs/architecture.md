@@ -66,7 +66,12 @@ Starts. Ob der Pull entfiel, weiß nur der alte Prozess; er gibt es dem Subproze
 Abbruchs, ein gescheiterter Download oder Install eine eigene; am Ende, wenn das Binary
 gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
 behält das alte Programm, und ein eigener, wenn Kephalaion aktualisiert oder sein Node neu
-gestartet wurde. `--check` schreibt nichts: `kephalaion upgrade --check --json` für
+gestartet wurde. Hat der Pull die `VERSION` bewegt (`program.versionChanged`) oder das Binary
+gewechselt, sagt die letzte Zeile, dass /k-upgrade in einer (bei Neustart: neuen) Sitzung die
+Umstellungen nachzieht — `--check` gibt dafür eine Vorschauzeile aus, `--project-only` nichts —,
+außer `K_PLAYBOOK_VIA_COMMAND=1` ist gesetzt (gelesen allein in `upgradeViaCommand`), wie es
+Hülle und Ersatzaufruf von /k-upgrade tun: eine Variable statt eines Schalters, weil ein altes
+Binary einen unbekannten Schalter abwiese und die Einbettung scheitern ließe. `--check` schreibt nichts: `kephalaion upgrade --check --json` für
 Kephalaion (nie `--auto`), `CheckUpdate()` und
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
 `PendingLinkChanges()`, `CheckMCP()` und `MigrateKephalaionBinding()` mit `check` für das,

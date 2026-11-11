@@ -1053,3 +1053,185 @@ func TestUpgradeOhneCloneOhneKephalaion(t *testing.T) {
 		}
 	}
 }
+
+// kUpgradeHinweis ist der Anfang der letzten Zeile nach einer neuen Version,
+// kUpgradeVorschau der Anfang der Vorschauzeile von --check.
+const (
+	kUpgradeHinweis  = "Neue Version geholt: die Umstellungen, die eine Beurteilung brauchen, zieht /k-upgrade nach"
+	kUpgradeVorschau = "Ein Lauf holt Neues; bringt er eine neue Version, zieht danach /k-upgrade"
+)
+
+// stubCheckUpdate ersetzt die Abfrage des Remote-Stands bei --check.
+func stubCheckUpdate(t *testing.T, status project.UpdateStatus) {
+	t.Helper()
+	before := upgradeCheckUpdate
+	t.Cleanup(func() { upgradeCheckUpdate = before })
+	upgradeCheckUpdate = func(string) (project.UpdateStatus, error) { return status, nil }
+}
+
+// withClone gibt der Installation ein .git-Verzeichnis, damit der Pull läuft.
+func withClone(t *testing.T, root string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func lastLine(text string) string {
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+	return lines[len(lines)-1]
+}
+
+func runUpgradeText(t *testing.T, args ...string) string {
+	t.Helper()
+	return captureStdout(t, func() {
+		if err := runUpgrade(args); err != nil {
+			t.Errorf("upgrade %v: %v", args, err)
+		}
+	})
+}
+
+// Hat der Pull die VERSION bewegt, ohne dass das Binary wechselt, ist der
+// Hinweis auf /k-upgrade die letzte Zeile — ohne Neustart „in einer Sitzung“.
+func TestUpgradeHinweisAufKUpgradeNachBewegterVersion(t *testing.T) {
+	t.Setenv(viaCommandEnv, "")
+	root := upgradeProjectDir(t, "v0.17.0")
+	setOwnVersion(t, "v0.17.0")
+	withClone(t, root)
+	stubUpgradeSteps(t, func(string) (project.UpdateResult, error) {
+		return project.UpdateResult{VersionChanged: true, Version: "v0.17.0"}, nil
+	}, nil)
+
+	stdout := runUpgradeText(t)
+	last := lastLine(stdout)
+	if !strings.HasPrefix(last, kUpgradeHinweis) || !strings.Contains(last, "— in einer Sitzung des Assistenten aufrufen.") {
+		t.Errorf("letzte Zeile ist nicht der Hinweis ohne Neustart: %q\n%s", last, stdout)
+	}
+	if strings.Contains(stdout, "neu starten") {
+		t.Errorf("ohne Binärwechsel kein Neustart-Hinweis:\n%s", stdout)
+	}
+	if report := runUpgradeJSON(t); !report.Program.VersionChanged || report.Messages[len(report.Messages)-1] != last {
+		t.Errorf("JSON: versionChanged %v, letzte Meldung %q", report.Program.VersionChanged, report.Messages[len(report.Messages)-1])
+	}
+}
+
+// Ist das Binary ersetzt, steht der Hinweis nach den Neustart-Hinweisen und
+// sagt „in einer neuen Sitzung“ — auch wenn der Pull die VERSION nicht bewegt hat.
+func TestUpgradeHinweisAufKUpgradeNachBinaerwechsel(t *testing.T) {
+	t.Setenv(viaCommandEnv, "")
+	root := upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
+	setOwnVersion(t, "v0.16.8")
+	withClone(t, root)
+
+	stub := filepath.Join(t.TempDir(), "k-playbook-neu")
+	script := "#!/bin/sh\n" +
+		"[ \"$1\" = upgrade ] && [ \"$2\" = --project-only ] && [ $# = 2 ] || exit 7\n" +
+		"printf 'Projekt: nachgezogen vom Stub.\\n'\n"
+	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stubUpgradeSteps(t,
+		func(string) (project.UpdateResult, error) {
+			return project.UpdateResult{Version: "v0.17.0"}, nil
+		},
+		func(string) (program.Result, error) {
+			return program.Result{Target: stub, Expected: "v0.17.0", Bootstrapped: true}, nil
+		})
+
+	stdout := runUpgradeText(t)
+	assertOrder(t, stdout, "Projekt: nachgezogen vom Stub.", "Das Programm hat gewechselt: die Sitzung neu starten", kUpgradeHinweis)
+	if last := lastLine(stdout); !strings.HasPrefix(last, kUpgradeHinweis) || !strings.Contains(last, "— in einer neuen Sitzung des Assistenten aufrufen.") {
+		t.Errorf("letzte Zeile ist nicht der Hinweis mit neuer Sitzung: %q\n%s", last, stdout)
+	}
+}
+
+// Ohne neue Version kein Hinweis; mit K_PLAYBOOK_VIA_COMMAND=1 — der Aufruf
+// aus /k-upgrade — auch nach einer neuen Version nicht.
+func TestUpgradeKeinHinweisAufKUpgrade(t *testing.T) {
+	for _, fall := range []struct {
+		name, via      string
+		versionChanged bool
+	}{
+		{"ohne neue Version", "", false},
+		{"aus /k-upgrade", "1", true},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			t.Setenv(viaCommandEnv, fall.via)
+			root := upgradeProjectDir(t, "v0.17.0")
+			setOwnVersion(t, "v0.17.0")
+			withClone(t, root)
+			stubUpgradeSteps(t, func(string) (project.UpdateResult, error) {
+				return project.UpdateResult{VersionChanged: fall.versionChanged, Version: "v0.17.0"}, nil
+			}, nil)
+
+			stdout := runUpgradeText(t)
+			if strings.Contains(stdout, "/k-upgrade") {
+				t.Errorf("unerwarteter Hinweis auf /k-upgrade:\n%s", stdout)
+			}
+			if fall.versionChanged && !strings.Contains(stdout, "VERSION jetzt v0.17.0") {
+				t.Errorf("der Pull hat die VERSION nicht bewegt:\n%s", stdout)
+			}
+		})
+	}
+}
+
+// --project-only ist der Projektschritt im neuen Programm; der Hinweis kommt
+// nur vom aufrufenden Prozess.
+func TestUpgradeProjectOnlyOhneHinweisAufKUpgrade(t *testing.T) {
+	t.Setenv(viaCommandEnv, "")
+	root := upgradeProjectDir(t, "v0.17.0")
+	setOwnVersion(t, "v0.16.8")
+	withClone(t, root)
+	stubUpgradeSteps(t,
+		func(string) (project.UpdateResult, error) {
+			t.Error("--project-only hat gepullt")
+			return project.UpdateResult{VersionChanged: true}, nil
+		},
+		func(string) (program.Result, error) {
+			t.Error("--project-only hat installiert")
+			return program.Result{}, nil
+		})
+
+	if stdout := runUpgradeText(t, "--project-only"); strings.Contains(stdout, "/k-upgrade") {
+		t.Errorf("--project-only gibt den Hinweis auf /k-upgrade aus:\n%s", stdout)
+	}
+}
+
+// --check sagt in einer eigenen Vorschauzeile, dass ein Lauf Neues holt: wenn
+// die Installation hinter dem Remote ist oder das laufende Programm älter und
+// installierbar ist. Sonst keine Zeile, und mit K_PLAYBOOK_VIA_COMMAND=1 nie.
+func TestUpgradeCheckVorschauAufKUpgrade(t *testing.T) {
+	hinter := project.UpdateStatus{Available: true, Branch: "main", Local: "aaaaaaaaaaaa", Remote: "bbbbbbbbbbbb"}
+	gleich := project.UpdateStatus{Branch: "main", Local: "aaaaaaaaaaaa", Remote: "aaaaaaaaaaaa"}
+	for _, fall := range []struct {
+		name, via, own string
+		update         project.UpdateStatus
+		erwartet       bool
+	}{
+		{"hinter dem Remote", "", "v0.17.0", hinter, true},
+		{"älteres installierbares Programm", "", "v0.16.8", gleich, true},
+		{"nichts Neues", "", "v0.17.0", gleich, false},
+		{"aus /k-upgrade", "1", "v0.16.8", hinter, false},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			t.Setenv(viaCommandEnv, fall.via)
+			upgradeProjectDir(t, "v0.17.0")
+			installTargetInPath(t)
+			setOwnVersion(t, fall.own)
+			stubCheckUpdate(t, fall.update)
+
+			stdout := runUpgradeText(t, "--check")
+			if fall.erwartet {
+				if last := lastLine(stdout); !strings.HasPrefix(last, kUpgradeVorschau) {
+					t.Errorf("letzte Zeile ist nicht die Vorschau: %q\n%s", last, stdout)
+				}
+			} else if strings.Contains(stdout, "/k-upgrade") {
+				t.Errorf("unerwartete Vorschau auf /k-upgrade:\n%s", stdout)
+			}
+			if strings.Contains(stdout, kUpgradeHinweis) || strings.Contains(stdout, "neuere Version") {
+				t.Errorf("--check gibt den Hinweis eines Laufs aus:\n%s", stdout)
+			}
+		})
+	}
+}

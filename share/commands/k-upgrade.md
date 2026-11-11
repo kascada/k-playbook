@@ -8,7 +8,7 @@ allowed-tools: [Bash, Read, Edit, Grep, Glob, mcp__k-playbook__k_playbook_briefi
 
 Ausgabe von `k-playbook upgrade`, beim Aufruf dieses Commands schon gelaufen:
 
-!`k-playbook upgrade 2>&1`
+!`K_PLAYBOOK_VIA_COMMAND=1 k-playbook upgrade 2>&1`
 
 Der Text dieses Commands steht unter `k-playbook:/commands/k-upgrade.md`. Lies ihn
 nach der Verweisregel aus dem Briefing — MCP `k_playbook_doc_read` mit dem Verweis

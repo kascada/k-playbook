@@ -213,14 +213,17 @@ func inventoryBody(t *testing.T, content string) []byte {
 // beim Aufruf aus, vor dem Briefing des Textes: sonst zöge das Briefing die
 // Verlinkung noch mit dem alten Programm nach. Die Einbettung steht am
 // Zeilenanfang, so wie Claude Code und OpenCode sie erkennen (gemessen
-// 2026-10-25), und der Text nimmt auf ihre Ausgabe Bezug.
+// 2026-10-25), und der Text nimmt auf ihre Ausgabe Bezug. Sie setzt
+// K_PLAYBOOK_VIA_COMMAND=1 vor den Aufruf, damit der Hinweis auf /k-upgrade
+// nicht mitten in /k-upgrade steht; die Form ohne env ist in beiden Clients
+// gemessen (2026-11-11, Task 142), ebenso der Ersatzaufruf im Text.
 func TestShareKUpgradeHuelleFuehrtUpgradeAus(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	hull := string(data)
-	if !strings.Contains(hull, "\n!`k-playbook upgrade 2>&1`\n") {
+	if !strings.Contains(hull, "\n!`K_PLAYBOOK_VIA_COMMAND=1 k-playbook upgrade 2>&1`\n") {
 		t.Errorf("Hülle ohne Einbettung von k-playbook upgrade:\n%s", hull)
 	}
 	if !strings.Contains(hull, "allowed-tools: [Bash,") {
@@ -228,6 +231,9 @@ func TestShareKUpgradeHuelleFuehrtUpgradeAus(t *testing.T) {
 	}
 	if text := readRepoDefault(t, "commands/k-upgrade.md"); !strings.Contains(text, "Ausgabe von\n`k-playbook upgrade`") {
 		t.Errorf("der Text nimmt keinen Bezug auf die Ausgabe der Hülle:\n%s", text)
+	}
+	if text := readRepoDefault(t, "commands/k-upgrade.md"); !strings.Contains(text, "\n    K_PLAYBOOK_VIA_COMMAND=1 k-playbook upgrade\n") {
+		t.Errorf("der Ersatzaufruf setzt K_PLAYBOOK_VIA_COMMAND=1 nicht:\n%s", text)
 	}
 }
 
@@ -240,7 +246,7 @@ func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 	if !strings.Contains(file, "\n"+includeLine) {
 		t.Fatalf("k-upgrade.md ohne Include-Zeile:\n%s", file)
 	}
-	if !strings.Contains(file, "\n    k-playbook upgrade\n") || strings.Contains(file, "k-playbook context") {
+	if !strings.Contains(file, "\n    K_PLAYBOOK_VIA_COMMAND=1 k-playbook upgrade\n") || strings.Contains(file, "k-playbook context") {
 		t.Errorf("k-upgrade.md ruft nicht `k-playbook upgrade`:\n%s", file)
 	}
 	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
