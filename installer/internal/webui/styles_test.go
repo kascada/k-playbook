@@ -290,7 +290,7 @@ func TestStylesheetGuardFindsFixedValues(t *testing.T) {
 // Nur ein Knopf sieht aus wie ein Knopf: Beschriftungen tragen weder Fläche
 // noch Rahmen, Schatten oder Knopfhöhe. Der Zustand steckt in der Schriftfarbe
 // und im Punkt davor.
-const labelRules = `k-playbook-local/guidelines/oberflaeche-gestaltung.md, Abschnitt „Nur ein Knopf sieht aus wie ein Knopf"; ausgeliefert in installer/docs/architecture.md, Abschnitt „Gestaltung der Oberfläche"`
+const labelRules = `keph:/docs/guidelines/ui-design.md, Abschnitt „Only a button looks like a button"; ausgeliefert in installer/docs/architecture.md, Abschnitt „Gestaltung der Oberfläche"`
 
 // styleLabelClasses sind die Klassen reiner Beschriftungen. Getroffen wird nur
 // der ganze Klassenname: .pill-row ist ein Behälter und zählt nicht als .pill.

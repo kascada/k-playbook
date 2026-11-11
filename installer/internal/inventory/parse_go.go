@@ -15,12 +15,20 @@ func parseGo(c *collector) {
 	}
 }
 
+// goIndirectNote ist die Notiz einer `require`-Zeile mit `// indirect`. Der
+// Text ist das Erkennungsmerkmal, an dem /k-docs-tools rein indirekte
+// Kandidaten erkennt; Vertrag (docs/version-inventory.md) und Command nennen
+// ihn wörtlich.
+const goIndirectNote = "indirekt (// indirect in go.mod)"
+
 func parseGoMod(c *collector) {
 	block := ""
 	for index, raw := range c.lines() {
 		line := strings.TrimSpace(raw)
-		if comment := strings.Index(line, "//"); comment >= 0 {
-			line = strings.TrimSpace(line[:comment])
+		comment := ""
+		if start := strings.Index(line, "//"); start >= 0 {
+			comment = line[start+2:]
+			line = strings.TrimSpace(line[:start])
 		}
 		if line == "" {
 			continue
@@ -55,13 +63,32 @@ func parseGoMod(c *collector) {
 			if len(fields) < 2 {
 				continue
 			}
+			note := ""
+			if isGoIndirect(comment) {
+				note = goIndirectNote
+			}
 			c.add(Entry{Ecosystem: EcoGo, Name: fields[0], KindOfThing: ThingPackage,
 				Version: fields[1], Pin: PinExact,
-				SourceKey: "require." + fields[0], SourceLine: index + 1})
+				SourceKey: "require." + fields[0], SourceLine: index + 1, Note: note})
 		case "replace":
 			addGoReplace(c, line, index+1)
 		}
 	}
+}
+
+// isGoIndirect folgt isIndirect aus golang.org/x/mod/modfile: Der Kommentar
+// hinter `//`, an Leerraum in Wörter zerlegt, ist genau `indirect`, oder sein
+// erstes Wort ist `indirect;` und es folgen weitere. `indirect` an anderer
+// Stelle im Kommentar zählt nicht.
+func isGoIndirect(comment string) bool {
+	words := strings.Fields(comment)
+	if len(words) == 0 {
+		return false
+	}
+	if len(words) == 1 {
+		return words[0] == "indirect"
+	}
+	return words[0] == "indirect;"
 }
 
 // addGoReplace: `replace` auf einen Pfad ist local; `replace` auf eine andere

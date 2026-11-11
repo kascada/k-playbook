@@ -468,7 +468,7 @@ func TestContextForDirHeiltNichtBeiUnbekannterFassung(t *testing.T) {
 // findet kein Werkzeug dieses Namens und das Rezept scopt still ins Leere. Ein
 // leerer Perspektiven-Report sieht dann aus wie ein sauberes Projekt.
 func TestAusgelieferteRezepteScopenNurBekannteWerkzeuge(t *testing.T) {
-	reviewsDir := filepath.Join("..", "..", "..", "reviews")
+	reviewsDir := filepath.Join("..", "..", "..", "defaults", "reviews")
 	entries, err := os.ReadDir(reviewsDir)
 	if err != nil {
 		t.Fatalf("reviews/: %v", err)

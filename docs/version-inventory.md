@@ -211,6 +211,15 @@ not to this project.
 `go.mod`, `go.sum`, `tools.go`, `.go-version`.
 
 - `require` produces `package` rows with an `exact` pin: Go modules are always exact.
+- A `require` line marked `// indirect`, in the block form `require ( … )` as well as in
+  the single form `require x v1 // indirect`, stays in the inventory and carries the
+  `note` `indirekt (// indirect in go.mod)` ("indirect, marked `// indirect` in
+  `go.mod`"); `scope` stays empty, and everything else about the row is unchanged. The
+  rule follows Go (`isIndirect` in `golang.org/x/mod/modfile`): the comment at the end of
+  the line, without `//` and split into words at whitespace, is exactly `indirect`, or its
+  first word is `indirect;` and more words follow. `// indirect; tool` therefore counts;
+  other comments change nothing, including `indirect` elsewhere in the comment
+  (`// TODO: indirect use entfernen`).
 - `replace` to a path is `local`; `replace` to another version is a separate row with a
   `note`.
 - The `go` directive and `toolchain` are `runtime` entries.

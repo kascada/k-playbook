@@ -59,9 +59,12 @@ folgen; sie brauchen die Werkzeuge des neuen Programms und einen erreichbaren No
 
 ## Schritt 3 — Umstellungen
 
-Jede Umstellung prüft zuerst ihren Anlass. Liegt er nicht vor, meldest du eine Zeile
-„nichts zu tun“ und gehst zur nächsten; eine erledigte Umstellung wird so beim nächsten Lauf
-von selbst übersprungen.
+Jede Umstellung prüft zuerst ihren Anlass. Liegt er nicht vor, gehst du ohne Meldung zur
+nächsten; eine erledigte Umstellung wird so beim nächsten Lauf von selbst übersprungen.
+`/k-upgrade` läuft oft, und eine Zeile „nichts zu tun“ je Umstellung sagt dann nichts mehr.
+Gemeldet wird nur, was zu tun ist: was eine Umstellung vorlegt, ausführt oder liegen lässt,
+dazu jede Warnung, etwa dass sie auf den Binärwechsel wartet. Liegt bei keiner Umstellung ein
+Anlass vor, steht für Schritt 3 genau eine Zeile: `Umstellungen: alles erledigt.`
 
 Für alle Umstellungen gilt:
 
@@ -762,7 +765,9 @@ Schritt 2 gehört in den nächsten Commit des Projekts — sag das.
 
 ## Schritt 4 — Schluss
 
-Nenne in einer Zeile je Umstellung, ob sie etwas getan hat, und was liegen geblieben ist; für
+Nenne nur die Umstellungen, die etwas getan haben, bei denen etwas liegen geblieben ist oder die
+eine Warnung tragen, je eine Zeile; eine Umstellung ohne Anlass erscheint nicht. Trifft das auf
+keine zu, steht hier nur `Umstellungen: alles erledigt.`, dazu Hinweise aus Schritt 2. Für
 3.0 je gelöschtem Verzeichnis die Zahl seiner Dateien und je Datei aus `knowledge/` ihr Ziel
 (`keph:`-Verweis, gelöscht oder liegen geblieben), für das Aufräumen die gelöschten
 Verzeichnisse und jede Zeile `bleibt: …`, bei `commands/` und `skills/` mit den Zeilen je

@@ -221,7 +221,7 @@ adjusted: it appears in the selection basis under `unavailableCandidates` with
 A perspective runs **after** the merge and is not a scanner of its own. It reads the merge
 output `review-input.json` and writes exactly one Markdown file directly into the run
 directory, for example `review-secret-scanning.md`. The complete example of this contract
-is in the [`review-secret-scanning.md`](../reviews/review-secret-scanning.md) recipe.
+is in the [`review-secret-scanning.md`](../defaults/reviews/review-secret-scanning.md) recipe.
 
 Frontmatter contract:
 
@@ -261,9 +261,9 @@ Scope semantics for `mode: perspective`:
 An evidence source runs **before** the merge. It reads code in the frozen path scope and
 supplies part of `review-input.json` rather than reading it. Its required artifact is SARIF
 under `raw/<entry>.sarif`; no Markdown result is created. The two converted examples are
-[`review-tech.md`](../reviews/review-tech.md) and
-[`review-python-comment-hardspots.md`](../reviews/review-python-comment-hardspots.md);
-[`review-code.md`](../reviews/review-code.md) was written as an evidence source from the start.
+[`review-tech.md`](../defaults/reviews/review-tech.md) and
+[`review-python-comment-hardspots.md`](../defaults/reviews/review-python-comment-hardspots.md);
+[`review-code.md`](../defaults/reviews/review-code.md) was written as an evidence source from the start.
 
 Frontmatter contract:
 

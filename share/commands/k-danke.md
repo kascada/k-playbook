@@ -167,8 +167,8 @@ warten in `keph:/queue/findings/` auf die Übernahme.
 ## Anti-Muster (nicht tun)
 
 - **Die Prüfung aus `/k-enforcement` nachbauen.** Eine zweite Fassung läuft davon weg.
-- **Selbst übernehmen.** Nichts nach `docs/` oder `guidelines/fallen.md`
-  schreiben, auch wenn das Ziel feststeht. Das tut die Übernahme aus der Queue.
+- **Selbst übernehmen.** Nichts nach `docs/` oder in eine andere Ablage schreiben,
+  auch wenn das Ziel feststeht. Das tut die Übernahme aus der Queue.
 - **`ziel` ohne Bestätigung setzen.** Der Vorschlag ist deiner, die Entscheidung gehört
   dem Nutzer.
 - **Einen Befund umschreiben.** Außer `ziel` bleibt er, wie er geschrieben wurde; was

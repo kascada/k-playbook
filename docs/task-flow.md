@@ -125,7 +125,7 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
   which it reads itself, and appends `### Diff: Geänderte Dateien`, `### Diff: Code-Änderungen`,
   and `### Review: Befunde` to the task with `k_playbook_doc_append` and `since_revision`.
   Criteria and the classification into critical, important, and note are defined only in the
-  recipe [`reviews/review-code.md`](../reviews/review-code.md), section
+  recipe [`reviews/review-code.md`](../defaults/reviews/review-code.md), section
   `## Ergebnisform für den Diff eines Tasks`; this page does not repeat them. The recipe is
   the entry `k-playbook:/reviews/review-code.md` under `documents.reviews` of the briefing, so
   a project-owned overlay under `k-playbook-local/reviews/` takes effect. No

@@ -1,6 +1,8 @@
 package inventory
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -147,6 +149,100 @@ func TestGoModuleUndErsetzungen(t *testing.T) {
 		if entry.SourceFile == "go.sum" {
 			t.Errorf("go.sum wiederholt go.mod und wird nicht geführt: %+v", entry)
 		}
+	}
+}
+
+// goIndirectProject ist ein Projekt mit einem go.mod, das direkte und
+// indirekte Abhängigkeiten in Block- und Einzelform mischt, dazu Kommentare,
+// die nichts kennzeichnen.
+func goIndirectProject(t *testing.T) Result {
+	t.Helper()
+
+	root := t.TempDir()
+	content := `module example.com/indirekt
+
+go 1.24
+
+require (
+	github.com/direkt/block v1.0.0
+	github.com/indirekt/block v1.1.0 // indirect
+	github.com/indirekt/mehr v1.2.0 // indirect; tool
+	github.com/fremd/kommentar v1.3.0 // gepinnt wegen Bug 42
+	github.com/indirekt/spaeter v1.4.0 // TODO: indirect use entfernen
+	github.com/indirekt/allein v1.5.0 // indirect;
+)
+
+require github.com/indirekt/einzeln v2.0.0 // indirect
+
+require github.com/direkt/einzeln v2.1.0
+`
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(content), 0o644); err != nil {
+		t.Fatalf("schreiben: %v", err)
+	}
+	result, err := Collect(Options{ProjectDir: root})
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	return result
+}
+
+// Eine require-Zeile mit `// indirect` bleibt im Inventar und trägt die Notiz;
+// erkannt wird wie in Go (isIndirect in golang.org/x/mod/modfile), in Block-
+// und Einzelform. Alles andere an der Zeile bleibt, wie es ist.
+func TestGoIndirekteAbhaengigkeitenSindGekennzeichnet(t *testing.T) {
+	result := goIndirectProject(t)
+
+	cases := []struct {
+		module   string
+		version  string
+		line     int
+		indirect bool
+	}{
+		{"github.com/direkt/block", "v1.0.0", 6, false},
+		{"github.com/indirekt/block", "v1.1.0", 7, true},
+		{"github.com/indirekt/mehr", "v1.2.0", 8, true},
+		{"github.com/fremd/kommentar", "v1.3.0", 9, false},
+		{"github.com/indirekt/spaeter", "v1.4.0", 10, false},
+		{"github.com/indirekt/allein", "v1.5.0", 11, false},
+		{"github.com/indirekt/einzeln", "v2.0.0", 14, true},
+		{"github.com/direkt/einzeln", "v2.1.0", 16, false},
+	}
+	for _, want := range cases {
+		entry := find(t, result, "go/"+want.module, "go.mod")
+		wantNote := ""
+		if want.indirect {
+			wantNote = "indirekt (// indirect in go.mod)"
+		}
+		if entry.Note != wantNote {
+			t.Errorf("%s: Note = %q, erwartet %q", want.module, entry.Note, wantNote)
+		}
+		if entry.Version != want.version || entry.Pin != PinExact || entry.Scope != "" ||
+			entry.SourceKey != "require."+want.module || entry.SourceLine != want.line {
+			t.Errorf("%s: Zeile verändert: %+v", want.module, entry)
+		}
+	}
+}
+
+// Die Notiz steht in der Datei in der Spalte Herkunft der Zeile — dort, wo
+// /k-docs-tools sie als Erkennungsmerkmal liest.
+func TestRenderZeigtDieIndirektNotiz(t *testing.T) {
+	result := goIndirectProject(t)
+	rendered := Render(result, "2026-11-11T12:00:00+01:00")
+
+	indirectRow, directRow := "", ""
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.Contains(line, "`require.github.com/indirekt/einzeln`") {
+			indirectRow = line
+		}
+		if strings.Contains(line, "`require.github.com/direkt/einzeln`") {
+			directRow = line
+		}
+	}
+	if !strings.Contains(indirectRow, "`go.mod:14` · `require.github.com/indirekt/einzeln` · indirekt (// indirect in go.mod)") {
+		t.Errorf("die Notiz fehlt in der Zeile: %q", indirectRow)
+	}
+	if directRow == "" || strings.Contains(directRow, "indirekt (") {
+		t.Errorf("die direkte Zeile fehlt oder trägt die Notiz: %q", directRow)
 	}
 }
 

@@ -3343,8 +3343,8 @@ was sich anklicken lässt. Die Zustandsmarken `.pill` zeigen ihren Zustand über
 Schriftfarbe und einen Punkt in `.pill::before`, der über `currentColor` der Farbe
 folgt. Die Versionsangabe `.version-badge` ist schlichter Text. Die Regel und die
 Einordnung von Bildern und Inhaltsflächen stehen in der Guideline
-`k-playbook-local/guidelines/oberflaeche-gestaltung.md`, Abschnitt „Nur ein Knopf sieht
-aus wie ein Knopf“. `TestStylesheetKeepsLabelsFlat` verbietet in jeder Regel, deren
+`keph:/docs/guidelines/ui-design.md` der Projekt-Collection, Abschnitt „Only a button looks
+like a button“. `TestStylesheetKeepsLabelsFlat` verbietet in jeder Regel, deren
 Selektor eine dieser Klassen als ganzen Namen trifft, Pseudo-Elemente eingeschlossen,
 `background…`, `border…` außer `none` oder `0` (`border-radius` bleibt erlaubt),
 `box-shadow` und `min-height`. Nur `.pill::before` darf eine Hintergrundfarbe tragen.

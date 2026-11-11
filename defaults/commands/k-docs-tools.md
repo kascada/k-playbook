@@ -130,9 +130,12 @@ mit verschiedenen Versionen. Als Kandidat fasst du ihn über seine Zeilen zusamm
 - **Scope** — die verschiedenen Werte aus `Scope` (`main`, `dev`, `optional`, `test`,
   `build`), dazu die Umgebungen, in denen er vorkommt.
 
-Das Inventar führt nur direkte Angaben; transitive Pakete kommen darin nicht vor und werden
-auch nicht ergänzt. Abweichungen zwischen den Zeilen sind kein Fehler dieses Commands; das
-Inventar weist sie selbst aus.
+Das Inventar führt die Angaben der Manifeste; aus Lockfiles kommen nur die direkten
+Abhängigkeiten, transitive Pakete werden nicht ergänzt. Indirekte Angaben bringt nur
+`go.mod` mit: Es nennt auch indirekte Go-Module (`// indirect`), und das Inventar führt sie
+als gekennzeichnete Zeilen. Erkennungsmerkmal ist die Spalte `Herkunft`: Sie enthält
+`indirekt (// indirect in go.mod)`. Abweichungen zwischen den Zeilen sind kein Fehler
+dieses Commands; das Inventar weist sie selbst aus.
 
 **Nutzung im Code** zählst du je Kandidat mit Grep, innerhalb des Scope aus Schritt 1 —
 der Scope begrenzt nur dieses Zählen, nicht die Liste. Gesucht wird nach dem Import, passend
@@ -160,6 +163,10 @@ entfällt die Zählung; die Liste zeigt dort `—`.
 - **A — empfohlen:** Score ≥ 3 oder auf der Known-Pitfall-Liste.
 - **B — optional:** Score 1–2.
 - **C — übersprungen:** Score ≤ 0.
+- **Rein indirekt:** Ein Kandidat, dessen Zeilen alle das Merkmal
+  `indirekt (// indirect in go.mod)` in der Spalte `Herkunft` tragen, kommt nach C — ohne
+  Ausnahme, unabhängig vom Score und ohne Hinweis. Wer ihn will, holt ihn mit
+  `add <gegenstand>` aus C.
 
 **Known-Pitfall-Liste:** JWT, cryptography, aiohttp, pytz und Zeitzonen-Handling, Kafka,
 LangChain, boto3, azure-sdk-*, pandas mit großen Frames, nebenläufige asyncio-Libraries, ORMs,
