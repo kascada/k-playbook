@@ -54,7 +54,8 @@ const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema ste
 	"Wurzel, keph:/… ein Dokument der Projekt-Collection über den Kephalaion-Node (~ steht für den eigenen User; " +
 	"Anbindung nicht bereit: kephalaion_unavailable, kein Rückfall), k-playbook:/… lokal und mitgeliefert schon " +
 	"gegeneinander aufgelöst, dieselbe Überlagerung wie catalogs in k_playbook_context: eine lokale Datei ersetzt " +
-	"die gleichnamige mitgelieferte, eine leere schaltet sie ab. Sorten unter k-playbook:: instructions/, " +
+	"die gleichnamige mitgelieferte, eine leere schaltet sie ab; die lokale Fassung von instructions und reviews " +
+	"liegt in der Collection des Projekts unter keph:/k-playbook/<sorte>/. Sorten unter k-playbook:: instructions/, " +
 	"reviews/, guidelines/, commands/ (der Text eines Commands, dessen Hülle beim Assistenten liegt), dazu " +
 	"docs/<pfad>/README.md — die Vorlage für keph:/docs/<pfad>/README.md, nur mitgeliefert, ohne lokale Fassung. " +
 	"Eine Datei kommt mit Frontmatter; k-playbook:/instructions/always/ (mit / am Ende) baut das Verzeichnis zu " +
@@ -62,8 +63,9 @@ const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema ste
 	"liest du einzeln mit Dateinamen, mit / am Ende sind sie invalid_input. Include-Zeilen (include: <verweis>, " +
 	"absolut oder relativ im selben Präfix) sind schon durch den Rumpf des Ziels ersetzt, rekursiv bis Tiefe 10; " +
 	"includes: false liefert den Rohtext. Die Antwort trägt content, disabled (abgeschaltete Datei: leer, kein " +
-	"Fehler, mit hint), parts (name, origin, disabled), problems (übergangene Dateien und Teile, deren Include " +
-	"scheiterte — mit Kette), includes (ref, origin, depth, disabled — die eingesetzten Ziele), totalLines (Zeilen " +
+	"Fehler, mit hint), parts (name, origin, location — bei einem lokalen Teil aus der Collection sein keph:-Ort, " +
+	"auch wenn er abschaltet —, disabled), problems (übergangene Dateien und Teile, deren Include " +
+	"scheiterte — mit Kette), includes (ref, origin, location, depth, disabled — die eingesetzten Ziele), totalLines (Zeilen " +
 	"des ganzen Inhalts) und bei keph: revision (für since_revision der Änderungswerkzeuge). lines (von-bis oder " +
 	"von-) oder section (eine Überschriftenzeile wie ## Intent, bis vor die nächste gleicher oder höherer Ebene) " +
 	"liefern nur einen Teil einer Einzeldatei, nach dem Einsetzen der Includes; fehlt die Überschrift: " +

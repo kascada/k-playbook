@@ -8,14 +8,16 @@ sind bewusst:
 
 - Gelesen werden die mitgelieferten Quellen unter <playbook>/defaults/ (commands/,
   instructions/, guidelines/) und <playbook>/share/ (commands/, skills/) und
-  ihre projekteigenen Gegenstücke: commands/ und skills/ unter
-  <config-root>/.k-playbook/, instructions/ und guidelines/ unter
-  <config-root>/k-playbook-local/, jeweils alle .md- und .md.template-Dateien.
+  ihre projekteigenen Gegenstücke auf der Platte: commands/ und skills/ unter
+  <config-root>/.k-playbook/, guidelines/ unter <config-root>/k-playbook-local/,
+  jeweils alle .md- und .md.template-Dateien.
   Schlüssel ist der Pfad ab dem Playbook (defaults/…, share/…) bzw. ab der
   Konfigurationswurzel (.k-playbook/…, k-playbook-local/…). Den früheren Ort
   k-playbook-local/commands/ und k-playbook-local/skills/ liest der Check nicht mehr,
-  wie das Programm seit Task 129. Die Tasks in der Projekt-Collection durchsucht der
-  Check nicht.
+  wie das Programm seit Task 129, ebenso k-playbook-local/instructions/ seit Task 143.
+  Projekteigene Instructions liegen seitdem in der Projekt-Collection unter
+  keph:/k-playbook/instructions/; die prüft der Check nicht — eine bewusst
+  hingenommene Lücke. Die Tasks in der Projekt-Collection durchsucht er ebenso nicht.
 - Gemeldet wird je Zeile und Art höchstens einmal:
   - ``link`` — ein relativer Markdown-Link, ``](../…)`` oder ``](./…)``, überall,
     auch in Codeblöcken (Vorlagen, die ein Command schreibt);
@@ -53,7 +55,9 @@ KINDS = ("link", "pfad")
 
 PLAYBOOK_SCOPE = ("defaults/commands", "defaults/instructions",
                   "defaults/guidelines", "share/commands", "share/skills")
-LOCAL_SCOPE = ("instructions", "guidelines")
+# Projekteigene Instructions liegen seit Task 143 in der Projekt-Collection
+# (keph:/k-playbook/instructions/) und werden hier nicht geprüft.
+LOCAL_SCOPE = ("guidelines",)
 # Projekteigene Commands und Skills liegen in .k-playbook/, nicht in k-playbook-local/.
 PROJECT_SCOPE = ("commands", "skills")
 

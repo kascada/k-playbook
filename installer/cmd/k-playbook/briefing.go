@@ -65,8 +65,9 @@ func runBriefing(args []string) error {
 // (briefingTextHead), dann der Text der immer geltenden Anweisungen, so wie `k-playbook read` ihn liefert — ohne die Liste
 // seiner Teile, die Herkunft steht nur in der JSON-Antwort —, dann der Block
 // der Umgebungsprüfung (healthText, derselbe wie bei `k-playbook health`),
-// dann je Abschnitt die Verweise mit Herkunft in Klammern und Titel, dahinter
-// die Beschreibung.
+// dann je Abschnitt die Verweise mit Herkunft in Klammern — bei einem
+// projekteigenen Teil aus der Collection mit seinem keph:-Ort daneben — und
+// Titel, dahinter die Beschreibung.
 func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 	var b strings.Builder
 	always := briefing.Documents.Always
@@ -90,7 +91,13 @@ func writeBriefingText(out io.Writer, briefing project.Briefing) error {
 			return
 		}
 		for _, entry := range list {
-			fmt.Fprintf(&b, "  %s  [%s]  %s", entry.Ref, entry.Origin, entry.Title)
+			// Der Ort eines projekteigenen Teils steht neben der Herkunft:
+			// [local keph:/k-playbook/…].
+			origin := entry.Origin
+			if entry.Location != "" {
+				origin += " " + entry.Location
+			}
+			fmt.Fprintf(&b, "  %s  [%s]  %s", entry.Ref, origin, entry.Title)
 			if entry.Description != "" {
 				fmt.Fprintf(&b, " — %s", entry.Description)
 			}

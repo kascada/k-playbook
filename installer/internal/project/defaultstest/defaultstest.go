@@ -18,9 +18,21 @@ import (
 // Address ist die Adresse der öffentlichen Collection in Tests.
 const Address = "test:k-playbook"
 
+// ProjectAddress ist die Adresse der Collection des Projekts in Tests.
+const ProjectAddress = "test:projekt"
+
+// CollectionDir ist das Verzeichnis im Projekt eines Tests, aus dem Isolate
+// die Collection des Projekts baut: test-collection/k-playbook/reviews/x.md
+// ist dort keph:/k-playbook/reviews/x.md. Das Programm liest es nie.
+const CollectionDir = "test-collection"
+
 // Isolate setzt den Store ein und gibt die Rücknahme zurück — für TestMain.
+// Ebenso für die projekteigene Ebene in der Collection des Projekts
+// (project.OpenProjectLayerStore): ein Store im Speicher, gefüllt beim Öffnen
+// aus CollectionDir des Projekts; fehlt es, ist die Collection leer.
 func Isolate() func() {
 	original := project.OpenDefaultsStore
+	originalProject := project.OpenProjectLayerStore
 	project.OpenDefaultsStore = func(projectDir string) (project.DefaultsStore, string, error) {
 		store, err := kephtest.Defaults(filepath.Join(project.PlaybookDir(projectDir), "defaults"))
 		if err != nil {
@@ -28,5 +40,15 @@ func Isolate() func() {
 		}
 		return store, Address, nil
 	}
-	return func() { project.OpenDefaultsStore = original }
+	project.OpenProjectLayerStore = func(projectDir string) (project.DefaultsStore, string, error) {
+		store, err := kephtest.Collection(filepath.Join(projectDir, CollectionDir))
+		if err != nil {
+			return nil, ProjectAddress, err
+		}
+		return store, ProjectAddress, nil
+	}
+	return func() {
+		project.OpenDefaultsStore = original
+		project.OpenProjectLayerStore = originalProject
+	}
 }

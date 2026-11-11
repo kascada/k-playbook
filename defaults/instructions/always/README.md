@@ -9,9 +9,11 @@ vorweg (`documents.always.content`), eine Sitzung muss ihn also nicht eigens les
 - Aufgenommen werden nur Dateien dieses Verzeichnisses, deren Name mit einer Ziffer beginnt,
   nicht aber Unterverzeichnisse und nicht diese `README.md`. Eine Datei ohne Ziffer vorn wird
   nicht aufgenommen und als Problem gemeldet.
-- Mitgelieferte und lokale Teile (`k-playbook-local/instructions/always/`) werden gemeinsam
+- Mitgelieferte und lokale Teile werden gemeinsam
   nach der Ziffer am Anfang des Namens sortiert, und zwar numerisch: `20-` kommt vor `100-`.
-  Bei gleicher Ziffer entscheidet der Name.
+  Bei gleicher Ziffer entscheidet der Name. Die lokalen Teile liegen in der Collection des
+  Projekts unter `keph:/k-playbook/instructions/always/`; `k-playbook-local/instructions/always/`
+  wird nicht mehr gelesen.
 - Ein gleichnamiger lokaler Teil ersetzt den mitgelieferten vollständig. Ein leerer lokaler
   Teil schaltet ihn ab. Leer heißt: nur Leerzeilen und Zeilen, die mit `#` beginnen — auch
   eine Datei nur aus Überschriften schaltet also ab.

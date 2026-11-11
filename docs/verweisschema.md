@@ -36,8 +36,8 @@ More examples:
   [Assembling a directory](#assembling-a-directory)). Every other directory, such as
   `instructions/on-demand/` or `instructions/` itself, is read file by file with its name; a
   reference to it ending in `/` lacks the file name and is an error (`invalid_input`).
-- **`k-playbook:` is read only through k-playbook**, never directly from `k-playbook/` or
-  `k-playbook-local/`. k-playbook decides whether a local version replaces or disables the
+- **`k-playbook:` is read only through k-playbook**, never directly from `k-playbook/`,
+  `k-playbook-local/` or `keph:/k-playbook/`. k-playbook decides whether a local version replaces or disables the
   shipped one; whoever looks on disk can pick the wrong version.
 - **A reference k-playbook does not know is an error.** The tool reports it with an error
   code; it does not fall back to reading from disk, and the session reports it instead of
@@ -151,8 +151,8 @@ An unknown reference -- a file, or an assembled directory that neither layer has
 `not_found`. The tool's full answer and error codes are in [mcp.md](mcp.md#doc-read-contract).
 
 Two kinds exist only as targets: **`includes/`** holds text blocks for include lines
-(`defaults/includes/`, overridable by `k-playbook-local/includes/`, an empty local file
-disables), and **`testdata/`** holds fixed test cases that come out the same on every
+(`defaults/includes/`, overridable by `keph:/k-playbook/includes/` in the project collection
+since task 143, an empty local document disables), and **`testdata/`** holds fixed test cases that come out the same on every
 installation (`defaults/testdata/`). Both are resolved like `instructions/`, but appear in no
 catalog, no briefing and no help text: nobody reads them for their own sake.
 
@@ -229,7 +229,8 @@ keeps the default. With the raw text there are no include errors.
 **`includes` in the answer.** The inserted targets in reading order, each with `ref`
 (canonical, resolved -- relative made absolute, `~` replaced), `origin` (`dist`, `local`,
 `override`, `project`, `keph`; empty for an assembled directory as target, whose parts are
-not listed individually), `depth` and `disabled`. Always present, `[]` without includes and
+not listed individually), `location` (for a local target from the project collection its
+`keph:` reference, see below), `depth` and `disabled`. Always present, `[]` without includes and
 with `includes: false`. `parts` remains what it is: the parts of a directory.
 
 **`keph:` includes** are allowed by the mechanism. That they make a document depend on the
@@ -252,7 +253,7 @@ Two layers, compared by name:
 | Layer | Directory | Origin |
 |---|---|---|
 | shipped | the public collection `<hub>:k-playbook` under `defaults/` — what the hub fetched from the latest release; every kind is read there, with the same path below `defaults/` | `dist` |
-| local | `k-playbook-local/`; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; never for `docs/`, the README templates (task 137) | `local`, or `override` when it replaces a shipped file of the same name |
+| local | `instructions/`, `includes/` and `reviews/` from the project collection under `k-playbook/` (`keph:/k-playbook/<kind>/`) since task 143; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; `guidelines/` (and `testdata/`) still from `k-playbook-local/`; never for `docs/`, the README templates (task 137) | `local`, or `override` when it replaces a shipped file of the same name |
 
 The shipped layer is read from Kephalaion since task 131 (`NewKephDefaultsSource` in
 `defaultsdocs.go`): the hub is the one of the project binding, the collection is always
@@ -275,8 +276,26 @@ text here — so it carries the text itself and must not point at the same refer
 would resolve to that file. First command on this route: `/k-upgrade` (task 092).
 
 The resolution goes through an exchangeable source — a directory listing and a file read per
-layer. The shipped layer is Kephalaion, the local layer the disk; the caller does not notice
-the difference.
+layer. The shipped layer is Kephalaion, the local layer partly Kephalaion and partly the disk;
+the caller does not notice the difference.
+
+The local layer of `instructions/`, `includes/` and `reviews/` lies in the project collection
+under `k-playbook/` since task 143 (`NewKephProjectLayerSource` in `projectlayer.go`), with the
+same tree as below `k-playbook:/`: `k-playbook:/reviews/review-x.md` is overridden by
+`keph:/k-playbook/reviews/review-x.md`. The source behaves like the shipped one — one
+recursive listing, read ahead per directory, only existing files read — with one difference:
+an empty `k-playbook/` is an empty layer, not an error, and there is no `VERSION` check and no
+`fetch_release` remedy. Any error of the project collection (no binding, not listable, not
+readable) is `kephalaion_unavailable`, also when `<hub>:k-playbook` is readable; the shipped
+layer is never served alone. `k-playbook-local/instructions/`, `includes/` and `reviews/` are
+no longer read (hard switch); `/k-upgrade` 3.4 removes them.
+
+**`location`.** A part of the local layer that lies in the collection carries its place as a
+`keph:` reference next to the origin: `parts[].location` and `includes[].location` in the answer of
+`k-playbook read --json` and `k_playbook_doc_read`, `location` per entry and per part of
+`always` in the briefing, `location` per catalog entry of the context output — for `local`,
+`override` and `disabled` alike. The hint of a disabled file names it as well. The origin
+values themselves are unchanged.
 
 There is **one** overlay, not two: `overlayDocDir` in `docref.go` lays the two layers of a
 directory over each other -- same name wins locally, an empty local file disables -- and the

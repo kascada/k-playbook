@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
@@ -40,7 +41,7 @@ func newSelectionProject(t *testing.T) (string, []string) {
 		}
 		mustWriteFile(t, filepath.Join(reviewsDir, filepath.Base(source)), string(data))
 	}
-	localDir := filepath.Join(project.LocalDir(root), "reviews")
+	localDir := filepath.Join(root, defaultstest.CollectionDir, project.ProjectLayerDirName, "reviews")
 	mustWriteFile(t, filepath.Join(localDir, "review-eigen.md"), "---\ntitle: Eigenes Rezept\naudit:\n  enabled: true\n---\n# Überschrift\n")
 	mustWriteFile(t, filepath.Join(localDir, "review-tech.md"), "---\naudit:\n  enabled: true\nreview:\n  enabled: true\n---\n# Lokale Technik\n")
 	mustWriteFile(t, filepath.Join(localDir, "review-sast.md"), "")
@@ -65,18 +66,18 @@ func aiSelectionCandidates(base reviewSelectionBase) []selectionCandidate {
 	return out
 }
 
-// Die Auswahl liefert je Rezept Name, Modus, Titel und Rezeptpfad: ein
-// mitgeliefertes Rezept mit dem Verweis k-playbook:/reviews/…, ein
-// projekteigenes mit seinem Pfad auf der Platte. Erwartet wird, was das
+// Die Auswahl liefert je Rezept Name, Modus, Titel und Rezeptpfad: jedes
+// Rezept mit dem wirksamen Verweis k-playbook:/reviews/…, auch ein
+// projekteigenes oder überschreibendes aus der Collection des Projekts
+// (Task 143). Erwartet wird, was das
 // Rezept selbst sagt — gelesen über die Quelldatei auf der Platte, nicht über
 // den Weg der Auswahl.
 func TestAuswahlKandidatenDerRezepte(t *testing.T) {
 	root, sources := newSelectionProject(t)
-	localDir := filepath.Join(project.LocalDir(root), "reviews")
 
 	want := []selectionCandidate{
-		{Name: "eigen", Mode: review.ModePerspective, Title: "Eigenes Rezept", RecipePath: filepath.Join(localDir, "review-eigen.md")},
-		{Name: "tech", Mode: review.ModePerspective, Title: "Lokale Technik", RecipePath: filepath.Join(localDir, "review-tech.md")},
+		{Name: "eigen", Mode: review.ModePerspective, Title: "Eigenes Rezept", RecipePath: "k-playbook:/reviews/review-eigen.md"},
+		{Name: "tech", Mode: review.ModePerspective, Title: "Lokale Technik", RecipePath: "k-playbook:/reviews/review-tech.md"},
 	}
 	for _, source := range sources {
 		name := filepath.Base(source)
@@ -115,6 +116,22 @@ func TestAuswahlKandidatenDerRezepte(t *testing.T) {
 	for i := range want {
 		if got[i] != want[i] {
 			t.Errorf("Kandidat %d:\n got  %+v\n want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+// readAIRecipeMetadata liest ein Rezept über seinen RecipePath aus dem
+// Katalog — auch ein projekteigenes und ein überschreibendes aus der
+// Collection des Projekts, deren Path der Verweis k-playbook:/reviews/… ist.
+func TestRezeptAngabenUeberRecipePath(t *testing.T) {
+	root, _ := newSelectionProject(t)
+	for key, title := range map[string]string{"eigen": "Eigenes Rezept", "tech": "Lokale Technik"} {
+		metadata, err := readAIRecipeMetadata(root, key, "k-playbook:/reviews/review-"+key+".md")
+		if err != nil {
+			t.Fatalf("%s: %v", key, err)
+		}
+		if !metadata.Enabled || metadata.Title != title {
+			t.Errorf("%s: %+v, erwartet aktiv mit Titel %q", key, metadata, title)
 		}
 	}
 }

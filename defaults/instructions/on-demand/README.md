@@ -4,8 +4,10 @@ Anweisungen für bestimmte Aufgaben. Sie werden nicht in jeder Sitzung geliefert
 wenn ein Verweis auf sie zeigt, etwa `k-playbook:/instructions/on-demand/<thema>.md`.
 
 - Die Dateien sind nicht nummeriert. Der Dateiname ist der Name, über den sie erreichbar sind.
-- Zuerst gilt die lokale Fassung (`k-playbook-local/instructions/on-demand/`), sonst die
-  mitgelieferte. Ein leerer lokaler Eintrag schaltet den mitgelieferten ab.
+- Zuerst gilt die lokale Fassung, sonst die mitgelieferte. Die lokale Fassung liegt in der
+  Collection des Projekts unter `keph:/k-playbook/instructions/on-demand/`, mit demselben
+  Namen; `k-playbook-local/instructions/on-demand/` wird nicht mehr gelesen. Ein leerer
+  lokaler Eintrag schaltet den mitgelieferten ab.
 - Mit `instructions/always/` haben sie nichts zu tun: eigener Namensraum, keine Reihenfolge.
 - Das Verzeichnis wird nicht zusammengebaut. Jede Datei liest du einzeln mit ihrem Namen;
   `k-playbook:/instructions/on-demand/` mit `/` am Ende ist ein Fehler, weil der Dateiname

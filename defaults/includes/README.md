@@ -6,8 +6,9 @@ eingesetzt.
 
 - `includes/` ist eine Sorte der Verweisauflösung (Task 093): `k-playbook:/includes/<name>.md`
   wird aufgelöst wie `instructions/` und `commands/`, mitgeliefert aus `defaults/includes/`,
-  eine gleichnamige Datei in `k-playbook-local/includes/` ersetzt den Baustein, eine leere
-  schaltet ihn ab. Die Sorte erscheint in keinem Katalog, keinem Briefing und keiner Hilfe:
+  eine gleichnamige Datei in der Collection des Projekts unter `keph:/k-playbook/includes/`
+  ersetzt den Baustein, eine leere schaltet ihn ab (seit Task 143;
+  `k-playbook-local/includes/` wird nicht mehr gelesen). Die Sorte erscheint in keinem Katalog, keinem Briefing und keiner Hilfe:
   Bausteine liest keine Sitzung für sich, sie werden eingesetzt.
 - Eingesetzt wird über eine Include-Zeile im einbindenden Dokument — ohne führenden
   Leerraum, genau ein Argument, sonst nichts auf der Zeile:

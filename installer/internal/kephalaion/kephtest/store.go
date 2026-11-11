@@ -98,6 +98,20 @@ func Defaults(dir string) (*Store, error) {
 	return store, nil
 }
 
+// Collection baut eine Collection im Speicher aus dem Baum unter dir: jede
+// Datei als Dokument unter ihrem relativen Pfad — etwa die Collection eines
+// Projekts aus dem Baum, den ein Test dafür anlegt. Fehlt dir, ist sie leer.
+func Collection(dir string) (*Store, error) {
+	store := New()
+	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
+		return store, nil
+	}
+	if err := store.PutDir("", dir); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
 // Content ist der Inhalt eines Dokuments, ok sagt, ob es lebt.
 func (s *Store) Content(name string) (string, bool) {
 	s.mu.Lock()

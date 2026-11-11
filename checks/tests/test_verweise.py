@@ -188,7 +188,10 @@ class ExceptionsTest(unittest.TestCase):
 
 
 class SourceFilesTest(unittest.TestCase):
-    """Projekteigene Commands und Skills kommen aus .k-playbook/, der alte Ort zählt nicht."""
+    """Projekteigene Commands und Skills kommen aus .k-playbook/, der alte Ort zählt nicht.
+
+    k-playbook-local/instructions/ zählt seit Task 143 ebenso nicht mehr.
+    """
 
     def test_project_sources_from_dot_k_playbook_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -204,6 +207,7 @@ class SourceFilesTest(unittest.TestCase):
             put("k-playbook-local/rules/r.md")
             put("k-playbook-local/commands/alt.md")
             put("k-playbook-local/skills/alt/SKILL.md")
+            put("k-playbook-local/instructions/on-demand/alt.md")
             files = source_files(root / "k-playbook", root / "k-playbook-local", root / ".k-playbook")
         self.assertEqual(files, {
             ".k-playbook/commands/_x/eins.md": command,

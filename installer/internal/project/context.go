@@ -281,14 +281,19 @@ type CatalogEntry struct {
 	Name string `json:"name"`
 	// Key ist der handliche Aufrufname: ohne Endung und ohne Sortenpräfix.
 	Key string `json:"key"`
-	// Path sagt, wo der wirksame Eintrag liegt: bei einem projekteigenen der
-	// Pfad auf der Platte unter k-playbook-local/; bei einem mitgelieferten
-	// reviews-Eintrag der Verweis k-playbook:/<sorte>/<name> —
-	// diese Ebene liegt in <hub>:k-playbook, nicht auf der Platte; gelesen
-	// wird er mit ReadCatalogEntry. checks liegen nur in der Installation.
+	// Path sagt, wie der wirksame Eintrag gelesen wird: bei reviews der
+	// Verweis k-playbook:/reviews/<name>, gleich ob mitgeliefert,
+	// projekteigen oder überschreibend — beide Ebenen liegen in Collections
+	// (<hub>:k-playbook unter defaults/, die Collection des Projekts unter
+	// k-playbook/); gelesen wird er mit ReadCatalogEntry über die Ebenen.
+	// checks liegen nur in der Installation: dort ein Pfad auf der Platte.
 	Path string `json:"path"`
 	// Origin: dist, local oder override; bei checks immer dist.
 	Origin string `json:"origin"`
+	// Location ist bei local und override, auch abgeschaltet, der Ort des
+	// projekteigenen Eintrags als keph:-Verweis (keph:/k-playbook/reviews/
+	// <name>); leer bei dist.
+	Location string `json:"location,omitempty"`
 	// Disabled: eine leere projekteigene Datei schaltet den Eintrag ab; bei
 	// checks nie, sie haben keine lokale Ebene.
 	Disabled bool         `json:"disabled,omitempty"`
@@ -356,30 +361,30 @@ var guidelinesKind = catalogKind{name: "guidelines", dirName: "guidelines", suff
 
 // BuildContext stellt den Arbeitsstand zusammen.
 func BuildContext(projectDir string) (Context, error) {
-	return buildContext(projectDir, nil)
+	return buildContext(projectDir, DocLayers{})
 }
 
 // BuildContextWithLayers ist BuildContext und gibt dazu die Ebenen des
-// Projekts zurück (ProjectDocLayers), deren mitgelieferte Ebene den Katalog
-// reviews schon gelesen hat. Wer danach Einträge dieses Katalogs
+// Projekts zurück (ProjectDocLayers), deren mitgelieferte und projekteigene
+// Ebene den Katalog reviews schon gelesen haben. Wer danach Einträge dieses Katalogs
 // liest, nimmt sie über ReadCatalogEntryWith aus diesen Ebenen: Die
 // mitgelieferte Ebene ist dann einmal geöffnet und hält die gelesenen
 // Dateien, statt je Eintrag einen neuen Zugang zum Node aufzubauen (Task 132,
 // die Review-Auswahl). Context selbst bleibt dabei, wie BuildContext ihn baut.
 func BuildContextWithLayers(projectDir string) (Context, DocLayers, error) {
 	layers := ProjectDocLayers(projectDir)
-	built, err := buildContext(projectDir, layers.Dist)
+	built, err := buildContext(projectDir, layers)
 	if err != nil {
 		return Context{}, DocLayers{}, err
 	}
 	return built, layers, nil
 }
 
-// buildContext ist BuildContext mit der mitgelieferten Ebene des Katalogs
-// reviews; nil heißt eine eigene (NewProjectDefaultsSource). Das
-// Briefing reicht seine durch, damit es dieselben Dokumente nicht zweimal vom
-// Node liest.
-func buildContext(projectDir string, defaults DocSource) (Context, error) {
+// buildContext ist BuildContext mit den Ebenen des Katalogs reviews: Dist die
+// mitgelieferte, Local die projekteigene; nil heißt je eine eigene
+// (NewProjectDefaultsSource, NewProjectLocalDocSource). Das Briefing reicht
+// seine durch, damit es dieselben Dokumente nicht zweimal vom Node liest.
+func buildContext(projectDir string, shared DocLayers) (Context, error) {
 	config, err := ReadConfig(projectDir)
 	if err != nil {
 		return Context{}, err
@@ -440,15 +445,20 @@ func buildContext(projectDir string, defaults DocSource) (Context, error) {
 		VersionSources: readVersionSources(localDir),
 	}
 
-	if defaults == nil {
-		defaults = NewProjectDefaultsSource(projectDir)
+	layers := DocLayers{Dist: shared.Dist, Local: shared.Local}
+	if layers.Dist == nil {
+		layers.Dist = NewProjectDefaultsSource(projectDir)
+	}
+	if layers.Local == nil {
+		layers.Local = NewProjectLocalDocSource(projectDir)
 	}
 	for _, kind := range catalogKinds() {
-		entries, err := resolveCatalog(projectDir, defaults, kind)
+		entries, err := resolveCatalog(projectDir, layers, kind)
 		if errDefaultsUnavailable(err) {
-			// Die mitgelieferte Ebene fehlt: keine Kataloge aus der lokalen
-			// Ebene allein. Der Rest der Kontextausgabe bleibt — er trägt
-			// unter kephalaion, warum.
+			// Eine Ebene in einer Collection fehlt — die mitgelieferte oder
+			// die projekteigene: keine Kataloge aus der anderen allein. Der
+			// Rest der Kontextausgabe bleibt — er trägt unter kephalaion,
+			// warum.
 			context.Catalogs[kind.name] = []CatalogEntry{}
 			context.CatalogsProblem = err.Error()
 			continue
@@ -466,9 +476,10 @@ func buildContext(projectDir string, defaults DocSource) (Context, error) {
 // Verweise und das Briefing anwenden; eine zweite Fassung der Regel gäbe
 // irgendwann eine zweite Antwort.
 //
-// Die mitgelieferte Ebene von reviews ist defaults, dieselbe
-// Quelle wie hinter k-playbook:-Verweisen (<hub>:k-playbook unter
-// defaults/); checks liest weiter aus der Installation k-playbook/.
+// Die Ebenen von reviews sind dieselben Quellen wie hinter
+// k-playbook:-Verweisen: mitgeliefert <hub>:k-playbook unter defaults/,
+// projekteigen die Collection des Projekts unter k-playbook/ (Task 143);
+// checks liest weiter aus der Installation k-playbook/.
 //
 // checks hat keine lokale Ebene mehr (Task 134): Local bleibt leer, ein
 // k-playbook-local/checks/ wird nicht gelesen, jeder Eintrag ist dist und
@@ -479,10 +490,9 @@ func buildContext(projectDir string, defaults DocSource) (Context, error) {
 // mitgelieferten vollständig; ist er leer, gilt der Eintrag als abgeschaltet.
 // Ein fehlendes Verzeichnis ist ein leerer Katalog; eine unlesbare Datei ist
 // ein Fehler, kein stiller Eintrag ohne Befund.
-func resolveCatalog(projectDir string, defaults DocSource, kind catalogKind) ([]CatalogEntry, error) {
+func resolveCatalog(projectDir string, layers DocLayers, kind catalogKind) ([]CatalogEntry, error) {
 	playbookDir := PlaybookDir(projectDir)
-	localDir := LocalDir(projectDir)
-	layers := DocLayers{Dist: defaults, Local: NewDiskDocSource(localDir)}
+	layers = DocLayers{Dist: layers.Dist, Local: layers.Local}
 	if kind.name == "checks" {
 		layers = DocLayers{Dist: NewDiskDocSource(playbookDir)}
 	}
@@ -493,10 +503,9 @@ func resolveCatalog(projectDir string, defaults DocSource, kind catalogKind) ([]
 
 	entries := make([]CatalogEntry, 0, len(resolved))
 	for _, item := range resolved {
-		entry := CatalogEntry{Name: item.Name, Key: catalogKey(item.Name, kind), Origin: item.Origin, Disabled: item.Disabled}
+		entry := CatalogEntry{Name: item.Name, Key: catalogKey(item.Name, kind), Origin: item.Origin,
+			Location: item.Location, Disabled: item.Disabled}
 		switch {
-		case item.Origin != DocOriginDist:
-			entry.Path = filepath.Join(localDir, kind.dirName, item.Name)
 		case kind.name == "checks":
 			entry.Path = filepath.Join(playbookDir, kind.dirName, item.Name)
 		default:
@@ -524,9 +533,10 @@ func resolveCatalog(projectDir string, defaults DocSource, kind catalogKind) ([]
 
 // ReadCatalogEntry liest den wirksamen Inhalt eines Katalogeintrags über
 // seinen Path: einen Verweis k-playbook:/… über frische Ebenen des Projekts
-// (ProjectDocLayers, Rohtext ohne eingesetzte Includes), sonst die Datei auf
-// der Platte — einen projekteigenen Eintrag oder einen Pfad aus einem älteren
-// Lauf. Jeder Aufruf mit einem Verweis öffnet die mitgelieferte Ebene neu;
+// (ProjectDocLayers, Rohtext ohne eingesetzte Includes) — mitgeliefert,
+// projekteigen oder überschreibend —, sonst die Datei auf der Platte, etwa
+// einen check oder einen Pfad aus einem älteren Lauf. Jeder Aufruf mit einem
+// Verweis öffnet die Ebenen neu;
 // wer mehrere Einträge liest, nimmt ReadCatalogEntryWith.
 func ReadCatalogEntry(projectDir string, entryPath string) ([]byte, error) {
 	if !strings.HasPrefix(entryPath, DocSchemeKPlaybook+":/") {
@@ -917,12 +927,12 @@ func contextLinks(repair LinkRepair) *ContextLinks {
 // Katalog dieses Projekts, nicht dem Weg, auf dem die Installation zu ihrem
 // Stand kam.
 func ContextForDir(startDir string) (Context, error) {
-	return contextForDir(startDir, "", nil)
+	return contextForDir(startDir, "", DocLayers{})
 }
 
 // contextForDir ist ContextForDir; liegt startDir im Projekt sharedDir, lesen
-// die Kataloge die mitgelieferte Ebene aus shared statt aus einer eigenen.
-func contextForDir(startDir string, sharedDir string, shared DocSource) (Context, error) {
+// die Kataloge die Ebenen aus shared statt aus eigenen.
+func contextForDir(startDir string, sharedDir string, shared DocLayers) (Context, error) {
 	projectDir, err := Discover(startDir)
 	if errors.Is(err, ErrNotFound) {
 		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
@@ -936,11 +946,11 @@ func contextForDir(startDir string, sharedDir string, shared DocSource) (Context
 	// neuen Konfiguration ab, wird auch nichts eingerichtet: ein Werkzeug, das
 	// die Fassung nicht versteht, soll die Registrierung nicht nach seinen
 	// Regeln umschreiben.
-	var defaults DocSource
-	if shared != nil && projectDir == sharedDir {
-		defaults = shared
+	var layers DocLayers
+	if projectDir == sharedDir {
+		layers = shared
 	}
-	built, err := buildContext(projectDir, defaults)
+	built, err := buildContext(projectDir, layers)
 	if err != nil {
 		return Context{}, err
 	}

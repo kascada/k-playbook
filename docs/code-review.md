@@ -103,8 +103,9 @@ Invocations:
 /k-review secret-scanning
 ```
 
-Without an argument, the command shows the effective recipe set from `k-playbook/reviews/` and
-`k-playbook-local/reviews/`.
+Without an argument, the command shows the effective recipe set from the shipped layer
+(`<hub>:k-playbook/defaults/reviews/`) and the project-owned one (`keph:/k-playbook/reviews/` in
+the project collection).
 
 The command:
 
@@ -422,8 +423,8 @@ every run directory and is not combined with the audit run.
 Recipes and results are strictly separate:
 
 ```text
-k-playbook/reviews/                    shipped recipes
-k-playbook-local/reviews/              project-owned recipes, overlay
+<hub>:k-playbook/defaults/reviews/     shipped recipes
+keph:/k-playbook/reviews/              project-owned recipes, overlay (project collection)
 k-playbook-local/known-decisions.md    deliberately made decisions, maintained by hand
 k-playbook-local/results/              everything reviews create
 ```

@@ -56,11 +56,11 @@ Earlier versions used a `paths:` block with nine keys. It has been removed: the 
 
 ## How do I change a shipped review recipe?
 
-You do not: `k-playbook/` is replaced during updates. Instead, create a file with the same name under `k-playbook-local/`:
+You do not: the shipped layer comes from the hub. Instead, create a document with the same name in the project collection under `keph:/k-playbook/reviews/` (task 143; `k-playbook-local/reviews/` is no longer read):
 
 ```text
 <hub>:k-playbook/defaults/reviews/review-code.md    is no longer read
-k-playbook-local/reviews/review-code.md             applies on its own
+keph:/k-playbook/reviews/review-code.md             applies on its own
 ```
 
 The local file **completely** replaces the shipped one. It must therefore contain the whole recipe; individual sections are not retained from the original. The cost is that later improvements to the original no longer reach this copy.
@@ -74,7 +74,7 @@ With an **empty** file of the same name. Because the local file completely repla
 "Empty" means nothing except blank lines and comments. This lets the file state its own reason:
 
 ```text
-# k-playbook-local/reviews/review-dependabot-alerts.md
+# keph:/k-playbook/reviews/review-dependabot-alerts.md
 # Disabled: this project is not on GitHub.
 ```
 

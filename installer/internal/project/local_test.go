@@ -33,9 +33,17 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"reviews", "results", "priv"} {
+	for _, name := range []string{"results", "priv"} {
 		if !isDir(filepath.Join(local, name)) {
 			t.Errorf("%s fehlt", name)
+		}
+	}
+	// Projekteigene Instructions, Includes und Review-Rezepte liegen in der
+	// Collection des Projekts unter keph:/k-playbook/ (Task 143); angelegt
+	// wird keines der alten Verzeichnisse.
+	for _, name := range []string{"reviews", "instructions", "includes"} {
+		if pathExists(filepath.Join(local, name)) {
+			t.Errorf("%s angelegt", name)
 		}
 	}
 	// Projekteigene Guidelines liegen unter keph:/docs/guidelines/ (Todo #40).
@@ -98,12 +106,12 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	readme := filepath.Join(LocalDir(root), "reviews", "README.md")
+	readme := filepath.Join(LocalDir(root), "priv", "README.md")
 	content, err := os.ReadFile(readme)
 	if err != nil {
 		t.Fatalf("README fehlt: %v", err)
 	}
-	if !strings.Contains(string(content), "Review-Rezepte") {
+	if !strings.Contains(string(content), "eigene Notizen") {
 		t.Errorf("README ohne Zweckbeschreibung:\n%s", content)
 	}
 }
@@ -199,10 +207,10 @@ func TestCreateLocalUeberschreibtNichts(t *testing.T) {
 	local := LocalDir(root)
 
 	// Ein Projekt, das schon Inhalte hat.
-	if err := os.MkdirAll(filepath.Join(local, "reviews"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(local, "priv"), 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
-	eigen := filepath.Join(local, "reviews", "README.md")
+	eigen := filepath.Join(local, "priv", "README.md")
 	if err := os.WriteFile(eigen, []byte("# eigene Beschreibung\n"), 0o644); err != nil {
 		t.Fatalf("README anlegen: %v", err)
 	}
@@ -244,18 +252,16 @@ func TestCreateLocalIstIdempotent(t *testing.T) {
 	}
 }
 
-// Die Overlay-Sorte reviews muss ein lokales Gegenstück haben, sonst greift
-// die Overlay-Auflösung ins Leere. checks hat seit Task 134 keine lokale
-// Ebene mehr.
-func TestLocalStructureDecktOverlaySortenAb(t *testing.T) {
-	vorhanden := map[string]bool{}
+// Keine Overlay-Sorte hat ihre lokale Ebene mehr unter k-playbook-local/:
+// instructions, includes und reviews liegen seit Task 143 in der Collection
+// des Projekts, commands in .k-playbook/commands/, checks hat seit Task 134
+// keine lokale Ebene mehr. Die Struktur führt keine davon.
+func TestLocalStructureOhneOverlaySorten(t *testing.T) {
 	for _, entry := range LocalStructure() {
-		vorhanden[entry.Path] = true
-	}
-
-	for _, kind := range []string{"reviews"} {
-		if !vorhanden[kind] {
-			t.Errorf("Overlay-Sorte %s fehlt in der lokalen Struktur", kind)
+		for _, kind := range []string{"reviews", "instructions", "includes", "commands", "checks"} {
+			if entry.Path == kind {
+				t.Errorf("Overlay-Sorte %s steht noch in der lokalen Struktur", kind)
+			}
 		}
 	}
 }
@@ -412,7 +418,7 @@ func TestEnsureLocalLaesstUnvollstaendigesVerzeichnisStehen(t *testing.T) {
 	if _, err := CreateLocal(root); err != nil {
 		t.Fatalf("CreateLocal: %v", err)
 	}
-	readme := filepath.Join(LocalDir(root), "reviews", "README.md")
+	readme := filepath.Join(LocalDir(root), "priv", "README.md")
 	if err := os.Remove(readme); err != nil {
 		t.Fatalf("README entfernen: %v", err)
 	}

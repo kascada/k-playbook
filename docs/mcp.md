@@ -514,9 +514,11 @@ even if the recipe changes later. `mode` is written explicitly, including for `p
 so the run itself says how an entry was intended; an empty field in an old run is read as
 `perspective`. `recipePath` is the `path` of the catalog entry: for a shipped recipe the
 reference `k-playbook:/reviews/<name>` -- the shipped layer lies in `<hub>:k-playbook`, not on
-disk (task 131) --, for a project-owned one the file under `k-playbook-local/reviews/`. The
+disk (task 131) --, and since task 143 the same effective reference for a project-owned or
+overriding one, whose layer lies in the project collection under `keph:/k-playbook/reviews/`. The
 tools read a single recipe through `project.ReadCatalogEntry`, which resolves the reference and
-also still reads the disk paths of older runs. The selection in `k_playbook_review_status`
+also still reads the disk paths of older runs, such as a project-owned recipe under the former
+`k-playbook-local/reviews/`. The selection in `k_playbook_review_status`
 (`available`) and `k_playbook_review_create` reads all recipes through the layers it built the
 catalog with (`project.BuildContextWithLayers`, `project.ReadCatalogEntryWith`), so it opens
 the shipped layer once per selection instead of once per recipe (task 132).

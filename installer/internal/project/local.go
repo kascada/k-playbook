@@ -48,10 +48,6 @@ type LocalEntry struct {
 
 // LocalStructure beschreibt, was ein Projekt braucht.
 //
-// reviews ist die Overlay-Sorte hier: ein gleichnamiger lokaler Eintrag
-// ersetzt den mitgelieferten, ein leerer schaltet ihn ab. Aufgelöst wird das
-// in context.go.
-//
 // docs, tasks, tasks/done, data und material stehen nicht mehr hier (Task
 // 107): ihr Inhalt liegt in der Projekt-Collection. commands und skills
 // ebenso nicht (Task 129): projekteigene Commands und Skills liegen in
@@ -60,12 +56,14 @@ type LocalEntry struct {
 // projekteigene Checks gibt es bis zu ihrer neuen Form nicht, k-check führt
 // nur die mitgelieferten aus. guidelines ebenso nicht (Todo #40):
 // projekteigene Guidelines liegen unter keph:/docs/guidelines/, /k-upgrade
-// löscht das alte Verzeichnis auch mit Inhalt. /k-upgrade räumt die leeren Verzeichnisse eines
+// löscht das alte Verzeichnis auch mit Inhalt. reviews ebenso nicht (Task
+// 143): projekteigene Review-Rezepte liegen wie projekteigene Instructions
+// und Includes in der Collection des Projekts unter keph:/k-playbook/<sorte>/
+// (projectlayer.go). /k-upgrade räumt die leeren Verzeichnisse eines
 // Bestandsprojekts ab, dazu die Reste der früheren Wissensablage auf der
 // Platte (Task 123).
 func LocalStructure() []LocalEntry {
 	return []LocalEntry{
-		{Path: "reviews", Purpose: "Projekteigene Review-Rezepte, benannt als review-<name>.md."},
 		{
 			Path:             "results",
 			Private:          true,

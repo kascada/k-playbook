@@ -17,32 +17,38 @@ import (
 )
 
 // newBriefingProject baut ein Projekt mit beiden Ebenen: ersetzt,
-// abgeschaltet, nur lokal und nur mitgeliefert kommen in jeder Sorte vor.
+// abgeschaltet, nur lokal und nur mitgeliefert kommen in jeder Sorte vor. Die
+// projekteigene Ebene von instructions/ und reviews/ liegt in der Collection
+// des Projekts (test-collection/ baut sie, isolateDefaults); was noch unter
+// k-playbook-local/instructions/ und reviews/ liegt, liest nichts mehr.
 func newBriefingProject(t *testing.T) string {
 	t.Helper()
 
 	root := newContextProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/instructions/always/010-verweise.md": "## Verweise\n\nText.\n",
-		"k-playbook/defaults/instructions/always/100-wissen.md":   "---\ntitle: Projektwissen zuerst\ndescription: Doku vor Code.\n---\n\n## Projektwissen\n",
-		"k-playbook/defaults/instructions/always/200-befunde.md":  "## Befunde festhalten\n",
-		"k-playbook/defaults/instructions/always/README.md":       "# Liesmich\n",
-		"k-playbook/defaults/instructions/on-demand/muster.md":    "---\ntitle: Muster\ndescription: Zeigt den Aufbau.\n---\n\n## Muster\n",
-		"k-playbook/defaults/instructions/on-demand/release.md":   "## Release fahren\n",
-		"k-playbook/defaults/reviews/review-code.md":              "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
-		"k-playbook/defaults/reviews/review-tech.md":              "# Tech-Review\n",
-		"k-playbook/defaults/reviews/notiz.md":                    "# kein Rezept\n",
-		"k-playbook/defaults/guidelines/betrieb.md":               "# Betrieb: Ablageorte\n\nText.\n",
-		"k-playbook/defaults/guidelines/README.md":                "# Guidelines\n",
-		"k-playbook-local/instructions/always/100-wissen.md":      "## Projektwissen lokal\n\nText.\n",
-		"k-playbook-local/instructions/always/200-befunde.md":     "# Abgeschaltet: keine Befunde.\n",
-		"k-playbook-local/instructions/always/1000-eigen.md":      "## Eigene Anweisung\n\nText.\n",
-		"k-playbook-local/instructions/always/notiz.md":           "## Ohne Ziffer\n",
-		"k-playbook-local/instructions/on-demand/release.md":      "",
-		"k-playbook-local/instructions/on-demand/eigen.md":        "## Eigen auf Abruf\n\nText.\n",
-		"k-playbook-local/rules/eigene.md":                        "# Liegengeblieben\n",
-		"k-playbook-local/reviews/review-tech.md":                 "# Abgeschaltet.\n",
-		"k-playbook-local/guidelines/stil.md":                     "# Stil\n\nText.\n",
+		"k-playbook/defaults/instructions/always/010-verweise.md":       "## Verweise\n\nText.\n",
+		"k-playbook/defaults/instructions/always/100-wissen.md":         "---\ntitle: Projektwissen zuerst\ndescription: Doku vor Code.\n---\n\n## Projektwissen\n",
+		"k-playbook/defaults/instructions/always/200-befunde.md":        "## Befunde festhalten\n",
+		"k-playbook/defaults/instructions/always/README.md":             "# Liesmich\n",
+		"k-playbook/defaults/instructions/on-demand/muster.md":          "---\ntitle: Muster\ndescription: Zeigt den Aufbau.\n---\n\n## Muster\n",
+		"k-playbook/defaults/instructions/on-demand/release.md":         "## Release fahren\n",
+		"k-playbook/defaults/reviews/review-code.md":                    "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
+		"k-playbook/defaults/reviews/review-tech.md":                    "# Tech-Review\n",
+		"k-playbook/defaults/reviews/notiz.md":                          "# kein Rezept\n",
+		"k-playbook/defaults/guidelines/betrieb.md":                     "# Betrieb: Ablageorte\n\nText.\n",
+		"k-playbook/defaults/guidelines/README.md":                      "# Guidelines\n",
+		"test-collection/k-playbook/instructions/always/100-wissen.md":  "## Projektwissen lokal\n\nText.\n",
+		"test-collection/k-playbook/instructions/always/200-befunde.md": "# Abgeschaltet: keine Befunde.\n",
+		"test-collection/k-playbook/instructions/always/1000-eigen.md":  "## Eigene Anweisung\n\nText.\n",
+		"test-collection/k-playbook/instructions/always/notiz.md":       "## Ohne Ziffer\n",
+		"test-collection/k-playbook/instructions/on-demand/release.md":  "",
+		"test-collection/k-playbook/instructions/on-demand/eigen.md":    "## Eigen auf Abruf\n\nText.\n",
+		"test-collection/k-playbook/reviews/review-tech.md":             "# Abgeschaltet.\n",
+		"k-playbook-local/rules/eigene.md":                              "# Liegengeblieben\n",
+		"k-playbook-local/instructions/always/300-alt.md":               "## Alter Ort\n",
+		"k-playbook-local/instructions/on-demand/muster.md":             "",
+		"k-playbook-local/reviews/review-code.md":                       "",
+		"k-playbook-local/guidelines/stil.md":                           "# Stil\n\nText.\n",
 	}
 	for rel, content := range files {
 		path := filepath.Join(root, filepath.FromSlash(rel))
@@ -90,9 +96,12 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 	}
 	wantAlways := []BriefingEntry{
 		{Ref: "k-playbook:/instructions/always/010-verweise.md", Title: "Verweise", Origin: DocOriginDist},
-		{Ref: "k-playbook:/instructions/always/100-wissen.md", Title: "Projektwissen lokal", Origin: DocOriginOverride},
-		{Ref: "k-playbook:/instructions/always/200-befunde.md", Title: "200-befunde.md", Origin: BriefingOriginDisabled},
-		{Ref: "k-playbook:/instructions/always/1000-eigen.md", Title: "Eigene Anweisung", Origin: DocOriginLocal},
+		{Ref: "k-playbook:/instructions/always/100-wissen.md", Title: "Projektwissen lokal", Origin: DocOriginOverride,
+			Location: "keph:/k-playbook/instructions/always/100-wissen.md"},
+		{Ref: "k-playbook:/instructions/always/200-befunde.md", Title: "200-befunde.md", Origin: BriefingOriginDisabled,
+			Location: "keph:/k-playbook/instructions/always/200-befunde.md"},
+		{Ref: "k-playbook:/instructions/always/1000-eigen.md", Title: "Eigene Anweisung", Origin: DocOriginLocal,
+			Location: "keph:/k-playbook/instructions/always/1000-eigen.md"},
 	}
 	if !reflect.DeepEqual(always.Parts, wantAlways) {
 		t.Errorf("always.parts:\n%+v\nerwartet\n%+v", always.Parts, wantAlways)
@@ -116,9 +125,11 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 	}
 
 	wantOnDemand := []BriefingEntry{
-		{Ref: "k-playbook:/instructions/on-demand/eigen.md", Title: "Eigen auf Abruf", Origin: DocOriginLocal},
+		{Ref: "k-playbook:/instructions/on-demand/eigen.md", Title: "Eigen auf Abruf", Origin: DocOriginLocal,
+			Location: "keph:/k-playbook/instructions/on-demand/eigen.md"},
 		{Ref: "k-playbook:/instructions/on-demand/muster.md", Title: "Muster", Description: "Zeigt den Aufbau.", Origin: DocOriginDist},
-		{Ref: "k-playbook:/instructions/on-demand/release.md", Title: "release.md", Origin: BriefingOriginDisabled},
+		{Ref: "k-playbook:/instructions/on-demand/release.md", Title: "release.md", Origin: BriefingOriginDisabled,
+			Location: "keph:/k-playbook/instructions/on-demand/release.md"},
 	}
 	if !reflect.DeepEqual(briefing.Documents.OnDemand, wantOnDemand) {
 		t.Errorf("onDemand:\n%+v\nerwartet\n%+v", briefing.Documents.OnDemand, wantOnDemand)
@@ -133,7 +144,8 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 	// Reviews folgen dem Muster des Katalogs: notiz.md ist kein Rezept.
 	wantReviews := []BriefingEntry{
 		{Ref: "k-playbook:/reviews/review-code.md", Title: "Code-Review", Origin: DocOriginDist},
-		{Ref: "k-playbook:/reviews/review-tech.md", Title: "review-tech.md", Origin: BriefingOriginDisabled},
+		{Ref: "k-playbook:/reviews/review-tech.md", Title: "review-tech.md", Origin: BriefingOriginDisabled,
+			Location: "keph:/k-playbook/reviews/review-tech.md"},
 	}
 	if !reflect.DeepEqual(briefing.Documents.Reviews, wantReviews) {
 		t.Errorf("reviews:\n%+v\nerwartet\n%+v", briefing.Documents.Reviews, wantReviews)
@@ -148,8 +160,15 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 		t.Errorf("guidelines:\n%+v\nerwartet\n%+v", briefing.Documents.Guidelines, wantGuidelines)
 	}
 
+	// Der frühere Ort k-playbook-local/instructions/ und reviews/ wirkt nicht
+	// mehr (Task 143): 300-alt.md kommt nicht hinzu, die leeren Dateien dort
+	// schalten muster.md und review-code.md nicht ab.
+	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "300-alt.md") {
+		t.Errorf("documents nennt eine Datei vom alten Ort: %s %v", data, err)
+	}
+
 	// Jeder Verweis des Briefings lässt sich über ResolveDocRef lesen, mit
-	// derselben Herkunft.
+	// derselben Herkunft und demselben Ort.
 	layers := ProjectDocLayers(root)
 	for _, entries := range [][]BriefingEntry{always.Parts, briefing.Documents.OnDemand, briefing.Documents.Reviews, briefing.Documents.Guidelines} {
 		for _, entry := range entries {
@@ -160,6 +179,9 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 			}
 			if origin != entry.Origin {
 				t.Errorf("%s: Briefing %s, Verweis %s", entry.Ref, entry.Origin, origin)
+			}
+			if result.Parts[0].Location != entry.Location {
+				t.Errorf("%s: Ort im Briefing %q, beim Verweis %q", entry.Ref, entry.Location, result.Parts[0].Location)
 			}
 		}
 	}
@@ -551,11 +573,11 @@ func TestBriefingUmgebungsfehler(t *testing.T) {
 func TestBriefingSetztIncludesEinWieRead(t *testing.T) {
 	root := newContextProject(t)
 	for rel, content := range map[string]string{
-		"k-playbook/defaults/instructions/always/010-a.md":       "## A\n\ninclude: k-playbook:/instructions/on-demand/baustein.md\n",
-		"k-playbook/defaults/instructions/always/020-b.md":       "## B\n",
-		"k-playbook/defaults/instructions/on-demand/baustein.md": "---\ntitle: Baustein\n---\n\nBaustein.\n",
-		"k-playbook-local/instructions/always/1000-kaputt.md":    "## Kaputt\n\ninclude: fehlt.md\n",
-		"k-playbook-local/instructions/always/1100-eigen.md":     "## Eigen\n\ninclude: 020-b.md\n",
+		"k-playbook/defaults/instructions/always/010-a.md":              "## A\n\ninclude: k-playbook:/instructions/on-demand/baustein.md\n",
+		"k-playbook/defaults/instructions/always/020-b.md":              "## B\n",
+		"k-playbook/defaults/instructions/on-demand/baustein.md":        "---\ntitle: Baustein\n---\n\nBaustein.\n",
+		"test-collection/k-playbook/instructions/always/1000-kaputt.md": "## Kaputt\n\ninclude: fehlt.md\n",
+		"test-collection/k-playbook/instructions/always/1100-eigen.md":  "## Eigen\n\ninclude: 020-b.md\n",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		mkdirAll(t, filepath.Dir(path))

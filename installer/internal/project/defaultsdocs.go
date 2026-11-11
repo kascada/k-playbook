@@ -101,7 +101,7 @@ func NewProjectDefaultsSource(projectDir string) DocSource {
 // Fehlt defaults/VERSION, ist der Lieferumfang nicht angekommen: dann ist
 // jeder Zugriff kephalaion_unavailable mit der Abhilfe fetch_release.
 func NewKephDefaultsSource(open func() (DefaultsStore, string, error)) DocSource {
-	return &kephDefaultsSource{open: open, ctx: context.Background()}
+	return &kephCollectionSource{open: open, ctx: context.Background(), root: defaultsDirName}
 }
 
 // newProjectDefaultsSourceContext ist NewProjectDefaultsSource, dessen
@@ -109,36 +109,53 @@ func NewKephDefaultsSource(open func() (DefaultsStore, string, error)) DocSource
 // Schreiben der READMEs beim Einrichten. DocSource selbst kennt keinen
 // Kontext.
 func newProjectDefaultsSourceContext(ctx context.Context, projectDir string) DocSource {
-	return &kephDefaultsSource{open: func() (DefaultsStore, string, error) { return OpenDefaultsStore(projectDir) }, ctx: ctx}
+	return &kephCollectionSource{open: func() (DefaultsStore, string, error) { return OpenDefaultsStore(projectDir) },
+		ctx: ctx, root: defaultsDirName}
 }
 
-type kephDefaultsSource struct {
+// kephCollectionSource ist eine DocSource über ein Verzeichnis root einer
+// Collection: defaults/ in <hub>:k-playbook für das Mitgelieferte
+// (NewKephDefaultsSource), k-playbook/ in der Collection des Projekts für die
+// projekteigene Ebene (NewKephProjectLayerSource, projectlayer.go). Beide
+// verhalten sich gleich — einmal rekursiv listen, beim Listen vorauslesen,
+// nur Vorhandenes lesen —, bis auf die Frage, was ein leeres root heißt: Beim
+// Mitgelieferten ist der Lieferumfang nicht angekommen (VERSION fehlt), bei
+// der projekteigenen Ebene ist sie einfach leer.
+type kephCollectionSource struct {
 	open func() (DefaultsStore, string, error)
 	// ctx begrenzt List und Read am Node; Hintergrund, wenn niemand eine
 	// Frist setzt.
 	ctx context.Context
+	// root ist das Verzeichnis in der Collection, das die Ebene trägt.
+	root string
+	// project meldet die projekteigene Ebene: keine Prüfung auf VERSION,
+	// keine Abhilfe fetch_release, ein leeres root ist eine leere Ebene.
+	project bool
 
 	once    sync.Once
 	err     error
 	store   DefaultsStore
 	address string
-	// files sind die Dateien unter defaults/, relativ dazu.
+	// files sind die Dateien unter root, relativ dazu.
 	files map[string]bool
-	// dirs sind die Verzeichnisse unter defaults/, relativ dazu; "" ist
-	// defaults/ selbst.
+	// dirs sind die Verzeichnisse unter root, relativ dazu; "" ist root
+	// selbst.
 	dirs map[string]bool
 
 	mu       sync.Mutex
 	contents map[string][]byte
 }
 
-// load öffnet den Zugang und listet defaults/ einmal.
-func (s *kephDefaultsSource) load() error {
+// load öffnet den Zugang und listet root einmal.
+func (s *kephCollectionSource) load() error {
 	s.once.Do(func() { s.err = s.index() })
 	return s.err
 }
 
-func (s *kephDefaultsSource) index() error {
+func (s *kephCollectionSource) index() error {
+	if s.project {
+		return s.indexProject()
+	}
 	store, address, err := s.open()
 	if address == "" {
 		address = "<hub>:" + DefaultsCollectionName
@@ -158,20 +175,7 @@ func (s *kephDefaultsSource) index() error {
 				"fetch_release für %s anstoßen",
 			address, err, DefaultsCollectionName, address)
 	}
-	s.store = store
-	s.files = map[string]bool{}
-	s.dirs = map[string]bool{"": true}
-	s.contents = map[string][]byte{}
-	for _, entry := range entries {
-		rel, ok := strings.CutPrefix(entry.Name, defaultsDirName+"/")
-		if !ok || rel == "" {
-			continue
-		}
-		s.files[rel] = true
-		for dir := path.Dir(rel); dir != "."; dir = path.Dir(dir) {
-			s.dirs[dir] = true
-		}
-	}
+	s.remember(store, entries)
 	if !s.files[defaultsVersionName] {
 		return docRefErrorf(DocCodeKephalaionUnavailable,
 			"die mitgelieferten Texte fehlen: %s/%s/ ist leer (%s/%s fehlt) — Abhilfe: beim Hub-Betreiber "+
@@ -181,7 +185,25 @@ func (s *kephDefaultsSource) index() error {
 	return nil
 }
 
-func (s *kephDefaultsSource) List(dir string) ([]DocSourceEntry, error) {
+// remember hält den Store und die Namen aus dem Listing von root fest.
+func (s *kephCollectionSource) remember(store DefaultsStore, entries []kephalaion.Entry) {
+	s.store = store
+	s.files = map[string]bool{}
+	s.dirs = map[string]bool{"": true}
+	s.contents = map[string][]byte{}
+	for _, entry := range entries {
+		rel, ok := strings.CutPrefix(entry.Name, s.root+"/")
+		if !ok || rel == "" {
+			continue
+		}
+		s.files[rel] = true
+		for dir := path.Dir(rel); dir != "."; dir = path.Dir(dir) {
+			s.dirs[dir] = true
+		}
+	}
+}
+
+func (s *kephCollectionSource) List(dir string) ([]DocSourceEntry, error) {
 	if err := s.load(); err != nil {
 		return nil, err
 	}
@@ -218,7 +240,7 @@ func (s *kephDefaultsSource) List(dir string) ([]DocSourceEntry, error) {
 // Leser eines ganzen Verzeichnisses nimmt (die Vorlagen README.md unter docs/
 // liest docsreadme.go einzeln). Ein Fehler bleibt hier stumm: Das spätere
 // Read fragt noch einmal und meldet ihn.
-func (s *kephDefaultsSource) prefetch(prefix string, entries []DocSourceEntry) {
+func (s *kephCollectionSource) prefetch(prefix string, entries []DocSourceEntry) {
 	files := []string{}
 	s.mu.Lock()
 	for _, entry := range entries {
@@ -247,7 +269,7 @@ func (s *kephDefaultsSource) prefetch(prefix string, entries []DocSourceEntry) {
 	wg.Wait()
 }
 
-func (s *kephDefaultsSource) Read(file string) ([]byte, error) {
+func (s *kephCollectionSource) Read(file string) ([]byte, error) {
 	if err := s.load(); err != nil {
 		return nil, err
 	}
@@ -263,13 +285,13 @@ func (s *kephDefaultsSource) Read(file string) ([]byte, error) {
 	if ok {
 		return data, nil
 	}
-	read, err := s.store.Read(s.ctx, defaultsDirName+"/"+file)
+	read, err := s.store.Read(s.ctx, s.root+"/"+file)
 	if err != nil {
 		mapped := kephError(err)
 		if DocRefErrorCode(mapped) != DocCodeKephalaionUnavailable {
 			mapped = &DocRefError{Code: DocCodeKephalaionUnavailable, err: mapped}
 		}
-		return nil, fmt.Errorf("%s/%s/%s lesen: %w", s.address, defaultsDirName, file, mapped)
+		return nil, fmt.Errorf("%s/%s/%s lesen: %w", s.address, s.root, file, mapped)
 	}
 	switch read.Kind {
 	case kephalaion.ReadKindNone:

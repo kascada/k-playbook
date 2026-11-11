@@ -47,7 +47,8 @@ func addBriefingTool(server *mcp.Server) {
 			"neu vergeben — sie steht in allem, was die Sitzung später wiederfinden muss, etwa im Kopf eines Befunds. documents: always (ref, content, parts), " +
 			"onDemand, reviews, guidelines — lokal und " +
 			"mitgeliefert schon gegeneinander aufgelöst, je Eintrag ref, title, description und origin (dist, local, " +
-			"override, disabled). work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
+			"override, disabled), bei einem lokalen Eintrag aus der Collection des Projekts dazu location, sein " +
+			"keph:-Ort unter keph:/k-playbook/. work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
 			"mit Titel — und problem, wenn das Frontmatter nicht lesbar oder der Titel vermutlich an ‚ #‘ abgeschnitten " +
 			"ist — und openFindings, die Zahl der offenen Befunde in queue/findings/ — offen heißt nicht in done/; " +
 			"ist Kephalaion nicht nutzbar, steht available false mit message. projectDocs: der Einstieg der " +

@@ -66,6 +66,9 @@ func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 
 	// Ein zweiter Fehler kommt dazu; der Umschlag bleibt ok.
 	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

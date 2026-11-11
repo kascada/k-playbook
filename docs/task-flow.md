@@ -128,7 +128,8 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
   recipe [`reviews/review-code.md`](../defaults/reviews/review-code.md), section
   `## Ergebnisform für den Diff eines Tasks`; this page does not repeat them. The recipe is
   the entry `k-playbook:/reviews/review-code.md` under `documents.reviews` of the briefing, so
-  a project-owned overlay under `k-playbook-local/reviews/` takes effect. No
+  a project-owned overlay under `keph:/k-playbook/reviews/` in the project collection takes
+  effect. No
   assistant-specific skill is involved; the review behaves the same in Claude Code and
   OpenCode.
 - **Notification.** Before every question to the user and at the end of the run, the main
@@ -139,7 +140,7 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
   describes; `/k-task-refine` includes the same module. `<task>` is the file stem of the task
   document. A `no_channel` answer, for example in a devcontainer, changes nothing: the
   question and the summary stay in the chat.
-- **Switching it off.** Only an empty project-owned `k-playbook-local/reviews/review-code.md`
+- **Switching it off.** Only an empty project-owned `keph:/k-playbook/reviews/review-code.md`
   switches the review off for `/k-task-run`. The diff sections are still written, and the
   final summary shows "Review: abgeschaltet". `review.enabled` and `audit.enabled` only
   affect `/k-review` and `/k-audit`. An overlay that lacks the section for the diff of a task

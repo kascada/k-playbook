@@ -832,9 +832,9 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"legt zehn Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
+		"legt elf Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
 		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/` - `rules/` - `checks/` - `guidelines/` - `tmp/`",
+		"- `material/` - `commands/` - `skills/` - `instructions/` - `includes/` - `reviews/` - `rules/` - `checks/` - `guidelines/` - `tmp/`",
 		"**Ausnahme für `guidelines/`.** Es wird gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
 		"nennt die Meldung jede gelöschte Datei, ohne die Grenze von fünf Pfaden",
 		"guidelines/ gelöscht: README.md, stil.md",
@@ -864,7 +864,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 			t.Errorf("3.4 nennt %q nicht", needle)
 		}
 	}
-	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse"} {
+	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse", "zehn Verzeichnisse"} {
 		if strings.Contains(section, stale) {
 			t.Errorf("3.4 zählt noch %s", stale)
 		}
@@ -874,9 +874,47 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt"} {
+	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt",
+		"dazu instructions, includes und reviews, die k-playbook nicht mehr liest",
+		"jede Datei in instructions, includes oder reviews mit ihrem Ziel unter keph:/k-playbook/<sorte>/ in der Projekt-Collection, das der Nutzer beim Umzug ändern kann"} {
 		if !strings.Contains(string(hull), needle) {
 			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
+		}
+	}
+}
+
+// /k-upgrade 3.4 räumt seit Task 143 instructions/, includes/ und reviews/
+// unter k-playbook-local/ ab: leer gelöscht, sonst je Datei mit ihrem Ziel in
+// der Projekt-Collection unter keph:/k-playbook/<sorte>/ genannt und nur auf
+// Zuruf umgezogen — über Kephalaion create, gelöscht erst danach; das Ziel ist
+// ein Vorschlag.
+func TestDefaultsKUpgradeAufraeumenProjektebene(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.4 — "), strings.Index(file, "### 3.5 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.4 nicht gefunden")
+	}
+	section := squashSpace(file[start:end])
+	for _, needle := range []string{
+		"`keph:/k-playbook/instructions/`, `keph:/k-playbook/includes/` und `keph:/k-playbook/reviews/`",
+		"`instructions/`, `includes/` und `reviews/` auf der Platte wertet k-playbook nicht mehr aus",
+		"Ein älteres Programm liest sie noch von der Platte und nicht aus der Collection",
+		"diese Dateien mit diesem Programm nicht mehr gelesen werden",
+		"`keph:/k-playbook/<sorte>/<gleicher pfad>`",
+		"Eine leere Datei zieht mit um und nennt dazu `schaltet ab`",
+		"Das genannte Ziel ist ein Vorschlag: Der Nutzer kann beim Umzug ein anderes nennen.",
+		"on-demand/release.md → keph:/k-playbook/instructions/on-demand/release.md",
+		"always/500-eigen.md → keph:/k-playbook/instructions/always/500-eigen.md Ziel belegt",
+		"reviews/ gelöscht: README.md",
+		"Bleibt `commands/`, `skills/`, `instructions/`, `includes/` oder `reviews/`",
+		"mit Kephalaion `create` ein Dokument am Ziel an",
+		"Erst wenn `create` das Dokument bestätigt hat, löschst du die Datei auf der Platte",
+		"Meldet `create` `name_taken`, bleibt die Datei liegen und wird mit `Ziel belegt` genannt",
+		"führst c) und d) für diese drei Verzeichnisse noch einmal aus",
+		"e) zieht nicht um",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.4 nennt %q nicht", needle)
 		}
 	}
 }

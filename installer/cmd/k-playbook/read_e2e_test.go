@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -17,20 +18,20 @@ func readProject(t *testing.T) string {
 
 	root := todoProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/instructions/always/010-a.md":    "---\ntitle: A\n---\n\n## A\n",
-		"k-playbook/defaults/instructions/always/100-b.md":    "## B mitgeliefert\n",
-		"k-playbook/defaults/instructions/always/200-c.md":    "## C\n",
-		"k-playbook/defaults/instructions/on-demand/thema.md": "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
-		"k-playbook-local/instructions/always/100-b.md":       "## B lokal\n\nText.\n",
-		"k-playbook-local/instructions/always/200-c.md":       "# Abgeschaltet\n",
-		"k-playbook-local/instructions/always/notiz.md":       "## Notiz\n\nText.\n",
-		"k-playbook-local/instructions/on-demand/aus.md":      "",
-		"k-playbook/defaults/instructions/on-demand/aus.md":   "## Aus\n",
-		"k-playbook/commands/k-upgrade.md":                    "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
-		"k-playbook/defaults/commands/k-upgrade.md":           "# k-upgrade\n\nText aus defaults.\n",
-		"k-playbook/defaults/commands/k-gui.md":               "# k-gui\n\nText aus defaults.\n",
-		".k-playbook/commands/k-gui.md":                       "# k-gui\n\nlokal\n",
-		"k-playbook-local/commands/k-upgrade.md":              "# am alten Ort, nicht mehr gelesen\n",
+		"k-playbook/defaults/instructions/always/010-a.md":         "---\ntitle: A\n---\n\n## A\n",
+		"k-playbook/defaults/instructions/always/100-b.md":         "## B mitgeliefert\n",
+		"k-playbook/defaults/instructions/always/200-c.md":         "## C\n",
+		"k-playbook/defaults/instructions/on-demand/thema.md":      "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
+		"test-collection/k-playbook/instructions/always/100-b.md":  "## B lokal\n\nText.\n",
+		"test-collection/k-playbook/instructions/always/200-c.md":  "# Abgeschaltet\n",
+		"test-collection/k-playbook/instructions/always/notiz.md":  "## Notiz\n\nText.\n",
+		"test-collection/k-playbook/instructions/on-demand/aus.md": "",
+		"k-playbook/defaults/instructions/on-demand/aus.md":        "## Aus\n",
+		"k-playbook/commands/k-upgrade.md":                         "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
+		"k-playbook/defaults/commands/k-upgrade.md":                "# k-upgrade\n\nText aus defaults.\n",
+		"k-playbook/defaults/commands/k-gui.md":                    "# k-gui\n\nText aus defaults.\n",
+		".k-playbook/commands/k-gui.md":                            "# k-gui\n\nlokal\n",
+		"k-playbook-local/commands/k-upgrade.md":                   "# am alten Ort, nicht mehr gelesen\n",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -119,8 +120,43 @@ func TestReadJSON(t *testing.T) {
 	if result.Content != "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n" || result.Disabled || result.Directory {
 		t.Errorf("Antwort: %+v", result)
 	}
-	if len(result.Parts) != 1 || result.Parts[0].Origin != "dist" {
+	if len(result.Parts) != 1 || result.Parts[0].Origin != "dist" || result.Parts[0].Location != "" {
 		t.Errorf("parts: %+v", result.Parts)
+	}
+
+	// Projekteigene Teile nennen ihren Ort in der Collection — die
+	// abgeschaltete Datei wie jeder Teil des zusammengebauten Verzeichnisses.
+	stdout, _, err = runReadCaptured(t, "k-playbook:/instructions/on-demand/aus.md", "--json")
+	if err != nil {
+		t.Fatalf("read --json aus.md: %v", err)
+	}
+	result = project.DocResult{}
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("kein JSON: %v — %s", err, stdout)
+	}
+	if !result.Disabled || len(result.Parts) != 1 || result.Parts[0].Location != "keph:/k-playbook/instructions/on-demand/aus.md" ||
+		!strings.Contains(stdout, `"location": "keph:/k-playbook/instructions/on-demand/aus.md"`) {
+		t.Errorf("aus.md: %s", stdout)
+	}
+	stdout, _, err = runReadCaptured(t, "k-playbook:/instructions/always/", "--json")
+	if err != nil {
+		t.Fatalf("read --json always/: %v", err)
+	}
+	result = project.DocResult{}
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("kein JSON: %v — %s", err, stdout)
+	}
+	locations := map[string]string{}
+	for _, part := range result.Parts {
+		locations[part.Name] = part.Location
+	}
+	want := map[string]string{
+		"010-a.md": "",
+		"100-b.md": "keph:/k-playbook/instructions/always/100-b.md",
+		"200-c.md": "keph:/k-playbook/instructions/always/200-c.md",
+	}
+	if !reflect.DeepEqual(locations, want) {
+		t.Errorf("Orte der Teile: %v, erwartet %v", locations, want)
 	}
 }
 
@@ -247,12 +283,12 @@ func TestReadHilfeIstFolgenlos(t *testing.T) {
 func TestReadSetztIncludesEin(t *testing.T) {
 	root := readProject(t)
 	for rel, content := range map[string]string{
-		"k-playbook/defaults/includes/context.md":             "---\ntitle: Kontext\n---\n\n## Kontext\n\nBaustein.\n",
-		"k-playbook/defaults/commands/k-danke.md":             "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
-		"k-playbook/defaults/commands/verschachtelt.md":       "# V\n\ninclude: k-danke.md\n",
-		"k-playbook/defaults/commands/zyklus-a.md":            "include: zyklus-b.md\n",
-		"k-playbook/defaults/commands/zyklus-b.md":            "include: zyklus-a.md\n",
-		"k-playbook-local/instructions/always/1000-kaputt.md": "## Kaputt\n\ninclude: fehlt.md\n",
+		"k-playbook/defaults/includes/context.md":                       "---\ntitle: Kontext\n---\n\n## Kontext\n\nBaustein.\n",
+		"k-playbook/defaults/commands/k-danke.md":                       "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
+		"k-playbook/defaults/commands/verschachtelt.md":                 "# V\n\ninclude: k-danke.md\n",
+		"k-playbook/defaults/commands/zyklus-a.md":                      "include: zyklus-b.md\n",
+		"k-playbook/defaults/commands/zyklus-b.md":                      "include: zyklus-a.md\n",
+		"test-collection/k-playbook/instructions/always/1000-kaputt.md": "## Kaputt\n\ninclude: fehlt.md\n",
 	} {
 		full := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {

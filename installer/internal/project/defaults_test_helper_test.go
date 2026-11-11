@@ -20,8 +20,13 @@ var realOpenDefaultsStore = OpenDefaultsStore
 // seines Projekts anlegt — dem Lieferumfang, wie der Release ihn packt; fehlt
 // er, steht nur VERSION darin. Gelesen wird über den Store, nicht über die
 // Platte.
+//
+// Ebenso die Collection des Projekts für die projekteigene Ebene
+// (OpenProjectLayerStore): gefüllt aus testCollectionDir des Projekts, leer
+// ohne.
 func isolateDefaults() func() {
 	original := OpenDefaultsStore
+	originalProject := OpenProjectLayerStore
 	OpenDefaultsStore = func(projectDir string) (DefaultsStore, string, error) {
 		store, err := kephtest.Defaults(filepath.Join(PlaybookDir(projectDir), defaultsDirName))
 		if err != nil {
@@ -29,7 +34,38 @@ func isolateDefaults() func() {
 		}
 		return store, testDefaultsAddress, nil
 	}
-	return func() { OpenDefaultsStore = original }
+	OpenProjectLayerStore = func(projectDir string) (DefaultsStore, string, error) {
+		store, err := kephtest.Collection(filepath.Join(projectDir, testCollectionDir))
+		if err != nil {
+			return nil, testProjectAddress, err
+		}
+		return store, testProjectAddress, nil
+	}
+	return func() {
+		OpenDefaultsStore = original
+		OpenProjectLayerStore = originalProject
+	}
+}
+
+// realOpenProjectLayerStore ist OpenProjectLayerStore, wie das Programm es hat.
+var realOpenProjectLayerStore = OpenProjectLayerStore
+
+// testProjectAddress ist die Adresse der Collection des Projekts in Tests.
+const testProjectAddress = "test:projekt"
+
+// testCollectionDir ist das Verzeichnis im Projekt eines Tests, aus dem
+// isolateDefaults die Collection des Projekts baut:
+// test-collection/k-playbook/reviews/x.md ist dort keph:/k-playbook/reviews/x.md.
+// Das Programm liest es nie.
+const testCollectionDir = "test-collection"
+
+// stubProjectLayerStore setzt für einen Test einen festen Store der
+// Collection des Projekts ein.
+func stubProjectLayerStore(t *testing.T, open func(projectDir string) (DefaultsStore, string, error)) {
+	t.Helper()
+	original := OpenProjectLayerStore
+	OpenProjectLayerStore = open
+	t.Cleanup(func() { OpenProjectLayerStore = original })
 }
 
 // stubDefaultsStore setzt für einen Test einen festen Store ein.

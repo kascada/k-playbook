@@ -49,7 +49,7 @@ locations derive from the project root, the directory that holds
 | shared script library | `~/.local/share/k-playbook/scripts/lib/` |
 | project-owned commands | `.k-playbook/commands/` — setup does not create it; it appears when the project puts a command there |
 | project-owned skills | `.k-playbook/skills/` — setup does not create it; it appears when the project puts a skill there |
-| project-owned review recipes | `k-playbook-local/reviews/` |
+| project-owned review recipes | `keph:/k-playbook/reviews/` — in the project collection since task 143. Setup no longer creates `k-playbook-local/reviews/`; nothing reads it, `/k-upgrade` 3.4 removes it once it is empty and otherwise names every file with its target |
 | project-owned checks | none since task 134: `k-check` runs only the shipped checks from `k-playbook/checks/`; `/k-upgrade` 3.4 removes a leftover `k-playbook-local/checks/` |
 | review results | `k-playbook-local/results/` |
 | results kept to present | `keph:/results/` — in the project collection, project-wide, `.md` only, names start with the date (`<YYYY-MM-DD>-<name>.md`); written only when the user asks or a command provides for it, never as a duty, and cleaned up by the user. The rules are `k-playbook:/instructions/on-demand/ergebnisse.md`. Not the same as `k-playbook-local/results/`, which `/k-review` and `/k-audit` still use |
@@ -58,7 +58,8 @@ locations derive from the project root, the directory that holds
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
 | manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |
 | project-owned guidelines | `keph:/docs/guidelines/` — in the project collection. Setup no longer creates `k-playbook-local/guidelines/`; `/k-upgrade` 3.4 deletes a leftover one even with content and names every file (todo #40) |
-| project-owned instructions | `k-playbook-local/instructions/always/`, `k-playbook-local/instructions/on-demand/` |
+| project-owned instructions | `keph:/k-playbook/instructions/always/`, `keph:/k-playbook/instructions/on-demand/` — in the project collection since task 143; `k-playbook-local/instructions/` is no longer read, `/k-upgrade` 3.4 removes it or names each file with its target |
+| project-owned includes | `keph:/k-playbook/includes/` — in the project collection since task 143; `k-playbook-local/includes/` is no longer read, `/k-upgrade` 3.4 handles it like `instructions/` |
 | open tasks | `keph:/user/<user>/tasks/` — in the project collection, not under `k-playbook-local/`; form in `k-playbook:/instructions/on-demand/tasks.md` |
 | completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; a `k-playbook-local/tasks/` from before is moved by `/k-upgrade` 3.3 and removed by 3.4 once empty |
 | project todos | `todos/` in the project collection; a `k-playbook-local/data/todos.json` from before is taken over by `k-playbook todo migrate` |
@@ -176,16 +177,39 @@ above.
 
 ## Merge shipped and project-owned content
 
-Three kinds exist twice. What applies is the union of both sides:
+Five kinds exist twice. What applies is the union of both sides:
 
 | Kind | Shipped | Project-owned | Unit |
 |---|---|---|---|
-| review recipes | `<hub>:k-playbook/defaults/reviews/` | `k-playbook-local/reviews/` | `review-*.md` |
+| instructions | `<hub>:k-playbook/defaults/instructions/` | `keph:/k-playbook/instructions/` | `*.md`, by path below `instructions/` |
+| includes | `<hub>:k-playbook/defaults/includes/` | `keph:/k-playbook/includes/` | `*.md`, by path below `includes/` |
+| review recipes | `<hub>:k-playbook/defaults/reviews/` | `keph:/k-playbook/reviews/` | `review-*.md` |
 | commands | `~/.local/share/k-playbook/commands/` | `.k-playbook/commands/` | `*.md`, recursive |
 | skills | `~/.local/share/k-playbook/skills/` | `.k-playbook/skills/` | directory with `SKILL.md` |
 
 The comparison unit is the **name**. Both sides use the same naming convention,
 so no derived key is required.
+
+**The project-owned side of instructions, includes and review recipes lies in the
+project collection** (task 143), under `keph:/k-playbook/<kind>/` beside `docs/`,
+`queue/`, `todos/` and `user/`, with the same tree as below `k-playbook:/`: a project-owned
+`k-playbook:/instructions/on-demand/muster.md` is `keph:/k-playbook/instructions/on-demand/muster.md`.
+It applies to everyone who uses the project; write access is that of the rest of the
+collection, without a scope of its own. The rule is the same as for every layer: the same
+name replaces, an empty document disables, a new name is added; `k-playbook:/instructions/always/`
+is still assembled from both layers in one go, numerically sorted across them. Without a
+`k-playbook/` directory in the collection the project-owned layer is empty, without an
+error. An error of the collection — not ready, not listable, not readable — is
+`kephalaion_unavailable`, also when `<hub>:k-playbook` is readable: there is no silent
+fallback to the shipped layer alone. The switch was hard: `k-playbook-local/instructions/`,
+`includes/` and `reviews/` are no longer read; `/k-upgrade` 3.4 removes them.
+
+The origin values stay `dist`, `local`, `override` and `disabled`. A project-owned part from
+the collection carries its place as well: the field `location` with the `keph:` reference
+(`keph:/k-playbook/reviews/review-x.md`) in the briefing, in `k-playbook read --json`, in
+`k_playbook_doc_read` — for an assembled directory per part — and in the catalog entries
+of the context output; the plain-text briefing shows it next to the origin
+(`[local keph:/k-playbook/…]`).
 
 The kind for rules is gone since task 135: nothing is shipped, read or listed for it, and
 `/k-upgrade` 3.4 removes a leftover local directory once it is empty.
@@ -316,18 +340,20 @@ configuration and the filesystem:
 | `gh` | the GitHub CLI host finding for this machine |
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
-| `catalogs` | `reviews`, merged with the project-owned side, and `checks`, shipped only (task 134); the shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131) |
-| `catalogsProblem` | only when the shipped layer of `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty): why that list is empty -- they are never shown from the local layer alone; the rest of the output stays, and `kephalaion` says more |
+| `catalogs` | `reviews`, merged with the project-owned side, and `checks`, shipped only (task 134); the shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131), the project-owned side from `keph:/k-playbook/reviews/` in the project collection (task 143) |
+| `catalogsProblem` | only when a layer of `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty, the project collection not readable): why that list is empty -- it is never shown from one layer alone; the rest of the output stays, and `kephalaion` says more |
 | `guidelines` | files from `k-playbook-local/guidelines/` only -- not merged with the shipped guidelines, unlike `k_playbook_doc_read` and the briefing; the one named exception until the context output is switched (task 086) |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
 Each catalog entry has `name` (the filename), `key` (the invocation name without
 extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`; for
-`checks` always `dist`), and `disabled`, where applicable (never for `checks`). `path` is a file on disk for a project-owned entry and for
-a shipped check; for a shipped recipe it is the reference
-`k-playbook:/<kind>/<name>`, read with `k_playbook_doc_read` or `k-playbook read`, because
-that layer lies in `<hub>:k-playbook` (task 131).
+`checks` always `dist`), `location` for a project-owned recipe (its `keph:` reference
+under `keph:/k-playbook/reviews/`, also when it disables), and `disabled`, where applicable
+(never for `checks`). `path` is a file on disk only for a shipped check; for every recipe —
+shipped, project-owned or overriding — it is the effective reference
+`k-playbook:/reviews/<name>`, read with `k_playbook_doc_read` or `k-playbook read`, because
+both layers lie in collections (tasks 131 and 143).
 
 This means no command has to apply overlay rules itself. There is one answer,
 and everyone receives the same one.

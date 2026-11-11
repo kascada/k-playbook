@@ -548,10 +548,15 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 
 ### 3.4 — Aufräumen
 
-Das Einrichten legt zehn Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
+Das Einrichten legt elf Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
 sie nicht mehr als fehlend: Der Inhalt der ersten fünf liegt in der Projekt-Collection, der von
 `commands/` und `skills/` in `<context.project.dir>/.k-playbook/commands/` und
-`<context.project.dir>/.k-playbook/skills/`. Der Inhalt von `rules/` hat keinen Nachfolger in
+`<context.project.dir>/.k-playbook/skills/`. Projekteigene Instructions, Includes und
+Review-Rezepte liegen in der Projekt-Collection unter `keph:/k-playbook/instructions/`,
+`keph:/k-playbook/includes/` und `keph:/k-playbook/reviews/`, mit demselben Baum wie unter
+`k-playbook:/`; `instructions/`, `includes/` und `reviews/` auf der Platte wertet k-playbook
+nicht mehr aus. `reviews/` hat das Einrichten angelegt, `instructions/` und `includes/` legten
+Projekte von Hand an. Der Inhalt von `rules/` hat keinen Nachfolger in
 der Collection: Die Sorte gibt es nicht mehr, k-playbook liest dort nichts. Auch der Inhalt von
 `checks/` hat keinen Nachfolger: `k-check` führt nur noch die mitgelieferten Checks aus,
 projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen. Projekteigene Guidelines
@@ -575,20 +580,27 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `material/`
 - `commands/`
 - `skills/`
+- `instructions/`
+- `includes/`
+- `reviews/`
 - `rules/`
 - `checks/`
 - `guidelines/`
 - `tmp/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
-die Collection nicht.
+die Collection nicht; nur die Prüfung auf `Ziel belegt` in d) und der Umzug in e) für
+`instructions/`, `includes/` und `reviews/` brauchen sie. Steht `context.kephalaion.ok` nicht auf
+`true`, nennt d) die Ziele ohne diese Prüfung und sagt das, und e) zieht nicht um.
 
 **Vorbedingung:** Schritt 2 hat das Programm als aktuell gemeldet — in seiner Ausgabe steht
 die Zeile `Programm-Stand: nichts zu tun — …`. Fehlt sie, nennst du in einer Zeile, dass das
 Aufräumen auf den Binärwechsel wartet: Ein älteres Programm legt die Verzeichnisse beim Knopf
 „Anlegen“ der Oberfläche wieder an. Für `commands/` und `skills/` trifft das genau: Erst das
 neue Programm nimmt Einträge aus `.k-playbook/<sorte>/`; mit einem älteren verschwände eine
-umgezogene Datei aus der Verlinkung. Dann bleibt alles liegen, und du gehst zu Schritt 4.
+umgezogene Datei aus der Verlinkung. Für `instructions/`, `includes/` und `reviews/` ebenso:
+Ein älteres Programm liest sie noch von der Platte und nicht aus der Collection. Dann bleibt
+alles liegen, und du gehst zu Schritt 4.
 
 **Leer** heißt: Im Verzeichnis liegt, auch in Unterverzeichnissen, nichts außer
 
@@ -654,6 +666,16 @@ wirken, und darunter steht je Eintrag eine eigene Zeile mit seinem Ziel
 Dateien mit dem Namen `README.md` und die verwaltete `.gitignore` ziehen nicht um und
 erscheinen dort nicht. Liegt am Ziel schon etwas, steht `Ziel belegt` hinter der Zeile.
 
+Für `instructions/`, `includes/` und `reviews/` gilt dasselbe: Liegt anderes darin, nennt die
+Zeile `bleibt:` als Grund, dass diese Dateien mit diesem Programm nicht mehr gelesen werden,
+und darunter steht je Datei, auch in Unterverzeichnissen wie `instructions/always/`, eine
+eigene Zeile mit ihrem Ziel `keph:/k-playbook/<sorte>/<gleicher pfad>` in der
+Projekt-Collection. Eine leere Datei zieht mit um und nennt dazu `schaltet ab`: Auch in der
+Collection schaltet sie die gleichnamige mitgelieferte ab. Ob am Ziel schon etwas liegt,
+prüfst du mit Kephalaion `read` (`collection` gleich `context.kephalaion.address`, `name` gleich
+dem Ziel ohne `keph:/`); liegt dort ein Dokument, steht `Ziel belegt` hinter der Zeile. Das
+genannte Ziel ist ein Vorschlag: Der Nutzer kann beim Umzug ein anderes nennen.
+
 Für `rules/` nennt die Zeile `bleibt:` wie sonst höchstens fünf Pfade und dazu als Warnung,
 dass diese Regeln nicht mehr gelesen werden: Ihr Inhalt gehört von Hand in Guidelines
 (`keph:/docs/`) oder Instructions. 3.4 zieht ihn nicht um.
@@ -681,6 +703,12 @@ Aufräumen in k-playbook-local/
     k-gui.md         → .k-playbook/commands/k-gui.md  Ziel belegt
   skills/      bleibt: wirkt mit diesem Programm nicht mehr, Ziel je Skill
     forelle/         → .k-playbook/skills/forelle/
+  instructions/  bleibt: wird mit diesem Programm nicht mehr gelesen, Ziel je Datei
+    on-demand/release.md  → keph:/k-playbook/instructions/on-demand/release.md
+    on-demand/muster.md   → keph:/k-playbook/instructions/on-demand/muster.md  schaltet ab
+    always/500-eigen.md   → keph:/k-playbook/instructions/always/500-eigen.md  Ziel belegt
+  includes/    gelöscht: README.md
+  reviews/     gelöscht: README.md
   rules/       gelöscht: README.md
   checks/      gelöscht: README.md
   guidelines/  gelöscht: README.md, stil.md — projekteigene Guidelines liegen unter keph:/docs/guidelines/
@@ -713,9 +741,9 @@ Liegt in `data/` noch eine `todos.json`, lautet seine Zeile etwa:
 
 Ein Verzeichnis, das nicht liegt, erscheint nicht. Auf die Meldung folgt keine Frage.
 
-Bleibt `commands/` oder `skills/`, folgt auf die Meldung ein Hinweis, ebenfalls ohne Frage:
-Umgebaut wird von Hand oder auf ausdrücklichen Zuruf des Nutzers in derselben Sitzung; 3.4
-zieht nicht von selbst um. Das Löschen am alten Ort und die Dateien am neuen gehören in den
+Bleibt `commands/`, `skills/`, `instructions/`, `includes/` oder `reviews/`, folgt auf die
+Meldung ein Hinweis, ebenfalls ohne Frage: Umgebaut wird von Hand oder auf ausdrücklichen
+Zuruf des Nutzers in derselben Sitzung; 3.4 zieht nicht von selbst um. Das Löschen am alten Ort und die Dateien am neuen gehören in den
 nächsten Commit des Projekts; eine versionierte Datei verschoben mit `git mv` behält ihre
 Geschichte.
 
@@ -730,6 +758,21 @@ nachzieht, prüfst, dass die Links in `.claude/commands/`,
 `.opencode/commands/` und `.claude/skills/` für die umgezogenen Einträge auf
 `.k-playbook/<sorte>/` zeigen, und führst c) und d) für `commands/` und `skills/` noch
 einmal aus.
+
+Für `instructions/`, `includes/` und `reviews/` heißt Umziehen: Du legst je genannter Datei
+mit Kephalaion `create` ein Dokument am Ziel an (`collection` gleich
+`context.kephalaion.address`, `name` gleich dem Ziel ohne `keph:/`, `content` gleich dem
+Inhalt der Datei, unverändert, auch leer). Nennt der Nutzer für eine Datei ein anderes Ziel,
+nimmst du seines; es muss unter `keph:/k-playbook/<sorte>/` liegen, sonst wirkt die Datei
+nicht, und das sagst du ihm. Erst wenn `create` das Dokument bestätigt hat, löschst du die
+Datei auf der Platte — `git rm`, wenn `git` da ist und sie versioniert ist, sonst `rm`.
+Meldet `create` `name_taken`, bleibt die Datei liegen und wird mit `Ziel belegt` genannt;
+zusammengeführt wird nicht. Bei `outcome_unknown` liest du das Ziel mit Kephalaion `read` nach,
+statt noch einmal anzulegen, und löschst erst, wenn es dort mit dem Inhalt der Datei liegt.
+Danach lädst du das Briefing neu und prüfst, dass es jede umgezogene Datei mit ihrem
+`keph:`-Ort neben der Herkunft nennt (eine Anweisung auf Abruf oder ein Rezept als Eintrag,
+ein Teil von `always/` im Text), und führst c) und d) für diese drei Verzeichnisse noch einmal
+aus.
 
 Die Umstellung ist wiederholbar: Ein Verzeichnis, das bleibt, löscht der nächste Lauf, sobald
 es leer ist — etwa `material/` nach 3.1 oder `tasks/` nach 3.3.

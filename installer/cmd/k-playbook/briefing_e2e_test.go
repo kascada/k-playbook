@@ -20,10 +20,10 @@ func briefingProject(t *testing.T) string {
 
 	root := readProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/reviews/review-code.md": "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
-		"k-playbook/defaults/guidelines/betrieb.md":  "# Betrieb\n\nText.\n",
-		"k-playbook-local/guidelines/stil.md":        "# Stil\n\nText.\n",
-		"k-playbook-local/reviews/review-eigen.md":   "# Eigenes Review\n\nText.\n",
+		"k-playbook/defaults/reviews/review-code.md":         "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
+		"k-playbook/defaults/guidelines/betrieb.md":          "# Betrieb\n\nText.\n",
+		"k-playbook-local/guidelines/stil.md":                "# Stil\n\nText.\n",
+		"test-collection/k-playbook/reviews/review-eigen.md": "# Eigenes Review\n\nText.\n",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -83,8 +83,10 @@ func TestBriefingKlartext(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"Auf Abruf:\n  k-playbook:/instructions/on-demand/aus.md  [disabled]  aus.md\n  k-playbook:/instructions/on-demand/thema.md  [dist]  Thema — D\n",
-		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n  k-playbook:/reviews/review-eigen.md  [local]  Eigenes Review\n",
+		"Auf Abruf:\n  k-playbook:/instructions/on-demand/aus.md  [disabled keph:/k-playbook/instructions/on-demand/aus.md]  aus.md\n" +
+			"  k-playbook:/instructions/on-demand/thema.md  [dist]  Thema — D\n",
+		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n" +
+			"  k-playbook:/reviews/review-eigen.md  [local keph:/k-playbook/reviews/review-eigen.md]  Eigenes Review\n",
 		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\n  k-playbook:/guidelines/stil.md  [local]  Stil\n",
 		"Eigene Arbeit: Kephalaion nicht nutzbar — ",
 		"Projektdoku: keph:/docs/\n",

@@ -1286,8 +1286,8 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		return reviewSelectionBase{}, wrapError(err, "read_failed", "Review-Katalog ist nicht lesbar.", map[string]any{"projectDir": env.Root})
 	}
 	if built.CatalogsProblem != "" {
-		// Ohne die mitgelieferte Ebene wäre der Katalog nur halb: keine
-		// Auswahl, die still die mitgelieferten Rezepte weglässt.
+		// Ohne die mitgelieferte oder die projekteigene Ebene wäre der
+		// Katalog nur halb: keine Auswahl, die still Rezepte weglässt.
 		return reviewSelectionBase{}, reviewToolError{
 			Code:    project.DocCodeKephalaionUnavailable,
 			Message: "Review-Katalog ist nicht lesbar: " + built.CatalogsProblem,
@@ -1525,10 +1525,11 @@ func cloneReviewScope(scope *review.Scope) *review.Scope {
 }
 
 // readAIRecipeMetadata liest die Angaben eines Rezepts über seinen Pfad aus
-// dem Katalog: ein mitgeliefertes Rezept ist ein Verweis k-playbook:/reviews/…
-// und kommt über frische Ebenen des Projekts aus <hub>:k-playbook, ein
-// projekteigenes (oder ein Pfad aus einem älteren Lauf) von der Platte
-// (project.ReadCatalogEntry). Die Auswahl liest viele Rezepte und nimmt
+// dem Katalog: jedes Rezept ist ein Verweis k-playbook:/reviews/… und kommt
+// über frische Ebenen des Projekts — mitgeliefert aus <hub>:k-playbook,
+// projekteigen oder überschreibend aus der Collection des Projekts unter
+// k-playbook/ (Task 143); nur ein Pfad aus einem älteren Lauf kommt von der
+// Platte (project.ReadCatalogEntry). Die Auswahl liest viele Rezepte und nimmt
 // deshalb die Ebenen aus dem Aufbau des Katalogs (buildSelectionBase).
 func readAIRecipeMetadata(root string, key string, path string) (aiRecipeMetadata, error) {
 	data, err := project.ReadCatalogEntry(root, path)

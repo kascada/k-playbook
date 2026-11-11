@@ -27,17 +27,17 @@ func newDocProject(t *testing.T) string {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 	files := map[string]string{
-		"k-playbook/defaults/instructions/always/010-a.md":    "---\ntitle: A\n---\n\n## A\n",
-		"k-playbook/defaults/instructions/always/100-b.md":    "## B mitgeliefert\n",
-		"k-playbook/defaults/instructions/always/200-c.md":    "## C\n",
-		"k-playbook/defaults/instructions/always/README.md":   "# Liesmich\n\nText.\n",
-		"k-playbook/defaults/instructions/on-demand/thema.md": "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
-		"k-playbook/defaults/instructions/on-demand/aus.md":   "## Aus\n",
-		"k-playbook-local/instructions/always/100-b.md":       "## B lokal\n\nText.\n",
-		"k-playbook-local/instructions/always/200-c.md":       "# Abgeschaltet\n",
-		"k-playbook-local/instructions/always/notiz.md":       "## Notiz\n\nText.\n",
-		"k-playbook-local/instructions/always/1000-eins.md":   "## Eigen\n\nText.\n",
-		"k-playbook-local/instructions/on-demand/aus.md":      "",
+		"k-playbook/defaults/instructions/always/010-a.md":            "---\ntitle: A\n---\n\n## A\n",
+		"k-playbook/defaults/instructions/always/100-b.md":            "## B mitgeliefert\n",
+		"k-playbook/defaults/instructions/always/200-c.md":            "## C\n",
+		"k-playbook/defaults/instructions/always/README.md":           "# Liesmich\n\nText.\n",
+		"k-playbook/defaults/instructions/on-demand/thema.md":         "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
+		"k-playbook/defaults/instructions/on-demand/aus.md":           "## Aus\n",
+		"test-collection/k-playbook/instructions/always/100-b.md":     "## B lokal\n\nText.\n",
+		"test-collection/k-playbook/instructions/always/200-c.md":     "# Abgeschaltet\n",
+		"test-collection/k-playbook/instructions/always/notiz.md":     "## Notiz\n\nText.\n",
+		"test-collection/k-playbook/instructions/always/1000-eins.md": "## Eigen\n\nText.\n",
+		"test-collection/k-playbook/instructions/on-demand/aus.md":    "",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -90,9 +90,9 @@ func TestDocReadBautVerzeichnisZusammen(t *testing.T) {
 	}
 	want := []project.DocPart{
 		{Name: "010-a.md", Origin: "dist"},
-		{Name: "100-b.md", Origin: "override"},
-		{Name: "200-c.md", Origin: "override", Disabled: true},
-		{Name: "1000-eins.md", Origin: "local"},
+		{Name: "100-b.md", Origin: "override", Location: "keph:/k-playbook/instructions/always/100-b.md"},
+		{Name: "200-c.md", Origin: "override", Location: "keph:/k-playbook/instructions/always/200-c.md", Disabled: true},
+		{Name: "1000-eins.md", Origin: "local", Location: "keph:/k-playbook/instructions/always/1000-eins.md"},
 	}
 	if envelope.Parts == nil || !reflect.DeepEqual(*envelope.Parts, want) {
 		t.Errorf("parts: %+v", envelope.Parts)
@@ -120,6 +120,15 @@ func TestDocReadEinzeldatei(t *testing.T) {
 	}
 	if envelope.Content == nil || *envelope.Content != "" || envelope.Disabled == nil || !*envelope.Disabled || envelope.Hint == "" {
 		t.Errorf("abgeschaltete Datei: %#v", envelope)
+	}
+	// Die abgeschaltete Datei nennt den Ort ihres leeren Eintrags in der
+	// Collection des Projekts.
+	wantParts := []project.DocPart{{Name: "aus.md", Origin: "override", Location: "keph:/k-playbook/instructions/on-demand/aus.md", Disabled: true}}
+	if envelope.Parts == nil || !reflect.DeepEqual(*envelope.Parts, wantParts) {
+		t.Errorf("parts der abgeschalteten Datei: %+v", envelope.Parts)
+	}
+	if !strings.Contains(envelope.Hint, "keph:/k-playbook/instructions/on-demand/aus.md") {
+		t.Errorf("Hinweis ohne Ort: %q", envelope.Hint)
 	}
 }
 

@@ -126,7 +126,11 @@ ab dem Arbeitsverzeichnis aufwärts.
             Eine Datei: die lokale, sonst die mitgelieferte, unverändert mit
             Frontmatter — dieselbe Überlagerung wie catalogs in k-playbook
             context. Eine leere lokale Datei schaltet ab: kein Inhalt, ein
-            Hinweis auf stderr, Exit 0.
+            Hinweis auf stderr, Exit 0. Die lokale Fassung von instructions
+            und reviews liegt in der Collection des Projekts unter
+            keph:/k-playbook/<sorte>/, die von commands/ unter
+            .k-playbook/commands/, die von guidelines/ unter
+            k-playbook-local/guidelines/.
   k-playbook:/docs/<pfad>/README.md
             Die Vorlage für keph:/docs/<pfad>/README.md (k-playbook docs
             readme). Nur mitgeliefert: eine lokale Fassung gibt es nicht,
@@ -162,9 +166,10 @@ sich aus und gelten nicht für ein Verzeichnis (invalid_input):
             section_not_found.
 
 Ohne --json steht auf stdout nur der Inhalt. Mit --json kommt die Antwort als
-JSON: ref, directory, content, disabled, hint, parts (name, origin, disabled),
-problems, includes (ref, origin, depth, disabled — die eingesetzten Ziele
-in Lesereihenfolge), totalLines (Zeilen des ganzen Inhalts) und bei keph:
+JSON: ref, directory, content, disabled, hint, parts (name, origin, location
+— bei einem lokalen Teil aus der Collection sein keph:-Ort, auch abgeschaltet
+—, disabled), problems, includes (ref, origin, location, depth, disabled — die
+eingesetzten Ziele in Lesereihenfolge), totalLines (Zeilen des ganzen Inhalts) und bei keph:
 revision. Ein unbekannter Verweis ist ein Fehler (not_found);
 k-playbook: außerhalb von instructions/, reviews/, guidelines/, commands/
 und docs/ wird nicht aufgelöst (unsupported).

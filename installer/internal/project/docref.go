@@ -29,8 +29,10 @@ import (
 // (bei docs/ nur die mitgelieferte, docDistOnlyKinds)
 // — die mitgelieferte und die lokale —, die über eine austauschbare Quelle
 // gelesen werden: die mitgelieferte aus der öffentlichen Collection
-// <hub>:k-playbook unter defaults/ (defaultsdocs.go), die lokale von der
-// Platte. Wer aufruft,
+// <hub>:k-playbook unter defaults/ (defaultsdocs.go), die lokale für
+// instructions/, includes/ und reviews/ aus der Collection des Projekts unter
+// k-playbook/ (projectlayer.go), für commands/ aus .k-playbook/commands/ und
+// für guidelines/ von der Platte. Wer aufruft,
 // sieht davon nichts; er bekommt den Inhalt mit lokal und mitgeliefert schon
 // gegeneinander aufgelöst.
 //
@@ -283,7 +285,8 @@ type DocLayers struct {
 // ProjectDocLayers sind die Quellen eines Projekts: die mitgelieferte Ebene
 // aus der öffentlichen Collection <hub>:k-playbook unter defaults/ (siehe
 // NewProjectDefaultsSource, geöffnet erst beim ersten Zugriff), die
-// projekteigene Ebene auf der Platte (siehe NewProjectLocalDocSource), das
+// projekteigene Ebene (siehe NewProjectLocalDocSource — teils in der
+// Collection des Projekts, teils auf der Platte), das
 // Projekt selbst ab seiner Wurzel und, auf Abruf, seine Collection
 // (OpenKephDocs). Von der Installation k-playbook/ liest keine Ebene mehr.
 func ProjectDocLayers(projectDir string) DocLayers {
@@ -309,31 +312,48 @@ func memoKephDocs(open func() (KephDocs, error)) func() (KephDocs, error) {
 }
 
 // NewProjectLocalDocSource ist die projekteigene Ebene hinter k-playbook:.
-// Die Sorte commands/ liest aus .k-playbook/commands/, demselben Ort, aus dem
-// die Verlinkung projekteigene Commands nimmt (ProjectAssetDir), samt der
-// Bausteine unter commands/_shared/. Eine Datei dort ersetzt Hülle und Text
-// zugleich. Die übrigen Sorten (reviews/, guidelines/, instructions/,
-// includes/) lesen bis zu ihrem Umzug weiter aus k-playbook-local/. Den
-// früheren Ort k-playbook-local/commands/ liest seit Task 129 nichts mehr.
+// instructions/, includes/ und reviews/ liest sie aus der Collection des
+// Projekts unter k-playbook/ (NewProjectLayerSource, geöffnet erst beim
+// ersten Zugriff; Task 143). Die Sorte commands/ liest aus
+// .k-playbook/commands/, demselben Ort, aus dem die Verlinkung projekteigene
+// Commands nimmt (ProjectAssetDir), samt der Bausteine unter
+// commands/_shared/; eine Datei dort ersetzt Hülle und Text zugleich. Die
+// übrigen Sorten (guidelines/, testdata/) lesen bis zu ihrem Umbau weiter aus
+// k-playbook-local/. Die früheren Orte k-playbook-local/commands/ (seit Task
+// 129) und k-playbook-local/instructions/, includes/, reviews/ (seit Task
+// 143) liest nichts mehr.
 func NewProjectLocalDocSource(projectDir string) DocSource {
+	return newProjectLocalDocSource(projectDir, NewProjectLayerSource(projectDir))
+}
+
+// newProjectLocalDocSource ist NewProjectLocalDocSource mit einer gegebenen
+// Quelle für die Sorten in der Collection — für Tests mit einem Store im
+// Speicher.
+func newProjectLocalDocSource(projectDir string, collection DocSource) DocSource {
 	return projectLocalDocSource{
-		local:   NewDiskDocSource(LocalDir(projectDir)),
-		project: NewDiskDocSource(filepath.Join(projectDir, ProjectDirName)),
+		local:      NewDiskDocSource(LocalDir(projectDir)),
+		project:    NewDiskDocSource(filepath.Join(projectDir, ProjectDirName)),
+		collection: collection,
 	}
 }
 
 type projectLocalDocSource struct {
-	local   DocSource
-	project DocSource
+	local      DocSource
+	project    DocSource
+	collection DocSource
 }
 
-// pick wählt nach dem ersten Segment: commands/ aus .k-playbook/, alles andere
-// aus k-playbook-local/. Der Pfad bleibt derselbe, weil .k-playbook/commands/
-// denselben Aufbau hat.
+// pick wählt nach dem ersten Segment: instructions/, includes/ und reviews/
+// aus der Collection, commands/ aus .k-playbook/, alles andere aus
+// k-playbook-local/. Der Pfad bleibt derselbe, weil jeder Ort denselben
+// Aufbau hat.
 func (s projectLocalDocSource) pick(p string) DocSource {
 	first, _, _ := strings.Cut(p, "/")
-	if first == docCommandsRoot {
+	switch {
+	case first == docCommandsRoot:
 		return s.project
+	case isProjectLayerKind(first):
+		return s.collection
 	}
 	return s.local
 }
@@ -342,6 +362,31 @@ func (s projectLocalDocSource) List(dir string) ([]DocSourceEntry, error) {
 	return s.pick(dir).List(dir)
 }
 func (s projectLocalDocSource) Read(file string) ([]byte, error) { return s.pick(file).Read(file) }
+
+// Locate nennt den Ort eines projekteigenen Teils als Verweis: für die Sorten
+// in der Collection keph:/k-playbook/<pfad>, sonst leer.
+func (s projectLocalDocSource) Locate(file string) string {
+	first, _, _ := strings.Cut(file, "/")
+	if isProjectLayerKind(first) {
+		return projectLayerLocation(file)
+	}
+	return ""
+}
+
+// DocLocator ist eine DocSource, die den Ort ihrer Dateien als Verweis nennen
+// kann — die projekteigene Ebene für die Teile in der Collection. Leer heißt:
+// kein Ort zu nennen.
+type DocLocator interface {
+	Locate(file string) string
+}
+
+// docLocation ist der Ort einer Datei in einer Ebene, leer ohne DocLocator.
+func docLocation(source DocSource, file string) string {
+	if locator, ok := source.(DocLocator); ok {
+		return locator.Locate(file)
+	}
+	return ""
+}
 
 // NewDiskDocSource ist eine DocSource über ein Verzeichnis auf der Platte.
 // Gelesen wird über fs.FS: Pfade, die aus der Wurzel herausführen, weist das
@@ -420,8 +465,13 @@ func notExistForFileAsDir(err error) error {
 // einem Verzeichnis jeder Teil, der zusammengebaut wurde oder abgeschaltet
 // ist.
 type DocPart struct {
-	Name     string `json:"name"`
-	Origin   string `json:"origin"`
+	Name   string `json:"name"`
+	Origin string `json:"origin"`
+	// Location ist der Ort eines projekteigenen Teils (local, override, auch
+	// abgeschaltet) als keph:-Verweis, etwa keph:/k-playbook/reviews/x.md;
+	// leer beim Mitgelieferten und bei Teilen, die nicht in der Collection
+	// liegen.
+	Location string `json:"location,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
 }
 
@@ -469,6 +519,9 @@ type DocInclude struct {
 	// keph. Leer bei einem zusammengebauten Verzeichnis als Ziel; seine
 	// Teile stehen nicht einzeln hier.
 	Origin string `json:"origin,omitempty"`
+	// Location ist der Ort eines projekteigenen Ziels als keph:-Verweis, wie
+	// DocPart.Location.
+	Location string `json:"location,omitempty"`
 	// Depth ist die Tiefe: 1 für ein Include des Hauptdokuments.
 	Depth int `json:"depth"`
 	// Disabled meldet ein lokal abgeschaltetes Ziel: nichts eingesetzt, kein
@@ -719,7 +772,7 @@ func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 
 	switch {
 	case localFound:
-		part := DocPart{Name: name, Origin: DocOriginLocal}
+		part := DocPart{Name: name, Origin: DocOriginLocal, Location: docLocation(layers.Local, ref.Path)}
 		if distFound {
 			part.Origin = DocOriginOverride
 		}
@@ -727,6 +780,9 @@ func resolveDocFile(layers DocLayers, ref DocRef) (DocResult, error) {
 			part.Disabled = true
 			result.Disabled = true
 			result.Hint = fmt.Sprintf("%s ist lokal abgeschaltet: der lokale Eintrag ist leer", result.Ref)
+			if part.Location != "" {
+				result.Hint = fmt.Sprintf("%s ist lokal abgeschaltet: der lokale Eintrag %s ist leer", result.Ref, part.Location)
+			}
 		} else {
 			result.Content = string(local)
 		}
@@ -864,6 +920,7 @@ const (
 type docDirEntry struct {
 	Name     string
 	Origin   string
+	Location string
 	Disabled bool
 	Content  []byte
 }
@@ -916,6 +973,7 @@ func overlayDocDir(layers DocLayers, dir string, keep func(name string) bool) ([
 				return nil, true, fmt.Errorf("%s:/%s lokal lesen: %w", DocSchemeKPlaybook, file, err)
 			}
 			entry.Origin = DocOriginLocal
+			entry.Location = docLocation(layers.Local, file)
 			if inDist[name] {
 				entry.Origin = DocOriginOverride
 			}
@@ -1064,7 +1122,7 @@ func (x *docIncluder) assembleDir(dir string, chain []string, depth int) ([]docD
 			continue
 		}
 		parts = append(parts, docDirPart{
-			DocPart: DocPart{Name: entry.Name, Origin: entry.Origin, Disabled: entry.Disabled},
+			DocPart: DocPart{Name: entry.Name, Origin: entry.Origin, Location: entry.Location, Disabled: entry.Disabled},
 			number:  number,
 			content: entry.Content,
 		})
@@ -1226,7 +1284,8 @@ func (x *docIncluder) include(target DocRef, chain []string, depth int) (string,
 		}
 		chain = append(append([]string{}, chain...), result.Ref)
 	}
-	x.includes = append(x.includes, DocInclude{Ref: result.Ref, Origin: result.Parts[0].Origin, Depth: depth, Disabled: result.Disabled})
+	x.includes = append(x.includes, DocInclude{Ref: result.Ref, Origin: result.Parts[0].Origin, Location: result.Parts[0].Location,
+		Depth: depth, Disabled: result.Disabled})
 	if result.Disabled {
 		return "", nil
 	}

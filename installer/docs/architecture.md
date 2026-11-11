@@ -432,7 +432,11 @@ installer/
 │   │                            <hub>:k-playbook/defaults/ (Task 131): OpenDefaultsStore,
 │   │                            NewKephDefaultsSource — ein rekursives list, Vorauslesen,
 │   │                            kephalaion_unavailable ohne Rückfall auf die Platte
-│   ├── defaultstest/            OpenDefaultsStore im Speicher für Tests anderer Pakete
+│   ├── projectlayer.go          die projekteigene Ebene von instructions/, includes/,
+│   │                            reviews/ aus keph:/k-playbook/ (Task 143):
+│   │                            OpenProjectLayerStore, NewKephProjectLayerSource
+│   ├── defaultstest/            OpenDefaultsStore und OpenProjectLayerStore im Speicher
+│   │                            für Tests anderer Pakete
 │   ├── docref.go                Verweise im Präfixschema: ParseDocRef, DocSource (Platte
 │   │                            über fs.FS), overlayDocDir (die eine Überlagerung, auch
 │   │                            für resolveCatalog), ResolveDocRef für alle drei Präfixe —
@@ -755,7 +759,7 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-reviews/  results/  guidelines/  priv/
+results/  priv/
 k-playbook.md  version-sources.yaml
 ```
 
@@ -776,6 +780,12 @@ Einrichten legt beide nicht an. Den alten Ort liest nichts mehr, auch nicht als 
 weder die Registry (`registryDirs()`) noch die lokale Ebene von `k-playbook:/commands/`
 (`NewProjectLocalDocSource()` in `project/docref.go`). `/k-upgrade` 3.4 löscht die leeren alten
 Verzeichnisse und nennt sonst jeden Eintrag mit seinem Ziel.
+
+`reviews/` steht seit Task 143 nicht mehr darin. Projekteigene Instructions, Includes und
+Review-Rezepte liegen in der Projekt-Collection unter `keph:/k-playbook/<sorte>/`
+(`NewKephProjectLayerSource()` in `project/projectlayer.go`, unten unter „Kataloge auflösen“);
+`k-playbook-local/instructions/`, `includes/` und `reviews/` liest nichts mehr.
+`/k-upgrade` 3.4 löscht sie leer und nennt sonst je Datei ihr Ziel in der Collection.
 
 `checks/` steht seit Task 134 nicht mehr darin. Projekteigene Checks gibt es nicht, bis sie
 eine neue Form bekommen: `bin/k-check` führt nur die mitgelieferten aus
@@ -1276,6 +1286,45 @@ wie unter `k-playbook:` — `k-playbook:/guidelines/betrieb.md` ist
   `project/defaultstest`. Tests gegen den echten Lieferumfang füllen den Store aus dem
   `defaults/` des Repos (`kephtest.Defaults`).
 
+## Die projekteigene Ebene aus der Collection des Projekts
+
+Seit Task 143 liest das Binary die projekteigene Ebene von `instructions/`, `includes/` und
+`reviews/` hinter `k-playbook:` aus der Collection des Projekts unter `k-playbook/`, nicht
+mehr aus `k-playbook-local/`. Darunter gilt derselbe Baum wie unter `k-playbook:` —
+`k-playbook:/reviews/review-x.md` wird von `keph:/k-playbook/reviews/review-x.md` ersetzt
+oder, leer, abgeschaltet. `commands/` bleibt in `.k-playbook/commands/` (die Assistenten
+brauchen die Hüllen auf der Platte), `guidelines/` und `testdata/` bleiben vorerst in
+`k-playbook-local/`. Die Weiche ist `projectLocalDocSource.pick()` in `project/docref.go`.
+
+- **Zugang.** `OpenProjectLayerStore` (`project/projectlayer.go`) geht denselben Weg wie
+  `OpenKephDocs` und gibt wie `OpenDefaultsStore` einen `kephalaion.ReaderPool` zurück.
+- **Quelle.** `NewKephProjectLayerSource` ist dieselbe `kephCollectionSource` wie die
+  mitgelieferte Ebene (`project/defaultsdocs.go`) — einmal rekursiv listen, beim Listen
+  vorauslesen, nur Vorhandenes lesen —, mit Wurzel `k-playbook/` und ohne die Prüfung auf
+  `VERSION`: Ein leeres `k-playbook/` ist eine leere Ebene, kein Fehler, und es gibt keine
+  Abhilfe `fetch_release`.
+- **Kein stiller Rückfall.** Jeder Fehler der Collection des Projekts — Anbindung nicht
+  bereit, nicht auflistbar, nicht lesbar — ist `kephalaion_unavailable`, auch wenn
+  `<hub>:k-playbook` lesbar ist. Das Briefing scheitert dann als Ganzes wie bei der
+  mitgelieferten Ebene, die Kataloge der Kontextausgabe bleiben leer mit `catalogsProblem`.
+- **Ort.** Ein projekteigener Teil aus der Collection nennt seinen Ort als `keph:`-Verweis
+  im Feld `location` (`DocPart`, `DocInclude`, `BriefingEntry`, `CatalogEntry`), auch wenn er
+  abschaltet; die Herkunftswerte `dist`, `local`, `override`, `disabled` bleiben. Die Ebene
+  nennt den Ort über die Schnittstelle `DocLocator`. Den Ort setzt `overlayDocDir()` bzw.
+  `resolveDocFile()`, nie `entry.Path` des Katalogs: Der bleibt der wirksame Verweis
+  `k-playbook:/reviews/<name>`.
+- **Laufzeit.** Gemessen am 2026-11-11 im Quell-Repo gegen `vm:k-playbook-dev`, je acht
+  Läufe von `k-playbook briefing --json`: bisheriges Programm (lokale Ebene von der Platte)
+  im Median 0,43 s, neues Programm mit leerem `k-playbook/` 0,47 s, mit zwei Dokumenten darunter
+  0,36 s — im Rauschen der Messung, ein zusätzliches Öffnen und ein `list` der Collection.
+- **Gemeinsame Ebenen.** Das Briefing reicht `Dist` und `Local` an den Kontextabschnitt durch
+  (`contextForDir` mit `shared`), `BuildContextWithLayers()` gibt beide an die
+  Review-Auswahl weiter: Jede Collection wird je Aufruf einmal geöffnet und gelistet.
+- **Tests** fragen den Node nicht: `isolateDefaults` und `defaultstest.Isolate` setzen auch
+  `OpenProjectLayerStore` auf einen `kephtest.Store`, gefüllt aus dem Baum, den ein Test
+  unter `test-collection/` seines Projekts anlegt (`kephtest.Collection`) — dort ist
+  `test-collection/k-playbook/reviews/x.md` das Dokument `k-playbook/reviews/x.md`.
+
 ## Instruktionen
 
 Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
@@ -1285,7 +1334,7 @@ Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
 | `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
 | `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
 | `<hub>:k-playbook/defaults/instructions/` | jedes Projekt, das k-playbook nutzt | der Hub holt den neuen Release |
-| `k-playbook-local/instructions/` | nur dieses Projekt | bleibt |
+| `keph:/k-playbook/instructions/` (Collection des Projekts, seit Task 143) | nur dieses Projekt | bleibt |
 
 Die Sorte `instructions` — das Verzeichnis `instructions/` mit `always/` und `on-demand/` —
 ist neu und noch nicht eingebaut (Task 087): weder `instructionFiles()` noch die
@@ -1448,19 +1497,22 @@ Zwei Sorten, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 
 | `reviews` | `reviews/` | `review-*.md` |
 | `checks` | `checks/` | `*.sh` |
 
-Mitgeliefert liegt `reviews` seit Task 131 in `<hub>:k-playbook/defaults/`:
-`resolveCatalog()` nimmt dafür dieselbe Quelle wie die Verweise (`NewProjectDefaultsSource`),
+Mitgeliefert liegt `reviews` seit Task 131 in `<hub>:k-playbook/defaults/`, projekteigen seit
+Task 143 in der Collection des Projekts unter `k-playbook/reviews/`:
+`resolveCatalog()` nimmt für beide Ebenen dieselben Quellen wie die Verweise
+(`NewProjectDefaultsSource`, `NewProjectLocalDocSource`),
 `checks` liest weiter aus der Installation `k-playbook/checks/` (die Checks fallen ohnehin
 weg). `checks` hat seit Task 134 keine lokale Ebene: `resolveCatalog()` lässt `Local` leer,
 jeder Eintrag ist `dist`, keiner abgeschaltet, ein `k-playbook-local/checks/` wird nicht
-gelesen. `path` eines Eintrags ist darum nicht immer ein Plattenpfad: projekteigen die Datei
-unter `k-playbook-local/reviews/`, mitgeliefert bei `checks` die Datei in der Installation,
-bei `reviews` der Verweis `k-playbook:/<sorte>/<name>`. Wer den Inhalt braucht,
+gelesen. `path` eines Eintrags ist darum nicht immer ein Plattenpfad: bei `checks` die Datei
+in der Installation, bei `reviews` immer der wirksame Verweis `k-playbook:/reviews/<name>`,
+gleich ob `dist`, `local` oder `override`. Den Ort eines projekteigenen Rezepts in der
+Collection nennt das Feld `location` (`keph:/k-playbook/reviews/<name>`), nie `path`. Wer den Inhalt braucht,
 liest über `project.ReadCatalogEntry()` — Verweis über frische `ProjectDocLayers`, sonst die
 Platte; so liest `readAIRecipeMetadata()` in `mcpserver/review.go` ein einzelnes Rezept, auch
 den `recipePath` eines älteren Laufs. Wer viele Einträge liest, baut den Katalog mit
 `project.BuildContextWithLayers()` — derselbe Kontext wie `BuildContext()`, dazu die Ebenen,
-deren mitgelieferte Ebene den Katalog schon gelesen hat — und liest die Einträge mit
+deren mitgelieferte und projekteigene Ebene den Katalog schon gelesen haben — und liest die Einträge mit
 `project.ReadCatalogEntryWith()` aus diesen Ebenen. So hält es die Review-Auswahl
 (`buildSelectionBase()`): Die mitgelieferte Ebene wird je Auswahl einmal geöffnet, nicht
 einmal je Rezept, und die Rezepte kommen aus dem Zwischenspeicher, den das Auflisten des

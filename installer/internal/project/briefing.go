@@ -126,6 +126,10 @@ type BriefingEntry struct {
 	Description string `json:"description"`
 	// Origin ist die Herkunft: dist, local, override oder disabled.
 	Origin string `json:"origin"`
+	// Location ist bei local, override und disabled der Ort des
+	// projekteigenen Teils als keph:-Verweis (keph:/k-playbook/<pfad>), wenn
+	// er in der Collection liegt; sonst leer.
+	Location string `json:"location,omitempty"`
 }
 
 // BriefingWork ist die eigene Arbeit aus der Projekt-Collection. Ist Kephalaion
@@ -248,12 +252,13 @@ var briefingCoveredContextFields = []string{
 // Funktion wie `k-playbook context` — kein Nachbau. Sie heilt dabei die
 // Assistenten-Links; das Ergebnis steht wie dort unter links, hier als
 // context.links. Die Kataloge darin lesen die mitgelieferte Ebene des
-// Briefings mit (shared), statt sie ein zweites Mal vom Node zu holen.
+// Briefings mit (shared), statt sie ein zweites Mal vom Node zu holen — die
+// mitgelieferte wie die projekteigene.
 // Austauschbar für Tests.
 var briefingContextForDir = contextForDir
 
 // briefingContext baut den Abschnitt ab startDir. Jeder Fehler ist ein Zustand.
-func briefingContext(startDir string, projectDir string, shared DocSource) BriefingContext {
+func briefingContext(startDir string, projectDir string, shared DocLayers) BriefingContext {
 	built, err := briefingContextForDir(startDir, projectDir, shared)
 	if err != nil {
 		return BriefingContext{Message: err.Error()}
@@ -417,7 +422,7 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 
 	briefing.Work = briefingWork(ctx, projectDir)
 	briefing.Health = health.Check(ctx, projectDir)
-	briefing.Context = briefingContext(startDir, projectDir, layers.Dist)
+	briefing.Context = briefingContext(startDir, projectDir, layers)
 	return briefing, nil
 }
 
@@ -446,7 +451,7 @@ func briefingAssembled(ctx context.Context, layers DocLayers, dir string) (Brief
 	}
 	for _, part := range parts {
 		assembled.Parts = append(assembled.Parts, briefingEntry(dir, docDirEntry{
-			Name: part.Name, Origin: part.Origin, Disabled: part.Disabled, Content: part.content,
+			Name: part.Name, Origin: part.Origin, Location: part.Location, Disabled: part.Disabled, Content: part.content,
 		}))
 	}
 	assembled.Content = joinDocDirParts(parts)
@@ -471,8 +476,9 @@ func briefingEntries(layers DocLayers, kind catalogKind) ([]BriefingEntry, error
 // briefingEntry macht aus einem aufgelösten Eintrag die Zeile im Briefing.
 func briefingEntry(dir string, item docDirEntry) BriefingEntry {
 	entry := BriefingEntry{
-		Ref:    DocSchemeKPlaybook + ":/" + path.Join(dir, item.Name),
-		Origin: item.Origin,
+		Ref:      DocSchemeKPlaybook + ":/" + path.Join(dir, item.Name),
+		Origin:   item.Origin,
+		Location: item.Location,
 	}
 	if item.Disabled {
 		entry.Origin = BriefingOriginDisabled

@@ -52,8 +52,13 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 
 	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-code.md"), "# mitgeliefert\n")
 	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-tech.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(LocalDir(root), "reviews", "review-code.md"), "# eigene Fassung\n")
-	write(t, filepath.Join(LocalDir(root), "reviews", "review-eigen.md"), "# nur lokal\n")
+	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-code.md"), "# eigene Fassung\n\nText.\n")
+	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-eigen.md"), "# nur lokal\n\nText.\n")
+	// Der frühere Ort k-playbook-local/reviews/ wird nicht mehr gelesen
+	// (Task 143): Weder schaltet diese leere Datei ab, noch kommt ein Rezept
+	// hinzu.
+	write(t, filepath.Join(LocalDir(root), "reviews", "review-tech.md"), "")
+	write(t, filepath.Join(LocalDir(root), "reviews", "review-alt.md"), "# alter Ort\n")
 	// Ein liegengebliebenes k-playbook-local/rules/ ergibt keinen Katalog:
 	// Die Sorte gibt es nicht mehr.
 	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# liegengeblieben\n")
@@ -71,19 +76,39 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 		t.Fatalf("%d Reviews, erwartet 3: %+v", len(reviews), reviews)
 	}
 
-	cases := map[string]string{
-		"review-code.md":  "override",
-		"review-tech.md":  "dist",
-		"review-eigen.md": "local",
+	// Path ist für jedes Rezept der wirksame Verweis k-playbook:/reviews/<name>,
+	// der Ort in der Collection steht nur in Location.
+	cases := map[string]struct{ origin, location string }{
+		"review-code.md":  {"override", "keph:/k-playbook/reviews/review-code.md"},
+		"review-tech.md":  {"dist", ""},
+		"review-eigen.md": {"local", "keph:/k-playbook/reviews/review-eigen.md"},
 	}
-	for name, origin := range cases {
+	for name, want := range cases {
 		entry, ok := entryByName(reviews, name)
 		if !ok {
 			t.Errorf("%s fehlt im Katalog", name)
 			continue
 		}
-		if entry.Origin != origin {
-			t.Errorf("%s: Origin = %q, erwartet %q", name, entry.Origin, origin)
+		if entry.Origin != want.origin || entry.Location != want.location || entry.Disabled {
+			t.Errorf("%s: Origin %q, Location %q, Disabled %v; erwartet %q, %q", name, entry.Origin, entry.Location, entry.Disabled,
+				want.origin, want.location)
+		}
+		if entry.Path != "k-playbook:/reviews/"+name {
+			t.Errorf("%s: Path = %q, erwartet k-playbook:/reviews/%s", name, entry.Path, name)
+		}
+	}
+
+	// ReadCatalogEntry liest jedes Rezept über die Ebenen, auch das
+	// projekteigene und das überschreibende.
+	for name, want := range map[string]string{
+		"review-code.md":  "# eigene Fassung\n\nText.\n",
+		"review-eigen.md": "# nur lokal\n\nText.\n",
+		"review-tech.md":  "# mitgeliefert\n",
+	} {
+		entry, _ := entryByName(reviews, name)
+		data, err := ReadCatalogEntry(root, entry.Path)
+		if err != nil || string(data) != want {
+			t.Errorf("ReadCatalogEntry(%s) = %q, %v; erwartet %q", entry.Path, data, err, want)
 		}
 	}
 }
@@ -93,7 +118,7 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	root := newContextProject(t)
 
 	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-code.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(LocalDir(root), "reviews", "review-code.md"), "")
+	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-code.md"), "")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -109,6 +134,9 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	}
 	if entry.Origin != "override" {
 		t.Errorf("Origin = %q, erwartet override", entry.Origin)
+	}
+	if entry.Location != "keph:/k-playbook/reviews/review-code.md" {
+		t.Errorf("Location = %q, erwartet keph:/k-playbook/reviews/review-code.md", entry.Location)
 	}
 }
 
