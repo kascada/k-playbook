@@ -103,10 +103,14 @@ type ClientHub struct {
 
 // ClientError ist ein Zustand, an dem die Anbindung scheitert, bevor ein Node
 // gefragt wird: das Binary, die Auskunft oder was sie für den Hub nennt.
-// Message ist ein Satz samt Abhilfe, ohne Token.
+// Message ist ein Satz samt Abhilfe, ohne Token. Notes sind die Sätze, mit
+// denen Message hinter dem Satz des Zustands endet, ohne dass sie zu ihm
+// gehören — ein Problem der config von Kephalaion —, je samt eigener
+// Abhilfe; wie Status.Notes.
 type ClientError struct {
 	State   State
 	Message string
+	Notes   []string
 }
 
 func (e *ClientError) Error() string { return e.Message }
@@ -153,12 +157,12 @@ func QueryClient(ctx context.Context, hubs ...string) (ClientInfo, error) {
 		// Ein Hub wird ein Argument; die Namensregel schließt einen führenden
 		// Bindestrich aus, also auch eine eingeschleuste Option.
 		if err := CheckName("Hub", hub); err != nil {
-			return ClientInfo{}, &ClientError{StateInvalidEntry, "Eintrag ungültig: " + err.Error() + "."}
+			return ClientInfo{}, &ClientError{State: StateInvalidEntry, Message: "Eintrag ungültig: " + err.Error() + "."}
 		}
 	}
 	path, ok := FindBinary()
 	if !ok {
-		return ClientInfo{}, &ClientError{StateNoKephalaion, missingBinaryMessage()}
+		return ClientInfo{}, &ClientError{State: StateNoKephalaion, Message: missingBinaryMessage()}
 	}
 	args := []string{"node", "client", "--json", "--format", strconv.Itoa(ClientFormat), "--no-probe"}
 	for _, hub := range hubs {
@@ -181,28 +185,28 @@ func QueryClient(ctx context.Context, hubs ...string) (ClientInfo, error) {
 	if err != nil {
 		switch {
 		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-			return ClientInfo{}, &ClientError{StateClientFailed, fmt.Sprintf(
+			return ClientInfo{}, &ClientError{State: StateClientFailed, Message: fmt.Sprintf(
 				"Die Auskunft kephalaion node client hat nicht innerhalb von %s geantwortet. "+
 					"Abhilfe: %s von Hand aufrufen; hängt es dort auch, kephalaion neu installieren (kephalaion upgrade).",
 				ClientTimeout, call)}
 		case runCtx.Err() != nil:
-			return ClientInfo{}, &ClientError{StateClientFailed,
-				"Die Auskunft kephalaion node client wurde abgebrochen, bevor sie stand. Abhilfe: erneut prüfen (k-playbook context)."}
+			return ClientInfo{}, &ClientError{State: StateClientFailed,
+				Message: "Die Auskunft kephalaion node client wurde abgebrochen, bevor sie stand. Abhilfe: erneut prüfen (k-playbook context)."}
 		}
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			return ClientInfo{}, &ClientError{StateClientFailed, fmt.Sprintf(
+			return ClientInfo{}, &ClientError{State: StateClientFailed, Message: fmt.Sprintf(
 				"kephalaion unter %s lässt sich nicht starten (%s). Abhilfe: neu installieren mit %s.",
 				path, sanitize(err.Error()), InstallCommand)}
 		}
 		switch code := exitErr.ExitCode(); code {
 		case 2:
-			return ClientInfo{}, &ClientError{StateNoKephalaion, tooOldMessage(path, withReason("Exit 2", reason))}
+			return ClientInfo{}, &ClientError{State: StateNoKephalaion, Message: tooOldMessage(path, withReason("Exit 2", reason))}
 		case 1:
 			if reason == "" {
 				reason = "ohne Grund auf stderr"
 			}
-			return ClientInfo{}, &ClientError{StateClientFailed, fmt.Sprintf(
+			return ClientInfo{}, &ClientError{State: StateClientFailed, Message: fmt.Sprintf(
 				"Die Auskunft kephalaion node client konnte nicht entstehen: %s. "+
 					"Abhilfe: den Grund beheben (etwa das Heimatverzeichnis setzen oder die Rechte am Token-Verzeichnis prüfen) "+
 					"und mit %s von Hand prüfen.", reason, call)}
@@ -211,7 +215,7 @@ func QueryClient(ctx context.Context, hubs ...string) (ClientInfo, error) {
 			if code < 0 {
 				how = "beendet von außen"
 			}
-			return ClientInfo{}, &ClientError{StateClientFailed, fmt.Sprintf(
+			return ClientInfo{}, &ClientError{State: StateClientFailed, Message: fmt.Sprintf(
 				"Die Auskunft kephalaion node client ist abgebrochen (%s). "+
 					"Abhilfe: %s von Hand aufrufen; bricht es dort auch ab, kephalaion neu installieren (kephalaion upgrade).",
 				withReason(how, reason), call)}
@@ -220,11 +224,13 @@ func QueryClient(ctx context.Context, hubs ...string) (ClientInfo, error) {
 
 	info, problem := parseClientInfo(stdout)
 	if problem != "" {
-		return ClientInfo{}, &ClientError{StateNoKephalaion, tooOldMessage(path, problem)}
+		// Wie bei Exit 2 mit der ersten Zeile von stderr: Ein Binary ohne
+		// Format 1 sagt dort oft, was es nicht kennt.
+		return ClientInfo{}, &ClientError{State: StateNoKephalaion, Message: tooOldMessage(path, withReason(problem, reason))}
 	}
 	for _, hub := range hubs {
 		if !slices.ContainsFunc(info.Hubs, func(h ClientHub) bool { return h.Alias == hub }) {
-			return ClientInfo{}, &ClientError{StateClientFailed, fmt.Sprintf(
+			return ClientInfo{}, &ClientError{State: StateClientFailed, Message: fmt.Sprintf(
 				"Die Auskunft kephalaion node client nennt den Hub %s nicht, obwohl er gefragt war. "+
 					"Abhilfe: %s von Hand prüfen; fehlt er dort auch, kephalaion upgrade.", hub, call)}
 		}
@@ -300,14 +306,16 @@ func ResolveAccess(ctx context.Context, hub string) (Access, error) {
 //     Namensregel: StateTokenMissing.
 //
 // Ist die config nicht lesbar (config.problem), steht der Satz dazu in
-// ConfigProblem und hinter jeder Meldung.
+// ConfigProblem und hinter jeder Meldung, dort auch in Notes.
 func ResolveInfo(info ClientInfo, hub string) (Access, error) {
 	configProblem := configProblemSentence(info.Config)
 	fail := func(state State, message string) (Access, error) {
+		clientErr := &ClientError{State: state, Message: message}
 		if configProblem != "" {
-			message += " " + configProblem
+			clientErr.Message += " " + configProblem
+			clientErr.Notes = []string{configProblem}
 		}
-		return Access{}, &ClientError{State: state, Message: message}
+		return Access{}, clientErr
 	}
 	if err := CheckName("Hub", hub); err != nil {
 		return fail(StateInvalidEntry, "Eintrag ungültig: "+err.Error()+".")

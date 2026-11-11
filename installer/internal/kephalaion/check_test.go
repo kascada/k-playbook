@@ -241,6 +241,30 @@ func TestCheckBindingTakesAccountFromTheClientInfo(t *testing.T) {
 	}
 }
 
+// SplitRemedy schneidet nur im Satz des Zustands: Die Abhilfe eines
+// Hinweises dahinter wird nie die des Zustands und bleibt beim Hinweis.
+func TestStatusSplitRemedy(t *testing.T) {
+	const rotate = "Rotate offen. Abhilfe: kephalaion node account check vm a --token-file f räumt auf."
+	const config = "config nicht lesbar. Abhilfe: die config prüfen (kephalaion status)."
+	cases := []struct {
+		status           Status
+		sentence, remedy string
+	}{
+		{Status{Message: "Satz. Abhilfe: tun."}, "Satz.", "tun."},
+		{Status{Message: "Satz ohne Abhilfe."}, "Satz ohne Abhilfe.", ""},
+		{Status{Message: "Node weg. " + rotate + " " + config, Notes: []string{rotate, config}},
+			"Node weg. " + rotate + " " + config, ""},
+		{Status{Message: "Wahl fehlt. Abhilfe: Standard setzen. " + config, Notes: []string{config}},
+			"Wahl fehlt. " + config, "Standard setzen."},
+	}
+	for _, c := range cases {
+		sentence, remedy := c.status.SplitRemedy()
+		if sentence != c.sentence || remedy != c.remedy {
+			t.Errorf("%q:\nSatz    %q\nAbhilfe %q", c.status.Message, sentence, remedy)
+		}
+	}
+}
+
 func TestCheckNodeUnreachable(t *testing.T) {
 	// Ein Port, auf dem niemand lauscht.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

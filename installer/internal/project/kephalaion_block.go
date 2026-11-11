@@ -271,29 +271,65 @@ func setKephalaionBlock(content, hub, collection string) (string, error) {
 }
 
 // replaceScalarLine setzt in einer Zeile `<einrückung><key>: <wert>` den Wert;
-// ein Kommentar dahinter und ein CR am Ende bleiben. Ist der Wert schon
-// derselbe, bleibt die Zeile byte-gleich.
+// ein Kommentar dahinter — auch hinter einem Wert in Anführungszeichen — und
+// ein CR am Ende bleiben. Ist der Wert schon derselbe, bleibt die Zeile
+// byte-gleich.
 func replaceScalarLine(line, key, value string) string {
 	body, crlf := strings.CutSuffix(line, "\r")
-	if configScalar(strings.SplitN(body, ":", 2)[1]) == value {
+	_, rest, _ := strings.Cut(body, ":")
+	if configScalar(rest) == value {
 		return line
 	}
-	indent := body[:lineIndent(body)]
-	comment := ""
-	rest := strings.SplitN(body, ":", 2)[1]
-	for _, marker := range []string{" #", "\t#"} {
-		if index := strings.Index(rest, marker); index >= 0 && !strings.ContainsAny(rest[:index], `"'`) {
-			// Der Abstand vor dem Kommentar bleibt, wie er war.
-			for index > 0 && (rest[index-1] == ' ' || rest[index-1] == '\t') {
-				index--
-			}
-			comment = rest[index:]
-			break
-		}
-	}
-	updated := indent + key + ": " + value + comment
+	_, comment := splitValueComment(rest)
+	updated := body[:lineIndent(body)] + key + ": " + value + comment
 	if crlf {
 		updated += "\r"
 	}
 	return updated
+}
+
+// splitValueComment teilt, was in einer Zeile hinter `<key>:` steht, in den
+// Wert und einen Kommentar dahinter; der Kommentar trägt den Abstand davor,
+// damit er beim Ersetzen bleibt, wie er war. Ein Kommentar beginnt mit # nach
+// Leerraum, aber nicht innerhalb eines Werts in Anführungszeichen: In "…"
+// maskiert ein Backslash das nächste Zeichen, in '…' stehen zwei Apostrophe
+// für eines. Schließt das Anführungszeichen nicht in derselben Zeile, gibt es
+// keinen Kommentar.
+func splitValueComment(rest string) (value, comment string) {
+	from := len(rest) - len(strings.TrimLeft(rest, " \t"))
+	if from < len(rest) && (rest[from] == '"' || rest[from] == '\'') {
+		end := closingQuote(rest, from)
+		if end < 0 {
+			return rest, ""
+		}
+		from = end + 1
+	}
+	for index := from; index < len(rest); index++ {
+		if rest[index] != '#' || index == 0 || (rest[index-1] != ' ' && rest[index-1] != '\t') {
+			continue
+		}
+		for index > 0 && (rest[index-1] == ' ' || rest[index-1] == '\t') {
+			index--
+		}
+		return rest[:index], rest[index:]
+	}
+	return rest, ""
+}
+
+// closingQuote liefert die Stelle des Anführungszeichens, das den Wert ab
+// open schließt, oder -1.
+func closingQuote(text string, open int) int {
+	quote := text[open]
+	for index := open + 1; index < len(text); index++ {
+		switch {
+		case quote == '"' && text[index] == '\\':
+			index++
+		case text[index] != quote:
+		case quote == '\'' && index+1 < len(text) && text[index+1] == '\'':
+			index++
+		default:
+			return index
+		}
+	}
+	return -1
 }

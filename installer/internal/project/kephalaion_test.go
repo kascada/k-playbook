@@ -242,6 +242,51 @@ func TestSetKephalaionBindingAendertVorhandenenBlock(t *testing.T) {
 	}
 }
 
+// Ein Kommentar hinter dem Wert bleibt auch, wenn der Wert in Anführungszeichen
+// steht: Ein # innerhalb der Anführungszeichen ist kein Kommentar, in "…"
+// maskiert der Backslash, in '…' stehen zwei Apostrophe für eines.
+func TestSetKephalaionBindingBehaeltKommentarHinterGequotetemWert(t *testing.T) {
+	root := newContextProject(t)
+	for _, test := range []struct{ line, want string }{
+		{`  hub: alt   # Alias`, `  hub: vm   # Alias`},
+		{`  hub: "alt" # Kommentar`, `  hub: vm # Kommentar`},
+		{`  hub: 'alt' # Kommentar`, `  hub: vm # Kommentar`},
+		{`  hub: "a # b"  # Kommentar`, `  hub: vm  # Kommentar`},
+		{"  hub: 'a # b'\t# Kommentar", "  hub: vm\t# Kommentar"},
+		{`  hub: "a # b"`, `  hub: vm`},
+		{`  hub: 'a # b'`, `  hub: vm`},
+		{`  hub: "a\" # b" # Kommentar`, `  hub: vm # Kommentar`},
+		{`  hub: 'it''s # b' # Kommentar`, `  hub: vm # Kommentar`},
+		{`  hub: a"b # Kommentar`, `  hub: vm # Kommentar`},
+		{"  hub: alt\t# erster # zweiter", "  hub: vm\t# erster # zweiter"},
+		{`  hub: # nur Kommentar`, `  hub: vm # nur Kommentar`},
+		{`  hub: "vm" # schon richtig`, `  hub: "vm" # schon richtig`},
+	} {
+		content := "kephalaion:\n" + test.line + "\n  collection: 'omni' # Collection\n"
+		write(t, ConfigPath(root), content)
+		if _, err := SetKephalaionBinding(root, "vm", "omni"); err != nil {
+			t.Errorf("%q: %v", test.line, err)
+			continue
+		}
+		want := "kephalaion:\n" + test.want + "\n  collection: 'omni' # Collection\n"
+		if got := readConfigText(t, root); got != want {
+			t.Errorf("%q:\n got %q\nwant %q", test.line, got, want)
+		}
+		if config, _ := ReadConfig(root); config.Kephalaion.Binding() != (kephalaion.Binding{Hub: "vm", Collection: "omni"}) {
+			t.Errorf("%q: gelesen %+v", test.line, config.Kephalaion)
+		}
+	}
+
+	// Beide Zeilen gequotet, mit CRLF: Kommentar und CR bleiben.
+	write(t, ConfigPath(root), "kephalaion:\r\n  hub: \"alt\" # Hub\r\n  collection: 'alt-coll' # Collection\r\n")
+	if _, err := SetKephalaionBinding(root, "vm", "omni"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readConfigText(t, root); got != "kephalaion:\r\n  hub: vm # Hub\r\n  collection: omni # Collection\r\n" {
+		t.Fatalf("CRLF: %q", got)
+	}
+}
+
 // Ungültige Namen und Formen, die sich nicht sicher ändern lassen: nichts
 // geschrieben.
 func TestSetKephalaionBindingLehntAb(t *testing.T) {

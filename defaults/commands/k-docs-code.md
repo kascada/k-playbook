@@ -108,7 +108,7 @@ Bedeutung, nicht nach Verzeichnissen. Suche nach:
 
 Nicht aufnehmen: Framework-Standard ohne Eigenanteil, Kommentare, die den Code
 nacherzählen, Signaturen einzelner Funktionen — dazu, was die Ablage oben ausschließt.
-Was der Scan an möglichen Fehlern und Altlasten findet, steht unter `## Randfälle` oder in
+Was der Scan an möglichen Fehlern und Altlasten findet, steht unter `## Edge cases` oder in
 einem Dokument für bekannte Macken, nicht in Befunden.
 
 **Sub-Agenten.** Bei sehr großen Repos teilst du Analyse und Schreiben auf, einen
@@ -168,23 +168,23 @@ questions: [ "<Frage, die ein Neuer in der ersten Woche stellt>", … ]
 
 <1–2 Sätze: worum es geht, aus welcher Sicht.>
 
-## Wozu
+## Purpose
 
 <Der fachliche oder technische Zweck.>
 
-## Wie es funktioniert
+## How it works
 
 <Die Kernidee: Datenfluss, Abhängigkeiten, Aufrufweg. Stellen im Code als `pfad:zeile`.>
 
-## Wichtige Stellen im Code
+## Key places in the code
 
 - `pfad/zur/datei.go:45` — <was dort steht, in einem Satz>
 
-## Randfälle
+## Edge cases
 
 <Nicht Offensichtliches, versteckte Verträge, bekannte Fehler.>
 
-## Verwandte Themen
+## Related topics
 
 - `<NN>-<slug>.md` — <in welchem Zusammenhang>
 ```
@@ -198,7 +198,12 @@ Regeln:
   ein Fehler.
 - Keine erfundenen Erklärungen: Unklarheiten — auch die der Sub-Agenten — legst du wie in
   der Ablage oben vor `publish` vor; was offen bleibt, nennt Schritt 7.
-- Keine Fließtextwände; Sprache wie im Projekt vereinbart, in der Regel Deutsch.
+- **Englisch schreiben.** Kopf (`title`, `description`, `questions`) und Text sind englisch,
+  auch wenn Code, Kommentare oder der bisherige Text deutsch sind; die Überschriften der
+  Vorlage stehen wörtlich so. Bezeichner, Pfade, Command-Namen und Meldungen aus dem Code
+  bleiben unverändert in Code-Schrift. Bestehende `hints` übersetzt du nicht — sie zu
+  ändern braucht die Bestätigung wie im Kopf beschrieben —, neue schlägst du englisch vor.
+- Keine Fließtextwände.
 
 Nach jeder geschriebenen Datei kurz melden: Dateiname und Zeilenzahl, nicht der Inhalt.
 

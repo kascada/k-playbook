@@ -83,6 +83,12 @@ type Status struct {
 	OK bool `json:"ok"`
 	// Message ist der Satz zum Zustand, deutsch, ohne Token.
 	Message string `json:"message"`
+	// Notes sind die Sätze, mit denen Message hinter dem Satz des Zustands
+	// endet, ohne dass sie zu ihm gehören — ein offener Tausch des Tokens
+	// (rotate), ein Problem der config von Kephalaion —, je samt eigener
+	// Abhilfe. Die Kontextausgabe zeigt Message ganz; getrennt braucht sie
+	// nur SplitRemedy.
+	Notes []string `json:"-"`
 	// Rights sind die Rechte auf die Collection, wie whoami sie nennt (read,
 	// write, supersede, vendor/<name>, dir <pfad>/); nur bei ok.
 	Rights []string `json:"rights,omitempty"`
@@ -96,6 +102,42 @@ type Status struct {
 	NodeVersion string `json:"nodeVersion,omitempty"`
 	// Sync ist der Stand des Abgleichs des Hubs, sobald whoami geantwortet hat.
 	Sync *Sync `json:"sync,omitempty"`
+}
+
+// remedyMarker leitet in einer Meldung die Abhilfe ein.
+const remedyMarker = "Abhilfe: "
+
+// SplitRemedy teilt die Meldung für eine Anzeige, die Satz und Abhilfe
+// getrennt führt (die Umgebungsprüfung): remedy ist die Abhilfe des
+// Zustands — was in seinem Satz hinter „Abhilfe: “ steht, leer ohne —,
+// sentence sein Satz davor, gefolgt von den Notes, jede samt ihrer eigenen
+// Abhilfe. Geschnitten wird nur im Satz des Zustands: Die Abhilfe einer Note
+// (rotate offen, config nicht lesbar) wird nie die Abhilfe eines Zustands,
+// zu dem sie nicht gehört.
+func (s Status) SplitRemedy() (sentence, remedy string) {
+	state, notes := s.Message, []string(nil)
+	for i := len(s.Notes) - 1; i >= 0; i-- {
+		trimmed, ok := strings.CutSuffix(state, " "+s.Notes[i])
+		if !ok {
+			break
+		}
+		state, notes = trimmed, append([]string{s.Notes[i]}, notes...)
+	}
+	before, after, found := strings.Cut(state, remedyMarker)
+	if !found {
+		before = state
+	}
+	return strings.Join(append([]string{strings.TrimSpace(before)}, notes...), " "), strings.TrimSpace(after)
+}
+
+// addNote hängt einen Satz an Message an, der nicht zum Zustand gehört, und
+// führt ihn in Notes.
+func (s *Status) addNote(note string) {
+	if note == "" {
+		return
+	}
+	s.Message += " " + note
+	s.Notes = append(s.Notes, note)
 }
 
 // Check prüft die Anbindung eines Projekts: Hub und Collection aus dem Block
@@ -135,6 +177,7 @@ func CheckBinding(ctx context.Context, binding Binding) Status {
 		var clientErr *ClientError
 		if errors.As(err, &clientErr) {
 			status.State, status.Message = clientErr.State, clientErr.Message
+			status.Notes = append([]string(nil), clientErr.Notes...)
 		} else {
 			status.State, status.Message = StateClientFailed, err.Error()
 		}
@@ -145,7 +188,7 @@ func CheckBinding(ctx context.Context, binding Binding) Status {
 
 // checkAccess prüft Hub und Collection mit einem Zugang aus der Auskunft.
 // Ein Hinweis des Zugangs (rotate offen) und ein Problem der config stehen
-// hinter der Meldung, gleich welcher Zustand.
+// hinter der Meldung, gleich welcher Zustand, und in Notes.
 func checkAccess(ctx context.Context, binding Binding, access Access) Status {
 	status := Status{Configured: true, Hub: binding.Hub, Collection: binding.Collection, Address: binding.Address(),
 		Account: access.Account, Choice: access.Choice}
@@ -155,11 +198,8 @@ func checkAccess(ctx context.Context, binding Binding, access Access) Status {
 	} else {
 		evaluate(&status, binding, reply)
 	}
-	for _, extra := range []string{access.Note, access.ConfigProblem} {
-		if extra != "" {
-			status.Message += " " + extra
-		}
-	}
+	status.addNote(access.Note)
+	status.addNote(access.ConfigProblem)
 	return status
 }
 

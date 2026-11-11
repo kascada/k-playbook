@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 )
 
 // healthProject legt ein Projekt an, dessen Umgebung in Ordnung ist: Matrix der Basis-Werkzeuge mit einem Werkzeug, das da ist,
@@ -86,6 +88,79 @@ func TestHealthKephalaionEingetragenAberNichtOKIstFehler(t *testing.T) {
 		if report := health.Check(context.Background(), root); report.OK {
 			t.Errorf("%s: OK trotz Fehler", state)
 		}
+	}
+}
+
+// Hängt die Prüfung hinter den Satz des Zustands einen Hinweis mit eigener
+// Abhilfe (rotate offen, config nicht lesbar), bleibt der Hint die Abhilfe
+// des Zustands; der Hinweis steht samt seiner Abhilfe im Satz. Der Status
+// kommt aus der echten Prüfung: Ersatz-Binary, Node ohne Lauscher.
+func TestHealthKephalaionHinweisVerdraengtNichtDieAbhilfe(t *testing.T) {
+	// Das Ersatz-Binary braucht cat aus dem PATH, den healthProject ersetzt;
+	// geprüft wird hier nur die Quelle kephalaion.
+	path := os.Getenv("PATH")
+	root := healthProject(t)
+	t.Setenv("PATH", path)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := listener.Addr().String()
+	listener.Close()
+
+	fake := kephtest.NewFakeClient(t)
+	tokens := kephtest.Token(t, filepath.Join(t.TempDir(), "tokens"), "vm", "kamran-wsl",
+		"keph_HEALTHLEAKCANARYabcdefghijklmnopqrstuvw1234")
+	hub := kephtest.Hub(tokens, "vm", "kamran-wsl")
+	hub.Pending = []string{"kamran-wsl"}
+	info := kephtest.Info("http://"+addr+"/mcp", tokens, hub)
+	problem := "Zeile 3: kein YAML"
+	info.Config.Problem = &problem
+	fake.SetInfo(t, info)
+	binding := kephalaion.Binding{Hub: "vm", Collection: "k-playbook-dev"}
+
+	// Zustand ohne eigene Abhilfe (node-unreachable): Hint aus kephalaionHint.
+	status := kephalaion.Check(context.Background(), binding, ConfigDisplayName)
+	if status.State != kephalaion.StateNodeUnreachable {
+		t.Fatalf("Zustand: %+v", status)
+	}
+	stubKephalaionCheck(t, status)
+	problems := healthKephalaion(context.Background(), root)
+	if len(problems) != 1 {
+		t.Fatalf("Problems = %+v", problems)
+	}
+	got := problems[0]
+	if got.Hint != kephalaionHint(kephalaion.StateNodeUnreachable) {
+		t.Errorf("Hint nicht die Abhilfe des Zustands: %q", got.Hint)
+	}
+	for _, want := range []string{"Der Node antwortet nicht",
+		"Abhilfe: kephalaion node account check vm kamran-wsl --token-file " + filepath.Join(tokens, "vm", "kamran-wsl.token"),
+		"Zeile 3: kein YAML", "Abhilfe: die config prüfen (kephalaion status)."} {
+		if !strings.Contains(got.Message, want) {
+			t.Errorf("Satz ohne %q: %s", want, got.Message)
+		}
+	}
+
+	// Zustand mit eigener Abhilfe, an der Auskunft gescheitert (Wahl fehlt):
+	// Hint ist seine Abhilfe, ohne den Satz zur config dahinter.
+	info.Hubs = []kephalaion.ClientHub{{Alias: "vm", Choice: kephalaion.ChoiceMissing,
+		Candidates: []string{"kamran-wsl", "zweit"}, Pending: []string{}, Notes: []string{}}}
+	fake.SetInfo(t, info)
+	status = kephalaion.Check(context.Background(), binding, ConfigDisplayName)
+	if status.State != kephalaion.StateAccountChoiceMissing {
+		t.Fatalf("Zustand: %+v", status)
+	}
+	stubKephalaionCheck(t, status)
+	got = healthKephalaion(context.Background(), root)[0]
+	if !strings.HasPrefix(got.Hint, "einen davon als Standard setzen, etwa kephalaion node account default vm kamran-wsl.") ||
+		!strings.HasSuffix(got.Hint, "wird der Standard auf dem Host gesetzt.") {
+		t.Errorf("Hint nicht die Abhilfe des Zustands: %q", got.Hint)
+	}
+	if !strings.HasSuffix(got.Message, "Abhilfe: die config prüfen (kephalaion status).") || strings.Contains(got.Message, "Standard setzen") {
+		t.Errorf("Satz: %s", got.Message)
+	}
+	if strings.Contains(got.Message+got.Hint, "HEALTHLEAKCANARY") {
+		t.Fatal("Token in der Umgebungsprüfung")
 	}
 }
 

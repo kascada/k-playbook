@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 	"github.com/kascada/k-playbook/installer/internal/health"
@@ -42,8 +41,10 @@ func init() {
 // gibt es keine mitgelieferten Texte (k-playbook:, das Briefing; Task 131),
 // keine keph:-Verweise und keine eigene Arbeit im Briefing. Was
 // kephalaion.Check am Node fragt, bleibt wie es ist; der Satz ist dessen
-// Message, die nie ein Token trägt. Nennt die Message ihre Abhilfe
-// („Abhilfe: …“), wird sie dort geteilt: Satz davor, Abhilfe als Hint.
+// Message, die nie ein Token trägt. Nennt der Satz des Zustands seine
+// Abhilfe („Abhilfe: …“), wird er dort geteilt: Satz davor, Abhilfe als
+// Hint (Status.SplitRemedy); Hinweise hinter ihm (rotate offen, config nicht
+// lesbar) bleiben samt eigener Abhilfe im Satz.
 //
 // Fehlt kephalaion an allen Orten der Suche, ist das die Abhilfe vor jeder
 // anderen: Ohne Binary gibt es keine Auskunft und damit keine Anbindung.
@@ -83,7 +84,10 @@ func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 	if status.OK {
 		return problems
 	}
-	message, hint := splitRemedy(status.Message)
+	// Geteilt wird nur im Satz des Zustands: Ein Hinweis dahinter (rotate
+	// offen, config nicht lesbar) bleibt samt seiner Abhilfe im Satz und
+	// verdrängt nie die Abhilfe des Zustands.
+	message, hint := status.SplitRemedy()
 	if hint == "" || status.State == kephalaion.StateNotConfigured {
 		// Nicht eingetragen: Die Abhilfe nennt dazu, was ohne Block fehlt.
 		hint = kephalaionHint(status.State)
@@ -97,16 +101,6 @@ func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 		Message: message,
 		Hint:    hint,
 	})
-}
-
-// splitRemedy teilt eine Meldung an ihrer ersten „Abhilfe: “ in Satz und
-// Abhilfe; ohne sie bleibt die Abhilfe leer.
-func splitRemedy(message string) (sentence, remedy string) {
-	before, after, found := strings.Cut(message, "Abhilfe: ")
-	if !found {
-		return message, ""
-	}
-	return strings.TrimSpace(before), strings.TrimSpace(after)
 }
 
 // kephalaionMissingHint ist die Abhilfe, wenn kephalaion nirgends liegt.

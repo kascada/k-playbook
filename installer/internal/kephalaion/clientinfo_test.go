@@ -341,24 +341,39 @@ func TestClientExit2NeedsUpgrade(t *testing.T) {
 	expectState(t, err, StateNoKephalaion, "kephalaion upgrade", "dieses Binary trägt die Fassungen 2")
 }
 
-// Ein Binary ohne node client (vor v0.4.0) endet ebenfalls mit Exit 2.
+// Ein Binary ohne node client (vor v0.4.0) endet ebenfalls mit Exit 2. Eine
+// andere Fassung bei Exit 0 nennt wie Exit 2 die erste Zeile von stderr.
 func TestClientWrongFormat(t *testing.T) {
 	fake := newFakeClient(t)
 	tokens := tokensWith(t)
 	info := infoFor(tokens, hubWith(tokens, "vm", "kamran-wsl", ChoiceOnly))
 	info.Format = 2
-	fake.setInfo(t, info)
+	data, err := json.Marshal(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.set(t, string(data)+"\n", "node client: Fassung 1 veraltet, gebe Fassung 2 aus\nzweite Zeile\n", 0)
 
-	_, err := clientState(t, "vm")
-	expectState(t, err, StateNoKephalaion, "kephalaion upgrade", "Format 2 statt 1")
+	_, failure := clientState(t, "vm")
+	expectState(t, failure, StateNoKephalaion, "kephalaion upgrade", "Format 2 statt 1",
+		"node client: Fassung 1 veraltet, gebe Fassung 2 aus")
+	if strings.Contains(failure.Message, "zweite Zeile") {
+		t.Fatalf("mehr als die erste Zeile von stderr: %s", failure.Message)
+	}
 }
 
+// Keine JSON-Ausgabe bei Exit 0: kephalaion upgrade und die erste Zeile von
+// stderr, wie bei Exit 2.
 func TestClientNoJSON(t *testing.T) {
 	fake := newFakeClient(t)
-	fake.set(t, "Hub vm: kamran-wsl (einzige Token-Datei)\n", "", 0)
+	fake.set(t, "Hub vm: kamran-wsl (einzige Token-Datei)\n", "\nunbekannte Option --json, Ausgabe als Text\nzweite Zeile\n", 0)
 
 	_, err := clientState(t, "vm")
-	expectState(t, err, StateNoKephalaion, "kephalaion upgrade", "keine JSON-Ausgabe")
+	expectState(t, err, StateNoKephalaion, "kephalaion upgrade", "keine JSON-Ausgabe",
+		"unbekannte Option --json, Ausgabe als Text")
+	if strings.Contains(err.Message, "zweite Zeile") {
+		t.Fatalf("mehr als die erste Zeile von stderr: %s", err.Message)
+	}
 }
 
 func TestClientCrashAndTimeout(t *testing.T) {
