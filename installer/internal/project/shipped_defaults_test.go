@@ -250,9 +250,12 @@ func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 		t.Errorf("k-upgrade.md ruft nicht `k-playbook upgrade`:\n%s", file)
 	}
 	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
+	// Seit Task 144 bindet 3.6 den Schreibweg der Quellenkonfiguration ein.
+	const configLine = "include: _shared/inventory-config.md\n"
+	config := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/inventory-config.md"))))
 
 	got := mustResolveDoc(t, layers, ref)
-	want := strings.Replace(file, includeLine, module+"\n", 1)
+	want := strings.Replace(strings.Replace(file, includeLine, module+"\n", 1), configLine, config+"\n", 1)
 	if got.Content != want {
 		t.Errorf("eingesetzter Text:\n%q\nerwartet\n%q", got.Content, want)
 	}
@@ -264,7 +267,8 @@ func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 	if !strings.Contains(got.Content, "`documents.always.content`") || strings.Contains(got.Content, "k-playbook context") {
 		t.Errorf("k-upgrade liest nicht aus dem Briefing:\n%s", got.Content)
 	}
-	if len(got.Includes) != 1 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1}) {
+	if len(got.Includes) != 2 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1}) ||
+		got.Includes[1] != (DocInclude{Ref: "k-playbook:/commands/_shared/inventory-config.md", Origin: DocOriginDist, Depth: 1}) {
 		t.Errorf("includes: %+v", got.Includes)
 	}
 	if len(got.Problems) != 0 || got.Disabled || got.Directory {
@@ -305,7 +309,7 @@ func TestDefaultsKDocInventoryIstHuelleUndText(t *testing.T) {
 	}
 
 	file := readRepoDefault(t, "commands/k-doc-inventory.md")
-	includes := []string{"erster-schritt.md", "docs.md"}
+	includes := []string{"erster-schritt.md", "docs.md", "inventory-config.md"}
 	want := file
 	for _, name := range includes {
 		line := "include: _shared/" + name + "\n"
@@ -342,8 +346,9 @@ func TestDefaultsKDocInventoryIstHuelleUndText(t *testing.T) {
 	wantIncludes := []DocInclude{
 		{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1},
 		{Ref: "k-playbook:/commands/_shared/docs.md", Origin: DocOriginDist, Depth: 1},
+		{Ref: "k-playbook:/commands/_shared/inventory-config.md", Origin: DocOriginDist, Depth: 1},
 	}
-	if len(got.Includes) != 2 || got.Includes[0] != wantIncludes[0] || got.Includes[1] != wantIncludes[1] {
+	if len(got.Includes) != 3 || got.Includes[0] != wantIncludes[0] || got.Includes[1] != wantIncludes[1] || got.Includes[2] != wantIncludes[2] {
 		t.Errorf("includes: %+v", got.Includes)
 	}
 	if len(got.Problems) != 0 || got.Disabled || got.Directory {

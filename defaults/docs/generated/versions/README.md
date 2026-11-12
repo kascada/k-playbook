@@ -12,8 +12,9 @@ origin of each line; not what is active at run time. Its counts are in the front
 
 It is written by the program, `k-playbook inventory` (command `/k-doc-inventory`), from the
 declarative sources of the project, and only when its content changes. Which sources are read
-beyond the ones found by default, and which are excluded, is set in `version-sources.yaml` in
-the local directory of the project (`k-playbook-local/version-sources.yaml`), not in `hints`.
+beyond the ones found by default, and which are excluded, is set in the front matter of
+`keph:/k-playbook/inventory.md` in the project collection, not in `hints`; only paths below the
+project root are read.
 Changes made to the document by hand are lost on the next run.
 
 The profiles in `generated/libs/` build on this inventory.

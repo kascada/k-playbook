@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"strconv"
@@ -400,7 +401,7 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 
 	always, err := briefingAssembled(ctx, layers, briefingAlwaysDir)
 	if err != nil {
-		return Briefing{}, err
+		return Briefing{}, briefingError(err)
 	}
 	briefing.Documents.Always = always
 
@@ -415,7 +416,7 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 	} {
 		entries, err := briefingEntries(layers, item.kind)
 		if err != nil {
-			return Briefing{}, err
+			return Briefing{}, briefingError(err)
 		}
 		*item.target = entries
 	}
@@ -425,6 +426,55 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 	briefing.Context = briefingContext(startDir, projectDir, layers)
 	return briefing, nil
 }
+
+// briefingError macht aus dem Scheitern an einer nicht erreichbaren
+// Collection eine Meldung, die sich ohne Vorwissen lesen lässt: dass
+// Kephalaion nicht erreichbar ist, der Grund aus der Meldung von Kephalaion,
+// die Abhilfe wie in der Gesundheitsprüfung (kephalaionHint) und als
+// nächster Schritt TroubleshootingCommand. Der Code bleibt
+// DocCodeKephalaionUnavailable, der ursprüngliche Fehler bleibt umhüllt;
+// jeder andere Fehler bleibt, wie er ist. Ohne die mitgelieferten Texte gibt
+// es kein Briefing — es scheitert weiter als Ganzes (Task 131), nur
+// verständlich.
+func briefingError(err error) error {
+	if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
+		return err
+	}
+	reason, remedy := err.Error(), ""
+	var notReady *KephalaionNotReadyError
+	if errors.As(err, &notReady) {
+		sentence, hint := notReady.Status.SplitRemedy()
+		if sentence != "" {
+			reason = sentence
+		}
+		if hint == "" {
+			hint = kephalaionHint(notReady.Status.State)
+		}
+		remedy = hint
+	}
+	return &DocRefError{Code: DocCodeKephalaionUnavailable, err: &briefingUnavailableError{reason: reason, remedy: remedy, cause: err}}
+}
+
+// briefingUnavailableError ist der Fehler des Briefings ohne erreichbares
+// Kephalaion.
+type briefingUnavailableError struct {
+	reason string
+	// remedy ist die Abhilfe aus dem Zustand der Anbindung, leer, wenn der
+	// Fehler keinen Zustand trägt (dann steht sie im Grund).
+	remedy string
+	cause  error
+}
+
+func (e *briefingUnavailableError) Error() string {
+	text := "Kephalaion ist nicht erreichbar — ohne Kephalaion gibt es kein Briefing.\n" +
+		"Grund: " + e.reason + "\n"
+	if e.remedy != "" {
+		text += "Abhilfe: " + e.remedy + "\n"
+	}
+	return text + "Nächster Schritt: " + TroubleshootingCommand
+}
+
+func (e *briefingUnavailableError) Unwrap() error { return e.cause }
 
 // newSessionID vergibt die Sitzungskennung: Zeitpunkt des Briefings, damit
 // sich Kennungen ordnen lassen, und sechs Zeichen Zufall, damit zwei

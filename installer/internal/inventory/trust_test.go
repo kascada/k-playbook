@@ -34,7 +34,7 @@ func newBoundaryProject(t *testing.T) (projectRoot string, outside string) {
 
 func TestCheckLehntAusbruchUeberPunktPunktAb(t *testing.T) {
 	projectRoot, _ := newBoundaryProject(t)
-	boundary, err := NewBoundary(projectRoot, nil)
+	boundary, err := NewBoundary(projectRoot)
 	if err != nil {
 		t.Fatalf("NewBoundary: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestCheckLehntSymlinkAusDemProjektHerausAb(t *testing.T) {
 	if err := os.Symlink(filepath.Join(outside, "geheim.txt"), link); err != nil {
 		t.Fatalf("Symlink: %v", err)
 	}
-	boundary, err := NewBoundary(projectRoot, nil)
+	boundary, err := NewBoundary(projectRoot)
 	if err != nil {
 		t.Fatalf("NewBoundary: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCheckLoestAuchElternsegmenteAuf(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(projectRoot, "extern")); err != nil {
 		t.Fatalf("Symlink: %v", err)
 	}
-	boundary, _ := NewBoundary(projectRoot, nil)
+	boundary, _ := NewBoundary(projectRoot)
 
 	if _, err := boundary.Check("extern/geheim.txt"); err == nil {
 		t.Fatal("ein verlinktes Elternverzeichnis muss abgelehnt werden")
@@ -103,7 +103,7 @@ func TestExpandLehntGlobAusbruchAb(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outside, "values-prod.yaml"), []byte("image: a\n"), 0o644); err != nil {
 		t.Fatalf("schreiben: %v", err)
 	}
-	boundary, _ := NewBoundary(projectRoot, nil)
+	boundary, _ := NewBoundary(projectRoot)
 
 	paths, rejections := boundary.Expand("../draussen/*.yaml")
 	if len(paths) != 0 {
@@ -117,22 +117,23 @@ func TestExpandLehntGlobAusbruchAb(t *testing.T) {
 	}
 }
 
-// Eine ausdrücklich freigegebene Wurzel macht denselben Pfad lesbar — und nur
-// sie: ein absoluter Pfad in sources: gibt seine Wurzel nicht selbst frei.
-func TestFreigegebeneWurzelErlaubtLesenSegmentweise(t *testing.T) {
+// Die Projektwurzel ist die einzige Grenze (Task 144): Ein absoluter Pfad
+// außerhalb bleibt abgelehnt, und der Vergleich läuft segmentweise — ein
+// Nachbarverzeichnis mit gleichem Präfix liegt nicht darunter.
+func TestGrenzeIstAlleinDieProjektwurzel(t *testing.T) {
 	projectRoot, outside := newBoundaryProject(t)
-	boundary, err := NewBoundary(projectRoot, []string{outside})
+	boundary, err := NewBoundary(projectRoot)
 	if err != nil {
 		t.Fatalf("NewBoundary: %v", err)
 	}
-
-	data, _, exists, err := boundary.ReadFile(filepath.Join(outside, "geheim.txt"))
-	if err != nil || !exists || !strings.Contains(string(data), "nicht für uns") {
-		t.Fatalf("freigegebene Wurzel = %v / %v / %q", err, exists, data)
+	if got := boundary.Roots(); len(got) != 1 || got[0] != projectRoot {
+		t.Errorf("Wurzeln = %v, erwartet nur %s", got, projectRoot)
 	}
-
-	// /srv/deploy erlaubt /srv/deploy/x, aber nicht /srv/deploy-alt/x.
-	sibling := outside + "-alt"
+	if _, err := boundary.Check(filepath.Join(outside, "geheim.txt")); err == nil ||
+		!strings.Contains(err.Error(), "außerhalb der Projektwurzel") {
+		t.Fatalf("außerhalb der Projektwurzel muss abgelehnt werden: %v", err)
+	}
+	sibling := projectRoot + "-alt"
 	if err := os.MkdirAll(sibling, 0o755); err != nil {
 		t.Fatalf("anlegen: %v", err)
 	}
@@ -146,7 +147,7 @@ func TestFreigegebeneWurzelErlaubtLesenSegmentweise(t *testing.T) {
 // als auf dem CLI-Weg.
 func TestCheckExpandiertNichts(t *testing.T) {
 	projectRoot, _ := newBoundaryProject(t)
-	boundary, _ := NewBoundary(projectRoot, nil)
+	boundary, _ := NewBoundary(projectRoot)
 
 	resolved, err := boundary.Check("~/.ssh/id_rsa")
 	if err != nil {
@@ -165,7 +166,7 @@ func TestReadFileLiestNurRegulaereDateien(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(projectRoot, "unterverzeichnis"), 0o755); err != nil {
 		t.Fatalf("anlegen: %v", err)
 	}
-	boundary, _ := NewBoundary(projectRoot, nil)
+	boundary, _ := NewBoundary(projectRoot)
 
 	if _, _, _, err := boundary.ReadFile("unterverzeichnis"); err == nil {
 		t.Fatal("ein Verzeichnis ist keine Quelle")
@@ -176,12 +177,5 @@ func TestReadFileLiestNurRegulaereDateien(t *testing.T) {
 	}
 	if exists {
 		t.Error("exists = true für eine fehlende Datei")
-	}
-}
-
-func TestNewBoundaryLehntRelativeWurzelAb(t *testing.T) {
-	projectRoot, _ := newBoundaryProject(t)
-	if _, err := NewBoundary(projectRoot, []string{"../draussen"}); err == nil {
-		t.Fatal("eine relative Wurzel hinge vom Arbeitsverzeichnis ab und muss abgelehnt werden")
 	}
 }

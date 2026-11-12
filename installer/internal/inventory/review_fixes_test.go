@@ -8,10 +8,18 @@ import (
 	"testing"
 )
 
+// collectFiles legt die Dateien in einem Projekt an und erhebt. Unter
+// configKey steht statt einer Datei das Frontmatter der
+// Quellenkonfiguration.
 func collectFiles(t *testing.T, files map[string]string) Result {
 	t.Helper()
 	root := t.TempDir()
+	options := Options{ProjectDir: root}
 	for name, content := range files {
+		if name == configKey {
+			options.Config = sourcesConfig(t, content)
+			continue
+		}
 		path := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
@@ -20,7 +28,7 @@ func collectFiles(t *testing.T, files map[string]string) Result {
 			t.Fatal(err)
 		}
 	}
-	result, err := Collect(Options{ProjectDir: root, SourcesFile: filepath.Join(root, "version-sources.yaml")})
+	result, err := Collect(options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,17 +274,17 @@ func TestWorkspaceFehlerUndFehlendeOderAusgeschlosseneManifesteLeerenLockfile(t 
 		{"nicht auflösbares Mitglied", "yarn.lock", "Workspace-Manifest packages/missing/package.json", "", map[string]string{
 			"package.json": `{"workspaces":["packages/missing"]}`, "yarn.lock": "direct@1:\n  version \"1.0.0\"\n",
 		}},
-		{"ausgeschlossenes Mitglied", "yarn.lock", "Ausschlussregel \"packages/private/**\"", "schema_version: 1\nexclude:\n  - packages/private/**\n", map[string]string{
+		{"ausgeschlossenes Mitglied", "yarn.lock", "Ausschlussregel \"packages/private/**\"", "schema_version: 3\nexclude:\n  - packages/private/**\n", map[string]string{
 			"package.json": `{"workspaces":["packages/private"]}`, "packages/private/package.json": `{"dependencies":{"direct":"1"}}`, "yarn.lock": "direct@1:\n  version \"1.0.0\"\n",
 		}},
 		{"unlesbares Mitglied", "Cargo.lock", "ist ein Verzeichnis", "", map[string]string{
 			"Cargo.toml": "[workspace]\nmembers = [\"members/bad\"]\n", "members/bad/Cargo.toml/keep": "not a manifest", "Cargo.lock": "[[package]]\nname = \"direct\"\nversion = \"1.0.0\"\n",
 		}},
 		{"fehlendes Manifest", "yarn.lock", "package.json", "", map[string]string{"yarn.lock": "direct@1:\n  version \"1.0.0\"\n"}},
-		{"ausgeschlossenes Manifest", "yarn.lock", "Ausschlussregel \"package.json\"", "schema_version: 1\nexclude:\n  - package.json\n", map[string]string{
+		{"ausgeschlossenes Manifest", "yarn.lock", "Ausschlussregel \"package.json\"", "schema_version: 3\nexclude:\n  - package.json\n", map[string]string{
 			"package.json": `{"dependencies":{"direct":"1"}}`, "yarn.lock": "direct@1:\n  version \"1.0.0\"\n",
 		}},
-		{"konfiguriertes Lockfile inkludiert Manifest nicht", "yarn.lock", "Ausschlussregel \"package.json\"", "schema_version: 1\nexclude:\n  - package.json\nsources:\n  - path: yarn.lock\n    kind: node\n    env: lokal\n", map[string]string{
+		{"konfiguriertes Lockfile inkludiert Manifest nicht", "yarn.lock", "Ausschlussregel \"package.json\"", "schema_version: 3\nexclude:\n  - package.json\nsources:\n  - path: yarn.lock\n    kind: node\n    env: lokal\n", map[string]string{
 			"package.json": `{"dependencies":{"direct":"1"}}`, "yarn.lock": "direct@1:\n  version \"1.0.0\"\n",
 		}},
 	}
@@ -287,7 +295,7 @@ func TestWorkspaceFehlerUndFehlendeOderAusgeschlosseneManifesteLeerenLockfile(t 
 				files[path] = data
 			}
 			if tc.sources != "" {
-				files["version-sources.yaml"] = tc.sources
+				files[configKey] = tc.sources
 			}
 			result := collectFiles(t, files)
 			if entries := entriesFrom(result, tc.lock); len(entries) != 0 {
@@ -353,11 +361,8 @@ func TestConfiguredSourceNoteWirdMarkdownSicherGerendert(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "requirements.txt"), []byte("redis==1.0.0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	sources := filepath.Join(root, "sources.yaml")
-	if err := os.WriteFile(sources, []byte("schema_version: 1\nsources:\n  - path: requirements.txt\n    kind: python\n    env: lokal\n    note: Produktionsquelle | `geprüft`\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	result, err := Collect(Options{ProjectDir: root, SourcesFile: sources})
+	config := sourcesConfig(t, "schema_version: 3\nsources:\n  - path: requirements.txt\n    kind: python\n    env: lokal\n    note: Produktionsquelle | `geprüft`\n")
+	result, err := Collect(Options{ProjectDir: root, Config: config})
 	if err != nil {
 		t.Fatal(err)
 	}

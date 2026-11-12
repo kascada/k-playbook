@@ -10,11 +10,6 @@ import (
 // liegt neben der Installation, damit diese vollständig ersetzbar bleibt.
 const LocalDirName = "k-playbook-local"
 
-// VersionSourcesFileName ist die Quellenkonfiguration des Versionsinventars.
-// Sie liegt neben der Instruktionsdatei in k-playbook-local/ und wird von einem
-// Update nie überschrieben. Vertrag: docs/version-inventory.md.
-const VersionSourcesFileName = "version-sources.yaml"
-
 // LocalEntry ist ein Bestandteil der lokalen Struktur. Verzeichnisse bekommen
 // eine README, weil Git leere Verzeichnisse nicht speichert — ohne sie wären
 // sie nach einem Clone des Projekts verschwunden.
@@ -59,7 +54,12 @@ type LocalEntry struct {
 // löscht das alte Verzeichnis auch mit Inhalt. reviews ebenso nicht (Task
 // 143): projekteigene Review-Rezepte liegen wie projekteigene Instructions
 // und Includes in der Collection des Projekts unter keph:/k-playbook/<sorte>/
-// (projectlayer.go). /k-upgrade räumt die leeren Verzeichnisse eines
+// (projectlayer.go). Die Quellenkonfiguration ebenso nicht (Task 144): sie
+// liegt als Quellenkonfiguration des Versionsinventars im Dokument
+// keph:/k-playbook/inventory.md (versionsources.go), angelegt von
+// /k-doc-inventory bei der ersten bestätigten Ergänzung; eine alte Datei
+// meldet die Gesundheitsprüfung als Altbestand, /k-upgrade zieht sie um.
+// /k-upgrade räumt die leeren Verzeichnisse eines
 // Bestandsprojekts ab, dazu die Reste der früheren Wissensablage auf der
 // Platte (Task 123).
 func LocalStructure() []LocalEntry {
@@ -87,20 +87,6 @@ func LocalStructure() []LocalEntry {
 			Private: true,
 		},
 		{Path: InstructionsFileName, IsFile: true},
-		{
-			Path:   VersionSourcesFileName,
-			IsFile: true,
-			Purpose: "Versionsquellen für `k-playbook inventory`: zusätzlich lesbare Wurzeln außerhalb\n" +
-				"des Projekts und zusätzliche Quellen über die Standarderkennung hinaus.\n\n" +
-				"Die Datei ist handgepflegt. k-playbook schreibt nur nach ausdrücklicher Bestätigung\n" +
-				"in sie, und dann ausschließlich ergänzend: bestehende Einträge, Kommentare und\n" +
-				"Reihenfolge bleiben erhalten. Ohne Einträge gelten die Standardquellen unterhalb\n" +
-				"der Projektwurzel.\n\n" +
-				"Sie wird beim Einrichten als gültige, leere Konfiguration angelegt — nicht erst beim\n" +
-				"ersten Lauf des Sammlers —, damit ihr Zustand im Briefing (`k-playbook briefing`,\n" +
-				"Feld `versionSources`) von Anfang an eine Antwort hat. Vollständige Beschreibung:\n" +
-				PlaybookDirName + "/docs/version-inventory.md.",
-		},
 	}
 }
 
@@ -238,8 +224,6 @@ func fileTemplate(entry LocalEntry) string {
 	switch entry.Path {
 	case InstructionsFileName:
 		return instructionsTemplate()
-	case VersionSourcesFileName:
-		return versionSourcesTemplate()
 	default:
 		return genericFileTemplate(entry)
 	}
@@ -267,73 +251,5 @@ wiederkehrende Abläufe, alles was ein Assistent in jeder Sitzung wissen sollte.
 
 Was nicht: allgemeine k-playbook-Regeln — die stehen in der mitgelieferten
 Ebene und werden bei jedem Update aktualisiert.
-`
-}
-
-// versionSourcesTemplate ist die gültige, leere Quellenkonfiguration des
-// Versionsinventars. Der Inhalt ist wortgleich die Vorlage aus
-// docs/version-inventory.md, Abschnitt „Source Configuration → Template"; wer ihn
-// ändert, ändert ihn dort und zieht hier nach.
-func versionSourcesTemplate() string {
-	return "# Versionsquellen für `k-playbook inventory`\n" + `#
-# Diese Datei ist handgepflegt. k-playbook schreibt nur nach ausdrücklicher
-# Bestätigung in sie, und dann ausschließlich ergänzend: bestehende Einträge,
-# Kommentare und Reihenfolge bleiben erhalten.
-#
-` + "# Ohne Einträge erhebt `k-playbook inventory` die Standardquellen unterhalb der\n" + `# Projektwurzel — Manifeste, Lockfiles, Dockerfiles, Compose, DevContainer,
-# Helm und CI. Hier stehen nur zusätzliche Quellen und die Wurzeln außerhalb
-# des Projekts, die dafür gelesen werden dürfen.
-#
-# Vollständige Beschreibung: k-playbook/docs/version-inventory.md
-
-schema_version: 1
-
-# Zusätzlich lesbare Wurzeln, je ein absoluter Pfad. Die Projektwurzel ist
-# immer erlaubt und gehört nicht hierher. Was nicht unter einer dieser Wurzeln
-# liegt, wird abgelehnt — sichtbar gemeldet, nicht stillschweigend übergangen.
-#
-#   roots:
-#     - /srv/deploy
-roots: []
-
-# Zusätzliche Quellen. Je Eintrag:
-#   path: Datei oder Glob, relativ zur Projektwurzel oder absolut
-#   kind: auto, python, go, node, rust, ruby, php, java, elixir, dockerfile,
-#         compose, devcontainer, helm, ci, tool-versions
-#   env:  lokal, dev, devcontainer, ci, deployment
-#   note: optionaler Anzeigetext
-#
-#   sources:
-#     - path: /srv/deploy/values-prod.yaml
-#       kind: helm
-#       env: deployment
-#       note: Produktionswerte aus dem Deployment-Repo
-sources: []
-
-# Bereiche, in denen die Standarderkennung nicht suchen soll — je ein Muster
-` + "# relativ zur Projektwurzel, `*` für ein Segment, `**` für beliebig viele.\n" + `# Gedacht für Testfixtures und Beispielprojekte: gepflegter Inhalt, dessen
-# Versionen nichts über dieses Projekt aussagen.
-#
-# Gesperrt ist damit nichts. Jeder Ausschluss steht mit der Zahl der
-` + "# übergangenen Quellen im Inventar, und eine Quelle daraus kommt wieder hinein,\n" +
-		"# sobald sie unter `sources:` steht.\n" + `#
-` + "# Die Installation `k-playbook/` ist immer ausgenommen und gehört nicht hierher:\n" + `# sie ist ein Clone des Werkzeugs und sagt nichts über dieses Projekt.
-#
-#   exclude:
-#     - tests/fixtures/**
-exclude: []
-
-# Versionen in Helm-values, die keine Image-Referenz sind — etwa ein Subchart,
-# das nur einen Tag entgegennimmt. Je Eintrag:
-#   path: values-Datei oder Glob; sie muss ohnehin als Helm-values gelesen werden
-#   key:  Punktpfad zum Wert, Listenindex in eckigen Klammern
-#   item: Gegenstand als container/<name>
-#
-` + "# Der Abschnitt verlangt `schema_version: 2`; unter 1 wird er abgelehnt. Jeder\n" + `# Eintrag, der keine Zeile ergibt, steht als Hinweis mit Grund im Inventar.
-#
-#   helm_values:
-#     - path: helm/values.yaml
-#       key: redis.standalone.tag
-#       item: container/redis
 `
 }

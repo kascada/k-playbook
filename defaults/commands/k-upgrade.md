@@ -11,7 +11,9 @@ den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Reg
 nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
 `scripts/k-upgrade-umbau.sh`. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
 macht, nicht das Programm, zuletzt das Aufräumen der Verzeichnisse, die das Einrichten nicht
-mehr anlegt, und der alten `K-PLAYBOOK.local.yaml`. Der Command nimmt kein Argument.
+mehr anlegt, und der alten `K-PLAYBOOK.local.yaml`, dann der Umzug der Quellenkonfiguration
+des Versionsinventars aus der alten `version-sources.yaml` nach `keph:/k-playbook/inventory.md`.
+Der Command nimmt kein Argument.
 
 ## Schritt 1 — Briefing
 
@@ -824,6 +826,77 @@ muss. Die Zeile `/K-PLAYBOOK.local.yaml` in `<context.local.dir>/.gitignore` ble
 sie schadet nicht. Committet wird nicht: Die Änderung an `.k-playbook/K-PLAYBOOK.yaml` aus
 Schritt 2 gehört in den nächsten Commit des Projekts — sag das.
 
+### 3.6 — Quellenkonfiguration des Versionsinventars
+
+Bis Task 144 lag die Quellenkonfiguration von `k-playbook inventory` in
+`<context.local.dir>/version-sources.yaml`. Heute ist sie das Dokument
+`keph:/k-playbook/inventory.md` in der Collection des Projekts, die Einstellungen im
+Frontmatter; `roots` gibt es nicht mehr, gelesen wird nur unterhalb der Projektwurzel. Das
+Programm liest die alte Datei nicht mehr — die Gesundheitsprüfung meldet sie als Altbestand.
+Diese Umstellung zieht ihre Einstellungen um und löscht sie danach nach Rückfrage. Sie
+braucht die Collection.
+
+**Anlass:** Die Datei `<context.local.dir>/version-sources.yaml` liegt.
+
+**Vorbedingung:** Das Programm kennt den neuen Ort. Prüfe das in der Shell, nicht am
+Briefing — der MCP-Server einer laufenden Sitzung behält nach dem Binärwechsel das alte
+Programm: `k-playbook briefing --json` gibt unter `context.versionSources` das Feld `ref` mit
+`keph:/k-playbook/inventory.md` aus. Steht dort stattdessen `path`, liest das Programm die
+alte Datei noch: Nenne in einer Zeile, dass der Umzug auf den Binärwechsel wartet, und geh
+weiter — nach dem Umzug läse das alte Programm das Dokument nicht, und ein Löschen nähme ihm
+seine Einstellungen. Steht `context.kephalaion.ok` nicht auf `true`, wird die Umstellung
+übersprungen (siehe oben). Steht `versionSources.state` auf `invalid`, wird nicht
+geschrieben: Nenne `versionSources.error`; das Dokument repariert der Nutzer.
+
+**Bestand.** Lies die alte Datei — hier, und nur hier, liest eine Sitzung sie selbst — und
+das Dokument (Kephalaion `read`, `name` gleich `k-playbook/inventory.md`). Ordne jeden
+Eintrag der alten Datei zu:
+
+- `exclude:` — jedes Muster, das im Dokument noch nicht unter `exclude` steht, wird
+  übernommen.
+- `sources:` — jeder Eintrag mit relativem `path`, dessen `path` im Dokument noch nicht unter
+  `sources` steht, wird mit allen seinen Feldern (`path`, `kind`, `env`, `note`, `optional`)
+  übernommen. Ein Eintrag mit absolutem `path` (beginnt mit `/` oder einem Laufwerk wie `C:`)
+  wird **nicht** übernommen, sondern genannt: Das Werkzeug lehnt ihn ab, und was außerhalb der
+  Projektwurzel liegt, lässt sich nicht mehr einlesen.
+- `helm_values:` — steht in der alten Datei `schema_version: 1`, wird kein Eintrag übernommen,
+  sondern jeder genannt: Unter Fassung 1 wurden sie nicht angewandt und würden sonst plötzlich
+  wirksam. Unter `schema_version: 2` wird jeder Eintrag mit relativem `path`, den das
+  Dokument noch nicht trägt (gleiches `path` und `key`), übernommen; einer mit absolutem
+  `path` wird genannt.
+- `roots:` — ein leeres `roots: []`, wie es die alte Vorlage trug, lässt du still weg. Ein
+  nicht leeres `roots` wird **nicht** übernommen, sondern mit jedem Eintrag genannt: `roots`
+  gibt es nicht mehr.
+- Ein Kommentar, der direkt über einem übernommenen Eintrag steht, wandert mit. Die
+  erklärenden Kommentare der alten Vorlage — Kopf und auskommentierte Beispiele — wandern
+  nicht mit; das Dokument erklärt sich im Rumpf.
+
+Bestehende Einträge des Dokuments werden nie geändert, nur ergänzt. Gibt es nichts zu
+übernehmen — alle Listen leer oder schon im Dokument —, wird das Dokument nicht angefasst und
+nicht angelegt.
+
+**Vorlage.** Lege gebündelt vor: je Eintrag, ob er übernommen oder genannt wird (mit Grund),
+und den Diff des Dokuments — bei einem neuen das ganze Dokument nach dem Gerüst unten.
+
+```text
+Quellenkonfiguration des Versionsinventars
+  übernehmen nach keph:/k-playbook/inventory.md (neu angelegt)
+    exclude: "**/testdata/**"  (mit Kommentar)
+  nicht übernommen
+    roots: /srv/deploy — roots gibt es nicht mehr
+    sources: /srv/deploy/values-prod.yaml — absoluter Pfad
+  danach k-playbook-local/version-sources.yaml löschen? (eigene Rückfrage)
+```
+
+include: _shared/inventory-config.md
+
+**Löschen.** Erst wenn das Dokument geschrieben und geprüft ist (Schritt 4 des Schreibwegs
+oben) oder es nichts zu übernehmen gab, fragst du gesondert, ob die alte Datei gelöscht
+werden soll — sie allein. Was nicht übernommen wurde, steht dann nur noch in ihr; sag das in
+der Frage. Bei „nein“ bleibt sie liegen; die Gesundheitsprüfung meldet sie weiter als
+Altbestand, und der nächste Lauf von `/k-upgrade` legt dieselbe Frage wieder vor, ohne etwas
+doppelt zu übernehmen. Committet wird nicht.
+
 ## Schritt 4 — Schluss
 
 Nenne nur die Umstellungen, die etwas getan haben, bei denen etwas liegen geblieben ist oder die
@@ -835,4 +908,6 @@ Verzeichnisse und jede Zeile `bleibt: …`, bei `commands/` und `skills/` mit de
 Eintrag und dem, was e) umgezogen hat — oder bei 3.0 und beim Aufräumen, dass sie auf den
 Binärwechsel warten. Für 3.5: ob die alte `K-PLAYBOOK.local.yaml` gelöscht ist oder warum sie
 liegt, ein genannter Account mit seinem Befehl und dass `.k-playbook/K-PLAYBOOK.yaml` committet
-werden will.
+werden will. Für 3.6: wie viele Einträge nach `keph:/k-playbook/inventory.md` übernommen
+wurden (mit Revision), jeder nicht übernommene Eintrag mit Grund und ob die alte
+`version-sources.yaml` gelöscht ist, liegen bleibt oder auf den Binärwechsel wartet.

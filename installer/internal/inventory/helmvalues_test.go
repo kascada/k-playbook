@@ -16,7 +16,7 @@ const redisValues = "helm-chart-generic:\n" +
 	"    repository: registry.example.io\n"
 
 func helmValuesConfig(entries string) string {
-	return "schema_version: 2\nhelm_values:\n" + entries
+	return "schema_version: 3\nhelm_values:\n" + entries
 }
 
 // notesFor liefert die Hinweise, die einen Text enthalten.
@@ -37,7 +37,7 @@ func TestKonfigurierterHelmWertLandetInDerComposeGruppe(t *testing.T) {
 	result := collectFiles(t, map[string]string{
 		"docker-compose.yml": "services:\n  redis:\n    image: redis:7.4.11-alpine\n",
 		"helm/values.yaml":   redisValues,
-		"version-sources.yaml": helmValuesConfig("  - path: helm/values.yaml\n" +
+		configKey: helmValuesConfig("  - path: helm/values.yaml\n" +
 			"    key: helm-chart-generic.redis.standalone.tag\n" +
 			"    item: container/redis\n"),
 	})
@@ -62,7 +62,7 @@ func TestKonfigurierterHelmWertLandetInDerComposeGruppe(t *testing.T) {
 	}
 
 	rendered := Render(result, "2026-09-16T00:00:00Z")
-	if !strings.Contains(rendered, "| `v7.4.11` | exact | deployment | `helm/values.yaml:5` · `helm-chart-generic.redis.standalone.tag` · konfiguriert in version-sources.yaml |") {
+	if !strings.Contains(rendered, "| `v7.4.11` | exact | deployment | `helm/values.yaml:5` · `helm-chart-generic.redis.standalone.tag` · konfiguriert in keph:/k-playbook/inventory.md |") {
 		t.Errorf("Herkunft mit Schlüsselpfad und Zeile fehlt:\n%s", rendered)
 	}
 }
@@ -72,7 +72,7 @@ func TestKonfigurierterHelmWertLandetInDerComposeGruppe(t *testing.T) {
 func TestKonfigurierterHelmWertNimmtDenKontextDerQuelle(t *testing.T) {
 	result := collectFiles(t, map[string]string{
 		"helm/values.yaml": redisValues,
-		"version-sources.yaml": "schema_version: 2\n" +
+		configKey: "schema_version: 3\n" +
 			"sources:\n  - path: helm/values.yaml\n    kind: helm\n    env: dev\n" +
 			"helm_values:\n  - path: helm/values.yaml\n    key: helm-chart-generic.redis.standalone.tag\n    item: container/redis\n",
 	})
@@ -112,8 +112,8 @@ func TestKonfigurierterHelmWertOhneZeileErzeugtHinweis(t *testing.T) {
 			"helm/values.yaml", "a.b", "helm/values.yaml", "die Datei ist nicht auswertbar"},
 		{"Muster ohne Treffer", map[string]string{},
 			"helm/values-*.yaml", "a.tag", "helm/values-*.yaml", "das Muster trifft keine Datei"},
-		{"außerhalb der Wurzeln", map[string]string{},
-			"/srv/deploy/values.yaml", "a.tag", "/srv/deploy/values.yaml", "außerhalb der erlaubten Wurzeln"},
+		{"außerhalb der Projektwurzel", map[string]string{},
+			"../draussen/values.yaml", "a.tag", "../draussen/values.yaml", "außerhalb der Projektwurzel"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -121,7 +121,7 @@ func TestKonfigurierterHelmWertOhneZeileErzeugtHinweis(t *testing.T) {
 			for name, content := range tc.files {
 				files[name] = content
 			}
-			files["version-sources.yaml"] = helmValuesConfig("  - path: " + tc.path + "\n    key: " + tc.key + "\n    item: container/redis\n")
+			files[configKey] = helmValuesConfig("  - path: " + tc.path + "\n    key: " + tc.key + "\n    item: container/redis\n")
 			result := collectFiles(t, files)
 
 			for _, entry := range result.Entries {
@@ -129,7 +129,7 @@ func TestKonfigurierterHelmWertOhneZeileErzeugtHinweis(t *testing.T) {
 					t.Errorf("unerwartete Zeile: %+v", entry)
 				}
 			}
-			notes := notesFor(result, "konfigurierter Helm-Wert "+tc.key+" → container/redis (version-sources.yaml, Zeile 3) nicht angewandt: ")
+			notes := notesFor(result, "konfigurierter Helm-Wert "+tc.key+" → container/redis (keph:/k-playbook/inventory.md, Zeile 4) nicht angewandt: ")
 			if len(notes) != 1 {
 				t.Fatalf("Hinweise = %+v, erwartet genau einen", result.Notes)
 			}
@@ -151,7 +151,7 @@ func TestKonfigurierterHelmWertMitGlobMeldetJedeDatei(t *testing.T) {
 	result := collectFiles(t, map[string]string{
 		"helm/values-prod.yaml":  redisValues,
 		"helm/values-stage.yaml": "helm-chart-generic:\n  redis:\n    enabled: false\n",
-		"version-sources.yaml": helmValuesConfig("  - path: helm/values-*.yaml\n" +
+		configKey: helmValuesConfig("  - path: helm/values-*.yaml\n" +
 			"    key: helm-chart-generic.redis.standalone.tag\n" +
 			"    item: container/redis\n"),
 	})
@@ -168,21 +168,21 @@ func TestKonfigurierterHelmWertMitGlobMeldetJedeDatei(t *testing.T) {
 	}
 }
 
-// Unter schema_version 1 wird der Abschnitt sichtbar abgelehnt und ergibt
-// keine Zeile.
-func TestHelmValuesUnterFassung1ErgebenKeineZeile(t *testing.T) {
+// Ein absoluter Pfad in helm_values wird schon beim Lesen der Konfiguration
+// sichtbar abgelehnt und ergibt keine Zeile — auch unter der Projektwurzel.
+func TestHelmValueMitAbsolutemPfadErgibtKeineZeile(t *testing.T) {
 	result := collectFiles(t, map[string]string{
 		"helm/values.yaml": redisValues,
-		"version-sources.yaml": "schema_version: 1\nhelm_values:\n  - path: helm/values.yaml\n" +
+		configKey: "schema_version: 3\nhelm_values:\n  - path: /srv/helm/values.yaml\n" +
 			"    key: helm-chart-generic.redis.standalone.tag\n    item: container/redis\n",
 	})
 	for _, entry := range result.Entries {
-		if entry.Group == "container/redis" {
-			t.Errorf("unter Fassung 1 darf keine Zeile entstehen: %+v", entry)
+		if entry.Note == configuredValueNote {
+			t.Errorf("ein abgelehnter Eintrag darf keine Zeile ergeben: %+v", entry)
 		}
 	}
-	if len(result.Rejections) != 1 || !strings.Contains(result.Rejections[0].Reason, "helm_values verlangt schema_version: 2") ||
-		!strings.Contains(result.Rejections[0].Reason, "Zeile 3") {
+	if len(result.Rejections) != 1 || !strings.Contains(result.Rejections[0].Reason, "absoluter Pfad") ||
+		!strings.Contains(result.Rejections[0].Reason, "Zeile 4") {
 		t.Errorf("Ablehnungen = %+v", result.Rejections)
 	}
 }
@@ -191,7 +191,7 @@ func TestHelmValuesUnterFassung1ErgebenKeineZeile(t *testing.T) {
 func TestKonfigurierterHelmWertPinRegeln(t *testing.T) {
 	result := collectFiles(t, map[string]string{
 		"helm/values.yaml": "a:\n  tag: \"\"\nb:\n  tag: latest\nc:\n  tag: ${TAG}\nd:\n  tag: ubuntu-22.04\n",
-		"version-sources.yaml": helmValuesConfig(
+		configKey: helmValuesConfig(
 			"  - path: helm/values.yaml\n    key: a.tag\n    item: container/a\n" +
 				"  - path: helm/values.yaml\n    key: b.tag\n    item: container/b\n" +
 				"  - path: helm/values.yaml\n    key: c.tag\n    item: container/c\n" +
@@ -217,7 +217,7 @@ func TestKonfigurierteHelmWerteSindDeterministisch(t *testing.T) {
 		"helm/values-a.yaml": "x: 1\n",
 		"helm/values-b.yaml": "x: 1\n",
 		"helm/values-c.yaml": redisValues,
-		"version-sources.yaml": helmValuesConfig("  - path: helm/values-*.yaml\n" +
+		configKey: helmValuesConfig("  - path: helm/values-*.yaml\n" +
 			"    key: helm-chart-generic.redis.standalone.tag\n    item: container/redis\n"),
 	}
 	first := Render(collectFiles(t, files), "2026-09-16T00:00:00Z")

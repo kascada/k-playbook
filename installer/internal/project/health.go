@@ -7,13 +7,14 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Die Quellen der Umgebungsprüfung (Task 098). Jede Funktion ist eine Quelle
 // für health.Check: Sie bewertet einen Befund, den die Kontextausgabe heute
 // schon trägt, und macht daraus Einträge mit Stufe, Bereich, Satz und
 // Abhilfe. Die Quellen stehen hier und nicht im Paket health, weil sie aus
-// diesem Paket lesen (DetectBaseTools, readVersionSources,
+// diesem Paket lesen (DetectBaseTools, LoadVersionSources,
 // kephalaionCheck) und das Briefing in diesem Paket den Report trägt — health
 // kann project darum nicht importieren. Eingehängt werden sie beim Laden des
 // Pakets; jedes Programm, das das Briefing, die CLI, den MCP-Server oder die
@@ -157,23 +158,54 @@ func healthBaseTools(_ context.Context, projectDir string) []health.Problem {
 }
 
 // healthVersionSources bewertet die Quellenkonfiguration des
-// Versionsinventars: Ist die Datei da, aber nicht lesbar oder von unbekannter
-// Fassung, ist das ein Fehler — der Erhebungslauf bräche daran ab. Der Satz
-// nennt den Pfad, nicht den Inhalt: Die Einzelheiten des Lesers stehen in
-// der Kontextausgabe unter versionSources.error, die eine Zeile der Datei
-// zitieren kann.
-func healthVersionSources(_ context.Context, projectDir string) []health.Problem {
-	state := readVersionSources(LocalDir(projectDir))
-	if state.Error == "" {
-		return nil
+// Versionsinventars, das Dokument keph:/k-playbook/inventory.md:
+//
+//   - Liegt es, ist aber nicht lesbar, von fremder Fassung oder trägt roots,
+//     ist das ein Fehler — der Erhebungslauf bräche daran ab. Der Satz nennt
+//     den Ort, nicht den Inhalt: Die Einzelheiten des Lesers stehen in der
+//     Kontextausgabe unter versionSources.error, die eine Zeile des Dokuments
+//     zitieren kann.
+//   - Ist Kephalaion für das Projekt bereit, das Dokument aber nicht
+//     lesbar, ist das ebenfalls ein Fehler: Kein Leser fällt dann auf die
+//     Platte oder still auf die Standardquellen zurück.
+//   - Ist Kephalaion nicht bereit, schweigt diese Quelle: Den Fehler trägt
+//     schon der Bereich kephalaion mit seiner Abhilfe, und ein zweiter Satz
+//     zur selben Ursache sagte nichts Neues.
+//   - Liegt die alte Datei unter k-playbook-local/ noch, ist das eine
+//     Warnung mit dem Hinweis auf /k-upgrade — gelesen wird sie nicht.
+func healthVersionSources(ctx context.Context, projectDir string) []health.Problem {
+	var problems []health.Problem
+	if message := LegacyVersionSourcesMessage(projectDir); message != "" {
+		problems = append(problems, health.Problem{
+			Level: health.LevelWarning,
+			Area:  health.AreaVersionSources,
+			Message: LegacyVersionSourcesDisplay + " liegt noch; k-playbook liest die Quellenkonfiguration des " +
+				"Versionsinventars nicht mehr von dort, sondern aus " + versionsources.DocRef + ".",
+			Hint: legacyVersionSourcesHint,
+		})
 	}
-	return []health.Problem{{
+	_, opened, err := LoadVersionSources(ctx, projectDir)
+	switch {
+	case err == nil:
+		return problems
+	case !opened:
+		return problems
+	case versionsources.IsUnavailable(err):
+		return append(problems, health.Problem{
+			Level:   health.LevelError,
+			Area:    health.AreaVersionSources,
+			Message: "Die Quellenkonfiguration des Versionsinventars " + versionsources.DocRef + " ist nicht erreichbar.",
+			Hint: "Kephalaion auf diesem Rechner prüfen (kephalaion status, k-playbook context unter kephalaion); " +
+				"die Einzelheiten nennt k-playbook context unter versionSources.error.",
+		})
+	}
+	return append(problems, health.Problem{
 		Level:   health.LevelError,
 		Area:    health.AreaVersionSources,
-		Message: "Die Quellenkonfiguration des Versionsinventars " + state.Path + " ist nicht lesbar oder von unbekannter Fassung.",
-		Hint: "Die Datei korrigieren oder entfernen; die Einzelheiten nennt k-playbook context unter versionSources.error, " +
-			"den Vertrag docs/version-inventory.md der Installation.",
-	}}
+		Message: "Die Quellenkonfiguration des Versionsinventars " + versionsources.DocRef + " ist nicht lesbar, von unbekannter Fassung oder trägt roots.",
+		Hint: "Das Frontmatter des Dokuments korrigieren oder das Dokument entfernen; die Einzelheiten nennt k-playbook context " +
+			"unter versionSources.error, den Vertrag docs/version-inventory.md der Installation.",
+	})
 }
 
 // healthGitHub trägt die Probleme der persönlichen GitHub-Zugangsdatei

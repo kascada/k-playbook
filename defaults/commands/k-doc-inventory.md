@@ -19,8 +19,9 @@ Produces:
 - `keph:/docs/generated/versions/README.md` — die Beschreibung des Verzeichnisses, die das
   Subkommando nach dem Inventar aus ihrer Vorlage `k-playbook:/docs/generated/versions/README.md`
   schreibt, wenn sie fehlt oder abweicht.
-- `k-playbook-local/version-sources.yaml` — **nur** nach ausdrücklicher Bestätigung des
-  Nutzers und ausschließlich ergänzend (Schritt 4).
+- `keph:/k-playbook/inventory.md` — die Quellenkonfiguration, **nur** nach ausdrücklicher
+  Bestätigung des Nutzers und ausschließlich ergänzend (Schritt 4); bei der ersten
+  bestätigten Ergänzung angelegt.
 
 Nichts sonst.
 
@@ -39,22 +40,29 @@ Aus dem Briefing brauchst du:
 - `context.kephalaion` — `ok`, `address`, `message`. Ohne `ok: true` endet der Command hier
   (siehe die Ablage oben); `k-playbook inventory` bräche ohnehin mit
   `kephalaion_unavailable` ab.
-- `context.versionSources` — der Zustand der Quellenkonfiguration
-  `k-playbook-local/version-sources.yaml`. Lies die Datei **nicht** selbst — dieselbe Regel wie
-  für `K-PLAYBOOK.yaml`.
+- `context.versionSources` — der Zustand der Quellenkonfiguration, des Dokuments
+  `keph:/k-playbook/inventory.md` in der Collection des Projekts (`ref`). Ihre Einstellungen
+  stehen im Frontmatter. Werte sie **nicht** selbst aus — gelesen wird das Dokument nur in
+  Schritt 4 und nur, um es zu ergänzen.
 
 ## Schritt 2 — Quellenlage sichten
 
 Zwei Auskünfte, beide ohne eigene Dateilektüre:
 
-1. **Die Quellenkonfiguration** aus `context.versionSources`. Drei Zustände, und mehr nicht:
-   - `present: true`, `error` leer → gültig. `roots`, `sources`, `exclude` und `helmValues`
-     tragen den Inhalt; leere Listen heißen „nichts konfiguriert“. `schemaVersion` ist `1`
-     oder `2`; `helmValues` wirkt nur unter `2`.
-   - `present: false` → fehlt. Es gelten die Standardquellen unterhalb der Projektwurzel.
-   - `error` gefüllt → defekt. Der Erhebungslauf bricht damit ab (Fehlerfälle unten).
-   Fehlt das Feld `versionSources` ganz, ist die Installation älter als es: das sagen und auf
-   `/k-upgrade` verweisen, statt die Datei ersatzweise selbst zu öffnen.
+1. **Die Quellenkonfiguration** aus `context.versionSources`. Vier Zustände in `state`, und
+   mehr nicht:
+   - `present` → gültig. `sources`, `exclude` und `helmValues` tragen den Inhalt; leere
+     Listen heißen „nichts konfiguriert“. `schemaVersion` ist `3`.
+   - `missing` → fehlt. Es gelten die Standardquellen unterhalb der Projektwurzel.
+   - `invalid` → defekt; `error` nennt den Grund. Der Erhebungslauf bricht damit ab
+     (Fehlerfälle unten).
+   - `unavailable` → Kephalaion ist nicht erreichbar; über das Dokument ist nichts bekannt.
+     Der Erhebungslauf bricht ab (Fehlerfälle unten).
+   Fehlt das Feld `versionSources` ganz oder trägt es `path` statt `ref`, ist die
+   Installation älter als dieser Text: das sagen und auf `/k-upgrade` verweisen, statt die
+   alte Datei `k-playbook-local/version-sources.yaml` ersatzweise selbst zu öffnen. Meldet
+   das Briefing unter `health` die alte Datei als Altbestand, gilt sie nicht mehr; ihre
+   Einstellungen zieht `/k-upgrade` um.
 2. **Der Bestand des Inventars**: lies `keph:/docs/generated/versions/inventory.md` mit
    `k_playbook_doc_read` (ersatzweise `k-playbook read`). Kommt `not_found`, fehlt das
    Inventar — der Normalzustand vor dem ersten Lauf. Sonst nimm **nur** den YAML-Block
@@ -69,7 +77,7 @@ Zeige die Lage kompakt:
 ─────────────────────────────────────
 Collection    <context.kephalaion.address>
 Inventar      erhoben <generated.at>, <N> Quellen, <N> Abweichungen | fehlt
-Quellkonfig   vorhanden (<N> Wurzeln, <N> Quellen, <N> Ausschlüsse, <N> Helm-Werte) | fehlt | defekt: <error>
+Quellkonfig   keph:/k-playbook/inventory.md — vorhanden (<N> Quellen, <N> Ausschlüsse, <N> Helm-Werte) | fehlt | defekt: <error> | nicht erreichbar
 ```
 
 ## Schritt 3 — Weitere Quellen erfragen
@@ -87,8 +95,8 @@ Lockfiles, Dockerfiles, Compose, DevContainer, Helm und CI.
 1. Gibt es weitere Versionsquellen? Host-Dateien, eigene Deployment-Repos,
    `.tool-versions`, Nix-, Terraform-, Ansible- oder proprietäre Konfigurationen.
 2. Welche davon stehen für `lokal`, `dev`, `devcontainer`, `ci` oder Deployment?
-3. Sollen sie künftig automatisch mitgescannt werden — also in
-   k-playbook-local/version-sources.yaml eingetragen werden?
+3. Sollen sie künftig automatisch mitgescannt werden — also in die
+   Quellenkonfiguration keph:/k-playbook/inventory.md eingetragen werden?
 4. Gibt es umgekehrt Bereiche, die *nicht* mitgescannt werden sollen? Testfixtures
    und Beispielprojekte etwa, deren Versionen absichtlich alt oder widersprüchlich
    sind und über das Projekt nichts aussagen.
@@ -110,9 +118,10 @@ fehlt er, frag danach.
 
 Antwortet der Nutzer mit Quellen, ordne jeder eine Quellart (`kind`) und ein Umgebungslabel
 (`env`) aus den geschlossenen Mengen des Vertrags zu und zeige die Zuordnung, bevor
-irgendetwas geschrieben wird. Liegt eine Quelle außerhalb der Projektwurzel, braucht sie
-zusätzlich eine Wurzel unter `roots:` — ein absoluter Pfad in `sources:` gibt seine Wurzel
-**nicht** selbst frei.
+irgendetwas geschrieben wird. Gelesen wird nur unterhalb der Projektwurzel, und jeder `path`
+steht relativ zu ihr. Eine Quelle außerhalb der Projektwurzel — ein Host-Pfad, ein anderes
+Repo — lässt sich nicht eintragen: Das sagen, statt sie mit einem absoluten Pfad zu versuchen;
+das Werkzeug lehnt absolute Pfade ab. `roots` gibt es nicht mehr.
 
 ## Schritt 4 — Quellenkonfiguration ergänzen
 
@@ -121,24 +130,24 @@ auf Frage 4 Bereiche oder auf Frage 5 Helm-Werte genannt hat. Für `exclude:` un
 `helm_values:` gilt dieselbe Schreibregel wie für `sources:` — die Liste unten macht dabei
 keinen Unterschied zwischen ihnen.
 
-Die Datei ist handgepflegt. Für sie gilt die Schreibregel des Vertrags, und sie gilt für
-jeden Aufrufweg gleich:
+Die Quellenkonfiguration `keph:/k-playbook/inventory.md` ist handgepflegt und gilt für alle,
+die am Projekt arbeiten. Für sie gilt die Schreibregel des Vertrags, und sie gilt für jeden
+Aufrufweg gleich:
 
 - **Nur nach ausdrücklicher Bestätigung.** Ohne sie wird nicht geschrieben. Ein „ja“ auf
   Frage 3 aus Schritt 3 ist diese Bestätigung nur zusammen mit der Diff-Bestätigung unten.
-- **Nur ergänzend.** Neue Einträge kommen ans Ende der jeweiligen Liste. Die einzige
-  Änderung an Bestehendem: Ist der neue Eintrag der erste unter `helm_values:` und steht
-  `schema_version: 1` in der Datei, wird sie im selben Diff auf `2` gehoben — unter `1`
-  lehnt das Werkzeug den Abschnitt ab.
-- **Bestehende Einträge, Kommentare und Reihenfolge bleiben unangetastet.** Nichts wird
-  umsortiert, neu formatiert, zusammengefasst oder von Kommentaren befreit. Die
-  auskommentierten Beispiele der Vorlage bleiben stehen.
-- Fehlt die Datei, wird sie hier **nicht** angelegt: `/k-gui` anbieten — es legt die gültige,
-  leere Konfiguration aus der Vorlage des Werkzeugs an. Die Vorlage nicht selbst nachbauen.
+- **Nur ergänzend.** Neue Einträge kommen ans Ende der jeweiligen Liste; bestehende
+  Einträge, Kommentare und Reihenfolge bleiben unangetastet, im Frontmatter wie im Rumpf.
+- **Fehlt das Dokument** (`context.versionSources.state` ist `missing`), wird es bei der
+  ersten bestätigten Ergänzung angelegt.
+- **Steht `state` auf `invalid` oder `unavailable`, wird nicht geschrieben** — weder
+  angelegt noch ergänzt. Ein defektes Dokument repariert der Nutzer; über ein nicht
+  erreichbares ist nichts bekannt.
 
-Zeige den Diff und lass ihn bestätigen, bevor du schreibst. Bei „nein“ bleibt die Datei
-unverändert; die genannten Quellen fließen dann in **diesen** Lauf nicht ein, und das wird
-im Abschluss so gesagt.
+include: _shared/inventory-config.md
+
+Bei „nein“ bleibt das Dokument unverändert beziehungsweise ungeschrieben; die genannten
+Quellen fließen dann in **diesen** Lauf nicht ein, und das wird im Abschluss so gesagt.
 
 ## Schritt 5 — Erhebung anstoßen
 
@@ -173,8 +182,9 @@ weg.
 
 Kompakte Zusammenfassung:
 
-- Quellenkonfiguration: vorhanden / fehlt / defekt, und ob sie in diesem Lauf ergänzt wurde
-  (mit der Zahl neuer Einträge) oder unangetastet blieb.
+- Quellenkonfiguration `keph:/k-playbook/inventory.md`: vorhanden / fehlt / defekt / nicht
+  erreichbar, und ob sie in diesem Lauf angelegt oder ergänzt wurde (mit der Zahl neuer
+  Einträge und der Revision) oder unangetastet blieb.
 - Zahlen des Laufs: ausgewertete Quellen, konfigurierte Zusatzquellen, Einträge,
   Abweichungen (davon widersprüchliche), abgelehnte Quellen, nicht durchsuchte Quellen,
   nicht auswertbare Quellen, Hinweise.
@@ -187,7 +197,7 @@ Kompakte Zusammenfassung:
 - Jede abgelehnte Quelle mit angefragtem Pfad, aufgelöstem Pfad und Grund. Eine Ablehnung
   ist eine Lücke im Inventar; eine Lücke, die niemand sieht, ist schlimmer als ein Fehler.
 - Ausdrücklich: außerhalb von `keph:/docs/generated/versions/` wurde nichts geschrieben —
-  außer der bestätigten Ergänzung in `k-playbook-local/version-sources.yaml`.
+  außer der bestätigten Ergänzung in `keph:/k-playbook/inventory.md`.
 - Hinweis, falls Abweichungen der Art `widersprüchlich` stehen: dieselbe Umgebung sagt
   Verschiedenes. Das Inventar löst das nicht auf, es weist es aus.
 - Jeden Ausschluss, der Quellen übergangen hat, mit Muster, Herkunft und Zahl. Ein
@@ -209,11 +219,16 @@ Kompakte Zusammenfassung:
 - `k-playbook inventory` meldet `stale_revision` → zwischen Lesen und Schreiben hat jemand
   anders das Inventar geschrieben. Nichts wurde überschrieben. Den Lauf einmal wiederholen;
   meldet er es erneut, das sagen und nicht von Hand nachhelfen.
-- `context.versionSources.error` ist gesetzt → die Quellenkonfiguration ist defekt. Der
-  Erhebungslauf bricht damit ab und schreibt nichts; das Kommando meldet Datei, Zeile und
-  Parser-Meldung. Die Meldung weitergeben und die Datei **nicht** selbst reparieren — eine
+- `context.versionSources.state` ist `invalid` → die Quellenkonfiguration ist defekt. Der
+  Erhebungslauf bricht damit ab und schreibt nichts; das Kommando meldet Dokument, Zeile und
+  Parser-Meldung. Die Meldung weitergeben und das Dokument **nicht** selbst reparieren — eine
   defekte Konfiguration halb zu deuten hieße, eine andere Vertrauensgrenze anzuwenden als
-  die aufgeschriebene.
+  die aufgeschriebene. Ein Schlüssel `roots` (auch leer) oder `schema_version` unter `3`
+  ist so ein Defekt: das Dokument stammt aus einer alten Vorlage; der Nutzer entfernt `roots`
+  und hebt die Fassung.
+- `context.versionSources.state` ist `unavailable` → Kephalaion ist nicht erreichbar. Keine
+  Erhebung, kein Rückfall auf die alte Datei unter `k-playbook-local/` oder still auf die
+  Standardquellen; `context.versionSources.error` und `context.kephalaion.message` nennen.
 - `k-playbook inventory` meldet `unbekanntes Kommando` → die Installation ist älter als
   dieser Command. Melden, `/k-upgrade` nennen, und die Erhebung **nicht** von Hand nachbauen.
 - Die Zeile `README:` meldet `failed`, und das Kommando endet mit einem Fehler → gescheitert
@@ -225,15 +240,20 @@ Kompakte Zusammenfassung:
   die Ablehnungen stehen im Inventar und im Abschluss. Sie zu übergehen ist der Fehler.
 - Das Inventar ist da, sein Frontmatter defekt → das Kommando meldet es als Befund und
   schreibt neu, weil ein Vergleich nicht möglich ist. Den Befund im Abschluss nennen.
-- Der Nutzer bestätigt den Diff der Quellenkonfiguration nicht → Datei unverändert lassen,
-  Erhebung trotzdem laufen lassen, im Abschluss als übersprungen führen.
+- Der Nutzer bestätigt den Diff der Quellenkonfiguration nicht → Dokument unverändert
+  lassen, Erhebung trotzdem laufen lassen, im Abschluss als übersprungen führen.
+- Das Briefing meldet unter `health` die alte `k-playbook-local/version-sources.yaml` als
+  Altbestand → sie gilt nicht mehr und wird nicht gelesen; im Abschluss nennen und auf
+  `/k-upgrade` verweisen, das ihre Einstellungen umzieht. Nicht selbst umziehen.
 
 ## Anti-Muster (nicht tun)
 
 - **Die Erhebung nachbauen.** Manifeste von Hand lesen, Versionen schätzen, Zeilen ergänzen
   — dann gäbe es zwei Auslegungen des Vertrags, und die zweite ginge in keine Prüfung ein.
-- **`version-sources.yaml` selbst lesen.** Ihr Zustand steht in `context.versionSources`.
-  Wer sie direkt öffnet, liest eine zweite, womöglich andere Antwort.
+- **Die Quellenkonfiguration selbst auswerten.** Ihr Zustand steht in
+  `context.versionSources`. Wer das Dokument für die Auswertung liest — oder die alte Datei
+  unter `k-playbook-local/` —, liest eine zweite, womöglich andere Antwort.
+  Gelesen wird es nur in Schritt 4, um es zu ergänzen.
 - **Die Quellenkonfiguration umschreiben.** Kein Umsortieren, kein Neuformatieren, kein
   Entfernen von Kommentaren, kein Schreiben ohne Bestätigung — sie ist handgepflegt.
 - **Das Inventar von Hand nachbessern** — weder in der Collection noch als Datei auf der

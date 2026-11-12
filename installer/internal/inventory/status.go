@@ -175,17 +175,9 @@ func Body(data []byte) []byte {
 
 // FrontmatterBlock schneidet den YAML-Block zwischen den beiden `---`-Zeilen am
 // Dateianfang heraus. Ohne Frontmatter ist das zweite Ergebnis false. project/
-// benutzt denselben Schnitt (Briefing, Erzeuger-Arbeitsverzeichnis), damit
-// Frontmatter an genau einer Stelle erkannt wird.
+// benutzt denselben Schnitt (Briefing, Erzeuger-Arbeitsverzeichnis), die
+// Quellenkonfiguration ebenso — geschnitten wird in yamllite.Frontmatter,
+// damit Frontmatter an genau einer Stelle erkannt wird.
 func FrontmatterBlock(data []byte) (string, bool) {
-	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return "", false
-	}
-	for index := 1; index < len(lines); index++ {
-		if strings.TrimSpace(lines[index]) == "---" {
-			return strings.Join(lines[1:index], "\n"), true
-		}
-	}
-	return "", false
+	return yamllite.Frontmatter(data)
 }

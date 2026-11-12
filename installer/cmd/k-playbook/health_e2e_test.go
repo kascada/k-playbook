@@ -70,7 +70,9 @@ func TestHealthKlartextNichtEingetragenIstFehler(t *testing.T) {
 
 func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
 	root := healthE2EProject(t)
-	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
+	// Die alte Quellenkonfiguration ist Altbestand (Task 144): eine Warnung
+	// neben dem Fehler, gelesen wird sie nicht.
+	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
 	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +81,7 @@ func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
 	if err == nil || err.Error() != "" || exitCodeOf(err) != healthExitProblems {
 		t.Fatalf("Fehler: %v (Code %d)", err, exitCodeOf(err))
 	}
-	if !strings.Contains(stdout, "  [error] versionSources: Die Quellenkonfiguration des Versionsinventars "+path+" ist nicht lesbar") {
+	if !strings.Contains(stdout, "  [warning] versionSources: "+project.LegacyVersionSourcesDisplay+" liegt noch") {
 		t.Errorf("Ausgabe:\n%s", stdout)
 	}
 	if strings.Contains(stdout, "ungültig") {
@@ -99,7 +101,7 @@ func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
 	}
 	// Sortiert nach Bereich: kephalaion vor versionSources.
 	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError ||
-		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelError || report.Problems[1].Hint == "" {
+		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelWarning || report.Problems[1].Hint == "" {
 		t.Errorf("Problems: %+v", report.Problems)
 	}
 	// Der Report ist das ganze JSON — kein Umschlag auf der Kommandozeile.

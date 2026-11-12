@@ -19,7 +19,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 
 More examples:
 
-- `project:/k-playbook-local/version-sources.yaml`
+- `project:/k-playbook-local/k-playbook.md`
 - `k-playbook:/instructions/on-demand/<topic>.md`
 - `keph:/docs/manual/<topic>.md`
 - `keph:/docs/` (a directory)

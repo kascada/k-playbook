@@ -40,7 +40,7 @@ These names are fixed and used unchanged everywhere.
 | Command | `/k-doc-inventory` — hull `share/commands/k-doc-inventory.md`, text `defaults/commands/k-doc-inventory.md`, read as `k-playbook:/commands/k-doc-inventory.md` |
 | Shared include of the docs commands | `defaults/commands/_shared/docs.md` |
 | Inventory document | `keph:/docs/generated/versions/inventory.md` — in the project collection (`kephalaion.address`), name `docs/generated/versions/inventory.md`; the constant `inventory.DocName` |
-| Source configuration | `k-playbook-local/version-sources.yaml` |
+| Source configuration | `keph:/k-playbook/inventory.md` — in the project collection, name `k-playbook/inventory.md`; the constant `versionsources.DocName` (task 144; before that `k-playbook-local/version-sources.yaml`, now only recognized as a legacy file) |
 | Generator in frontmatter | `generated.by: k-doc-inventory` |
 
 The command deliberately uses the singular `doc`, although the rest of the family uses
@@ -480,9 +480,10 @@ even after confirmation: those documents belong to `/k-docs-tools`.
 
 ## Trust Boundary
 
-The source configuration can allow paths outside the project: host files and external
-deployment repositories. They are read by a binary that also runs a local web server in
-the same process model. Symlinks, `..`, and glob escapes are therefore not edge cases.
+The sources are read by a binary that also runs a local web server in the same process
+model, and the source configuration lives in a collection shared by everyone with write
+access to the project. Symlinks, `..`, and glob escapes are therefore not edge cases, and
+what the configuration names must never decide what is read on another person's machine.
 
 The boundary is defined **once** and applies identically to every invocation path: the
 subcommand, command, and web API from Task 043. Stage 3 implements it in **exactly one
@@ -490,19 +491,17 @@ place** in `internal/`: a function that checks a requested path and returns eith
 checked absolute path or an error. No reader opens a file without going through this
 function.
 
-### Allowed Roots
+### Allowed Root
 
-Exactly two kinds of root are allowed:
+Exactly one root is allowed: the **project root**, `project.dir` from `k-playbook context`,
+namely the directory containing `K-PLAYBOOK.yaml`. It does not appear in the configuration.
 
-1. The **project root**: `project.dir` from `k-playbook context`, namely the directory
-   containing `K-PLAYBOOK.yaml`. It is always allowed and does not appear in the
-   configuration.
-2. Every root explicitly allowed under `roots:` in `version-sources.yaml`.
-
-Nothing else. There are no implicit roots: an absolute path in `sources:` does **not**
-automatically allow its root. Anyone who wants to read outside the project writes down the
-root, so that the question "what may this binary read" is answered in one place and
-without evaluating globs.
+Nothing else. Since task 144 there are no additional roots: the former key `roots` depended
+on the machine, and in a shared collection anyone with write access could have decided what
+is read on other machines. A configuration that still carries `roots`, even an empty one,
+is rejected as a whole (see "Error cases"); an absolute `path` in `sources:` or
+`helm_values:` is rejected as an entry. A file outside the project root cannot be read into
+the inventory.
 
 `playbook.dir` is not a special root. It is below the project root and **may** be read
 like any other directory; nothing is ever written there anyway. That default detection
@@ -524,14 +523,14 @@ Before **every** check, in this order:
    This makes a `..` that leads beyond a root visible, and it fails the check.
 4. **Resolve symlinks.** The complete path, including all parent segments, is resolved.
    The **resolved** result, not the requested path, is checked. A symlink inside the
-   project that points outside is therefore an escape and is rejected unless its target is
-   below an allowed root. The roots themselves are likewise resolved before comparison.
-5. **Check.** The resolved path must equal a root or be below a root, compared by segment,
-   not as a string prefix. `/srv/deploy` allows `/srv/deploy/x`, but not
-   `/srv/deploy-alt/x`.
+   project that points outside is therefore an escape and is rejected. The project root
+   itself is likewise resolved before comparison.
+5. **Check.** The resolved path must equal the project root or be below it, compared by
+   segment, not as a string prefix. `/srv/projekt` allows `/srv/projekt/x`, but not
+   `/srv/projekt-alt/x`.
 
 Globs are expanded only **after** steps 1 through 3, using their static part, and only
-within an allowed root. **Every** result of expansion then individually goes through steps
+within the project root. **Every** result of expansion then individually goes through steps
 4 and 5. A glob is therefore never a way around the check.
 
 Only regular files are read. Directories, device files, FIFOs, and sockets are rejected.
@@ -554,43 +553,66 @@ output, and in the API response. It states the requested path, resolved path, an
 the inventory; a gap no one sees is worse than an error.
 
 The run therefore does **not** abort: the remaining sources are collected, the inventory
-is written, and it contains the rejections. Only an unreadable source configuration
-aborts; see "Error cases".
+is written, and it contains the rejections. Only an unreadable source configuration, or one
+that cannot be reached, aborts; see "Error cases".
 
 ## Source Configuration
 
-`k-playbook-local/version-sources.yaml`. YAML, because `K-PLAYBOOK.yaml` uses it too and
-a second format would provide no benefit.
+`keph:/k-playbook/inventory.md`: a document in the project collection (task 144). What the
+inventory reads is a setting of the project, so it lives next to the inventory in the
+collection, not on the disk of one machine. It sits at the root of `keph:/k-playbook/`,
+next to the kinds of the project's own layer (`instructions/`, `includes/`, `reviews/`) but
+in none of them, so that layer never picks it up; not under `keph:/docs/`, where it would
+be indexed and found as documentation.
 
-**Write rule.** The file is maintained manually. The command, subcommand, and every
+**Format.** The configuration is the document's YAML frontmatter, with the keys below; the
+Markdown body explains it. The collection stays with `.md`. The reader takes the document's
+raw text and evaluates the frontmatter with the same YAML reader as every other
+configuration, not the frontmatter Kephalaion parses: comments and nested lists stay
+readable, and line numbers in messages count from the first line of the document.
+
+**Write rule.** The document is maintained manually. The command, subcommand, and every
 future interface may write to it only with the user's explicit confirmation, and then
-only additively: existing entries, comments, and ordering remain untouched. Without
-confirmation, nothing is written. The single in-place change allowed is raising
-`schema_version: 1` to `2` when the confirmed addition is the first `helm_values` entry;
-it is part of the diff shown for confirmation.
+only additively: existing entries, comments, and ordering remain untouched, in the
+frontmatter and in the body. Without confirmation, nothing is written. `/k-doc-inventory`
+creates the document on the first confirmed addition and otherwise writes it with the read
+revision as `base_revision`; the skeleton and the write path are in
+`defaults/commands/_shared/inventory-config.md`. The interface only shows it.
 
 **State through `context`.** Commands read configuration exclusively from
-`k-playbook context`. The state of this file, whether present or absent, the allowed
-roots, and the configured sources, therefore belongs in the context output. The schema
-and field names are stated below under "State in the context output"; Stage 3 builds the
-reader as the **only** implementation used by both the collector and
-`installer/internal/project/context.go`.
+`k-playbook context`. The state of this document, whether present, absent, invalid, or not
+reachable, and the configured sources, therefore belongs in the context output. The schema
+and field names are stated below under "State in the context output". The reader in
+`installer/internal/versionsources/` is the **only** implementation, used by the
+collector, `installer/internal/project/versionsources.go` (context, health), and the
+interface.
+
+**Legacy file.** `k-playbook-local/version-sources.yaml` is no longer read as configuration
+(hard switch, as in task 143). If it is still there, the health check and
+`k-playbook inventory` report it as a legacy file with a pointer to `/k-upgrade`, which
+moves `exclude`, relative `sources`, and `helm_values` into the document — names, but does
+not move, a non-empty `roots`, absolute paths, and `helm_values` from a file with
+`schema_version: 1` — and then deletes the file after asking. Between the program update
+and `/k-upgrade` a project lacks its exclusions; a collection run in that window reads too
+much. That gap is accepted.
 
 ### Fields
 
 | Key | Required | Meaning |
 |---|---|---|
-| `schema_version` | yes | `1` or `2`. `2` is required only by `helm_values`; see "Schema version" below. Another value aborts the run instead of interpreting fields that could mean something else. |
-| `roots` | no | List of absolute paths that may be read in addition to the project root. Empty or absent means only the project root. |
+| `schema_version` | yes | `3`. Another value aborts the run instead of interpreting fields that could mean something else; see "Schema version" below. |
+| `roots` | — | Removed with schema version 3. Any `roots` key, even an empty one, aborts the run. |
 | `sources` | no | List of additional sources. Empty or absent means only the default sources below the project root. |
 | `exclude` | no | List of patterns where default detection does not search. Each pattern is a path relative to the project root; `*` means any number of characters within a segment, `**` any number of segments. A pattern without a wildcard matches the path itself and everything below it. An absolute pattern is visibly rejected: it would depend on the machine and match nothing on another one. |
-| `helm_values` | no | List of configured Helm values; see "Configured Helm values" below. Requires `schema_version: 2`. |
+| `helm_values` | no | List of configured Helm values; see "Configured Helm values" below. |
+
+Other frontmatter keys, such as `title`, are ignored.
 
 For each entry in `sources`:
 
 | Key | Required | Meaning |
 |---|---|---|
-| `path` | yes | File or glob. Relative to the project root or absolute; absolute only within a root from `roots`. |
+| `path` | yes | File or glob, relative to the project root. An absolute path (starting with `/`, `\`, or a drive such as `C:`) is visibly rejected, even below the project root: it would hold on one machine only. |
 | `kind` | yes | Source type: `auto`, `python`, `go`, `node`, `rust`, `ruby`, `php`, `java`, `elixir`, `dockerfile`, `compose`, `devcontainer`, `helm`, `ci`, `tool-versions`. `auto` determines the type from the file name as for default sources. |
 | `env` | yes | Environment label: `lokal`, `dev`, `devcontainer`, `ci`, `deployment`. |
 | `note` | no | Display text for the inventory's source list. |
@@ -610,32 +632,33 @@ recognized without guessing, for example a subchart that takes only a tag
 
 | Key | Required | Meaning |
 |---|---|---|
-| `path` | yes | File or glob of the values file, relative to the project root or absolute, like `path` in `sources`. |
+| `path` | yes | File or glob of the values file, relative to the project root, like `path` in `sources`; an absolute path is rejected. |
 | `key` | yes | Dot path to the value, for example `helm-chart-generic.redis.standalone.tag`. A segment may carry a list index in square brackets starting at `0`: `services[1].tag`. A key that itself contains a `.` cannot be addressed. |
 | `item` | yes | The item the value belongs to, as a group key `container/<name>`, for example `container/redis`. The name is normalized like an image name. Only the `container` ecosystem is allowed. |
 
 **Checks.** An entry without `path`, `key`, or `item`, with a `key` that has an empty
 segment or an invalid index, or with an `item` that is not `container/<name>`, is visibly
 rejected under "Abgelehnte Quellen und Hinweise" with the file's line and the reason, like
-an entry in `sources` with an unknown `kind`. The run continues.
+an entry in `sources` with an unknown `kind`. An absolute `path` is rejected the same way.
+The run continues.
 
 **Row.** The value of the key becomes `version` verbatim, and the pin rules for container
 tags apply: an empty value or a moving tag such as `latest` is `floating`, an unresolvable
 variable is `unknown`, and every other value is `exact`. `kindOfThing` is `image`,
 `sourceKey` is the configured `key`, `sourceLine` the line of the value, and `note` is
-`konfiguriert in version-sources.yaml` ("configured in version-sources.yaml"). The row
+`konfiguriert in keph:/k-playbook/inventory.md` ("configured in …"). The row
 carries the `context` of the source as which the file is read, including an `env` from
 `sources`. A configured entry does not make a file a source: the file must be read as Helm
 values anyway, by default detection or through `sources`.
 
 **No silent gap.** Every configured entry that yields no row produces a visible notice for
 the file, in the form
-`konfigurierter Helm-Wert <key> → <item> (version-sources.yaml, Zeile <n>) nicht angewandt: <reason>`
+`konfigurierter Helm-Wert <key> → <item> (keph:/k-playbook/inventory.md, Zeile <n>) nicht angewandt: <reason>`
 ("configured Helm value … not applied"). The reasons:
 
 | Case | Reason text |
 |---|---|
-| The path is outside the allowed roots | the rejection reason of the trust boundary |
+| The path is outside the project root | the rejection reason of the trust boundary |
 | A glob matches no file | `das Muster trifft keine Datei` |
 | The file does not exist | `die Datei liegt nicht auf der Platte` |
 | The file is excluded from default detection and not in `sources` | ``die Datei ist durch die Ausschlussregel `<pattern>` von der Standarderkennung ausgenommen; als Quelle unter sources: eintragen`` |
@@ -651,125 +674,81 @@ produces its own notice, while the other files yield their rows.
 
 ### Schema version
 
-`helm_values` is the first key added after `schema_version: 1`. An older binary checks only
-the version and does not recognize unknown top-level keys; under `schema_version: 1` it
-would skip `helm_values` silently and write an inventory without the configured rows. A
-configuration that is applied halfway and silently dropped halfway is worse than an error.
+**Decided:** the document carries `schema_version: 3`, and only `3` is read.
 
-**Decided:** `helm_values` requires `schema_version: 2`.
-
-- This binary reads both `1` and `2`. A file without `helm_values` works unchanged with
-  `1`; nothing needs to be migrated, and the template keeps `schema_version: 1`, so a newly
-  created configuration remains readable for older installations of the same project.
-- Under `schema_version: 1`, `helm_values` is not applied. The section is visibly
-  rejected once with its line and the reason
-  ``helm_values verlangt schema_version: 2; unter schema_version: 1 wird der Abschnitt nicht angewandt``,
-  and the run continues.
-- An older binary that understands only `1` aborts on a file with `2`, and its context
-  output reports `error`. The failure is visible, which is the point: the file relies on
-  a section that binary cannot apply.
-
-The rejected alternative was to keep `helm_values` under `schema_version: 1` and to
-document that older binaries skip it. It avoids the abort but leaves exactly the silent
-gap this contract rules out everywhere else.
+- `1` and `2` belonged to the former file `k-playbook-local/version-sources.yaml`: `2` added
+  `helm_values`, which `1` rejected visibly instead of applying. A document with `1` or `2`
+  would be one written by hand with the old meaning (including `roots`) and aborts the run.
+- `3` came with the move into the collection (task 144). It removes `roots`; the meaning of
+  a configuration changed, so the version changed with it. A document with `roots` is
+  rejected, even with `schema_version: 3`.
+- When `/k-upgrade` moves an old file, `helm_values` from a file with `schema_version: 1` are
+  named, not moved: they were never applied, and moving them would make them take effect
+  suddenly.
 
 ### Template
 
-The following content is both the **example file and the template** created by
-`LocalStructure()` in Stage 2: a valid, empty configuration with an explanatory comment.
-The template is German, as is the inventory file it configures; the block below is its
-exact wording. Stage 2 copies it verbatim into `versionSourcesTemplate()` in
-`installer/internal/project/local.go`, which the `fileTemplate()` branch returns for
-`version-sources.yaml`, rather than drafting it again.
+A new document gets this skeleton, created by `/k-doc-inventory` on the first confirmed
+addition and by `/k-upgrade` when it moves an old file; the wording is in
+`defaults/commands/_shared/inventory-config.md`, which both include. Filled lists are
+written as blocks, not as `[]`.
+
+```markdown
+---
+title: "Quellen des Versionsinventars"
+schema_version: 3
+sources: []
+exclude: []
+helm_values: []
+---
+
+# Quellen des Versionsinventars
+
+Einstellungen für `k-playbook inventory`, im Frontmatter oben: …
+```
+
+An example with entries:
 
 ```yaml
-# Versionsquellen für `k-playbook inventory`
-#
-# Diese Datei ist handgepflegt. k-playbook schreibt nur nach ausdrücklicher
-# Bestätigung in sie, und dann ausschließlich ergänzend: bestehende Einträge,
-# Kommentare und Reihenfolge bleiben erhalten.
-#
-# Ohne Einträge erhebt `k-playbook inventory` die Standardquellen unterhalb der
-# Projektwurzel — Manifeste, Lockfiles, Dockerfiles, Compose, DevContainer,
-# Helm und CI. Hier stehen nur zusätzliche Quellen und die Wurzeln außerhalb
-# des Projekts, die dafür gelesen werden dürfen.
-#
-# Vollständige Beschreibung: k-playbook/docs/version-inventory.md
-
-schema_version: 1
-
-# Zusätzlich lesbare Wurzeln, je ein absoluter Pfad. Die Projektwurzel ist
-# immer erlaubt und gehört nicht hierher. Was nicht unter einer dieser Wurzeln
-# liegt, wird abgelehnt — sichtbar gemeldet, nicht stillschweigend übergangen.
-#
-#   roots:
-#     - /srv/deploy
-roots: []
-
-# Zusätzliche Quellen. Je Eintrag:
-#   path: Datei oder Glob, relativ zur Projektwurzel oder absolut
-#   kind: auto, python, go, node, rust, ruby, php, java, elixir, dockerfile,
-#         compose, devcontainer, helm, ci, tool-versions
-#   env:  lokal, dev, devcontainer, ci, deployment
-#   note: optionaler Anzeigetext
-#
-#   sources:
-#     - path: /srv/deploy/values-prod.yaml
-#       kind: helm
-#       env: deployment
-#       note: Produktionswerte aus dem Deployment-Repo
-sources: []
-
-# Bereiche, in denen die Standarderkennung nicht suchen soll — je ein Muster
-# relativ zur Projektwurzel, `*` für ein Segment, `**` für beliebig viele.
-# Gedacht für Testfixtures und Beispielprojekte: gepflegter Inhalt, dessen
-# Versionen nichts über dieses Projekt aussagen.
-#
-# Gesperrt ist damit nichts. Jeder Ausschluss steht mit der Zahl der
-# übergangenen Quellen im Inventar, und eine Quelle daraus kommt wieder hinein,
-# sobald sie unter `sources:` steht.
-#
-# Die Installation `k-playbook/` ist immer ausgenommen und gehört nicht hierher:
-# sie ist ein Clone des Werkzeugs und sagt nichts über dieses Projekt.
-#
-#   exclude:
-#     - tests/fixtures/**
-exclude: []
-
-# Versionen in Helm-values, die keine Image-Referenz sind — etwa ein Subchart,
-# das nur einen Tag entgegennimmt. Je Eintrag:
-#   path: values-Datei oder Glob; sie muss ohnehin als Helm-values gelesen werden
-#   key:  Punktpfad zum Wert, Listenindex in eckigen Klammern
-#   item: Gegenstand als container/<name>
-#
-# Der Abschnitt verlangt `schema_version: 2`; unter 1 wird er abgelehnt. Jeder
-# Eintrag, der keine Zeile ergibt, steht als Hinweis mit Grund im Inventar.
-#
-#   helm_values:
-#     - path: helm/values.yaml
-#       key: redis.standalone.tag
-#       item: container/redis
+---
+title: "Quellen des Versionsinventars"
+schema_version: 3
+sources:
+  - path: deploy/values-prod.yaml
+    kind: helm
+    env: deployment
+    note: Produktionswerte
+exclude:
+  # Fixture-Projekte der Sammler-Tests
+  - "**/testdata/**"
+helm_values:
+  - path: helm/values.yaml
+    key: redis.standalone.tag
+    item: container/redis
+---
 ```
 
 ### State in the Context Output
 
-`k-playbook context` exposes the state of this file under the `versionSources` key. The
-context output thereby answers the question completely, and no command needs to open
-`version-sources.yaml` itself, the same rule that already applies to `K-PLAYBOOK.yaml`.
+`k-playbook context` exposes the state of this document under the `versionSources` key. The
+context output thereby answers the question completely, and no command needs to read the
+document itself, the same rule that already applies to `K-PLAYBOOK.yaml`. The field is
+filled by `ContextForDir` (the subcommand, the MCP tool, the briefing), not by
+`BuildContext`, because it reads from the collection; tools that only need the catalog do
+not ask the node for it.
 
 ```json
 "versionSources": {
-  "path": "/pfad/zum/projekt/k-playbook-local/version-sources.yaml",
+  "ref": "keph:/k-playbook/inventory.md",
+  "state": "present",
   "present": true,
-  "schemaVersion": 1,
-  "roots": ["/srv/deploy"],
+  "schemaVersion": 3,
   "sources": [
     {
-      "path": "/srv/deploy/values-prod.yaml",
+      "path": "deploy/values-prod.yaml",
       "kind": "helm",
       "env": "deployment",
-      "note": "Production values from the deployment repository",
-      "optional": false
+      "note": "Production values"
     }
   ],
   "exclude": ["tests/fixtures/**"],
@@ -779,45 +758,52 @@ context output thereby answers the question completely, and no command needs to 
       "key": "redis.standalone.tag",
       "item": "container/redis"
     }
-  ],
-  "error": ""
+  ]
 }
 ```
 
 | Field | Always present | Meaning |
 |---|---|---|
-| `path` | yes | Absolute path of the file, including when it is absent, so it is clear where it belongs. |
-| `present` | yes | Whether the file exists. |
-| `schemaVersion` | no | The version declared by the file. Absent until something has been read. |
-| `roots` | no | The allowed roots, verbatim as in the file. The project root is **not** included because it is always allowed. |
-| `sources` | no | The configured additional sources, in file order. Each entry has `path`, `kind`, `env`, `note`, `optional`, the same names as the YAML keys. An entry with an unknown `kind` or `env` is **included**: the context output shows the file as it stands, and omitting it would represent it differently. It is rejected only during the collection run, visibly there. |
-| `exclude` | no | The patterns where default detection does not search, verbatim as in the file. The fixed installation rule is **not** included because it does not come from the file. An absolute pattern that is therefore rejected is likewise not included: unlike `sources`, a pattern is not an entry one can inspect, but a rule that either applies or does not. |
-| `helmValues` | no | The configured Helm values, in file order, each with `path`, `key`, and `item`. As with `sources`, an entry the collection run rejects is **included**, including every entry under `schema_version: 1`, where the section is not applied. |
-| `error` | no | Set when the file exists but is unreadable or has an unknown version. |
+| `ref` | yes | The document as a `keph:` reference, including when it is absent or not reachable, so it is clear where it belongs. |
+| `state` | yes | `present`, `missing`, `invalid`, or `unavailable` (below). |
+| `present` | yes | Whether the document exists. `false` under `unavailable`, which says nothing about the document. |
+| `schemaVersion` | no | The version declared by the document. Absent until something has been read. |
+| `sources` | no | The configured additional sources, in document order. Each entry has `path`, `kind`, `env`, `note`, `optional`, the same names as the YAML keys. An entry with an unknown `kind` or `env`, or an absolute `path`, is **included**: the context output shows the document as it stands, and omitting it would represent it differently. It is rejected only during the collection run, visibly there. |
+| `exclude` | no | The patterns where default detection does not search, verbatim as in the document. The fixed installation rule is **not** included because it does not come from the document. An absolute pattern that is therefore rejected is likewise not included: unlike `sources`, a pattern is not an entry one can inspect, but a rule that either applies or does not. |
+| `helmValues` | no | The configured Helm values, in document order, each with `path`, `key`, and `item`. As with `sources`, an entry the collection run rejects is **included**. |
+| `error` | no | Set under `invalid` and `unavailable`: the reason. |
 
-The field names are the file's YAML keys, in camelCase as everywhere else in the context
-output; only `schema_version` becomes `schemaVersion` and `helm_values` becomes
+The field names are the frontmatter's YAML keys, in camelCase as everywhere else in the
+context output; only `schema_version` becomes `schemaVersion` and `helm_values` becomes
 `helmValues`. There is no renaming and no second terminology.
 
-Three states, and no more:
+Four states, and no more:
 
-- **present and valid**: `present: true`, `error` empty. `roots`, `sources`, `exclude`,
-  and `helmValues` contain the content; empty lists mean "nothing configured", not "not
-  read".
-- **absent**: `present: false`, `error` empty, and `roots`, `sources`, `exclude`, and
-  `helmValues` empty. This is not an error: the default sources below the project root
-  apply.
-- **invalid**: `present: true`, `error` populated, and `roots`, `sources`, `exclude`, and
-  `helmValues` empty.
+- **`present`**: the document exists and is valid. `sources`, `exclude`, and `helmValues`
+  contain the content; empty lists mean "nothing configured", not "not read".
+- **`missing`**: the document does not exist. This is not an error: the default sources
+  below the project root apply.
+- **`invalid`**: the document exists but has no readable frontmatter, another
+  `schema_version`, or a `roots` key; `error` says which, with the line.
+- **`unavailable`**: Kephalaion is not reachable, so nothing is known about the document;
+  `error` carries the reason. There is no fallback to the legacy file on disk and none,
+  silently, to the default sources.
 
-The context invocation does **not** abort for an invalid file. It runs at the start of
-every command; an invalid additional configuration must not disable every command. The
-state nevertheless remains visible, which is what `error` is for. The inventory
-**collection run** does abort, as stated under "Error cases"; this is not a contradiction,
-but the distinction between reporting and collecting.
+The context invocation does **not** abort for an invalid or unreachable document. It runs
+at the start of every command; an invalid additional configuration must not disable every
+command. The state nevertheless remains visible, which is what `state` and `error` are for.
+The inventory **collection run** does abort, as stated under "Error cases"; this is not a
+contradiction, but the distinction between reporting and collecting.
 
-If the field is entirely absent, the installation is older than it. This is the only case
-in which a command cannot evaluate it.
+If the field is entirely absent, or carries `path` instead of `ref`, the installation is
+older than this contract. A command then points to `/k-upgrade` and does not open the old
+file instead.
+
+**Health check.** Area `versionSources`: an `invalid` document is an `error`; with a ready
+Kephalaion binding, a document that cannot be read is an `error` too; with a binding that is
+not ready, this area stays silent, because area `kephalaion` already carries the error and
+its remedy. A legacy `k-playbook-local/version-sources.yaml` is a `warning` pointing to
+`/k-upgrade`.
 
 ## The Inventory Document
 
@@ -836,8 +822,9 @@ binding (`kephalaion.ok` not `true`) there is **no inventory**: the subcommand a
 `k-playbook-local/docs/versions/` is a state from before the move, not the inventory; it
 is cleared by `/k-upgrade`, not by the generator.
 
-`k-playbook-local/version-sources.yaml` stays on disk, unchanged: it is the hand-maintained
-control of the collection, not its output.
+The source configuration `keph:/k-playbook/inventory.md` is the hand-maintained control of
+the collection run, not its output; the run reads it through the same store before it
+collects (`versionsources.Load`), and never writes it.
 
 ### Frontmatter
 
@@ -1058,19 +1045,21 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 
 | Case | Behavior |
 |---|---|
-| `version-sources.yaml` is absent | No error. The default sources below the project root apply; the context output reports the file as absent. |
-| `version-sources.yaml` is unreadable YAML | **Abort** before any collection, with file, line, and the parser message. Nothing is written. Partially interpreting an invalid configuration would mean applying a trust boundary other than the documented one. |
-| `schema_version` is absent or neither `1` nor `2` | **Abort**, as for `K-PLAYBOOK.yaml`. |
-| `helm_values` under `schema_version: 1` | The **section** is rejected once, with line and reason, and not applied; see "Schema version". The run continues. |
+| `keph:/k-playbook/inventory.md` is absent | No error. The default sources below the project root apply; the context output reports the state `missing`. |
+| The collection cannot be reached while reading the configuration | **Abort** before any collection; the context output reports `unavailable`. No fallback to disk, none to the default sources. |
+| The document has no frontmatter, or the frontmatter is unreadable YAML | **Abort** before any collection, with document, line, and the parser message. Nothing is written. Partially interpreting an invalid configuration would mean applying a trust boundary other than the documented one. |
+| `schema_version` is absent or not `3` | **Abort**, as for `K-PLAYBOOK.yaml`. |
+| The frontmatter carries `roots`, even empty | **Abort**, with the line. `roots` was removed with schema version 3; see "Allowed Root". |
+| `k-playbook-local/version-sources.yaml` still exists | Not read. Health check and subcommand report it as a legacy file with a pointer to `/k-upgrade`. |
 | Invalid entry in `helm_values` | The **entry** is rejected with line and reason; the run continues. |
 | Configured Helm value yields no row | Visible notice for the file with key, item, configuration line, and reason; see "Configured Helm values". |
-| A root in `roots:` is not absolute | **Abort**. A relative root would depend on the caller's working directory and mean something different in the web-server process than on the CLI path; partially interpreting a trust boundary stated this way would be worse than rejecting it. |
+| Absolute `path` in `sources:` or `helm_values:` | The **entry** is rejected with line and reason; the run continues. |
 | Unknown `env` label in an entry | The **entry** is rejected and listed under "Abgelehnte Quellen und Hinweise" (rejected sources and notices), with the found value and the five valid values. The run continues. |
 | Unknown `kind` in an entry | As for the label: entry rejected, visibly, run continues. |
 | Absolute or empty pattern in `exclude:` | The **pattern** is rejected and listed under "Abgelehnte Quellen und Hinweise" (rejected sources and notices), with line and reason. It then does not apply; the run continues. |
 | Configured source is missing from disk | Visible notice, unless the entry has `optional: true`. |
-| Path outside allowed roots | Visible rejection with requested and resolved path. The run continues. |
-| Symlink points outside every root | As above; the resolved target is reported, so it is clear what would actually have been read. |
+| Path outside the project root | Visible rejection with requested and resolved path. The run continues. |
+| Symlink points outside the project root | As above; the resolved target is reported, so it is clear what would actually have been read. |
 | Known source file is invalid | Visible notice with file and error; the source has the state `nicht auswertbar`. The remaining sources are collected. No invented entries, no partial result without marking. |
 | `package-lock.json` without `packages[""]` | Visible notice; the lockfile contributes no entries and has the state `nicht auswertbar`. |
 | Lockfile readable, associated manifest absent or unreadable | The lockfile contributes no entries and has the state `nicht auswertbar`. A visible notice states lockfile, expected manifest, and reason; transitive lockfile packages do not substitute for direct ones. |
@@ -1093,7 +1082,9 @@ This page is the contract for:
   `share/commands/`, text in `defaults/commands/` (Task 042, Stage 4; hull plus text and the
   collection as the only location since Task 100),
 - the store access `project.OpenInventoryStore` and the document name `inventory.DocName`
-  (Task 100),
+  (Task 100), the source configuration `versionsources.DocName` with its state in
+  `installer/internal/project/versionsources.go` and the shared include
+  `defaults/commands/_shared/inventory-config.md` (Task 144),
 - the inventory area of the interface and its API (Task 043),
 - the fixtures and tests of both tasks.
 

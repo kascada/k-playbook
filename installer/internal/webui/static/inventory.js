@@ -164,28 +164,39 @@ function renderStatus(status, displayPath) {
   addFact(elements.statusFacts, "Nicht auswertbare Quellen", String(status.sourcesUnevaluable ?? 0));
 }
 
-// Die Quellenkonfiguration: Ort, Zustand, Zahlen. Kein Formular.
+// Die Quellenkonfiguration: Ort, Zustand, Zahlen. Kein Formular. Sie liegt
+// als Dokument in der Collection des Projekts (keph:/k-playbook/inventory.md);
+// ist Kephalaion nicht erreichbar, ist das ein eigener Zustand, kein „fehlt“.
 function renderSources(sources) {
-  addFact(elements.sourcesFacts, "Datei", sources.displayPath || sources.path || "");
+  addFact(elements.sourcesFacts, "Dokument", sources.displayPath || sources.path || "");
+  const legacy = sources.legacy ? `\n${sources.legacy}` : "";
 
-  if (!sources.present) {
-    elements.sourcesPill.className = "pill muted";
-    elements.sourcesPill.textContent = "Fehlt";
+  if (sources.state === "unavailable") {
+    elements.sourcesPill.className = "pill error";
+    elements.sourcesPill.textContent = "Nicht erreichbar";
     elements.sourcesMessage.textContent =
-      "Kein Fehler: es gelten die Standardquellen unterhalb der Projektwurzel. Das Einrichten auf der Setup-Seite legt die leere Vorlage an.";
+      `${sources.error || "Kephalaion ist nicht erreichbar."}\nEine Erhebung bricht damit ab; es gibt keinen Rückfall auf die Platte.${legacy}`;
     return;
   }
 
   if (sources.error) {
     elements.sourcesPill.className = "pill error";
     elements.sourcesPill.textContent = "Defekt";
-    elements.sourcesMessage.textContent = `${sources.error}\nEine Erhebung bricht damit ab, bis die Datei repariert ist.`;
+    elements.sourcesMessage.textContent = `${sources.error}\nEine Erhebung bricht damit ab, bis das Dokument repariert ist.${legacy}`;
+    return;
+  }
+
+  if (!sources.present) {
+    elements.sourcesPill.className = "pill muted";
+    elements.sourcesPill.textContent = "Fehlt";
+    elements.sourcesMessage.textContent =
+      `Kein Fehler: es gelten die Standardquellen unterhalb der Projektwurzel. /k-doc-inventory legt das Dokument bei der ersten bestätigten Ergänzung an.${legacy}`;
     return;
   }
 
   elements.sourcesPill.className = "pill ok";
   elements.sourcesPill.textContent = "Vorhanden";
-  addFact(elements.sourcesFacts, "Zusätzliche Wurzeln", String(sources.roots ?? 0));
+  elements.sourcesMessage.textContent = sources.legacy || "";
   addFact(elements.sourcesFacts, "Zusätzliche Quellen", String(sources.sources ?? 0));
   addFact(elements.sourcesFacts, "Ausschlussmuster", String(sources.exclude ?? 0));
   addFact(elements.sourcesFacts, "Konfigurierte Helm-Werte", String(sources.helmValues ?? 0));

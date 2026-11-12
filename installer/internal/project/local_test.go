@@ -65,35 +65,11 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	if !fileExists(filepath.Join(local, InstructionsFileName)) {
 		t.Errorf("%s fehlt", InstructionsFileName)
 	}
-	if !fileExists(filepath.Join(local, VersionSourcesFileName)) {
-		t.Errorf("%s fehlt", VersionSourcesFileName)
-	}
-}
-
-// fileTemplate fällt ohne eigenen Zweig auf den neutralen default:-Zweig
-// zurück, der aus dem Zweck des Eintrags eine Markdown-Überschrift baut. Die
-// Quellenkonfiguration bekäme dann einen Markdown-Rumpf statt einer gültigen,
-// leeren Konfiguration — und ihr Leser bräche beim ersten Lauf ab.
-func TestCreateLocalLegtVersionsquellenAlsGueltigeKonfigurationAn(t *testing.T) {
-	root := t.TempDir()
-
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatalf("CreateLocal: %v", err)
-	}
-
-	path := filepath.Join(LocalDir(root), VersionSourcesFileName)
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("%s lesen: %v", VersionSourcesFileName, err)
-	}
-	text := string(content)
-	if strings.HasPrefix(text, "# "+VersionSourcesFileName) {
-		t.Fatalf("%s trägt den neutralen Rumpf des default:-Zweigs:\n%s", VersionSourcesFileName, text)
-	}
-	for _, want := range []string{"schema_version: 1", "roots: []", "sources: []", "version-inventory.md"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("%s enthält %q nicht:\n%s", VersionSourcesFileName, want, text)
-		}
+	// Die Quellenkonfiguration liegt seit Task 144 in der Collection
+	// (keph:/k-playbook/inventory.md); das Einrichten legt die alte Datei
+	// nicht mehr an.
+	if pathExists(filepath.Join(local, LegacyVersionSourcesFileName)) {
+		t.Errorf("%s angelegt", LegacyVersionSourcesFileName)
 	}
 }
 

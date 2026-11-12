@@ -1170,6 +1170,16 @@ and one line per entry `  [level] area: message — hint`. The subcommand `brief
 even with errors in `health` -- the briefing reports, it does not judge; the exit code belongs
 to `k-playbook health`.
 
+**Without Kephalaion** there is no briefing: its shipped texts and the project's own layer live in
+collections (tasks 131, 143), so it fails as a whole with `kephalaion_unavailable` (the
+subcommand with exit 1, the tool with that error code), and there is no section `health`. Since
+task 144 the message says so plainly, in three or four lines: `Kephalaion ist nicht erreichbar —
+ohne Kephalaion gibt es kein Briefing.`, `Grund:` with the sentence of the binding's state,
+`Abhilfe:` with the remedy the health check gives for that state, and `Nächster Schritt:
+k-playbook troubleshooting`. That subcommand is a placeholder until its own task: it says that
+it will check Kephalaion first and then search for the next error of the environment step by
+step, and exits 0. `k-playbook health` still names the error under `kephalaion`.
+
 **Head of the plain text** (2026-10-25). `k-playbook briefing` without `--json` starts with three
 lines before the text of the always-instructions: `Sitzung: <session>`, the request to read the
 output in full (`Lies diese Ausgabe ganz, nicht gekürzt: …`), and `Es gelten:` with the titles of
@@ -1237,9 +1247,9 @@ nothing** and writes nothing -- the source `github` included: a missing access f
 an entry, and only `k-playbook github init` creates it --, and it **does not stop at the first
 problem**. No entry ever carries a token or a value from a file;
 service names and key names may appear (`services.backend.access[1]: Der Pfad in file ist
-relativ.`), values never. The entry for an unreadable `version-sources.yaml` names the path,
-not the parser's message, which may quote a line of the file (that message stays in
-`context.versionSources.error`); the entry for an unreadable `github.yaml` names the line
+relativ.`), values never. The entry for an unreadable source configuration names the document
+`keph:/k-playbook/inventory.md`, not the parser's message, which may quote a line of it (that
+message stays in `context.versionSources.error`); the entry for an unreadable `github.yaml` names the line
 number, not the line.
 
 The answer is `{ok: true, tool, projectDir, health: {ok, problems}}`. The report is nested under
@@ -1256,7 +1266,9 @@ is always present, `[]` without a problem. The sources in this version:
 | `kephalaion` | the block `kephalaion:` in `.k-playbook/K-PLAYBOOK.yaml` carries an `account:` | `warning` | remove the line and commit; the account of this machine is set with `kephalaion node account default <hub> <account>` |
 | `kephalaion` | the old `k-playbook-local/K-PLAYBOOK.local.yaml` still holds a block `kephalaion:` (or is unreadable) | `warning` | run `/k-upgrade`: `k-playbook upgrade` moves hub and collection into the block, then `/k-upgrade` deletes the old file after confirmation |
 | `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
-| `versionSources` | `version-sources.yaml` is present, but unreadable or of an unknown schema version (`versionSources.error` set) | `error` | fix or remove the file; the details are in `context.versionSources.error` |
+| `versionSources` | the source configuration `keph:/k-playbook/inventory.md` is present, but unreadable, of an unknown schema version, or carries `roots` (`versionSources.state` `invalid`) | `error` | fix the frontmatter or remove the document; the details are in `context.versionSources.error` |
+| `versionSources` | the Kephalaion binding is ready, but the document cannot be read (`versionSources.state` `unavailable`); with a binding that is not ready this area stays silent, area `kephalaion` carries the error | `error` | check Kephalaion on this machine (`kephalaion status`, `kephalaion` in `k-playbook context`) |
+| `versionSources` | the old `k-playbook-local/version-sources.yaml` still exists; it is no longer read (task 144) | `warning` | run `/k-upgrade`: conversion 3.6 moves `exclude`, `sources`, and `helm_values` into `keph:/k-playbook/inventory.md` and deletes the old file after asking |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |
 | `github` | the file reads, but a service has no `available` access -- every access is `unavailable` or `disabled`, judged without the network (`github-access.md`, "Availability"): `services.<name>: kein verfügbarer Zugang — <reason of the first access that is not disabled>` | `warning` | set up an access of that service in the file; `k-playbook github check` names the reason per access |
 | `share` | `K_PLAYBOOK_SHARE_DIR` is set but not an absolute path | `warning` | set it to an absolute path or remove it; until then the shipped commands and skills are missing |

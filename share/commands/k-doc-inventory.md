@@ -1,7 +1,7 @@
 ---
 description: Erhebt das Versionsinventar des Projekts aus seinen deklarativen Quellen und schreibt es in die Collection des Projekts nach keph:/docs/generated/versions/inventory.md. Dünne Hülle über dem Text k-playbook:/commands/k-doc-inventory.md, der dafür das Subkommando k-playbook inventory anstößt.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Bash, Read, Edit, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__kephalaion__read]
+allowed-tools: [Bash, Read, Edit, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__kephalaion__read, mcp__kephalaion__create, mcp__kephalaion__write]
 ---
 
 # k-doc-inventory

@@ -2,14 +2,13 @@ package project
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Ohne bereite Anbindung öffnet OpenInventoryStore keinen Store: der Fehler
@@ -44,7 +43,7 @@ func TestRunInventorySchreibtReadmeNachDemInventar(t *testing.T) {
 
 	root := t.TempDir()
 	store := kephtest.New()
-	options := inventory.Options{ProjectDir: root, SourcesFile: filepath.Join(LocalDir(root), VersionSourcesFileName)}
+	options := inventory.Options{ProjectDir: root}
 	_, outcome, readme, err := RunInventory(context.Background(), root, store, options)
 	if err != nil || !outcome.Written {
 		t.Fatalf("Inventar: %+v, %v", outcome, err)
@@ -56,12 +55,7 @@ func TestRunInventorySchreibtReadmeNachDemInventar(t *testing.T) {
 		t.Errorf("README: %q", content)
 	}
 
-	if err := os.MkdirAll(LocalDir(root), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(options.SourcesFile, []byte("schema_version: 99\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	store.Put(versionsources.DocName, "---\nschema_version: 99\n---\n")
 	calls := len(store.Calls)
 	_, _, readme, err = RunInventory(context.Background(), root, store, options)
 	if err == nil || readme != nil {

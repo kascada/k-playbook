@@ -86,9 +86,14 @@ k-playbook-local/
 ├── results/       everything reviews generate; see below
 ├── guidelines/
 ├── priv/          private notes; see below
-├── k-playbook.md  project-owned instruction layer
-└── version-sources.yaml   version sources for the version inventory, maintained manually
+└── k-playbook.md  project-owned instruction layer
 ```
+
+The source configuration of the version inventory is not created on disk any more: since
+task 144 it is the document `keph:/k-playbook/inventory.md` in the project collection,
+created by `/k-doc-inventory` on the first confirmed addition; a
+`k-playbook-local/version-sources.yaml` from before is no longer read, and `/k-upgrade`
+(conversion 3.6) moves it.
 
 Since task 107, setup no longer creates `docs/`, `tasks/`, `tasks/done/`, `data/` and `material/`, and the setup page does not count them as missing: tasks, todos and the project documentation live in the project collection (`keph:/user/<user>/tasks/`, `todos/`, `keph:/docs/`). Since task 129 the same holds for `commands/` and `skills/`: project-owned commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/`, versioned next to the configuration. Setup does not create these two either; they appear when the project puts something there. The former place under `k-playbook-local/` is no longer read; `/k-upgrade` 3.4 names every entry left there with its target and moves only when asked. In an existing project, `/k-upgrade` (conversion 3.4) deletes each of them that holds nothing but `README.md` files and the managed `.gitignore` (directly under `data/` also the renamed leftovers `todos.json.migriert` and `todos.json.nachzuegler-<date>[-<n>]`; a `data/todos.json` not yet taken over keeps it), without asking (task 117); anything else keeps the directory and is only named. The former knowledge directories on disk, with their search index, are gone since task 123; in an existing project `/k-upgrade` (conversion 3.0) clears what is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for deletion.
 

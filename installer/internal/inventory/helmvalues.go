@@ -10,7 +10,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/yamllite"
 )
 
-// Konfigurierte Helm-Werte (`helm_values:` in version-sources.yaml).
+// Konfigurierte Helm-Werte (`helm_values:` in der Quellenkonfiguration,
+// versionsources.DocRef).
 //
 // Ein solcher Eintrag macht eine Datei nicht zur Quelle: er wird angewandt,
 // wenn die Datei ohnehin als Helm-values gelesen wird, und bekommt deren
@@ -21,7 +22,7 @@ import (
 // configuredValueNote steht an jeder Zeile aus einem konfigurierten Helm-Wert.
 // Ohne sie wäre nicht zu erkennen, warum ausgerechnet dieser `tag:` im Inventar
 // steht, obwohl andere Schlüssel nicht geraten werden.
-const configuredValueNote = "konfiguriert in version-sources.yaml"
+const configuredValueNote = "konfiguriert in " + versionsources.DocRef
 
 // valueTarget ist ein konfigurierter Helm-Wert, bezogen auf genau eine Datei.
 // Ein Glob ergibt mehrere davon, damit jede getroffene Datei ihren eigenen
@@ -40,12 +41,12 @@ type valueTarget struct {
 
 // valueNote formuliert den Hinweis zu einem Eintrag, der keine Zeile ergibt.
 func valueNote(rule versionsources.HelmValue, reason string) string {
-	return fmt.Sprintf("konfigurierter Helm-Wert %s → %s (version-sources.yaml, Zeile %d) nicht angewandt: %s",
-		rule.Key, rule.Item, rule.Line, reason)
+	return fmt.Sprintf("konfigurierter Helm-Wert %s → %s (%s, Zeile %d) nicht angewandt: %s",
+		rule.Key, rule.Item, versionsources.DocRef, rule.Line, reason)
 }
 
 // planHelmValues löst die Pfade der gültigen Einträge über die
-// Vertrauensgrenze auf. Was schon hier scheitert — außerhalb der Wurzeln, kein
+// Vertrauensgrenze auf. Was schon hier scheitert — außerhalb der Projektwurzel, kein
 // Treffer —, wird sofort zum Hinweis.
 func planHelmValues(boundary *Boundary, rules []versionsources.HelmValue) (map[string][]*valueTarget, []*valueTarget, []Note) {
 	byFile := map[string][]*valueTarget{}

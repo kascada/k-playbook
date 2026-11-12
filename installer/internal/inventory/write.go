@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Outcome sagt, was ein Lauf mit dem Inventar gemacht hat.
@@ -95,6 +96,11 @@ func Write(ctx context.Context, store Store, options Options, result Result) (Ou
 // Run erhebt und schreibt in einem Zug. Das ist der Weg, den jeder Einstieg
 // nimmt; die Vertrauensgrenze liegt dahinter und nicht beim Aufrufer.
 func Run(ctx context.Context, store Store, options Options) (Result, Outcome, error) {
+	config, err := versionsources.Load(ctx, store)
+	if err != nil {
+		return Result{}, Outcome{Path: DocRef}, err
+	}
+	options.Config = config
 	result, err := Collect(options)
 	if err != nil {
 		return Result{}, Outcome{Path: DocRef}, err

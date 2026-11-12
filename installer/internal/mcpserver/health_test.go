@@ -64,8 +64,9 @@ func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 		t.Errorf("error steht in einer guten Antwort: %v", fields)
 	}
 
-	// Ein zweiter Fehler kommt dazu; der Umschlag bleibt ok.
-	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
+	// Ein zweiter Eintrag kommt dazu — die alte Quellenkonfiguration unter
+	// k-playbook-local/ ist Altbestand (Task 144); der Umschlag bleibt ok.
+	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

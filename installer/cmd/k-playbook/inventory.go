@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/project"
@@ -16,7 +15,11 @@ import (
 //
 // Wie scan und merge sammelt das Kommando nur zusammen, was der Lauf braucht —
 // Projektwurzel, Quellenkonfiguration und den Zugang zur Collection — und
-// reicht es an internal/inventory weiter. Die Fachlogik steht dort, allen voran
+// reicht es an internal/inventory weiter. Die Quellenkonfiguration liest
+// inventory.Run über denselben Zugang aus versionsources.DocRef
+// (keph:/k-playbook/inventory.md); ist das Dokument defekt oder Kephalaion
+// nicht erreichbar, bricht der Lauf ab, ohne auf die Platte oder still auf
+// die Standardquellen zurückzufallen. Die Fachlogik steht dort, allen voran
 // die Vertrauensgrenze: sie ist einmal definiert und gilt für jeden Aufrufweg
 // gleich, das Kommando öffnet keine Quelle an ihr vorbei.
 //
@@ -48,10 +51,13 @@ func runInventory(args []string) error {
 	if err != nil {
 		return docError(err)
 	}
-	localDir := project.LocalDir(environment.ProjectDir)
-	options := inventory.Options{
-		ProjectDir:  environment.ProjectDir,
-		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
+	options := inventory.Options{ProjectDir: environment.ProjectDir}
+
+	// Liegt die alte Datei noch, steht das vor allem anderen — auch vor einem
+	// Abbruch: Sie gilt nicht mehr, und wer ihre Einstellungen vermisst,
+	// findet hier den Grund.
+	if message := project.LegacyVersionSourcesMessage(environment.ProjectDir); message != "" {
+		fmt.Fprintf(os.Stdout, "Altbestand: %s\n\n", message)
 	}
 
 	result, outcome, readme, err := project.RunInventory(context.Background(), environment.ProjectDir, store, options)

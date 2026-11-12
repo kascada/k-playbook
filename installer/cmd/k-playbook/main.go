@@ -154,6 +154,10 @@ func run(args []string) error {
 		// gefragt wurde, und nichts daneben — und sie läuft später aus
 		// Hooks, deren Ausgabe niemand liest.
 		return runNotify(os.Stdout, args[1:])
+	case "troubleshooting":
+		// Ohne Wirt-Pflege wie health: der Befehl soll gerade bei einer
+		// kaputten Umgebung laufen und nichts daneben anfassen.
+		return runTroubleshooting(os.Stdout, args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -258,11 +262,12 @@ Unterkommandos:
             keph:/docs/generated/versions/inventory.md: k-playbook inventory,
             ohne weitere Argumente. Gelesen werden nur deklarative Quellen —
             Manifeste, Lockfiles, Container-, DevContainer-, Helm- und
-            CI-Dateien —, dazu die in k-playbook-local/version-sources.yaml
-            konfigurierten. Ein Lauf ohne inhaltliche Änderung lässt das
-            Dokument unangetastet. Ohne bereite Kephalaion-Anbindung bricht
-            der Lauf ab (kephalaion_unavailable); einen Rückfall auf die
-            Platte gibt es nicht. Vertrag: k-playbook/docs/version-inventory.md.
+            CI-Dateien —, nur unterhalb der Projektwurzel, dazu die im
+            Frontmatter von keph:/k-playbook/inventory.md konfigurierten.
+            Ein Lauf ohne inhaltliche Änderung lässt das Dokument
+            unangetastet. Ohne bereite Kephalaion-Anbindung bricht der Lauf
+            ab (kephalaion_unavailable); einen Rückfall auf die Platte gibt
+            es nicht. Vertrag: k-playbook/docs/version-inventory.md.
   todo      Verwaltet die Todos des Projekts in der Projekt-Collection
             (todos/): k-playbook todo list|add|update|delete|import. Die
             Ausgabe ist JSON auf stdout. Ohne Unterbefehl
@@ -299,6 +304,13 @@ Unterkommandos:
             Exit-Code 0 ohne Fehler (Warnungen zählen nicht), 1 mit
             Fehler, 2 bei Aufruffehlern. Dasselbe wie das MCP-Werkzeug
             k_playbook_health.
+  troubleshooting
+            Hilfe bei Fehlern der Umgebung: k-playbook troubleshooting.
+            Soll zuerst prüfen, ob Kephalaion erreichbar ist, und dann
+            Schritt für Schritt den nächsten Fehler suchen. Noch nicht
+            umgesetzt: gibt nur aus, was der Befehl werden soll, und endet
+            mit 0. Das Briefing nennt ihn, wenn Kephalaion nicht erreichbar
+            ist.
   github    Legt an, liest, prüft und testet die persönliche GitHub-
             Zugangsdatei ~/.config/k-playbook/github.yaml: k-playbook github
             init|check|show|test [<dienst>] [--json]. init legt die Vorlage

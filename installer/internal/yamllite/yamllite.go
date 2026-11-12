@@ -605,3 +605,22 @@ func unquote(value string) string {
 	}
 	return value
 }
+
+// Frontmatter schneidet den YAML-Block zwischen den beiden `---`-Zeilen am
+// Anfang eines Markdown-Dokuments heraus. Ohne Frontmatter ist das zweite
+// Ergebnis false. Die erste Zeile des Blocks ist Zeile 2 des Dokuments; wer
+// Zeilen des Blocks meldet, zählt eine dazu. Das Inventar (FrontmatterBlock)
+// und die Quellenkonfiguration (versionsources) schneiden hier, damit
+// Frontmatter an genau einer Stelle erkannt wird.
+func Frontmatter(data []byte) (string, bool) {
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return "", false
+	}
+	for index := 1; index < len(lines); index++ {
+		if strings.TrimSpace(lines[index]) == "---" {
+			return strings.Join(lines[1:index], "\n"), true
+		}
+	}
+	return "", false
+}

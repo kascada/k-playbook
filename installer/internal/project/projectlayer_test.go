@@ -9,6 +9,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // projectLayerStore baut die Collection eines Projekts im Speicher: die
@@ -133,6 +134,48 @@ func TestProjectLayerBautAlwaysZusammen(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result.Parts, want) {
 		t.Errorf("Teile:\n%+v\nerwartet\n%+v", result.Parts, want)
+	}
+}
+
+// Die Quellenkonfiguration des Versionsinventars liegt an der Wurzel von
+// keph:/k-playbook/ (versionsources.DocName, Task 144), neben den Sorten,
+// aber in keiner: Die Überlagerung greift sie weder als Sorte noch als Datei
+// der projekteigenen Ebene auf.
+func TestProjectLayerGreiftInventoryMdNichtAuf(t *testing.T) {
+	dist := defaultsStore(map[string]string{
+		"instructions/always/010-a.md":     "## A\n",
+		"instructions/on-demand/muster.md": "Muster.\n",
+		"reviews/review-code.md":           "# Code\n",
+	})
+	project := projectLayerStore(map[string]string{
+		"inventory.md": "---\nschema_version: 3\nexclude:\n  - \"**/testdata/**\"\n---\n\nQuellen.\n",
+	})
+	if _, ok := project.Content(versionsources.DocName); !ok {
+		t.Fatalf("Testaufbau: %s fehlt im Store: %v", versionsources.DocName, project.Names())
+	}
+	layers, root := projectLayers(t, dist, project)
+
+	always, err := ResolveDocRef(layers, "k-playbook:/instructions/always/")
+	if err != nil || always.Content != "## A\n" || len(always.Parts) != 1 {
+		t.Errorf("always/: %+v, %v", always, err)
+	}
+	if _, err := ResolveDocRef(layers, "k-playbook:/inventory.md"); err == nil {
+		t.Error("k-playbook:/inventory.md darf nicht aufgelöst werden — es ist keine Sorte und kein Teil der Ebene")
+	}
+	for _, kind := range catalogKinds() {
+		entries, err := resolveCatalog(root, layers, kind)
+		if err != nil {
+			t.Errorf("Katalog %s: %v", kind.name, err)
+			continue
+		}
+		for _, entry := range entries {
+			if strings.Contains(entry.Name, "inventory") || strings.Contains(entry.Path, "inventory") {
+				t.Errorf("Katalog %s greift inventory.md auf: %+v", kind.name, entry)
+			}
+		}
+	}
+	if isProjectLayerKind("inventory.md") || isProjectLayerKind("/inventory.md") {
+		t.Error("inventory.md ist keine Sorte der projekteigenen Ebene")
 	}
 }
 

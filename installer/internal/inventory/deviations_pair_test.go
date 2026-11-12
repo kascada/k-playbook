@@ -250,7 +250,7 @@ func TestPaarNurImSelbenKontext(t *testing.T) {
 	result := collectFiles(t, map[string]string{
 		"package.json":      `{"dependencies":{"alpinejs":"^3.17.1"}}`,
 		"package-lock.json": lockJSON("dependencies", map[string]string{"alpinejs": "3.17.1"}),
-		"version-sources.yaml": "schema_version: 1\nsources:\n" +
+		configKey: "schema_version: 3\nsources:\n" +
 			"  - path: package-lock.json\n    kind: node\n    env: ci\n",
 	})
 	requireDeviation(t, result, "node/alpinejs", DeviationEnvironmental, 2)

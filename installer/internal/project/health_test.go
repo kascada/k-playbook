@@ -13,6 +13,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // healthProject legt ein Projekt an, dessen Umgebung in Ordnung ist: Matrix der Basis-Werkzeuge mit einem Werkzeug, das da ist,
@@ -24,7 +25,7 @@ func healthProject(t *testing.T) string {
 	scriptDir := filepath.Join(shipped(t), "scripts")
 	mkdirAll(t, scriptDir)
 	write(t, filepath.Join(scriptDir, "base-tools.tsv"), baseMatrixHeader+"k-da\t-\tIst da\tja\tapt\tpaket\t-\t-\t-\n")
-	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), "schema_version: 1\nroots: []\nsources: []\n")
+	write(t, filepath.Join(root, testCollectionDir, versionsources.DocName), "---\nschema_version: 3\nsources: []\n---\n")
 	t.Setenv("PATH", fakeBinDir(t, filepath.Join(t.TempDir(), "aufrufe"), "k-da"))
 	t.Setenv("GH_CONFIG_DIR", t.TempDir())
 	t.Setenv("GH_TOKEN", "")
@@ -218,36 +219,91 @@ func TestHealthBaseToolsJeFehlendemEineWarnung(t *testing.T) {
 	}
 }
 
-// Die Quellenkonfiguration ist der Testfall der Messung: eine Datei, die da,
-// aber nicht lesbar ist. Der Satz nennt den Pfad, nicht den Inhalt der
-// Datei.
+// Ein Dokument, das da, aber nicht lesbar ist, ist ein Fehler. Der Satz
+// nennt den Ort, nicht den Inhalt des Dokuments.
 func TestHealthVersionSourcesUnlesbarIstFehler(t *testing.T) {
 	root := healthProject(t)
-	path := filepath.Join(LocalDir(root), VersionSourcesFileName)
-	write(t, path, ": ungültig\n")
+	path := filepath.Join(root, testCollectionDir, versionsources.DocName)
+	write(t, path, "---\n: ungültig\n---\n")
 
 	problems := healthVersionSources(context.Background(), root)
 	if len(problems) != 1 {
 		t.Fatalf("Problems = %+v", problems)
 	}
 	got := problems[0]
-	if got.Level != health.LevelError || got.Area != health.AreaVersionSources || !strings.Contains(got.Message, path) || got.Hint == "" {
+	if got.Level != health.LevelError || got.Area != health.AreaVersionSources ||
+		!strings.Contains(got.Message, versionsources.DocRef) || got.Hint == "" {
 		t.Errorf("Eintrag: %+v", got)
 	}
 	if strings.Contains(got.Message, "ungültig") || strings.Contains(got.Hint, "ungültig") {
-		t.Errorf("Eintrag zitiert die Datei: %+v", got)
+		t.Errorf("Eintrag zitiert das Dokument: %+v", got)
 	}
 	report := health.Check(context.Background(), root)
 	if report.OK || len(report.Problems) != 1 {
 		t.Errorf("Report: %+v", report)
 	}
 
-	// Fehlt die Datei, gelten die Standardquellen: kein Problem.
+	// roots ist ebenso ein Fehler, auch leer.
+	write(t, path, "---\nschema_version: 3\nroots: []\n---\n")
+	if problems = healthVersionSources(context.Background(), root); len(problems) != 1 || problems[0].Level != health.LevelError {
+		t.Errorf("mit roots: %+v", problems)
+	}
+
+	// Fehlt das Dokument, gelten die Standardquellen: kein Problem.
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
 	if problems = healthVersionSources(context.Background(), root); len(problems) != 0 {
-		t.Errorf("ohne Datei: %+v", problems)
+		t.Errorf("ohne Dokument: %+v", problems)
+	}
+}
+
+// Ist Kephalaion bereit, das Dokument aber nicht lesbar, ist das ein Fehler
+// im Bereich versionSources; ist Kephalaion nicht bereit, schweigt die
+// Quelle — den Fehler trägt der Bereich kephalaion.
+func TestHealthVersionSourcesNichtErreichbar(t *testing.T) {
+	root := healthProject(t)
+	original := OpenVersionSourcesReader
+	t.Cleanup(func() { OpenVersionSourcesReader = original })
+	store := kephtest.New()
+	store.Fail["read"] = os.ErrDeadlineExceeded
+	OpenVersionSourcesReader = func(string, kephalaion.Status) (versionsources.Reader, error) { return store, nil }
+
+	problems := healthVersionSources(context.Background(), root)
+	if len(problems) != 1 || problems[0].Level != health.LevelError || !strings.Contains(problems[0].Message, "nicht erreichbar") {
+		t.Fatalf("Problems = %+v", problems)
+	}
+
+	OpenVersionSourcesReader = original
+	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNodeUnreachable, Message: "Node antwortet nicht."})
+	if problems := healthVersionSources(context.Background(), root); len(problems) != 0 {
+		t.Errorf("Kephalaion nicht bereit: der Bereich kephalaion trägt den Fehler, nicht versionSources: %+v", problems)
+	}
+	report := health.Check(context.Background(), root)
+	if report.OK || len(report.Problems) != 1 || report.Problems[0].Area != health.AreaKephalaion ||
+		report.Problems[0].Level != health.LevelError {
+		t.Errorf("Report: %+v", report)
+	}
+}
+
+// Die alte Datei unter k-playbook-local/ ist Altbestand: eine Warnung mit
+// dem Hinweis auf /k-upgrade, gelesen wird sie nicht — auch eine unlesbare
+// macht keinen Fehler.
+func TestHealthVersionSourcesAltbestandIstWarnung(t *testing.T) {
+	root := healthProject(t)
+	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), ": ungültig\n")
+
+	problems := healthVersionSources(context.Background(), root)
+	if len(problems) != 1 {
+		t.Fatalf("Problems = %+v", problems)
+	}
+	got := problems[0]
+	if got.Level != health.LevelWarning || !strings.Contains(got.Message, LegacyVersionSourcesDisplay) ||
+		!strings.Contains(got.Message, versionsources.DocRef) || !strings.Contains(got.Hint, "/k-upgrade") {
+		t.Errorf("Eintrag: %+v", got)
+	}
+	if report := health.Check(context.Background(), root); !report.OK {
+		t.Errorf("eine Warnung lässt OK wahr: %+v", report)
 	}
 }
 
@@ -256,7 +312,7 @@ func TestHealthCheckSammeltAlleQuellen(t *testing.T) {
 	root := healthProject(t)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
 	write(t, filepath.Join(shipped(t), "scripts", "base-tools.tsv"), baseMatrixHeader+"k-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n")
-	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), ": ungültig\n")
+	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), ": ungültig\n")
 
 	report := health.Check(context.Background(), root)
 	if report.OK {

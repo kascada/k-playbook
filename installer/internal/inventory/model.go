@@ -157,7 +157,7 @@ type SourceRead struct {
 	Entries int    `json:"entries"`
 	// Configured sagt, ob die Quelle aus der Quellenkonfiguration stammt.
 	Configured bool `json:"configured,omitempty"`
-	// Note ist der Anzeigetext aus version-sources.yaml; er gehört nur in die
+	// Note ist der Anzeigetext aus der Quellenkonfiguration; er gehört nur in die
 	// Quellenliste der Inventardatei.
 	Note string `json:"note,omitempty"`
 	// Unevaluable ist der Zustand „nicht auswertbar": die Quelle wurde gelesen,

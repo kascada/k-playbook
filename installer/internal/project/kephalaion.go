@@ -46,3 +46,21 @@ func ProjectBinding(projectDir string) (kephalaion.Binding, error) {
 	}
 	return config.Kephalaion.Binding(), nil
 }
+
+// KephalaionNotReadyError ist der Fehler eines Zugangs, der an einer nicht
+// bereiten Anbindung scheitert. Er trägt den Status, damit ein Aufrufer —
+// etwa das Briefing — den Grund aus der Meldung von Kephalaion nennen kann,
+// ohne den Node ein zweites Mal zu fragen. Umhüllt ist er immer von einem
+// DocRefError mit DocCodeKephalaionUnavailable.
+type KephalaionNotReadyError struct {
+	Status kephalaion.Status
+}
+
+func (e *KephalaionNotReadyError) Error() string {
+	return fmt.Sprintf("Kephalaion ist für dieses Projekt nicht bereit (%s): %s", e.Status.State, e.Status.Message)
+}
+
+// TroubleshootingCommand ist der Befehl, den Meldungen zu einer kaputten
+// Umgebung als nächsten Schritt nennen. Bis zu seinem eigenen Task ist er ein
+// Platzhalter, der sagt, was er werden soll.
+const TroubleshootingCommand = InstalledCommandName + " troubleshooting"

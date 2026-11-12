@@ -163,7 +163,7 @@ func (s *kephCollectionSource) index() error {
 	s.address = address
 	if err != nil {
 		return docRefErrorf(DocCodeKephalaionUnavailable,
-			"die mitgelieferten Texte hinter k-playbook: liegen in %s/%s/ und sind ohne Kephalaion nicht erreichbar: %v — "+
+			"die mitgelieferten Texte hinter k-playbook: liegen in %s/%s/ und sind ohne Kephalaion nicht erreichbar: %w — "+
 				"Abhilfe: Kephalaion einrichten über /k-gui (k-playbook gui, Abschnitt Kephalaion)",
 			address, defaultsDirName, err)
 	}

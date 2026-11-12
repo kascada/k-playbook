@@ -11,6 +11,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Der Subkommando-Weg über die Fixture des Sammlers: runInventory sammelt nur
@@ -75,11 +76,7 @@ func putVersionsTemplate(t *testing.T, root string) {
 }
 
 func fixtureOptions(root string) inventory.Options {
-	localDir := project.LocalDir(root)
-	return inventory.Options{
-		ProjectDir:  root,
-		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
-	}
+	return inventory.Options{ProjectDir: root}
 }
 
 func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
@@ -130,30 +127,29 @@ func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
 // Ausgabe von runInventory gegen Pfad und Grund als Literale — nicht gegen die
 // Funktion, die den Bericht selbst formatiert.
 func TestSubkommandoNenntAbgelehntePfadeWieDieFachlogik(t *testing.T) {
-	root, _ := fixtureProject(t, "dreikontexte")
+	root, store := fixtureProject(t, "dreikontexte")
 	outside := t.TempDir()
 	if resolved, err := filepath.EvalSymlinks(outside); err == nil {
 		outside = resolved
 	}
-	foreign := filepath.Join(outside, "values.yaml")
-	if err := os.WriteFile(foreign, []byte("image: nginx:1.27\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outside, "values.yaml"), []byte("image: nginx:1.27\n"), 0o644); err != nil {
 		t.Fatalf("schreiben: %v", err)
 	}
-	options := fixtureOptions(root)
-	if err := os.MkdirAll(filepath.Dir(options.SourcesFile), 0o755); err != nil {
-		t.Fatalf("anlegen: %v", err)
+	// Die Konfiguration liegt in der Collection; relativ über .. hinaus ist
+	// außerhalb der Projektwurzel, der einzigen Grenze.
+	foreign, err := filepath.Rel(root, filepath.Join(outside, "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := os.WriteFile(options.SourcesFile,
-		[]byte("schema_version: 1\nsources:\n  - path: "+foreign+"\n    kind: helm\n    env: deployment\n"), 0o644); err != nil {
-		t.Fatalf("schreiben: %v", err)
-	}
+	store.Put(versionsources.DocName,
+		"---\nschema_version: 3\nsources:\n  - path: "+foreign+"\n    kind: helm\n    env: deployment\n---\n")
 
 	out := captureStdout(t, func() {
 		if err := runInventory(nil); err != nil {
 			t.Fatalf("runInventory: %v", err)
 		}
 	})
-	if !strings.Contains(out, foreign+": liegt außerhalb der erlaubten Wurzeln (") {
+	if !strings.Contains(out, ": liegt außerhalb der Projektwurzel (") || !strings.Contains(out, foreign+" → ") {
 		t.Errorf("der Bericht nennt Pfad und Grund der Ablehnung nicht:\n%s", out)
 	}
 	if !strings.Contains(out, "Abgelehnte Quellen:           1") {
@@ -230,5 +226,34 @@ func TestSubkommandoOhneVorlageSchreibtDasInventar(t *testing.T) {
 	}
 	if _, ok := store.Content("docs/generated/versions/README.md"); ok {
 		t.Error("README trotz fehlender Vorlage angelegt")
+	}
+}
+
+// Liegt die alte Datei unter k-playbook-local/ noch, nennt das Subkommando
+// sie als Altbestand mit dem Hinweis auf /k-upgrade — gelesen wird sie
+// nicht: Ihr Ausschluss wirkt nicht, der aus der Collection schon.
+func TestSubkommandoMeldetAltbestandUndLiestIhnNicht(t *testing.T) {
+	root, store := fixtureProject(t, "vollstaendig")
+	legacy := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("schema_version: 1\nexclude:\n  - \"**/*\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := runInventory(nil); err != nil {
+			t.Fatalf("runInventory: %v", err)
+		}
+	})
+	if !strings.HasPrefix(out, "Altbestand: "+project.LegacyVersionSourcesDisplay+" liegt noch") || !strings.Contains(out, "/k-upgrade") {
+		t.Errorf("der Bericht nennt den Altbestand nicht vorn:\n%s", out)
+	}
+	if strings.Contains(out, "**/*") || strings.Contains(out, "Ausgewertete Quellen:         0\n") {
+		t.Errorf("der Ausschluss der alten Datei wirkt — sie wurde gelesen:\n%s", out)
+	}
+	if _, ok := store.Content(inventory.DocName); !ok {
+		t.Errorf("das Inventar wurde nicht geschrieben: %v", store.Names())
 	}
 }

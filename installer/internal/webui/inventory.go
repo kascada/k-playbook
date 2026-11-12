@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"path/filepath"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
@@ -30,31 +29,40 @@ import (
 // bereite Anbindung zeigt die Oberfläche einen sichtbaren Zustand
 // (kephalaion_unavailable) und fällt nicht auf die Platte zurück.
 //
-// Die Quellenkonfiguration wird nur angezeigt, nicht gepflegt. Die
-// Schreibregel des Vertrags verlangt ausdrückliche Bestätigung und rein
-// ergänzendes Schreiben unter Erhalt von Kommentaren und Reihenfolge; eine
-// Eingabemaske bräuchte dafür eigene Validierung und einen zweiten Schreibpfad
-// neben dem Command. Es gibt deshalb keinen Endpunkt, der in
-// version-sources.yaml schreibt.
+// Die Quellenkonfiguration (keph:/k-playbook/inventory.md) wird nur
+// angezeigt, nicht gepflegt. Die Schreibregel des Vertrags verlangt
+// ausdrückliche Bestätigung und rein ergänzendes Schreiben unter Erhalt von
+// Kommentaren und Reihenfolge; eine Eingabemaske bräuchte dafür eigene
+// Validierung und einen zweiten Schreibpfad neben dem Command. Es gibt
+// deshalb keinen Endpunkt, der in die Quellenkonfiguration schreibt;
+// geschrieben wird allein von /k-doc-inventory.
 
 // inventorySourcesState ist die Quellenkonfiguration, wie die Oberfläche sie
-// zeigt: wo sie liegt, ob sie da ist, und was sie enthält — als Zahlen, nicht
-// als Formular. Gelesen wird sie mit demselben Leser wie im Sammler und in
-// `k-playbook context`.
+// zeigt: wo sie liegt, in welchem Zustand sie ist, und was sie enthält — als
+// Zahlen, nicht als Formular. Gelesen wird sie mit demselben Leser wie im
+// Sammler und in `k-playbook context` (versionsources.Load,
+// project.VersionSourcesFrom).
 type inventorySourcesState struct {
+	// Path und DisplayPath sind der keph:-Verweis des Dokuments.
 	Path        string `json:"path"`
 	DisplayPath string `json:"displayPath"`
-	Present     bool   `json:"present"`
-	Roots       int    `json:"roots"`
-	Sources     int    `json:"sources"`
-	Exclude     int    `json:"exclude"`
+	// State ist present, missing, invalid oder unavailable, wie
+	// versionSources.state in der Kontextausgabe.
+	State   string `json:"state"`
+	Present bool   `json:"present"`
+	Sources int    `json:"sources"`
+	Exclude int    `json:"exclude"`
 	// HelmValues ist die Zahl der Einträge unter helm_values, abgelehnte
 	// eingeschlossen — wie Sources.
 	HelmValues int `json:"helmValues"`
-	// Error ist gesetzt, wenn die Datei da, aber nicht lesbar oder von
-	// unbekannter Fassung ist. Der Erhebungslauf bricht dann ab; die Anzeige
-	// nennt den Grund.
+	// Error ist gesetzt, wenn das Dokument da, aber nicht lesbar oder von
+	// unbekannter Fassung ist, oder wenn Kephalaion nicht erreichbar ist. Der
+	// Erhebungslauf bricht dann ab; die Anzeige nennt den Grund.
 	Error string `json:"error,omitempty"`
+	// Legacy nennt die alte Datei unter k-playbook-local/, wenn sie noch
+	// liegt — Altbestand, der nicht mehr gelesen wird, mit dem Hinweis auf
+	// /k-upgrade.
+	Legacy string `json:"legacy,omitempty"`
 }
 
 // inventoryResponse ist der Stand des Inventars: Status aus dem Frontmatter
@@ -129,67 +137,53 @@ type inventoryFileResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
-// inventoryOptions sind die Optionen eines Laufs — dieselben Pfade, die auch
-// das Subkommando zusammensammelt. Der Ort des Inventars ist keiner davon
-// mehr: er steht in der Fachlogik (inventory.DocName).
+// inventoryOptions sind die Optionen eines Laufs — dieselben, die auch das
+// Subkommando zusammensammelt. Weder der Ort des Inventars noch der der
+// Quellenkonfiguration ist darunter: beide stehen in der Fachlogik
+// (inventory.DocName, versionsources.DocName), und Run liest die
+// Konfiguration über denselben Zugang, über den es schreibt.
 func inventoryOptions(projectDir string) inventory.Options {
-	localDir := project.LocalDir(projectDir)
-	return inventory.Options{
-		ProjectDir:  projectDir,
-		SourcesFile: filepath.Join(localDir, project.VersionSourcesFileName),
-	}
+	return inventory.Options{ProjectDir: projectDir}
 }
 
-// inventoryDisplayPath ist der Pfad der Quellenkonfiguration, wie die
-// Oberfläche ihn nennt: relativ zum Hauptverzeichnis.
-func inventoryDisplayPath(projectDir string, path string) string {
-	if relative, err := filepath.Rel(projectDir, path); err == nil {
-		return filepath.ToSlash(relative)
-	}
-	return project.DisplayPath(path)
-}
-
-// inventorySources liest den Zustand der Quellenkonfiguration für die
-// Anzeige. Eine defekte Datei ist hier ein sichtbarer Zustand, kein Abbruch —
-// dieselbe Trennung wie in `k-playbook context`: Auskunft geben ist nicht
-// Erheben.
-func inventorySources(projectDir string, path string) inventorySourcesState {
-	config, err := versionsources.Read(path)
+// inventorySources macht aus dem Lesen der Quellenkonfiguration den Zustand
+// für die Anzeige. Ein defektes oder unerreichbares Dokument ist hier ein
+// sichtbarer Zustand, kein Abbruch — dieselbe Trennung wie in
+// `k-playbook context`: Auskunft geben ist nicht Erheben.
+func inventorySources(projectDir string, config versionsources.Config, err error) inventorySourcesState {
+	read := project.VersionSourcesFrom(config, err)
 	state := inventorySourcesState{
-		Path:        path,
-		DisplayPath: inventoryDisplayPath(projectDir, path),
-		Present:     config.Present,
+		Path:        read.Ref,
+		DisplayPath: read.Ref,
+		State:       read.State,
+		Present:     read.Present,
+		Error:       read.Error,
+		Sources:     len(read.Sources),
+		Exclude:     len(read.Exclude),
+		HelmValues:  len(read.HelmValues),
 	}
-	if err != nil {
-		state.Error = err.Error()
-		return state
-	}
-	state.Roots = len(config.Roots)
-	state.Sources = len(config.Sources)
-	state.Exclude = len(config.Exclude)
-	state.HelmValues = len(config.HelmValues)
+	state.Legacy = project.LegacyVersionSourcesMessage(projectDir)
 	return state
 }
 
-// inventoryStatus ist der Stand aus der Collection. Ohne bereiten Zugang
-// ist er „nicht erreichbar“ mit dem Grund aus der Anbindung — ein eigener
-// Zustand, kein „fehlt“.
-func inventoryStatus(ctx context.Context, projectDir string) inventory.Status {
+// inventoryState ist der Stand aus der Collection: Inventar und
+// Quellenkonfiguration über denselben Zugang (OpenInventoryStore), damit die
+// Anzeige den Node nicht zweimal fragt. Ohne bereiten Zugang ist beides
+// „nicht erreichbar“ mit dem Grund aus der Anbindung — ein eigener Zustand,
+// kein „fehlt“.
+func inventoryState(ctx context.Context, projectDir string) inventoryResponse {
+	response := inventoryResponse{Available: true, DisplayPath: inventory.DocRef}
 	store, err := project.OpenInventoryStore(projectDir)
 	if err != nil {
-		return inventory.UnavailableStatus(err.Error())
+		response.Status = inventory.UnavailableStatus(err.Error())
+		response.Sources = inventorySources(projectDir, versionsources.Config{Ref: versionsources.DocRef},
+			&versionsources.UnavailableError{Err: err})
+		return response
 	}
-	return inventory.ReadStatus(ctx, store)
-}
-
-func inventoryState(ctx context.Context, projectDir string) inventoryResponse {
-	options := inventoryOptions(projectDir)
-	return inventoryResponse{
-		Available:   true,
-		Status:      inventoryStatus(ctx, projectDir),
-		DisplayPath: inventory.DocRef,
-		Sources:     inventorySources(projectDir, options.SourcesFile),
-	}
+	response.Status = inventory.ReadStatus(ctx, store)
+	config, err := versionsources.Load(ctx, store)
+	response.Sources = inventorySources(projectDir, config, err)
+	return response
 }
 
 func inventoryHandler(w http.ResponseWriter, r *http.Request) {

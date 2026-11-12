@@ -659,10 +659,13 @@ func TestBriefingTraegtHealth(t *testing.T) {
 		t.Errorf("health im JSON: %s", encoded)
 	}
 
-	// Zwei Fehler — die nicht eingetragene Anbindung ist seit Task 131 einer:
-	// beide da, ok falsch, Reihenfolge nach Bereich.
+	// Ein Fehler und eine Warnung — die nicht eingetragene Anbindung ist seit
+	// Task 131 ein Fehler, die alte Quellenkonfiguration unter
+	// k-playbook-local/ Altbestand (Task 144): beide da, ok falsch,
+	// Reihenfolge nach Bereich. Die alte Datei wird nicht gelesen, auch eine
+	// unlesbare nicht.
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
-	write(t, filepath.Join(LocalDir(root), VersionSourcesFileName), ": ungültig\n")
+	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), ": ungültig\n")
 	briefing, err = BuildBriefing(t.Context(), root)
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
@@ -672,7 +675,7 @@ func TestBriefingTraegtHealth(t *testing.T) {
 		t.Fatalf("health: %+v", report)
 	}
 	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError ||
-		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelError {
+		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelWarning {
 		t.Errorf("Einträge: %+v", report.Problems)
 	}
 	if strings.Contains(report.Problems[1].Message, "ungültig") {
@@ -683,7 +686,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 		t.Errorf("health.Check:\n%+v\nBriefing:\n%+v", direct, report)
 	}
 	// Die Felder, die health bewertet, stehen weiter unverändert im Rest.
-	if raw, ok := briefing.Context.Field("versionSources"); !ok || !strings.Contains(string(raw), `"error":`) {
+	if raw, ok := briefing.Context.Field("versionSources"); !ok || !strings.Contains(string(raw), `"state":"unavailable"`) ||
+		!strings.Contains(string(raw), `"ref":"keph:/k-playbook/inventory.md"`) || !strings.Contains(string(raw), `"error":`) {
 		t.Errorf("context.versionSources: %s", raw)
 	}
 }

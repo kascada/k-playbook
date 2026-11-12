@@ -5,17 +5,29 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
-func writeSources(t *testing.T, path string, content string) {
-	t.Helper()
+// configKey ist in collectFiles der Schlüssel, unter dem ein Test das
+// Frontmatter der Quellenkonfiguration statt einer Datei angibt.
+const configKey = "@quellenkonfiguration"
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("anlegen: %v", err)
+// sourcesDoc baut das Dokument der Quellenkonfiguration
+// (versionsources.DocRef) aus seinem Frontmatter.
+func sourcesDoc(frontmatter string) string {
+	return "---\n" + frontmatter + "---\n\nQuellen des Versionsinventars.\n"
+}
+
+// sourcesConfig wertet das Frontmatter aus, wie Run es aus der Collection
+// täte; ein Fehler lässt den Test scheitern.
+func sourcesConfig(t *testing.T, frontmatter string) versionsources.Config {
+	t.Helper()
+	config, err := versionsources.Parse([]byte(sourcesDoc(frontmatter)))
+	if err != nil {
+		t.Fatalf("Quellenkonfiguration: %v", err)
 	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("schreiben: %v", err)
-	}
+	return config
 }
 
 // Eine fehlende Quellenkonfiguration ist kein Fehler: es gelten die
@@ -35,27 +47,71 @@ func TestFehlendeQuellenkonfigurationIstKeinFehler(t *testing.T) {
 }
 
 // Der Erhebungslauf bricht bei defekter Konfiguration ab — anders als
-// `k-playbook context`, der sie als Zustand ausgibt und weiterläuft.
+// `k-playbook context`, der sie als Zustand ausgibt und weiterläuft. Ebenso,
+// wenn die Collection nicht erreichbar ist: kein Rückfall auf die
+// Standardquellen.
 func TestDefekteQuellenkonfigurationBrichtDenLaufAb(t *testing.T) {
 	for name, content := range map[string]string{
-		"nicht lesbares YAML": "schema_version: 1\nroots: [/srv\n",
-		"fremde Fassung":      "schema_version: 3\n",
+		"nicht lesbares YAML": sourcesDoc("schema_version: 3\nexclude: [a\n"),
+		"fremde Fassung":      sourcesDoc("schema_version: 2\n"),
+		"roots":               sourcesDoc("schema_version: 3\nroots: []\n"),
+		"kein Frontmatter":    "schema_version: 3\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			options := newRunProject(t)
-			writeSources(t, options.SourcesFile, content)
-
-			if _, err := Collect(options); err == nil {
-				t.Fatal("erwartet wurde ein Abbruch")
-			}
 			store := newRunStore(t)
+			store.Put(versionsources.DocName, content)
 			if _, _, err := runInto(t, store, options); err == nil {
-				t.Fatal("Run muss denselben Abbruch weitergeben")
+				t.Fatal("Run muss abbrechen")
 			}
-			if len(store.Calls) != 0 || len(store.Names()) != 0 {
-				t.Error("bei einem Abbruch wird nichts geschrieben und nichts gelesen")
+			if len(store.Names()) != 1 {
+				t.Errorf("bei einem Abbruch wird nichts geschrieben: %v", store.Names())
+			}
+			for _, call := range store.Calls {
+				if !strings.HasPrefix(call, "read") {
+					t.Errorf("bei einem Abbruch wird nur die Konfiguration gelesen: %v", store.Calls)
+				}
 			}
 		})
+	}
+	t.Run("nicht erreichbar", func(t *testing.T) {
+		options := newRunProject(t)
+		store := newRunStore(t)
+		store.Fail["read"] = os.ErrDeadlineExceeded
+		_, _, err := runInto(t, store, options)
+		if err == nil || !versionsources.IsUnavailable(err) {
+			t.Fatalf("erwartet „nicht erreichbar“, bekam %v", err)
+		}
+		if len(store.Names()) != 0 {
+			t.Errorf("nichts geschrieben: %v", store.Names())
+		}
+	})
+}
+
+// Run liest die Konfiguration aus der Collection: Der Ausschluss im
+// Dokument wirkt, ohne dass eine Datei auf der Platte liegt.
+func TestRunLiestDieKonfigurationAusDerCollection(t *testing.T) {
+	options := newRunProject(t)
+	if err := os.MkdirAll(filepath.Join(options.ProjectDir, "fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(options.ProjectDir, "fixtures", "requirements.txt"), []byte("django==1.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := newRunStore(t)
+	store.Put(versionsources.DocName, sourcesDoc("schema_version: 3\nexclude:\n  # Fixtures\n  - \"fixtures/**\"\n"))
+	result, _, err := runInto(t, store, options)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	skipped := 0
+	for _, exclusion := range result.Exclusions {
+		if exclusion.Pattern == "fixtures/**" {
+			skipped = exclusion.Skipped
+		}
+	}
+	if skipped != 1 {
+		t.Errorf("Ausschluss aus der Collection: %+v", result.Exclusions)
 	}
 }
 
@@ -63,7 +119,7 @@ func TestDefekteQuellenkonfigurationBrichtDenLaufAb(t *testing.T) {
 // Ablehnung steht sichtbar im Ergebnis.
 func TestUnbekanntesLabelLehntDenEintragSichtbarAb(t *testing.T) {
 	options := newRunProject(t)
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	options.Config = sourcesConfig(t, `schema_version: 3
 sources:
   - path: requirements.txt
     kind: python
@@ -79,8 +135,8 @@ sources:
 	if !strings.Contains(result.Rejections[0].Reason, "produktion") {
 		t.Errorf("der gefundene Wert muss in der Meldung stehen: %q", result.Rejections[0].Reason)
 	}
-	if !strings.Contains(result.Rejections[0].Reason, "version-sources.yaml") {
-		t.Errorf("die Meldung muss auf die Konfigurationsdatei zeigen: %q", result.Rejections[0].Reason)
+	if !strings.Contains(result.Rejections[0].Reason, versionsources.DocRef+", Zeile 4") {
+		t.Errorf("die Meldung muss auf das Dokument und die Zeile darin zeigen: %q", result.Rejections[0].Reason)
 	}
 	if result.ConfiguredSources != 1 {
 		t.Errorf("ein abgelehnter Eintrag zählt weiterhin als konfiguriert: %d", result.ConfiguredSources)
@@ -91,7 +147,7 @@ sources:
 // denn, der Eintrag trägt optional: true.
 func TestFehlendeKonfigurierteQuelleIstEinHinweis(t *testing.T) {
 	options := newRunProject(t)
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	options.Config = sourcesConfig(t, `schema_version: 3
 sources:
   - path: gibtesnicht.txt
     kind: python
@@ -117,7 +173,7 @@ sources:
 // dieselbe Datei, ausdrücklich gesetzter Kontext.
 func TestKonfigurierteQuelleUeberschreibtDasLabel(t *testing.T) {
 	options := newRunProject(t)
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	options.Config = sourcesConfig(t, `schema_version: 3
 sources:
   - path: requirements.txt
     kind: auto
@@ -183,10 +239,7 @@ func TestUnbekannterDateitypWirdUebergangen(t *testing.T) {
 // der die Standarderkennung abschaltet.
 func TestZusatzquelleErgaenztDieStandardquellen(t *testing.T) {
 	options := newRunProject(t)
-	extra := filepath.Join(t.TempDir(), "deploy")
-	if resolved, err := filepath.EvalSymlinks(filepath.Dir(extra)); err == nil {
-		extra = filepath.Join(resolved, "deploy")
-	}
+	extra := filepath.Join(options.ProjectDir, "deploy")
 	if err := os.MkdirAll(extra, 0o755); err != nil {
 		t.Fatalf("anlegen: %v", err)
 	}
@@ -194,8 +247,7 @@ func TestZusatzquelleErgaenztDieStandardquellen(t *testing.T) {
 		[]byte("image:\n  repository: ghcr.io/example/app\n  tag: 9.9.9\n"), 0o644); err != nil {
 		t.Fatalf("schreiben: %v", err)
 	}
-	writeSources(t, options.SourcesFile, "schema_version: 1\nroots:\n  - "+extra+
-		"\nsources:\n  - path: "+extra+"/*.yaml\n    kind: helm\n    env: deployment\n")
+	options.Config = sourcesConfig(t, "schema_version: 3\nsources:\n  - path: deploy/*.yaml\n    kind: helm\n    env: deployment\n")
 
 	result, err := Collect(options)
 	if err != nil {
@@ -207,11 +259,34 @@ func TestZusatzquelleErgaenztDieStandardquellen(t *testing.T) {
 	if len(result.Sources) != 2 {
 		t.Fatalf("Quellen = %+v", result.Sources)
 	}
-	entry := find(t, result, "container/ghcr.io/example/app", filepath.ToSlash(filepath.Join(extra, "values-prod.yaml")))
+	entry := find(t, result, "container/ghcr.io/example/app", "deploy/values-prod.yaml")
 	if entry.Version != "9.9.9" || entry.Context != EnvDeployment {
 		t.Errorf("Zusatzquelle = %+v", entry)
 	}
-	if !filepath.IsAbs(entry.SourceFile) {
-		t.Errorf("außerhalb der Projektwurzel steht der absolute Pfad: %q", entry.SourceFile)
+}
+
+// Eine absolute Quelle wird abgelehnt, auch wenn sie unter der Projektwurzel
+// liegt: Die Konfiguration gilt auf jedem Rechner, ein absoluter Pfad nur auf
+// einem. Außerhalb der Projektwurzel gibt es nichts mehr freizugeben.
+func TestAbsoluteQuelleWirdAbgelehnt(t *testing.T) {
+	options := newRunProject(t)
+	inside := filepath.ToSlash(filepath.Join(options.ProjectDir, "requirements.txt"))
+	options.Config = sourcesConfig(t, "schema_version: 3\nsources:\n  - path: "+inside+
+		"\n    kind: python\n    env: deployment\n  - path: ../draussen/values.yaml\n    kind: helm\n    env: deployment\n")
+
+	result, err := Collect(options)
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if len(result.Rejections) != 2 {
+		t.Fatalf("Ablehnungen = %+v", result.Rejections)
+	}
+	reasons := result.Rejections[0].Reason + " / " + result.Rejections[1].Reason
+	if !strings.Contains(reasons, "absoluter Pfad") || !strings.Contains(reasons, "außerhalb der Projektwurzel") {
+		t.Errorf("Gründe = %s", reasons)
+	}
+	entry := find(t, result, "python/redis", "requirements.txt")
+	if entry.ContextOrigin == ContextConfigured {
+		t.Errorf("die abgelehnte absolute Quelle darf das Label nicht setzen: %+v", entry)
 	}
 }

@@ -85,7 +85,7 @@ func TestAusschlussDerInstallationStehtSichtbarInDerDatei(t *testing.T) {
 // die Standarderkennung.
 func TestAusdruecklicheQuelleSchlaegtDenAusschluss(t *testing.T) {
 	options := withInstallation(t)
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	options.Config = sourcesConfig(t, `schema_version: 3
 sources:
   - path: k-playbook/installer/go.mod
     kind: go
@@ -134,7 +134,7 @@ func TestExcludeMusterUebergehtQuellenSichtbar(t *testing.T) {
 		t.Fatalf("ohne Ausschluss steht die Fixture im Inventar: %+v", before.Deviations)
 	}
 
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	options.Config = sourcesConfig(t, `schema_version: 3
 exclude:
   - tests/fixtures/**
 `)
@@ -165,7 +165,7 @@ exclude:
 // anderen nichts — stillschweigend. Es wird deshalb sichtbar abgelehnt.
 func TestAbsolutesAusschlussmusterWirdAbgelehnt(t *testing.T) {
 	options := newRunProject(t)
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	options.Config = sourcesConfig(t, `schema_version: 3
 exclude:
   - /srv/deploy/**
 `)

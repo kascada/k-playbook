@@ -24,7 +24,8 @@ gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
 `mcp`, `scan`, `merge`, `inventory`, `todo`, `docs`, `upgrade`, `vscode`,
-`version` und `stop`. Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
+`version` und `stop`. `troubleshooting` steht nur in der Hilfe: bis zu seinem eigenen Task
+ein Platzhalter (siehe „Umgebungsprüfung: `health`“). Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
 es gibt nur diese Übersicht aus.
 
 ```go
@@ -116,8 +117,10 @@ kommt nicht in den Input.
 `inventory` erhebt das Versionsinventar des Projekts und schreibt es in die Collection des
 Projekts nach `keph:/docs/generated/versions/inventory.md` (Name `inventory.DocName`). Es
 liest ausschließlich deklarative
-Quellen — Manifeste, Lockfiles, Container-, DevContainer-, Helm- und CI-Dateien, dazu die
-in `k-playbook-local/version-sources.yaml` konfigurierten —, fragt kein Netz und führt
+Quellen — Manifeste, Lockfiles, Container-, DevContainer-, Helm- und CI-Dateien, nur
+unterhalb der Projektwurzel, dazu die im Frontmatter der Quellenkonfiguration
+`keph:/k-playbook/inventory.md` konfigurierten (Task 144; `inventory.Run` liest sie über
+denselben Store, über den es schreibt) —, fragt kein Netz und führt
 kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei die Installation
 `<projekt>/k-playbook/` — ein Clone des Werkzeugs, der in jedem Zielprojekt dieselben
 Manifeste trägt — und die Muster aus `exclude:` der Quellenkonfiguration; beide Ausschlüsse
@@ -624,8 +627,10 @@ installer/
 │   │                            (nur Tests)
 │   └── check.go                 Prüfung und Zustände, lesbare Collections je Hub (ProbeHubs)
 ├── internal/versionsources/
-│   └── versionsources.go        version-sources.yaml lesen — die eine Implementierung,
-│                                benutzt vom Sammler und von project/context.go
+│   └── versionsources.go        die Quellenkonfiguration keph:/k-playbook/inventory.md
+│                                lesen (Rohtext, Frontmatter, Fassung 3, ohne roots) — die
+│                                eine Implementierung, benutzt vom Sammler, von
+│                                project/versionsources.go und der Oberfläche
 ├── internal/yamllite/
 │   ├── yamllite.go              der YAML-Ausschnitt, den beide brauchen, mit Zeilennummer;
 │   │                            doppelte Schlüssel in Node.Duplicates (für githubaccess)
@@ -765,7 +770,7 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 
 ```text
 results/  priv/
-k-playbook.md  version-sources.yaml
+k-playbook.md
 ```
 
 Fünf Einträge stehen seit Task 107 nicht mehr darin: `docs/`, `tasks/`, `tasks/done/`,
@@ -810,11 +815,13 @@ Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder Eintrag mi
 eigenen Format braucht dort einen eigenen Zweig; der `default:`-Zweig baut aus
 `entry.Purpose` einen neutralen Markdown-Rumpf — Überschrift plus Zweck —, damit ein
 neuer Eintrag ohne Zweig nicht still das Format eines fremden bekommt.
-`version-sources.yaml` bekommt deshalb die gültige, leere Quellenkonfiguration aus
-`versionSourcesTemplate()` — wortgleich die Vorlage aus `docs/version-inventory.md`. Sie
-deklariert `schema_version: 1`, obwohl `versionsources` auch `2` liest: `2` braucht nur, wer
-`helm_values` einträgt, und eine neu angelegte Datei soll auch ältere Installationen
-desselben Projekts nicht aussperren.
+
+Die Quellenkonfiguration des Versionsinventars steht seit Task 144 nicht mehr darin: Sie ist
+das Dokument `keph:/k-playbook/inventory.md` in der Projekt-Collection
+(`versionsources.DocName`), angelegt von `/k-doc-inventory` bei der ersten bestätigten
+Ergänzung. Das Einrichten legt die alte `version-sources.yaml` nicht mehr an; liegt sie noch,
+erkennt `project/versionsources.go` sie nur als Altbestand (`LegacyVersionSources`) — die
+Gesundheitsprüfung warnt, `k-playbook inventory` nennt sie, `/k-upgrade` 3.6 zieht um.
 
 Jedes Verzeichnis der Struktur bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
@@ -2453,8 +2460,10 @@ Hub gilt und dass die Collection lesbar ist. Sie belegt nicht, dass die Header i
 MCP-Konfiguration eines Assistenten dasselbe, noch gültige Token tragen.
 
 `k-playbook context` und das MCP-Werkzeug hängen das Ergebnis als `kephalaion` an
-(`project.KephalaionStatus`, gerufen in `ContextForDir`). `BuildContext` selbst hängt es nicht
-an, fragt den Node seit Task 131 aber für den Katalog `reviews`: dessen
+(`project.KephalaionStatus`, gerufen in `ContextForDir`), mit demselben Status auch
+`versionSources` — die Quellenkonfiguration des Versionsinventars aus der Collection
+(`project.versionSourcesWithStatus`, Task 144), ohne den Node ein zweites Mal zu prüfen.
+`BuildContext` selbst hängt beides nicht an, fragt den Node seit Task 131 aber für den Katalog `reviews`: dessen
 mitgelieferte Ebene liegt in `<hub>:k-playbook` (siehe „Die mitgelieferte Ebene aus
 `<hub>:k-playbook`“).
 
@@ -3422,7 +3431,8 @@ per `display` zu überstimmen. `TestStylesheetHonorsHiddenAttribute` prüft, das
 
 Der unterste Block der Setup-Seite zeigt, was `BuildContext()` liefert — dasselbe, was
 das Unterkommando `context` ausgibt: Pfade, Instruktionsdateien, die effektiven Kataloge
-und die Guidelines.
+und die Guidelines, dazu `kephalaion` aus dem Zwischenspeicher der Statusseite;
+`versionSources` steht nicht darin, die Quellenkonfiguration zeigt der Inventarbereich.
 
 Er ist ein `<details>` und der einzige Block, der **nicht** beim Seitenaufbau lädt.
 `/api/context` wird erst beim ersten Aufklappen gerufen und danach nicht wieder: die
@@ -3536,8 +3546,9 @@ liest jede Quelle des Projekts. **Letzter Lauf** erscheint danach: Erfolg oder A
 ob geschrieben wurde oder das Dokument unverändert blieb, die Zahlen des Laufs — dieselben,
 die `k-playbook inventory` ausgibt —, und jede Ablehnung, jeder greifende Ausschluss, jede
 nicht auswertbare Quelle und jeder Hinweis im Wortlaut. **Quellenkonfiguration** zeigt
-`version-sources.yaml`: Pfad, vorhanden oder fehlend oder defekt, und die Zahl der Wurzeln,
-Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte. **Inventar** zeigt das erzeugte Dokument gerendert, ohne seinen
+`keph:/k-playbook/inventory.md`: vorhanden, fehlend, defekt oder nicht erreichbar, die Zahl
+der Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte und, wenn die alte Datei
+unter `k-playbook-local/` noch liegt, den Hinweis auf `/k-upgrade`. **Inventar** zeigt das erzeugte Dokument gerendert, ohne seinen
 Frontmatter-Block — der steht als Stand darüber.
 
 Der Status kommt aus `inventory.ReadStatus`, also aus dem Frontmatter des Dokuments in der
@@ -3554,8 +3565,9 @@ Pfaden: `GET /api/inventory/file` nimmt keinen Pfad aus der Anfrage entgegen, so
 genau das eine Dokument. Die Vertrauensgrenze aus `inventory/trust.go` gilt für den Anstoß
 unverändert und wird nicht zweitverwendet implementiert — ein abgelehnter Pfad steht in
 der Antwort so, wie die Fachlogik ihn meldet: angefragter Pfad, aufgelöster Pfad, Grund.
-Die Quellenkonfiguration liest derselbe `versionsources.Read` wie im Sammler und in
-`k-playbook context`. Gerendert wird mit dem Goldmark aus `docs.go`; geteilt wird nur der
+Die Quellenkonfiguration liest derselbe `versionsources.Load` wie im Sammler und in
+`k-playbook context`, über denselben Store wie der Status (`inventoryState` öffnet ihn
+einmal); den Zustand bildet `project.VersionSourcesFrom`. Gerendert wird mit dem Goldmark aus `docs.go`; geteilt wird nur der
 Renderer, der Docs-Bereich selbst bleibt unberührt.
 
 **Anzeigen, nicht pflegen.** Die Quellenkonfiguration wird in der Oberfläche nur
@@ -3563,7 +3575,7 @@ gezeigt. Die Schreibregel des Vertrags verlangt ausdrückliche Bestätigung und 
 ergänzendes Schreiben unter Erhalt von Einträgen, Kommentaren und Reihenfolge; eine
 Eingabemaske bräuchte dafür eine eigene Validierung gegen das Quellenmodell und einen
 zweiten Schreibpfad neben `/k-doc-inventory`, der den Diff vor Augen hat. Es gibt deshalb
-weder ein Formular noch einen Endpunkt, der in `version-sources.yaml` schreibt. Der
+weder ein Formular noch einen Endpunkt, der in die Quellenkonfiguration schreibt. Der
 einzige schreibende Endpunkt des Bereichs ist `POST /api/inventory`, und der schreibt
 allein das Inventar in die Collection — und auch das nur, wenn die Erhebung sich inhaltlich
 vom Bestand unterscheidet: die Byte-Stabilitätsregel steht in `inventory.Write`, nicht im
@@ -4124,18 +4136,20 @@ Abschnitt `health` (Fassung 4, Task 098). Alle drei rufen `health.Check` in
 Warnungen lassen es wahr — und `problems`, je Eintrag `level`, `area`, `message` und `hint`,
 sortiert nach Bereich, dann Stufe, dann Satz. Die Prüfung bricht nicht beim ersten Problem
 ab, repariert nichts, und kein Eintrag nennt einen Token oder einen Wert aus einer Datei; der
-Eintrag zur unlesbaren `version-sources.yaml` nennt darum den Pfad, nicht die Meldung des
-Lesers, die eine Zeile der Datei zitieren kann (die steht weiter in
-`context.versionSources.error`).
+Eintrag zur unlesbaren Quellenkonfiguration nennt darum das Dokument
+`keph:/k-playbook/inventory.md`, nicht die Meldung des Lesers, die eine Zeile daraus
+zitieren kann (die steht weiter in `context.versionSources.error`).
 
 Das Paket `health` ist eine Sammelstelle, keine Prüfung: Es kennt Typen, `Register` und
 `Check`. Jede Quelle hängt sich mit `Register` ein; die drei aus dem Kontext — Kephalaion-Anbindung
 (nicht `ok`: `error`, auch nicht eingetragen — seit Task 131, weil es ohne Kephalaion keine
 mitgelieferten Texte gibt; vorher war das eine `warning`), Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
-Quellenkonfiguration des Versionsinventars (da, aber unlesbar: `error`) — stehen in
+Quellenkonfiguration des Versionsinventars (Dokument da, aber unlesbar, oder bei bereiter
+Anbindung nicht lesbar: `error`; Anbindung nicht bereit: still, das trägt der Bereich
+`kephalaion`; alte Datei unter `k-playbook-local/`: `warning`) — stehen in
 `project/health.go` und werden beim Laden des Pakets `project` registriert. Der Umweg ist
 der Importzyklus: Die Quellen lesen aus `project` (`DetectBaseTools`,
-`readVersionSources`, `kephalaionCheck`), und `project.Briefing` trägt den Report, also
+`LoadVersionSources`, `kephalaionCheck`), und `project.Briefing` trägt den Report, also
 darf `health` `project` nicht importieren. Eine weitere Quelle — als Nächstes die persönliche
 GitHub-Datei `~/.config/k-playbook/github.yaml` — registriert sich genauso, ohne dass
 Briefing, CLI, MCP oder GUI sich ändern. `health` bewertet Felder der Kontextausgabe
@@ -4194,6 +4208,25 @@ Warnung`) und färbt darüber den Punkt im Blockmenü. Der Pfad heißt bewusst n
 das jedes offene Fenster alle zehn Sekunden ruft und das billig bleiben muss;
 die Umgebungsprüfung fragt den Kephalaion-Node. Die Oberfläche rechnet nichts nach und
 repariert nichts; was ein Eintrag sagen darf, entscheidet das Paket `health`.
+
+### Ohne Kephalaion: Briefing und `troubleshooting`
+
+Ohne erreichbares Kephalaion gibt es kein Briefing — die mitgelieferten Texte und die
+projekteigene Ebene liegen in Collections —, also auch keinen Abschnitt `health`. Damit die
+Sitzung trotzdem versteht, was los ist, macht `briefingError` in `project/briefing.go` aus dem
+`kephalaion_unavailable` eine Meldung in drei oder vier Zeilen: „Kephalaion ist nicht erreichbar
+— ohne Kephalaion gibt es kein Briefing.“, `Grund:` mit dem Satz aus dem Zustand der Anbindung,
+`Abhilfe:` wie in der Gesundheitsprüfung (`kephalaionHint`) und `Nächster Schritt: k-playbook
+troubleshooting`. Den Zustand trägt der Fehler selbst: `openKephClientStatus` umhüllt ihn als
+`KephalaionNotReadyError`, und die Ebenen-Quellen reichen ihn mit `%w` durch — so wird der Node
+dafür nicht ein zweites Mal gefragt. Code und Exit-Code bleiben (`kephalaion_unavailable`, 1);
+das MCP-Werkzeug nimmt denselben Weg.
+
+`k-playbook troubleshooting` (`cmd/k-playbook/troubleshooting.go`, Name
+`project.TroubleshootingCommand`) ist bis zu seinem eigenen Task ein Platzhalter: Er sagt, dass
+er zuerst Kephalaion prüfen und dann Schritt für Schritt den nächsten Fehler der Umgebung suchen
+soll, nennt bis dahin `k-playbook health` und `kephalaion status` und endet mit 0 — ohne
+Projekt, ohne Datei, ohne MCP-Werkzeug.
 
 ## Der MCP-Server
 

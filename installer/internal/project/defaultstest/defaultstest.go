@@ -9,10 +9,13 @@
 package defaultstest
 
 import (
+	"fmt"
 	"path/filepath"
 
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Address ist die Adresse der öffentlichen Collection in Tests.
@@ -29,10 +32,20 @@ const CollectionDir = "test-collection"
 // Isolate setzt den Store ein und gibt die Rücknahme zurück — für TestMain.
 // Ebenso für die projekteigene Ebene in der Collection des Projekts
 // (project.OpenProjectLayerStore): ein Store im Speicher, gefüllt beim Öffnen
-// aus CollectionDir des Projekts; fehlt es, ist die Collection leer.
+// aus CollectionDir des Projekts; fehlt es, ist die Collection leer. Ebenso
+// die Quellenkonfiguration des Versionsinventars
+// (project.OpenVersionSourcesReader), die wie der echte Weg nur bei bereiter
+// Anbindung öffnet.
 func Isolate() func() {
 	original := project.OpenDefaultsStore
 	originalProject := project.OpenProjectLayerStore
+	originalSources := project.OpenVersionSourcesReader
+	project.OpenVersionSourcesReader = func(projectDir string, status kephalaion.Status) (versionsources.Reader, error) {
+		if !status.OK {
+			return nil, fmt.Errorf("Kephalaion ist für dieses Projekt nicht bereit (%s): %s", status.State, status.Message)
+		}
+		return kephtest.Collection(filepath.Join(projectDir, CollectionDir))
+	}
 	project.OpenDefaultsStore = func(projectDir string) (project.DefaultsStore, string, error) {
 		store, err := kephtest.Defaults(filepath.Join(project.PlaybookDir(projectDir), "defaults"))
 		if err != nil {
@@ -50,5 +63,6 @@ func Isolate() func() {
 	return func() {
 		project.OpenDefaultsStore = original
 		project.OpenProjectLayerStore = originalProject
+		project.OpenVersionSourcesReader = originalSources
 	}
 }

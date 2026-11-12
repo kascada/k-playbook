@@ -129,11 +129,11 @@ project/
     ├── results/          everything reviews produce; not versioned
     ├── guidelines/
     ├── priv/             notes and work in progress
-    ├── k-playbook.md     project-owned instruction layer
-    └── version-sources.yaml   version sources of the version inventory, hand-maintained
+    └── k-playbook.md     project-owned instruction layer
 ```
 
-Tasks, todos and the project documentation live in the project's Kephalaion collection.
+Tasks, todos, the project documentation and the source configuration of the version
+inventory (`keph:/k-playbook/inventory.md`) live in the project's Kephalaion collection.
 Its hub and name stand in the block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`, committed
 with the project; the account of each machine, its token and the node's address come from
 Kephalaion itself (`kephalaion node client`). Setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes

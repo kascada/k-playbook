@@ -12,6 +12,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // newRunProject baut ein kleines Projekt mit einer Quelle und liefert die
@@ -27,10 +28,7 @@ func newRunProject(t *testing.T) Options {
 	if err := os.WriteFile(filepath.Join(root, "requirements.txt"), []byte("redis==5.0.1\n"), 0o644); err != nil {
 		t.Fatalf("schreiben: %v", err)
 	}
-	return Options{
-		ProjectDir:  root,
-		SourcesFile: filepath.Join(root, "k-playbook-local", "version-sources.yaml"),
-	}
+	return Options{ProjectDir: root}
 }
 
 // newRunStore ist die Collection im Speicher, in die ein Lauf schreibt.
@@ -75,8 +73,10 @@ func TestErsterLaufLegtDasDokumentInDerCollectionAn(t *testing.T) {
 	if store.Names()[0] != DocName || len(store.Names()) != 1 {
 		t.Errorf("im Store liegt %v, erwartet nur %s", store.Names(), DocName)
 	}
-	if len(store.Calls) != 2 || store.Calls[0] != "read "+DocName || store.Calls[1] != "create "+DocName {
-		t.Errorf("Aufrufe = %v, erwartet read und create", store.Calls)
+	// Zuerst die Quellenkonfiguration, dann der Bestand, dann create.
+	if len(store.Calls) != 3 || store.Calls[0] != "read "+versionsources.DocName ||
+		store.Calls[1] != "read "+DocName || store.Calls[2] != "create "+DocName {
+		t.Errorf("Aufrufe = %v, erwartet read der Konfiguration, read und create", store.Calls)
 	}
 	if !strings.Contains(storedInventory(t, store), "redis") {
 		t.Error("das Dokument trägt die Erhebung nicht")
@@ -119,7 +119,7 @@ func TestZweiterLaufOhneQuellaenderungFasstDasDokumentNichtAn(t *testing.T) {
 	if second.Revision != first.Revision {
 		t.Errorf("die Revision bleibt: %d gegen %d", second.Revision, first.Revision)
 	}
-	if got := store.Calls[calls:]; len(got) != 1 || got[0] != "read "+DocName {
+	if got := store.Calls[calls:]; len(got) != 2 || got[0] != "read "+versionsources.DocName || got[1] != "read "+DocName {
 		t.Errorf("der zweite Lauf darf nur lesen: %v", got)
 	}
 }
@@ -193,12 +193,12 @@ func TestAblehnungenSindInhalt(t *testing.T) {
 		t.Fatalf("erster Lauf: %v", err)
 	}
 
-	writeSources(t, options.SourcesFile, `schema_version: 1
+	store.Put(versionsources.DocName, sourcesDoc(`schema_version: 3
 sources:
   - path: ../draussen/values.yaml
     kind: helm
     env: deployment
-`)
+`))
 	options.Now = func() time.Time { return time.Date(2026, 12, 24, 18, 0, 0, 0, time.UTC) }
 	result, outcome, err := runInto(t, store, options)
 	if err != nil {
@@ -211,7 +211,7 @@ sources:
 		t.Fatalf("Ablehnungen = %+v", result.Rejections)
 	}
 	content := storedInventory(t, store)
-	if !strings.Contains(content, "außerhalb der erlaubten Wurzeln") {
+	if !strings.Contains(content, "außerhalb der Projektwurzel") {
 		t.Error("die Ablehnung muss im Dokument stehen, nicht nur im Ergebnis")
 	}
 	if !strings.Contains(content, "rejected: 1") {

@@ -7,159 +7,170 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
-func versionSourcesPath(root string) string {
-	return filepath.Join(LocalDir(root), VersionSourcesFileName)
+// okStatus ist eine bereite Anbindung, wie ContextForDir sie hätte.
+var okStatus = kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."}
+
+// versionSourcesDoc ist der Ort des Dokuments in der Collection eines
+// Testprojekts (isolateDefaults baut sie aus testCollectionDir).
+func versionSourcesDoc(root string) string {
+	return filepath.Join(root, testCollectionDir, versionsources.DocName)
 }
 
-func TestBuildContextMeldetFehlendeQuellenkonfiguration(t *testing.T) {
+func TestVersionSourcesMeldetFehlendesDokument(t *testing.T) {
 	root := newContextProject(t)
 
-	context, err := BuildContext(root)
-	if err != nil {
-		t.Fatalf("BuildContext: %v", err)
+	state := versionSourcesWithStatus(root, okStatus)
+	if state.State != VersionSourcesMissing || state.Present {
+		t.Errorf("Zustand = %+v, erwartet missing", state)
 	}
-	state := context.VersionSources
-	if state == nil {
-		t.Fatal("versionSources fehlt in der Ausgabe")
+	if state.Ref != versionsources.DocRef {
+		t.Errorf("Ref = %q — auch ein fehlendes Dokument muss seinen Ort nennen", state.Ref)
 	}
-	if state.Present {
-		t.Errorf("Present = true für eine fehlende Datei")
-	}
-	if state.Path != versionSourcesPath(root) {
-		t.Errorf("Path = %q — auch eine fehlende Datei muss ihren Ort nennen", state.Path)
-	}
-	if state.Error != "" || len(state.Roots) != 0 || len(state.Sources) != 0 {
-		t.Errorf("fehlende Datei ist kein Fehler: %+v", state)
+	if state.Error != "" || len(state.Sources) != 0 {
+		t.Errorf("fehlendes Dokument ist kein Fehler: %+v", state)
 	}
 }
 
-func TestBuildContextGibtQuellenkonfigurationAus(t *testing.T) {
+func TestVersionSourcesGibtKonfigurationAus(t *testing.T) {
 	root := newContextProject(t)
-	write(t, versionSourcesPath(root), `schema_version: 1
-roots:
-  - /srv/deploy
+	write(t, versionSourcesDoc(root), `---
+title: "Quellen des Versionsinventars"
+schema_version: 3
 sources:
-  - path: /srv/deploy/values-prod.yaml
+  - path: deploy/values-prod.yaml
     kind: helm
     env: deployment
     note: Produktionswerte aus dem Deployment-Repo
 exclude:
+  # Testfixtures
   - tests/fixtures/**
+helm_values:
+  - path: omni-gw/helm/values.yaml
+    key: helm-chart-generic.redis.standalone.tag
+    item: container/redis
+---
+
+Erklärung.
 `)
 
-	context, err := BuildContext(root)
-	if err != nil {
-		t.Fatalf("BuildContext: %v", err)
-	}
-	state := context.VersionSources
-	if !state.Present || state.SchemaVersion != 1 || state.Error != "" {
+	state := versionSourcesWithStatus(root, okStatus)
+	if state.State != VersionSourcesPresent || !state.Present || state.SchemaVersion != 3 || state.Error != "" {
 		t.Fatalf("Zustand = %+v", state)
-	}
-	if len(state.Roots) != 1 || state.Roots[0] != "/srv/deploy" {
-		t.Errorf("roots = %v", state.Roots)
 	}
 	if len(state.Sources) != 1 {
 		t.Fatalf("sources = %+v", state.Sources)
 	}
 	source := state.Sources[0]
-	if source.Path != "/srv/deploy/values-prod.yaml" || source.Kind != "helm" || source.Env != "deployment" {
+	if source.Path != "deploy/values-prod.yaml" || source.Kind != "helm" || source.Env != "deployment" ||
+		source.Note != "Produktionswerte aus dem Deployment-Repo" {
 		t.Errorf("Eintrag = %+v", source)
-	}
-	if source.Note != "Produktionswerte aus dem Deployment-Repo" {
-		t.Errorf("note = %q", source.Note)
 	}
 	if len(state.Exclude) != 1 || state.Exclude[0] != "tests/fixtures/**" {
 		t.Errorf("exclude = %v — der Zustand muss vollständig aus context kommen", state.Exclude)
 	}
-	if len(state.HelmValues) != 0 {
-		t.Errorf("helmValues = %+v, erwartet leer", state.HelmValues)
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-// helm_values steht in der Kontextausgabe wie in der Datei — unter Fassung 1
-// auch dann, wenn der Sammler den Abschnitt ablehnt.
-func TestBuildContextGibtHelmValuesAus(t *testing.T) {
-	for _, version := range []string{"1", "2"} {
-		t.Run("Fassung "+version, func(t *testing.T) {
-			root := newContextProject(t)
-			write(t, versionSourcesPath(root), "schema_version: "+version+`
-helm_values:
-  - path: omni-gw/helm/values.yaml
-    key: helm-chart-generic.redis.standalone.tag
-    item: container/redis
-`)
-			context, err := BuildContext(root)
-			if err != nil {
-				t.Fatalf("BuildContext: %v", err)
-			}
-			state := context.VersionSources
-			if state.Error != "" || len(state.HelmValues) != 1 {
-				t.Fatalf("Zustand = %+v", state)
-			}
-			value := state.HelmValues[0]
-			if value.Path != "omni-gw/helm/values.yaml" || value.Key != "helm-chart-generic.redis.standalone.tag" || value.Item != "container/redis" {
-				t.Errorf("Eintrag = %+v", value)
-			}
-			data, err := json.Marshal(state)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(data), `"helmValues":[{"path":"omni-gw/helm/values.yaml","key":"helm-chart-generic.redis.standalone.tag","item":"container/redis"}]`) {
-				t.Errorf("JSON = %s", data)
-			}
-		})
+	for _, want := range []string{`"ref":"keph:/k-playbook/inventory.md"`, `"state":"present"`,
+		`"helmValues":[{"path":"omni-gw/helm/values.yaml","key":"helm-chart-generic.redis.standalone.tag","item":"container/redis"}]`} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("JSON ohne %s: %s", want, data)
+		}
+	}
+	if strings.Contains(string(data), `"roots"`) || strings.Contains(string(data), `"path":"/`) {
+		t.Errorf("roots und ein Pfad auf der Platte gibt es nicht mehr: %s", data)
 	}
 }
 
 // Eine defekte Zusatzkonfiguration darf nicht jeden Command lahmlegen: der
 // Kontextaufruf steht am Anfang jedes Commands. Sichtbar bleibt der Zustand
-// trotzdem — dafür ist `error` da.
-func TestBuildContextBrichtBeiDefekterQuellenkonfigurationNichtAb(t *testing.T) {
-	root := newContextProject(t)
-	write(t, versionSourcesPath(root), "schema_version: 1\nroots: [/srv\n")
-
-	context, err := BuildContext(root)
-	if err != nil {
-		t.Fatalf("der Kontextaufruf darf nicht abbrechen: %v", err)
-	}
-	state := context.VersionSources
-	if !state.Present || state.Error == "" {
-		t.Fatalf("Zustand = %+v", state)
-	}
-	if len(state.Roots) != 0 || len(state.Sources) != 0 {
-		t.Errorf("bei einem Fehler bleibt nichts halb gelesen: %+v", state)
+// trotzdem — dafür sind state und error da.
+func TestVersionSourcesDefektIstZustand(t *testing.T) {
+	for name, content := range map[string]string{
+		"nicht lesbar": "---\nschema_version: 3\nexclude: [a\n---\n",
+		"roots":        "---\nschema_version: 3\nroots: []\n---\n",
+		"Fassung 2":    "---\nschema_version: 2\n---\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := newContextProject(t)
+			write(t, versionSourcesDoc(root), content)
+			state := versionSourcesWithStatus(root, okStatus)
+			if state.State != VersionSourcesInvalid || !state.Present || state.Error == "" {
+				t.Fatalf("Zustand = %+v", state)
+			}
+			if len(state.Sources) != 0 || len(state.Exclude) != 0 {
+				t.Errorf("bei einem Fehler bleibt nichts halb gelesen: %+v", state)
+			}
+		})
 	}
 }
 
-// Die Vorlage, die /k-gui anlegt, muss von demselben Leser gelesen werden
-// können, den der Sammler benutzt — sonst legte das Werkzeug eine Datei an, die
-// es selbst ablehnt.
-func TestVersionSourcesVorlageIstEineGueltigeLeereKonfiguration(t *testing.T) {
-	path := filepath.Join(t.TempDir(), VersionSourcesFileName)
-	if err := os.WriteFile(path, []byte(versionSourcesTemplate()), 0o644); err != nil {
-		t.Fatalf("schreiben: %v", err)
+// Ist Kephalaion nicht bereit, ist das ein eigener Zustand — nicht „fehlt“,
+// und die alte Datei auf der Platte wird nicht gelesen.
+func TestVersionSourcesNichtErreichbarFaelltNichtZurueck(t *testing.T) {
+	root := newContextProject(t)
+	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), "schema_version: 1\nexclude:\n  - tests/**\n")
+	write(t, versionSourcesDoc(root), "---\nschema_version: 3\nexclude:\n  - x/**\n---\n")
+
+	state := versionSourcesWithStatus(root, kephalaion.Status{State: kephalaion.StateNodeUnreachable, Message: "Node antwortet nicht."})
+	if state.State != VersionSourcesUnavailable || state.Present || !strings.Contains(state.Error, "Node antwortet nicht.") {
+		t.Fatalf("Zustand = %+v", state)
+	}
+	if len(state.Exclude) != 0 {
+		t.Errorf("kein Rückfall: %+v", state)
+	}
+}
+
+// ContextForDir trägt versionSources, BuildContext nicht: Die
+// Quellenkonfiguration liegt in der Collection, und Werkzeuge, die nur den
+// Katalog brauchen, fragen den Node dafür nicht.
+func TestContextForDirTraegtVersionSources(t *testing.T) {
+	root := newContextProject(t)
+	stubKephalaionCheck(t, okStatus)
+	write(t, versionSourcesDoc(root), "---\nschema_version: 3\nexclude:\n  - \"**/testdata/**\"\n---\n")
+
+	built, err := ContextForDir(root)
+	if err != nil {
+		t.Fatalf("ContextForDir: %v", err)
+	}
+	if built.VersionSources == nil || built.VersionSources.State != VersionSourcesPresent ||
+		len(built.VersionSources.Exclude) != 1 || built.VersionSources.Exclude[0] != "**/testdata/**" {
+		t.Fatalf("versionSources = %+v", built.VersionSources)
 	}
 
-	config, err := versionsources.Read(path)
+	plain, err := BuildContext(root)
 	if err != nil {
-		t.Fatalf("die Vorlage muss lesbar sein: %v", err)
+		t.Fatalf("BuildContext: %v", err)
 	}
-	// Die Vorlage bleibt bei Fassung 1: 2 braucht nur, wer helm_values
-	// einträgt, und eine neu angelegte Datei soll ältere Installationen
-	// desselben Projekts nicht aussperren.
-	if config.SchemaVersion != versionsources.MinSchemaVersion {
-		t.Errorf("schema_version = %d", config.SchemaVersion)
+	if plain.VersionSources != nil {
+		t.Errorf("BuildContext fragt die Collection nicht: %+v", plain.VersionSources)
 	}
-	if len(config.Roots) != 0 || len(config.Sources) != 0 || len(config.Exclude) != 0 {
-		t.Errorf("die Vorlage ist leer: %+v", config)
+}
+
+// Die alte Datei wird erkannt, nicht gelesen.
+func TestLegacyVersionSourcesWirdErkannt(t *testing.T) {
+	root := t.TempDir()
+	if path, present := LegacyVersionSources(root); present || !strings.HasSuffix(path, filepath.Join(LocalDirName, LegacyVersionSourcesFileName)) {
+		t.Errorf("ohne Datei: %s, %v", path, present)
 	}
-	if len(config.Rejections) != 0 {
-		t.Errorf("die Vorlage darf nichts enthalten, was der Sammler ablehnt: %+v", config.Rejections)
+	if LegacyVersionSourcesMessage(root) != "" {
+		t.Error("ohne Datei kein Satz")
 	}
-	if !strings.Contains(versionSourcesTemplate(), "handgepflegt") {
-		t.Error("der erklärende Kommentar der Vorlage fehlt")
+	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), "egal\n")
+	if _, present := LegacyVersionSources(root); !present {
+		t.Error("die Datei wird nicht erkannt")
+	}
+	message := LegacyVersionSourcesMessage(root)
+	if !strings.Contains(message, LegacyVersionSourcesDisplay) || !strings.Contains(message, versionsources.DocRef) ||
+		!strings.Contains(message, "/k-upgrade") {
+		t.Errorf("Satz = %q", message)
+	}
+	if err := os.Remove(filepath.Join(LocalDir(root), LegacyVersionSourcesFileName)); err != nil {
+		t.Fatal(err)
 	}
 }

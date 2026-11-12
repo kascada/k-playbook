@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
-	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // Context ist der aufgelöste Arbeitsstand eines Projekts: alles, was ein
@@ -79,13 +78,16 @@ type Context struct {
 	CatalogsProblem string   `json:"catalogsProblem,omitempty"`
 	Guidelines      []string `json:"guidelines"`
 	// VersionSources ist der Zustand der Quellenkonfiguration des
-	// Versionsinventars. Sie steht hier, weil Commands Konfiguration
-	// ausschließlich aus dieser Ausgabe lesen: eine Datei, die nur der Sammler
-	// kennt, wäre für jeden Command unsichtbar und würde eine zweite,
-	// unsichtbare Konfigurationsquelle aufmachen.
+	// Versionsinventars, des Dokuments keph:/k-playbook/inventory.md. Sie
+	// steht hier, weil Commands Konfiguration ausschließlich aus dieser
+	// Ausgabe lesen: eine Konfiguration, die nur der Sammler kennt, wäre für
+	// jeden Command unsichtbar und würde eine zweite, unsichtbare
+	// Konfigurationsquelle aufmachen.
 	//
-	// Das Feld ist ein Zeiger mit omitempty, damit eine Installation, die es
-	// noch nicht füllt, dieselbe Ausgabe erzeugt wie bisher.
+	// Das Feld ist ein Zeiger mit omitempty: Gefüllt wird es von
+	// ContextForDir, nicht von BuildContext — es liest aus der Collection,
+	// und die Werkzeuge, die nur den Katalog brauchen, sollen den Node dafür
+	// nicht fragen (wie Kephalaion).
 	VersionSources *VersionSources `json:"versionSources,omitempty"`
 	// Kephalaion ist die Anbindung des Projekts an seine Collection: Hub und
 	// Collection aus dem Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml,
@@ -109,113 +111,6 @@ type Context struct {
 	// von ContextForDir, nicht von BuildContext — die Oberfläche und die
 	// Review-Auswahl über MCP tragen die Kosten nicht. Siehe contextGitHub.
 	GitHub *ContextGitHub `json:"github,omitempty"`
-}
-
-// VersionSources ist der Zustand von k-playbook-local/version-sources.yaml in
-// der Kontextausgabe. Der Vertrag dazu steht in docs/version-inventory.md,
-// Abschnitt „Source Configuration"; die Feldnamen sind die YAML-Schlüssel der
-// Datei, in camelCase wie überall sonst in dieser Ausgabe.
-//
-// Hier steht nur das Schema. Gelesen wird die Datei von
-// internal/versionsources — der einzigen Implementierung, die auch der Sammler
-// des Inventars benutzt. context.go bekommt keinen zweiten Parser: zwei Leser
-// derselben Datei wären zwei Auslegungen derselben Vertrauensgrenze.
-type VersionSources struct {
-	// Path ist der absolute Pfad der Datei — auch wenn sie fehlt, damit klar
-	// ist, wo sie hingehört.
-	Path string `json:"path"`
-	// Present sagt, ob die Datei da ist. Fehlt sie, ist das kein Fehler: es
-	// gelten die Standardquellen unterhalb der Projektwurzel.
-	Present bool `json:"present"`
-	// SchemaVersion ist die von der Datei deklarierte Fassung; 0, solange
-	// nichts gelesen wurde.
-	SchemaVersion int `json:"schemaVersion,omitempty"`
-	// Roots sind die zusätzlich lesbaren Wurzeln außerhalb der Projektwurzel.
-	// Die Projektwurzel selbst steht nicht darin — sie ist immer erlaubt.
-	Roots []string `json:"roots,omitempty"`
-	// Sources sind die konfigurierten Zusatzquellen. Sie ergänzen die
-	// Standarderkennung, sie ersetzen sie nicht.
-	Sources []VersionSource `json:"sources,omitempty"`
-	// Exclude sind die Muster, die von der Standarderkennung übergangen werden.
-	// Sie wirken nur dort: was unter Sources ausdrücklich steht, bleibt gelesen.
-	Exclude []string `json:"exclude,omitempty"`
-	// HelmValues sind die konfigurierten Helm-Werte. Wie bei Sources stehen
-	// auch abgelehnte Einträge darin — auch alle unter schema_version 1, wo der
-	// Abschnitt nicht angewandt wird.
-	HelmValues []VersionHelmValue `json:"helmValues,omitempty"`
-	// Error ist gesetzt, wenn die Datei da, aber nicht lesbar oder von
-	// unbekannter Fassung ist. Dann sind Roots und Sources leer und der Zustand
-	// ist ein sichtbarer Befund statt eines stillen Leerergebnisses. Der
-	// Kontextaufruf bricht deswegen nicht ab: er steht am Anfang jedes
-	// Commands, und eine defekte Zusatzkonfiguration darf nicht jeden Command
-	// lahmlegen. Der Erhebungslauf des Inventars bricht sehr wohl ab — so
-	// steht es im Vertrag.
-	Error string `json:"error,omitempty"`
-}
-
-// VersionSource ist ein Eintrag aus sources:. Die Felder heißen wie die
-// YAML-Schlüssel; die gültigen Werte von Kind und Env stehen im Vertrag.
-type VersionSource struct {
-	Path string `json:"path"`
-	Kind string `json:"kind"`
-	Env  string `json:"env"`
-	Note string `json:"note,omitempty"`
-	// Optional: true heißt, dass eine fehlende Datei kein Hinweis ist.
-	Optional bool `json:"optional,omitempty"`
-}
-
-// VersionHelmValue ist ein Eintrag aus helm_values:. Die Felder heißen wie die
-// YAML-Schlüssel.
-type VersionHelmValue struct {
-	Path string `json:"path"`
-	Key  string `json:"key"`
-	Item string `json:"item"`
-}
-
-// readVersionSources löst den Zustand der Quellenkonfiguration auf.
-//
-// Eine defekte Datei bricht den Kontextaufruf nicht ab: er steht am Anfang
-// jedes Commands, und eine defekte Zusatzkonfiguration darf nicht jeden
-// Command lahmlegen. Sichtbar bleibt der Zustand trotzdem — dafür ist `error`
-// da. Der Erhebungslauf des Inventars bricht bei derselben Datei sehr wohl ab;
-// das ist die Trennung zwischen Auskunft geben und Erheben, nicht ein zweites
-// Verhalten desselben Lesers.
-func readVersionSources(localDir string) *VersionSources {
-	path := filepath.Join(localDir, VersionSourcesFileName)
-	config, err := versionsources.Read(path)
-
-	state := &VersionSources{Path: config.Path, Present: config.Present}
-	if state.Path == "" {
-		state.Path = path
-	}
-	if err != nil {
-		state.Error = err.Error()
-		return state
-	}
-	state.SchemaVersion = config.SchemaVersion
-	state.Roots = config.Roots
-	state.Exclude = config.Exclude
-	// Ausgegeben werden die Einträge so, wie sie in der Datei stehen — auch die,
-	// die der Sammler wegen unbekanntem kind oder env ablehnt. Sie hier
-	// wegzulassen hieße, die Datei anders darzustellen als sie ist; die
-	// Ablehnung selbst führt der Erhebungslauf sichtbar in der Inventardatei.
-	for _, source := range config.Sources {
-		state.Sources = append(state.Sources, VersionSource{
-			Path:     source.Path,
-			Kind:     source.Kind,
-			Env:      source.Env,
-			Note:     source.Note,
-			Optional: source.Optional,
-		})
-	}
-	for _, value := range config.HelmValues {
-		state.HelmValues = append(state.HelmValues, VersionHelmValue{
-			Path: value.Path,
-			Key:  value.Key,
-			Item: value.Item,
-		})
-	}
-	return state
 }
 
 // InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heißt bewusst
@@ -432,17 +327,16 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 			Config:    ConfigPath(projectDir),
 			Languages: languages,
 		},
-		Playbook:       ContextDir{Dir: playbookDir},
-		Local:          ContextDir{Dir: localDir},
-		Remediation:    remediation,
-		Docs:           contextDocs(config),
-		GH:             DetectGH(),
-		MCP:            MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
-		Git:            gitSettings,
-		BaseTools:      DetectBaseTools(projectDir),
-		Catalogs:       map[string][]CatalogEntry{},
-		Guidelines:     listFiles(filepath.Join(localDir, "guidelines")),
-		VersionSources: readVersionSources(localDir),
+		Playbook:    ContextDir{Dir: playbookDir},
+		Local:       ContextDir{Dir: localDir},
+		Remediation: remediation,
+		Docs:        contextDocs(config),
+		GH:          DetectGH(),
+		MCP:         MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
+		Git:         gitSettings,
+		BaseTools:   DetectBaseTools(projectDir),
+		Catalogs:    map[string][]CatalogEntry{},
+		Guidelines:  listFiles(filepath.Join(localDir, "guidelines")),
 	}
 
 	layers := DocLayers{Dist: shared.Dist, Local: shared.Local}
@@ -958,6 +852,7 @@ func contextForDir(startDir string, sharedDir string, shared DocLayers) (Context
 	built.Links = contextLinks(HealLinks(projectDir))
 	status := KephalaionStatus(projectDir)
 	built.Kephalaion = &status
+	built.VersionSources = versionSourcesWithStatus(projectDir, status)
 	// Das Remote ab startDir, nicht ab projectDir: Ein eigenes Repo unterhalb
 	// des Projekts hat sein eigenes.
 	built.GitHub = contextGitHub(startDir)

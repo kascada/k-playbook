@@ -91,9 +91,9 @@ func TestYarnLockOhneManifestIstNichtAuswertbar(t *testing.T) {
 
 	t.Run("Manifest ausgeschlossen", func(t *testing.T) {
 		result := collectFiles(t, map[string]string{
-			"version-sources.yaml": "schema_version: 1\nexclude:\n  - package.json\n",
-			"package.json":         `{"dependencies":{"alpinejs":"^3.17.1"}}`,
-			"yarn.lock":            yarn,
+			configKey:      "schema_version: 3\nexclude:\n  - package.json\n",
+			"package.json": `{"dependencies":{"alpinejs":"^3.17.1"}}`,
+			"yarn.lock":    yarn,
 		})
 		if lock := sourceByFile(t, result, "yarn.lock"); !lock.Unevaluable {
 			t.Errorf("Lockfile = %+v, erwartet nicht auswertbar", lock)

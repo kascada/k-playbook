@@ -18,8 +18,11 @@ type Options struct {
 	// ProjectDir ist die Projektwurzel, das Verzeichnis mit .k-playbook/K-PLAYBOOK.yaml.
 	// Sie ist immer eine erlaubte Wurzel.
 	ProjectDir string
-	// SourcesFile ist k-playbook-local/version-sources.yaml.
-	SourcesFile string
+	// Config ist die Quellenkonfiguration aus versionsources.DocRef, schon
+	// gelesen. Run liest sie über den Zugang zur Collection
+	// (versionsources.Load), bevor gesammelt wird; wer Collect direkt ruft,
+	// reicht sie herein. Leer gelten die Standardquellen.
+	Config versionsources.Config
 	// Now liefert den Erhebungszeitpunkt. Fehlt es, gilt time.Now.
 	Now func() time.Time
 }
@@ -38,16 +41,14 @@ func (o Options) now() time.Time {
 
 // Collect erhebt das Inventar, ohne etwas zu schreiben.
 //
-// Der Rückgabefehler ist der abbrechende Fall und nur er: eine unlesbare oder
-// fremd versionierte Quellenkonfiguration. Alles andere — abgelehnte Pfade,
+// Der Rückgabefehler ist der abbrechende Fall: keine Projektwurzel. Eine
+// unlesbare oder fremd versionierte Quellenkonfiguration bricht schon beim
+// Lesen ab (Run, versionsources.Load). Alles andere — abgelehnte Pfade,
 // fehlende Quellen, defekte Dateien — steht im Ergebnis, weil eine Lücke, die
 // niemand sieht, schlimmer ist als ein Fehler.
 func Collect(options Options) (Result, error) {
-	config, err := versionsources.Read(options.SourcesFile)
-	if err != nil {
-		return Result{}, err
-	}
-	boundary, err := NewBoundary(options.ProjectDir, config.Roots)
+	config := options.Config
+	boundary, err := NewBoundary(options.ProjectDir)
 	if err != nil {
 		return Result{}, err
 	}
@@ -57,7 +58,7 @@ func Collect(options Options) (Result, error) {
 		result.Rejections = append(result.Rejections, Rejection{
 			Requested: rejection.Path,
 			Reason: fmt.Sprintf("%s (%s, Zeile %d)", rejection.Reason,
-				filepath.Base(options.SourcesFile), rejection.Line),
+				versionsources.DocRef, rejection.Line),
 		})
 	}
 

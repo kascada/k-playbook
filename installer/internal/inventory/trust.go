@@ -26,8 +26,9 @@ const MaxFileSize = 8 << 20
 // zusammenzulegen hieße, die Grenze von der Gruppierungslogik abhängig zu
 // machen.
 type Boundary struct {
-	// roots sind die aufgelösten, erlaubten Wurzeln. Die Projektwurzel steht
-	// immer an erster Stelle.
+	// roots sind die aufgelösten, erlaubten Wurzeln. Seit Task 144 ist das
+	// allein die Projektwurzel; die Liste bleibt, weil Check und Meldung sie
+	// so führen.
 	roots []string
 	// projectRoot ist die aufgelöste Projektwurzel; relative Pfade werden gegen
 	// sie aufgelöst, nie gegen das Arbeitsverzeichnis des Prozesses.
@@ -58,14 +59,13 @@ func (e *PathError) Rejection() Rejection {
 	return Rejection{Requested: e.Requested, Resolved: e.Resolved, Reason: e.Reason}
 }
 
-// NewBoundary baut die Grenze aus der Projektwurzel und den in der
-// Quellenkonfiguration freigegebenen Wurzeln.
-//
-// Es gibt keine impliziten Wurzeln: ein absoluter Pfad in `sources:` gibt seine
-// Wurzel nicht selbst frei. Wer außerhalb lesen will, schreibt die Wurzel hin —
-// damit die Frage „was darf dieses Binary lesen" an einer Stelle und ohne
-// Glob-Auswertung zu beantworten ist.
-func NewBoundary(projectRoot string, extraRoots []string) (*Boundary, error) {
+// NewBoundary baut die Grenze aus der Projektwurzel. Sie ist die einzige
+// erlaubte Wurzel: Zusätzliche Wurzeln (`roots`) gibt es seit Task 144 nicht
+// mehr — sie hingen vom Rechner ab, und aus einer gemeinsamen Collection
+// heraus bestimmte sonst jeder mit Schreibrecht, was auf fremden Rechnern
+// gelesen wird. Ein absoluter Pfad in `sources:` gibt deshalb nichts frei;
+// liegt er außerhalb der Projektwurzel, lehnt Check ihn ab.
+func NewBoundary(projectRoot string) (*Boundary, error) {
 	if strings.TrimSpace(projectRoot) == "" {
 		return nil, fmt.Errorf("keine Projektwurzel angegeben")
 	}
@@ -78,27 +78,11 @@ func NewBoundary(projectRoot string, extraRoots []string) (*Boundary, error) {
 	}
 	resolvedProject := resolveExisting(filepath.Clean(projectRoot))
 
-	boundary := &Boundary{
+	return &Boundary{
 		projectRoot:    resolvedProject,
 		roots:          []string{resolvedProject},
 		requestedRoots: []string{projectRoot},
-	}
-	for _, root := range extraRoots {
-		root = strings.TrimSpace(root)
-		if root == "" {
-			continue
-		}
-		// Eine relative Wurzel wäre eine Wurzel, die vom Arbeitsverzeichnis des
-		// Aufrufers abhinge — auf dem CLI-Weg etwas anderes als im
-		// Webserver-Prozess. Genau das darf eine Vertrauensgrenze nicht.
-		if !filepath.IsAbs(root) {
-			return nil, fmt.Errorf("Wurzel %q ist nicht absolut; `roots:` nimmt nur absolute Pfade", root)
-		}
-		resolved := resolveExisting(filepath.Clean(root))
-		boundary.roots = append(boundary.roots, resolved)
-		boundary.requestedRoots = append(boundary.requestedRoots, root)
-	}
-	return boundary, nil
+	}, nil
 }
 
 // ProjectRoot ist die aufgelöste Projektwurzel.
@@ -137,7 +121,7 @@ func (b *Boundary) Check(requested string) (string, error) {
 		return "", &PathError{
 			Requested: requested,
 			Resolved:  resolved,
-			Reason:    "liegt außerhalb der erlaubten Wurzeln (" + strings.Join(b.requestedRoots, ", ") + ")",
+			Reason:    "liegt außerhalb der Projektwurzel (" + strings.Join(b.requestedRoots, ", ") + ")",
 		}
 	}
 	return resolved, nil

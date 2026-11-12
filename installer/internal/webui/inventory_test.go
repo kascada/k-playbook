@@ -13,6 +13,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // newInventoryProject legt ein Projekt mit Anker und einer Quelle an und macht
@@ -91,17 +92,10 @@ func postInventory(t *testing.T) (int, inventoryRunResponse) {
 	return recorder.Code, response
 }
 
-func writeVersionSources(t *testing.T, root string, content string) string {
-	t.Helper()
-
-	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("anlegen: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("schreiben: %v", err)
-	}
-	return path
+// putVersionSources legt die Quellenkonfiguration als Dokument in die
+// Collection im Speicher: das Frontmatter zwischen zwei Zeilen ---.
+func putVersionSources(store *kephtest.Store, frontmatter string) {
+	store.Put(versionsources.DocName, "---\n"+frontmatter+"---\n\nQuellen des Versionsinventars.\n")
 }
 
 // storedInventory ist das Inventar in der Collection; fehlt es, scheitert der
@@ -133,15 +127,16 @@ func TestInventarStatusOhneInventarUndOhneKonfiguration(t *testing.T) {
 	if response.DisplayPath != inventory.DocRef || response.Status.Path != inventory.DocRef {
 		t.Errorf("DisplayPath = %q, Status.Path = %q", response.DisplayPath, response.Status.Path)
 	}
-	if response.Sources.Present || response.Sources.Error != "" {
+	if response.Sources.Present || response.Sources.Error != "" || response.Sources.State != project.VersionSourcesMissing {
 		t.Errorf("Quellenkonfiguration = %+v, erwartet fehlend ohne Fehler", response.Sources)
 	}
-	if response.Sources.Path != filepath.Join(project.LocalDir(root), project.VersionSourcesFileName) {
-		t.Errorf("Pfad der Quellenkonfiguration = %q", response.Sources.Path)
+	if response.Sources.Path != versionsources.DocRef || response.Sources.DisplayPath != versionsources.DocRef {
+		t.Errorf("Ort der Quellenkonfiguration = %q / %q", response.Sources.Path, response.Sources.DisplayPath)
 	}
-	if response.Sources.DisplayPath != "k-playbook-local/version-sources.yaml" {
-		t.Errorf("DisplayPath der Quellenkonfiguration = %q", response.Sources.DisplayPath)
+	if response.Sources.Legacy != "" {
+		t.Errorf("ohne alte Datei kein Altbestand: %q", response.Sources.Legacy)
 	}
+	_ = root
 
 	var file inventoryFileResponse
 	getJSON(t, "/api/inventory/file", &file)
@@ -223,7 +218,7 @@ func TestInventarAnstossSchreibtUndBleibtDanachByteStabil(t *testing.T) {
 	}
 }
 
-// Ein Pfad außerhalb der erlaubten Wurzeln wird abgelehnt — von der
+// Ein Pfad außerhalb der Projektwurzel wird abgelehnt — von der
 // Vertrauensgrenze in internal/inventory, nicht vom Handler. Die Antwort
 // trägt die Ablehnung so, wie die Fachlogik sie meldet: angefragter Pfad,
 // aufgelöster Pfad, Grund. Der Lauf bricht deswegen nicht ab.
@@ -233,13 +228,15 @@ func TestInventarAnstossFuehrtAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 	if resolved, err := filepath.EvalSymlinks(outside); err == nil {
 		outside = resolved
 	}
-	foreign := filepath.Join(outside, "values.yaml")
-	if err := os.WriteFile(foreign, []byte("image: nginx:1.27\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outside, "values.yaml"), []byte("image: nginx:1.27\n"), 0o644); err != nil {
 		t.Fatalf("schreiben: %v", err)
 	}
-	// Ohne Eintrag unter roots: — ein absoluter Pfad gibt seine Wurzel nicht
-	// selbst frei.
-	writeVersionSources(t, root, "schema_version: 1\nsources:\n  - path: "+foreign+"\n    kind: helm\n    env: deployment\n")
+	// Relativ, aber über .. hinaus: Die Projektwurzel ist die einzige Grenze.
+	foreign, err := filepath.Rel(root, filepath.Join(outside, "values.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	putVersionSources(store, "schema_version: 3\nsources:\n  - path: "+foreign+"\n    kind: helm\n    env: deployment\n")
 
 	code, response := postInventory(t)
 	if code != http.StatusOK || !response.OK {
@@ -254,7 +251,13 @@ func TestInventarAnstossFuehrtAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 
 	// Dieselbe Meldung wie auf dem CLI-Weg: dort ruft das Subkommando
 	// dieselbe Funktion mit denselben Optionen.
-	result, err := inventory.Collect(inventoryOptions(root))
+	config, err := versionsources.Load(t.Context(), store)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	options := inventoryOptions(root)
+	options.Config = config
+	result, err := inventory.Collect(options)
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
@@ -275,12 +278,12 @@ func TestInventarAnstossFuehrtAbgelehntePfadeWieDieFachlogik(t *testing.T) {
 // geschrieben wird — und GET zeigt sie als sichtbaren Zustand statt als
 // Nullergebnis.
 func TestInventarDefekteKonfigurationBrichtAbUndIstSichtbar(t *testing.T) {
-	root, store := newInventoryProject(t)
-	writeVersionSources(t, root, "schema_version: 1\nroots: [/srv\n")
+	_, store := newInventoryProject(t)
+	putVersionSources(store, "schema_version: 3\nroots: [/srv]\n")
 
 	var state inventoryResponse
 	getJSON(t, "/api/inventory", &state)
-	if !state.Sources.Present || state.Sources.Error == "" {
+	if !state.Sources.Present || state.Sources.Error == "" || state.Sources.State != project.VersionSourcesInvalid {
 		t.Errorf("Quellenkonfiguration = %+v, erwartet vorhanden mit Fehler", state.Sources)
 	}
 
@@ -288,10 +291,10 @@ func TestInventarDefekteKonfigurationBrichtAbUndIstSichtbar(t *testing.T) {
 	if code != http.StatusOK || !response.Available || response.OK {
 		t.Fatalf("Status %d, Antwort %+v — erwartet Abbruch", code, response)
 	}
-	if !strings.Contains(response.Message, project.VersionSourcesFileName) {
-		t.Errorf("die Meldung nennt die Datei nicht: %q", response.Message)
+	if !strings.Contains(response.Message, versionsources.DocRef) {
+		t.Errorf("die Meldung nennt das Dokument nicht: %q", response.Message)
 	}
-	if len(store.Names()) != 0 {
+	if len(store.Names()) != 1 {
 		t.Errorf("trotz Abbruch wurde geschrieben: %v", store.Names())
 	}
 	if response.Status.Present || response.Status.Unavailable {
@@ -380,9 +383,9 @@ func TestInventarStatusBeiNichtAntwortendemNode(t *testing.T) {
 // Die konfigurierten Zusatzquellen und Ausschlüsse erscheinen als Zahlen —
 // gelesen mit demselben Leser wie im Sammler. Ein Formular gibt es nicht.
 func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
-	root, _ := newInventoryProject(t)
-	writeVersionSources(t, root, "schema_version: 1\nroots:\n  - /srv/deploy\nsources:\n"+
-		"  - path: /srv/deploy/values.yaml\n    kind: helm\n    env: deployment\n"+
+	root, store := newInventoryProject(t)
+	putVersionSources(store, "schema_version: 3\nsources:\n"+
+		"  - path: deploy/values.yaml\n    kind: helm\n    env: deployment\n"+
 		"  - path: docs/extra.txt\n    kind: python\n    env: lokal\n    optional: true\n"+
 		"exclude:\n  - tests/fixtures/**\n"+
 		"helm_values:\n  - path: helm/values.yaml\n    key: redis.standalone.tag\n    item: container/redis\n")
@@ -392,8 +395,22 @@ func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
 	if !state.Sources.Present || state.Sources.Error != "" {
 		t.Fatalf("Quellenkonfiguration = %+v", state.Sources)
 	}
-	if state.Sources.Roots != 1 || state.Sources.Sources != 2 || state.Sources.Exclude != 1 || state.Sources.HelmValues != 1 {
-		t.Errorf("Zahlen = %+v, erwartet 1 Wurzel, 2 Quellen, 1 Ausschluss, 1 Helm-Wert", state.Sources)
+	if state.Sources.State != project.VersionSourcesPresent || state.Sources.Sources != 2 || state.Sources.Exclude != 1 || state.Sources.HelmValues != 1 {
+		t.Errorf("Zahlen = %+v, erwartet 2 Quellen, 1 Ausschluss, 1 Helm-Wert", state.Sources)
+	}
+
+	// Die alte Datei ist Altbestand: Die Anzeige nennt sie, gelesen wird sie
+	// nicht — die Zahlen bleiben die aus der Collection.
+	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("schema_version: 1\nexclude:\n  - a/**\n  - b/**\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	getJSON(t, "/api/inventory", &state)
+	if !strings.Contains(state.Sources.Legacy, "/k-upgrade") || state.Sources.Exclude != 1 {
+		t.Errorf("Altbestand = %+v", state.Sources)
 	}
 }
 
@@ -474,7 +491,13 @@ func TestInventarAnstossFuehrtNichtAuswertbareQuellen(t *testing.T) {
 		t.Fatalf("nicht auswertbare Quellen = %+v", response.Unevaluable)
 	}
 
-	result, err := inventory.Collect(inventoryOptions(root))
+	config, err := versionsources.Load(t.Context(), store)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	options := inventoryOptions(root)
+	options.Config = config
+	result, err := inventory.Collect(options)
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}

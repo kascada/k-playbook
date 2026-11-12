@@ -219,16 +219,18 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 		t.Errorf("Umgebung (%d) steht nicht vor Auf Abruf (%d):\n%s", umgebung, abruf, stdout)
 	}
 
-	path := filepath.Join(project.LocalDir(root), project.VersionSourcesFileName)
+	// Die alte Quellenkonfiguration ist Altbestand (Task 144): eine Warnung,
+	// gelesen wird sie nicht.
+	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
 	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	stdout, err = runBriefingCaptured(t)
 	if err != nil {
-		t.Fatalf("briefing mit Fehler: %v", err)
+		t.Fatalf("briefing mit Altbestand: %v", err)
 	}
-	if !strings.Contains(stdout, "\n  [error] versionSources: Die Quellenkonfiguration des Versionsinventars "+path+" ist nicht lesbar") {
-		t.Errorf("Fehler fehlt:\n%s", stdout)
+	if !strings.Contains(stdout, "\n  [warning] versionSources: "+project.LegacyVersionSourcesDisplay+" liegt noch") {
+		t.Errorf("Warnung fehlt:\n%s", stdout)
 	}
 
 	stdout, err = runBriefingCaptured(t, "--json")
@@ -259,7 +261,9 @@ func TestBriefingOhneMitgelieferteEbeneEndetMitFehler(t *testing.T) {
 	if err == nil || exitCodeOf(err) == 0 {
 		t.Fatalf("briefing: %v (Code %d), erwartet einen Fehler", err, exitCodeOf(err))
 	}
-	if project.DocRefErrorCode(err) != project.DocCodeKephalaionUnavailable || !strings.Contains(err.Error(), "/k-gui") {
+	if project.DocRefErrorCode(err) != project.DocCodeKephalaionUnavailable || !strings.Contains(err.Error(), "/k-gui") ||
+		!strings.HasPrefix(err.Error(), "Kephalaion ist nicht erreichbar") ||
+		!strings.HasSuffix(err.Error(), "\nNächster Schritt: k-playbook troubleshooting") {
 		t.Errorf("Fehler: %v", err)
 	}
 	if stdout != "" {

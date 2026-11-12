@@ -63,7 +63,7 @@ locations derive from the project root, the directory that holds
 | open tasks | `keph:/user/<user>/tasks/` — in the project collection, not under `k-playbook-local/`; form in `k-playbook:/instructions/on-demand/tasks.md` |
 | completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; a `k-playbook-local/tasks/` from before is moved by `/k-upgrade` 3.3 and removed by 3.4 once empty |
 | project todos | `todos/` in the project collection; a `k-playbook-local/data/todos.json` from before is taken over by `k-playbook todo migrate` |
-| version sources | `k-playbook-local/version-sources.yaml` |
+| version sources | `keph:/k-playbook/inventory.md` — in the project collection since task 144, settings in the frontmatter; a `k-playbook-local/version-sources.yaml` is no longer read, `/k-upgrade` 3.6 moves it |
 | private content | `k-playbook-local/priv/` |
 | instructions, shipped | `k-playbook/k-playbook.md` |
 | instructions, project-owned | `k-playbook-local/k-playbook.md` |
@@ -115,14 +115,18 @@ by 3.3. The version inventory lives in the project collection as
 `keph:/docs/generated/versions/inventory.md`, and hand-written documentation in
 `keph:/docs/manual/`.
 
-In contrast, setup creates the version inventory source configuration,
-`k-playbook-local/version-sources.yaml`, as a valid empty configuration. It is
-maintained manually and never overwritten by an update. Its status appears in
-the `versionSources` section of `k-playbook context`, so no command reads it
-itself. The template declares `schema_version: 1`; a configuration that uses
-`helm_values` declares `2`, and the tool reads both. The interface only displays
-it in the "Inventory" section, showing the path, status, and count of roots,
-sources, exclusions, and configured Helm values; it does not edit it.
+The source configuration of the version inventory is not created by setup either. Since
+task 144 it is the document `keph:/k-playbook/inventory.md` in the project collection, its
+settings in the frontmatter (`schema_version: 3`, `sources`, `exclude`, `helm_values`;
+`roots` no longer exists, only paths below the project root are read); `/k-doc-inventory`
+creates it on the first confirmed addition, and without it the default sources apply. It
+is maintained manually and never overwritten by an update. Its status appears in the
+`versionSources` section of `k-playbook context` (`ref`, `state`), so no command reads it
+itself. A `k-playbook-local/version-sources.yaml` from before is no longer read: the health
+check reports it as a legacy file, and `/k-upgrade` (conversion 3.6) moves its settings into
+the document and deletes it after asking. The interface only displays the configuration in
+the "Inventory" section, showing the document, its state, and the count of sources,
+exclusions, and configured Helm values; it does not edit it.
 That section also offers the inventory prompt, the same run as `k-playbook
 inventory` and `/k-doc-inventory`, writing into the project collection. The contract is in
 [`version-inventory.md`](./version-inventory.md); after a version jump in the current pass

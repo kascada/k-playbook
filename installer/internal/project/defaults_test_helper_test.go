@@ -4,7 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
 // testDefaultsAddress ist die Adresse der öffentlichen Collection in Tests.
@@ -22,11 +24,21 @@ var realOpenDefaultsStore = OpenDefaultsStore
 // Platte.
 //
 // Ebenso die Collection des Projekts für die projekteigene Ebene
-// (OpenProjectLayerStore): gefüllt aus testCollectionDir des Projekts, leer
-// ohne.
+// (OpenProjectLayerStore) und die Quellenkonfiguration des
+// Versionsinventars (OpenVersionSourcesReader): gefüllt aus
+// testCollectionDir des Projekts, leer ohne. Wie der echte Weg öffnet der
+// Leser nur bei bereiter Anbindung.
 func isolateDefaults() func() {
 	original := OpenDefaultsStore
 	originalProject := OpenProjectLayerStore
+	originalSources := OpenVersionSourcesReader
+	OpenVersionSourcesReader = func(projectDir string, status kephalaion.Status) (versionsources.Reader, error) {
+		if !status.OK {
+			return nil, docRefErrorf(DocCodeKephalaionUnavailable,
+				"Kephalaion ist für dieses Projekt nicht bereit (%s): %s", status.State, status.Message)
+		}
+		return kephtest.Collection(filepath.Join(projectDir, testCollectionDir))
+	}
 	OpenDefaultsStore = func(projectDir string) (DefaultsStore, string, error) {
 		store, err := kephtest.Defaults(filepath.Join(PlaybookDir(projectDir), defaultsDirName))
 		if err != nil {
@@ -44,6 +56,7 @@ func isolateDefaults() func() {
 	return func() {
 		OpenDefaultsStore = original
 		OpenProjectLayerStore = originalProject
+		OpenVersionSourcesReader = originalSources
 	}
 }
 

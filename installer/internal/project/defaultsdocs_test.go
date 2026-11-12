@@ -283,8 +283,28 @@ func TestBriefingOhneMitgelieferteEbeneScheitert(t *testing.T) {
 	if DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 		t.Fatalf("ohne Anbindung: %v (Code %q), erwartet %s", err, DocRefErrorCode(err), DocCodeKephalaionUnavailable)
 	}
-	for _, want := range []string{"Keine Collection eingetragen", "/k-gui"} {
-		if !strings.Contains(err.Error(), want) {
+	// Die Meldung sagt ohne Vorwissen, was los ist (Task 144): Kephalaion
+	// nicht erreichbar, der Grund aus dem Zustand, die Abhilfe wie in der
+	// Gesundheitsprüfung, als nächster Schritt k-playbook troubleshooting.
+	want := "Kephalaion ist nicht erreichbar — ohne Kephalaion gibt es kein Briefing.\n" +
+		"Grund: Keine Collection eingetragen.\n" +
+		"Abhilfe: " + kephalaionHint(kephalaion.StateNotConfigured) + "\n" +
+		"Nächster Schritt: k-playbook troubleshooting"
+	if err.Error() != want {
+		t.Errorf("Meldung:\n%v\nerwartet\n%s", err, want)
+	}
+	var notReady *KephalaionNotReadyError
+	if !errors.As(err, &notReady) || notReady.Status.State != kephalaion.StateNotConfigured {
+		t.Errorf("der Zustand der Anbindung bleibt im Fehler erreichbar: %#v", err)
+	}
+
+	// Mit Abhilfe in der Meldung von Kephalaion wird sie geteilt.
+	stubKephalaionCheck(t, kephalaion.Status{Configured: true, State: kephalaion.StateNodeUnreachable,
+		Message: "Der Node antwortet nicht unter http://127.0.0.1:9/mcp. Abhilfe: kephalaion status."})
+	_, err = BuildBriefing(t.Context(), root)
+	for _, want := range []string{"\nGrund: Der Node antwortet nicht unter http://127.0.0.1:9/mcp.\n",
+		"\nAbhilfe: kephalaion status.\n", "\nNächster Schritt: k-playbook troubleshooting"} {
+		if DocRefErrorCode(err) != DocCodeKephalaionUnavailable || !strings.Contains(err.Error(), want) {
 			t.Errorf("Meldung ohne %q: %v", want, err)
 		}
 	}

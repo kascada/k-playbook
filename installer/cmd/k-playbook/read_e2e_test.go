@@ -399,7 +399,9 @@ func TestReadKUpgradeAusDefaultsMitInclude(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("kein JSON: %v — %s", err, stdout)
 	}
-	if len(result.Includes) != 1 || result.Includes[0].Ref != "k-playbook:/commands/_shared/erster-schritt.md" || result.Includes[0].Depth != 1 || result.Includes[0].Origin != "dist" {
+	// Dazu seit Task 144 der Schreibweg der Quellenkonfiguration (3.6).
+	if len(result.Includes) != 2 || result.Includes[0].Ref != "k-playbook:/commands/_shared/erster-schritt.md" || result.Includes[0].Depth != 1 || result.Includes[0].Origin != "dist" ||
+		result.Includes[1].Ref != "k-playbook:/commands/_shared/inventory-config.md" {
 		t.Errorf("includes: %+v", result.Includes)
 	}
 }

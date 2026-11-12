@@ -409,10 +409,15 @@ func openKephClient(projectDir string) (*kephalaion.Client, string, error) {
 // demselben Hub, mit demselben Account — etwa DefaultsCollectionName. Leer
 // heißt: die Collection der Anbindung.
 func openKephClientFor(projectDir string, collection string) (*kephalaion.Client, string, error) {
-	status := KephalaionStatus(projectDir)
+	return openKephClientStatus(projectDir, collection, KephalaionStatus(projectDir))
+}
+
+// openKephClientStatus ist openKephClientFor mit einem Status, den der
+// Aufrufer schon geprüft hat — etwa ContextForDir, das ihn ohnehin ausgibt —,
+// damit der Node nicht ein zweites Mal gefragt wird.
+func openKephClientStatus(projectDir string, collection string, status kephalaion.Status) (*kephalaion.Client, string, error) {
 	if !status.OK {
-		return nil, "", docRefErrorf(DocCodeKephalaionUnavailable,
-			"Kephalaion ist für dieses Projekt nicht bereit (%s): %s", status.State, status.Message)
+		return nil, "", &DocRefError{Code: DocCodeKephalaionUnavailable, err: &KephalaionNotReadyError{Status: status}}
 	}
 	binding, err := ProjectBinding(projectDir)
 	if err != nil {
