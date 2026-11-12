@@ -16,7 +16,7 @@ unter `context` und in der Ausgabe von `k-playbook context`.
 
 Beispiele:
 
-- `project:/k-playbook-local/version-sources.yaml`
+- `project:/README.md`
 - `k-playbook:/instructions/on-demand/<thema>.md`
 - `keph:/docs/manual/<thema>.md`
 - `keph:/docs/` (ein Verzeichnis)

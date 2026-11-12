@@ -44,24 +44,38 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.git` | Ob die Oberfläche das Umschalten des Branches anbietet (`switch`, `allow`, `environments`, `configured`). Liest kein Command. |
 | `context.baseTools` | Die Werkzeuge, die k-playbook selbst aufruft, und was davon fehlt: `matrix`, `present`, `missing` (je `name`, `role`, `methods`), `ok`, `installCommand`. |
 | `context.catalogs.checks` | Die Checks — nur die mitgelieferten, `origin` immer `dist`; projekteigene Checks gibt es nicht. Reviews stehen nicht hier, sondern unter `documents.reviews`. |
-| `context.versionSources` | Zustand der Quellenkonfiguration des Versionsinventars `<local.dir>/version-sources.yaml`: ob sie da ist, welche Wurzeln außerhalb des Projekts sie öffnet, welche Zusatzquellen sie nennt, welche Bereiche sie ausschließt und welche Helm-Werte sie ausdrücklich nennt. Von hier lesen — nie die Datei selbst. Einzelheiten unten. |
+| `context.versionSources` | Zustand der Quellenkonfiguration des Versionsinventars `keph:/k-playbook/inventory.md`: ob sie da und lesbar ist, welche Zusatzquellen sie nennt, welche Bereiche sie ausschließt und welche Helm-Werte sie ausdrücklich nennt. Von hier lesen — nie das Dokument selbst. Einzelheiten unten. |
 | `context.kephalaion` | Die Anbindung des Projekts an seine Collection: `address`, `ok`, `user`, `message` u. a.; Hub und Collection aus dem Block `kephalaion:` von `.k-playbook/K-PLAYBOOK.yaml`, `account` und seine Herkunft `choice` (`override`, `default`, `only`) aus der Auskunft von Kephalaion. `keph:`-Verweise sind nur erreichbar, wenn `ok` wahr ist. |
 | `context.links` | Die Selbstheilung der Assistenten-Verknüpfungen: `healed`, `open`, `note`. Nur da, wenn es etwas zu melden gab; `note` sagt, was das für diese Sitzung heißt. |
 | `context.github` | Welcher Dienst der persönlichen GitHub-Zugangsdatei zum Repo des Arbeitsverzeichnisses gehört und welche Zugänge `k-playbook github run` dafür wählt: `file`, `present`, `problems`, `remote`, `repo`, `projectServices`, `services`. Im Klartext eine eigene Zeile `GitHub:` nach `Projektdoku:`. Einzelheiten unten. |
 
 ### `versionSources`
 
-`context.versionSources` trägt die ganze Antwort, kein Command muss die Datei öffnen: `present`
-sagt, ob sie da ist, `path`, wo sie liegt, `schemaVersion`, welche Vertragsfassung sie erklärt,
-`roots` die zusätzlich lesbaren Wurzeln und `sources` die konfigurierten Zusatzquellen (`path`,
-`kind`, `env`, `note`, `optional` je Eintrag), `exclude` die Muster, die der Standardlauf
-übergeht, und `helmValues` die konfigurierten Helm-Werte (`path`, `key`, `item` je Eintrag; nur
-unter `schemaVersion` 2 angewendet). Die Installation `<playbook.dir>` wird immer übergangen und
-steht nicht in `exclude` — diese Regel kommt aus dem Vertrag, nicht aus der Datei. `error` ist
-nur gefüllt, wenn die Datei da, aber unlesbar oder von unbekannter Fassung ist — dann sind
-`roots`, `sources`, `exclude` und `helmValues` leer, und der Zustand ist ein sichtbarer Befund,
-kein leeres Ergebnis. Auf einer Installation, die älter ist als das Feld, fehlt es. Der
-vollständige Vertrag steht in `<playbook.dir>/docs/version-inventory.md`.
+`context.versionSources` trägt die ganze Antwort, kein Command muss das Dokument öffnen: `ref`
+sagt, wo es liegt — immer `keph:/k-playbook/inventory.md`, auch wenn es fehlt —, `state`, in
+welchem Zustand es ist, `present`, ob es da ist, `schemaVersion`, welche Vertragsfassung es
+erklärt (gelesen wird nur `3`), `sources` die konfigurierten Zusatzquellen (`path`, `kind`,
+`env`, `note`, `optional` je Eintrag), `exclude` die Muster, die der Standardlauf übergeht, und
+`helmValues` die konfigurierten Helm-Werte (`path`, `key`, `item` je Eintrag). Jeder Pfad steht
+relativ zur Projektwurzel; gelesen wird nur unterhalb von ihr. Die Installation `<playbook.dir>`
+durchsucht der Standardlauf nicht, und sie steht nicht in `exclude` — diese Regel kommt aus dem
+Vertrag, nicht aus dem Dokument.
+
+`state` ist einer von vier Werten:
+
+- `present` — das Dokument liegt und ist lesbar.
+- `missing` — es fehlt; es gelten die Standardquellen. Kein Fehler.
+- `invalid` — es liegt, ist aber nicht lesbar, von anderer Fassung als `3` oder trägt den
+  Schlüssel `roots`. `error` nennt den Grund mit Zeile; `sources`, `exclude` und `helmValues`
+  sind leer, und ein Lauf von `k-playbook inventory` bräche ab.
+- `unavailable` — Kephalaion ist nicht erreichbar; über das Dokument ist nichts bekannt.
+  `error` nennt den Grund. Es gibt keinen Rückfall auf die Platte und keinen auf die
+  Standardquellen.
+
+Die alte Datei `<local.dir>/version-sources.yaml` liest kein Programmteil mehr. Liegt sie noch,
+meldet die Umgebungsprüfung sie als Altbestand; `/k-upgrade` zieht ihren Inhalt um. Auf einer
+Installation, die älter ist als das Feld, fehlt es. Der vollständige Vertrag steht in
+`<playbook.dir>/docs/version-inventory.md`.
 
 ### `health`
 
@@ -75,8 +89,11 @@ liegt noch die alte `k-playbook-local/K-PLAYBOOK.local.yaml` mit Block `kephalai
 scheitert mit `kephalaion_unavailable`, weil die mitgelieferten Texte aus der Collection
 kommen. Je fehlendem Basis-Werkzeug
 (`context.baseTools.missing`) — `warning`. Die Quellenkonfiguration des Versionsinventars
-ist da, aber nicht lesbar oder von unbekannter Fassung (`context.versionSources.error`) —
-`error`; der Eintrag nennt den Pfad, die Einzelheiten stehen in `context.versionSources.error`.
+`keph:/k-playbook/inventory.md` ist da, aber nicht lesbar, von anderer Fassung oder trägt
+`roots` (`state` `invalid`) — `error`; ebenso, wenn sie nicht erreichbar ist (`unavailable`),
+außer Kephalaion selbst ist nicht bereit: Dann trägt den Fehler schon der Bereich
+`kephalaion`. Die Einzelheiten stehen in `context.versionSources.error`. Liegt noch die alte
+`<local.dir>/version-sources.yaml` — `warning`, Abhilfe `/k-upgrade`.
 Was eine Sitzung mit den Einträgen tut, steht in den immer geltenden Anweisungen: in der
 ersten Antwort nennen, Fehler vor der Arbeit, nichts still beheben, die Abhilfe aus `hint`
 anbieten. Nach einer Abhilfe liefert `k_playbook_health` den Stand neu, ohne das Briefing neu

@@ -58,19 +58,31 @@ fields from two loads.
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether the GitHub CLI is installed and logged in on this machine (a host finding). |
 | `guidelines` | Project guideline files. |
-| `versionSources` | State of the version-inventory source configuration `<local.dir>/version-sources.yaml`: whether it is there, which roots outside the project it opens up, which extra sources it configures, which areas it excludes from the default scan and which Helm values it names explicitly. Read it from here — never read that file yourself. |
+| `versionSources` | State of the version-inventory source configuration `keph:/k-playbook/inventory.md`: whether it is there and readable, which extra sources it configures, which areas it excludes from the default scan and which Helm values it names explicitly. Read it from here — never read that document yourself. |
 
-`versionSources` carries the whole answer, so no command has to open the file:
-`present` says whether it exists, `path` where it is, `schemaVersion` which contract
-version it declares, `roots` the additional readable roots and `sources` the configured
-extra sources (`path`, `kind`, `env`, `note`, `optional` per entry), `exclude` the
-patterns the default scan skips and `helmValues` the configured Helm values (`path`, `key`,
-`item` per entry; applied only under `schemaVersion` 2). The installation `<playbook.dir>` is always skipped and
-is not part of `exclude` — that rule comes from the contract, not from the file. `error`
-is filled only when the file is there but unreadable or of an unknown schema version —
-then `roots`, `sources`, `exclude` and `helmValues` are empty and the state is a visible
-finding, not an empty result. The
-field is absent on an installation older than it. The full contract is in
+`versionSources` carries the whole answer, so no command has to open the document: `ref`
+says where it lives — always `keph:/k-playbook/inventory.md`, even when it is missing —,
+`state` which state it is in, `present` whether it exists, `schemaVersion` which contract
+version it declares (only `3` is read), `sources` the configured extra sources (`path`,
+`kind`, `env`, `note`, `optional` per entry), `exclude` the patterns the default scan skips
+and `helmValues` the configured Helm values (`path`, `key`, `item` per entry). Every path is
+relative to the project root; nothing outside it is read. The default scan does not search the
+installation `<playbook.dir>`, and it is not part of `exclude` — that rule comes from the
+contract, not from the document.
+
+`state` is one of four values:
+
+- `present` — the document exists and is readable.
+- `missing` — it is absent; the default sources apply. Not an error.
+- `invalid` — it exists but is unreadable, declares a version other than `3`, or carries the
+  key `roots`. `error` gives the reason with the line; `sources`, `exclude` and `helmValues`
+  are empty, and a run of `k-playbook inventory` would abort.
+- `unavailable` — Kephalaion is not reachable; nothing is known about the document. `error`
+  gives the reason. There is no fallback to the disk and none to the default sources.
+
+The old file `<local.dir>/version-sources.yaml` is no longer read by anything. If it is still
+there, the health check reports it as a leftover; `/k-upgrade` moves its content. The field is
+absent on an installation older than it. The full contract is in
 `<playbook.dir>/docs/version-inventory.md`.
 
 `gh` is a host finding for this machine only: `gh.installed`, `gh.loggedIn`, `gh.account`,
@@ -95,7 +107,7 @@ The layout is fixed. Everything below is derived from `local.dir`, `playbook.dir
 | tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar |
 | hand-written documentation | `keph:/docs/manual/` — in der Projekt-Collection, nicht unter `local.dir` |
-| version inventory sources | `<local.dir>/version-sources.yaml` — handgepflegt; ihr Zustand steht in `versionSources` |
+| version inventory sources | `keph:/k-playbook/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; handgepflegt, ergänzt nur von `/k-doc-inventory` nach Bestätigung; ihr Zustand steht in `versionSources` |
 | findings from analysis and debugging | `keph:/queue/findings/` in der Projekt-Collection, ein Dokument je Befund; Form nach `k-playbook:/instructions/on-demand/befunde.md`. Der bisherige Ort `<local.dir>/material/befunde/` wird nicht mehr beschrieben |
 | known decisions | `<local.dir>/known-decisions.md` |
 | review results | `<local.dir>/results/<family>/<date>/` |
