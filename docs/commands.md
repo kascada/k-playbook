@@ -2,7 +2,7 @@
 
 Compact index of slash commands. Detailed flows are on dedicated topic pages; this page does not duplicate them.
 
-Shipped review recipes and checks are under `k-playbook/`; the shipped commands and skills are unpacked by the binary into `~/.local/share/k-playbook/` and linked through `.k-playbook/share` (source in the repo: `share/`). `k-playbook-local/` contains project-owned content: review recipes, guidelines and instructions, plus results. Checks have no project-owned side since task 134: `k-check` runs only the shipped ones. Both locations derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`; there are no configured paths anymore.
+Shipped review recipes and checks are under `k-playbook/`; the shipped commands and skills are unpacked by the binary into `~/.local/share/k-playbook/` and linked through `.k-playbook/share` (source in the repo: `share/`). Project-owned review recipes and instructions live in the project collection under `keph:/k-playbook/`, project-owned guidelines under `keph:/docs/guidelines/`; `k-playbook-local/` is being phased out, and neither of them is read from there any more (tasks 143 and 148). Checks have no project-owned side since task 134: `k-check` runs only the shipped ones. Both locations derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`; there are no configured paths anymore.
 
 A project-owned command with the name of a shipped command **replaces** it; an empty one disables it. This page lists the shipped commands; the assistants section in the interface shows what actually applies in a particular project.
 
@@ -99,7 +99,7 @@ No command determines what applies itself. The tool does that:
 k-playbook context
 ```
 
-The JSON output names the resolved directories, remediation policy, guidelines, and the catalogs `reviews` and `checks`, with shipped and project-owned reviews already merged; `checks` lists only the shipped checks (task 134):
+The JSON output names the resolved directories, remediation policy, and the catalogs `reviews` and `checks`, with shipped and project-owned reviews already merged; `checks` lists only the shipped checks (task 134):
 
 ```json
 {
@@ -117,7 +117,7 @@ The JSON output names the resolved directories, remediation policy, guidelines, 
 
 `origin` is `dist`, `local`, or `override`. `disabled` appears where the project-owned file is empty; that is how to disable a shipped entry. For `checks`, `origin` is always `dist` and nothing is disabled: checks have no project-owned side.
 
-The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of reviews, checks, or guidelines has changed, or work has moved to another project.
+The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of reviews or checks has changed, or work has moved to another project.
 
 `/k-review`, `/k-enforcement`, and `k-check` work on this set and display it before working. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
 

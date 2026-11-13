@@ -71,9 +71,11 @@ flowchart LR
 
 Guidelines, commands, skills, review recipes, checks and the scanner
 matrix are not owned by any one of the three. They exist once and apply to all
-of them. Every one of these kinds exists twice — shipped under `k-playbook/` and
-project-owned under `k-playbook-local/` — and what actually applies is the union,
-with the project-owned entry winning for the same name.
+of them. Commands, skills and review recipes exist twice — shipped with k-playbook and
+project-owned, in `.k-playbook/` or in the project collection — and what actually applies
+is the union, with the project-owned entry winning for the same name. Guidelines and checks
+are read shipped only; project-owned guidelines live in the project collection under
+`keph:/docs/guidelines/` and are not merged with the shipped ones (task 148).
 
 Nothing works this out for itself. `k-playbook context` resolves it once per
 session and hands out the same answer to every command: the directories

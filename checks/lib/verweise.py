@@ -9,12 +9,11 @@ sind bewusst:
 - Gelesen werden die mitgelieferten Quellen unter <playbook>/defaults/ (commands/,
   instructions/, guidelines/) und <playbook>/share/ (commands/, skills/) und
   ihre projekteigenen Gegenstücke auf der Platte: commands/ und skills/ unter
-  <config-root>/.k-playbook/, guidelines/ unter <config-root>/k-playbook-local/,
-  jeweils alle .md- und .md.template-Dateien.
+  <config-root>/.k-playbook/, jeweils alle .md- und .md.template-Dateien.
   Schlüssel ist der Pfad ab dem Playbook (defaults/…, share/…) bzw. ab der
-  Konfigurationswurzel (.k-playbook/…, k-playbook-local/…). Den früheren Ort
-  k-playbook-local/commands/ und k-playbook-local/skills/ liest der Check nicht mehr,
-  wie das Programm seit Task 129, ebenso k-playbook-local/instructions/ seit Task 143.
+  Konfigurationswurzel (.k-playbook/…). Aus k-playbook-local/ liest der Check nichts
+  mehr, wie das Programm: commands/ und skills/ seit Task 129, instructions/ seit
+  Task 143, guidelines/ seit Task 148 (Guidelines kommen nur mitgeliefert).
   Projekteigene Instructions liegen seitdem in der Projekt-Collection unter
   keph:/k-playbook/instructions/; die prüft der Check nicht — eine bewusst
   hingenommene Lücke. Die Tasks in der Projekt-Collection durchsucht er ebenso nicht.
@@ -50,14 +49,13 @@ from common import fail_technical, finish_findings, status
 
 EXCEPTIONS_FILE = "verweis-exceptions.tsv"
 EXCEPTIONS_HEADER = ["datei", "zeile", "art", "begründung"]
-LOCAL_DIR_NAME = "k-playbook-local"
 KINDS = ("link", "pfad")
 
 PLAYBOOK_SCOPE = ("defaults/commands", "defaults/instructions",
                   "defaults/guidelines", "share/commands", "share/skills")
 # Projekteigene Instructions liegen seit Task 143 in der Projekt-Collection
-# (keph:/k-playbook/instructions/) und werden hier nicht geprüft.
-LOCAL_SCOPE = ("guidelines",)
+# (keph:/k-playbook/instructions/) und werden hier nicht geprüft; projekteigene
+# Guidelines liest das Programm seit Task 148 nicht mehr von der Platte.
 # Projekteigene Commands und Skills liegen in .k-playbook/, nicht in k-playbook-local/.
 PROJECT_SCOPE = ("commands", "skills")
 
@@ -98,15 +96,13 @@ def collect(directory: Path, key_prefix: str, files: dict[str, Path]) -> None:
             files[key] = entry
 
 
-def source_files(playbook_dir: Path, local_dir: Path, project_dir: Path) -> dict[str, Path]:
+def source_files(playbook_dir: Path, project_dir: Path) -> dict[str, Path]:
     """project_dir ist <config-root>/.k-playbook/."""
     files: dict[str, Path] = {}
     for part in PLAYBOOK_SCOPE:
         collect(playbook_dir / part, part, files)
     for part in PROJECT_SCOPE:
         collect(project_dir / part, f"{PROJECT_DIR_NAME}/{part}", files)
-    for part in LOCAL_SCOPE:
-        collect(local_dir / part, f"{LOCAL_DIR_NAME}/{part}", files)
     return files
 
 
@@ -253,13 +249,13 @@ def run() -> int:
     if len(sys.argv) != 2:
         return fail_technical("usage: verweise.py <check-script-dir>")
     script_dir = Path(sys.argv[1]).resolve()
-    playbook_dir, local_dir = resolve_dirs(script_dir)
+    playbook_dir, _ = resolve_dirs(script_dir)
     project_dir = config_root() / PROJECT_DIR_NAME
 
-    files = source_files(playbook_dir, local_dir, project_dir)
+    files = source_files(playbook_dir, project_dir)
     if not files:
-        status("skip", f"no sources found under {playbook_dir / 'defaults'}, {playbook_dir / 'share'}, "
-                       f"{project_dir} or {local_dir}")
+        status("skip", f"no sources found under {playbook_dir / 'defaults'}, {playbook_dir / 'share'} "
+                       f"or {project_dir}")
         return 0
 
     exceptions_path = script_dir / EXCEPTIONS_FILE

@@ -17,11 +17,11 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"6"`. |
 | `session` | Die Kennung dieser Sitzung, mit jedem Briefing neu vergeben, etwa `20261024-183012-3fa9c1`. Sie steht in allem, was die Sitzung später wiederfinden muss — im Kopf eines Befunds unter `sitzung`, nach dem `/k-danke` sucht. Lädt eine Sitzung das Briefing neu, gilt die neue Kennung, und die frühere gehört weiter zu ihr. |
 | `documents.always` | Das zusammengebaute Verzeichnis `k-playbook:/instructions/always/`: `ref`, `content` (der Text selbst, Includes eingesetzt — eine Sitzung muss ihn nicht eigens lesen), `parts` in der Reihenfolge des Texts, `problems` (übergangene Teile). |
-| `documents.onDemand`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Mitgeliefert und projektlokal sind schon gegeneinander aufgelöst. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
+| `documents.onDemand`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Bei Anweisungen und Reviews sind mitgeliefert und projekteigen schon gegeneinander aufgelöst; Guidelines kommen nur mitgeliefert, ihre Herkunft ist immer `dist`. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
 | `work` | Die eigene offene Arbeit aus der Projekt-Collection: `available` und `message` (ob die Collection lesbar war und sonst warum nicht), `user` (der eigene Kephalaion-User), `tasks` und `workbench` (je `ref`, `title`, `updated` und `problem`, wenn Kephalaion das Frontmatter nicht lesen konnte oder der Titel vermutlich an „ #“ abgeschnitten ist — gemeldet, nicht repariert; offen heißt: nicht in `done/`), `openFindings` (Zahl der offenen Befunde in `queue/findings/`). |
 | `projectDocs` | Der Einstieg der Projektdokumentation, als Verweis. |
 | `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, …), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
-| `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.reviews` und `guidelines` fehlen darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
+| `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.reviews` fehlt darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
 
 ### Der Abschnitt `context`
 
@@ -30,7 +30,6 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.available`, `context.message` | Ob die Kontextausgabe gebaut werden konnte. Wenn nicht, sagt `message` warum, und die übrigen Felder fehlen; das Briefing davor gilt trotzdem. |
 | `context.schemaVersion` | Die Fassung der Konfiguration `K-PLAYBOOK.yaml`. Liest kein Command. |
 | `context.now.date`, `context.now.timestamp` | Der Moment des Aufrufs in der Zeitzone des Rechners. `date` ist `YYYY-MM-DD`, `timestamp` RFC 3339. |
-| `context.instructions` | Dateien, die zuerst zu lesen sind, in dieser Reihenfolge: die mitgelieferte Ebene, dann die des Projekts. |
 | `context.project.dir` | Das Hauptverzeichnis — wo `K-PLAYBOOK.yaml` liegt. |
 | `context.project.repoRoot`, `context.project.vcs` | Das Code-Repository für Git-Operationen, und ob es unter Versionskontrolle steht. |
 | `context.project.config` | Der Pfad der Konfiguration `K-PLAYBOOK.yaml`. Nur zur Auskunft; gelesen wird sie nie selbst. |

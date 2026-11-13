@@ -55,7 +55,8 @@ const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema ste
 	"Anbindung nicht bereit: kephalaion_unavailable, kein Rückfall), k-playbook:/… lokal und mitgeliefert schon " +
 	"gegeneinander aufgelöst, dieselbe Überlagerung wie catalogs in k_playbook_context: eine lokale Datei ersetzt " +
 	"die gleichnamige mitgelieferte, eine leere schaltet sie ab; die lokale Fassung von instructions und reviews " +
-	"liegt in der Collection des Projekts unter keph:/k-playbook/<sorte>/. Sorten unter k-playbook:: instructions/, " +
+	"liegt in der Collection des Projekts unter keph:/k-playbook/<sorte>/; guidelines/ gibt es nur mitgeliefert, " +
+	"ohne lokale Fassung. Sorten unter k-playbook:: instructions/, " +
 	"reviews/, guidelines/, commands/ (der Text eines Commands, dessen Hülle beim Assistenten liegt), dazu " +
 	"docs/<pfad>/README.md — die Vorlage für keph:/docs/<pfad>/README.md, nur mitgeliefert, ohne lokale Fassung. " +
 	"Eine Datei kommt mit Frontmatter; k-playbook:/instructions/always/ (mit / am Ende) baut das Verzeichnis zu " +

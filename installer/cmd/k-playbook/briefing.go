@@ -391,8 +391,8 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     unter context.github;
   - hinter einer Trennzeile den Rest von k-playbook context — die
     Umgebungsangaben (Pfade, Werkzeuge, gh, git, Kephalaion-Anbindung …), die
-    das Briefing noch nicht selbst abdeckt; ohne catalogs.reviews und
-    guidelines, die oben schon stehen. Der Abschnitt wird
+    das Briefing noch nicht selbst abdeckt; ohne catalogs.reviews, das oben
+    schon steht. Der Abschnitt wird
     Feld für Feld abgebaut; ist er leer, entfällt k-playbook context. Lässt
     sich die Kontextausgabe nicht bauen, steht das dort — kein Fehler.
 

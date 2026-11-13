@@ -12,7 +12,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 | Prefix | Meaning | Example |
 |---|---|---|
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
-| `k-playbook:` | resolved by k-playbook, local before shipped | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/guidelines/betrieb.md` |
+| `k-playbook:` | resolved by k-playbook, local before shipped (`guidelines/` and `docs/` shipped only) | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/guidelines/betrieb.md` |
 | `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
 | `keph:` | the project's collection in Kephalaion | `keph:/docs/manual/abc.md` |
 | `keph:` with a trailing `/` | a directory in the project's collection, listed with Kephalaion `list` (`recursive`, `frontmatter`), its documents read one by one | `keph:/docs/` |
@@ -159,10 +159,12 @@ catalog, no briefing and no help text: nobody reads them for their own sake.
 A third kind outside the catalogs is **`docs/`** (task 137): `k-playbook:/docs/<path>/README.md`
 is the template for `keph:/docs/<path>/README.md` in the project collection
 (`defaults/docs/<path>/README.md` in the source repo, on the hub under
-`<hub>:k-playbook/defaults/`). It is the one kind with **no local version**: only the shipped
+`<hub>:k-playbook/defaults/`). It has **no local version**: only the shipped
 layer is read (`docDistOnlyKinds` in `docref.go`), a file under `k-playbook-local/docs/` does
 not win and an empty one does not disable, because the README is the same in every project
-and comes from one source. A missing template is `not_found`. The tree under `docs/` is the
+and comes from one source. The reader kind `guidelines/` is the second kind on that list
+(task 148): `k-playbook:/guidelines/<name>.md` answers from the shipped layer only, and
+`k-playbook-local/guidelines/` is not read. A missing template is `not_found`. The tree under `docs/` is the
 list of templates -- there is no second list in the code; `docs/README.md` at the top has no
 template, it belongs to Kephalaion. `k-playbook docs readme` (MCP `k_playbook_docs_readme`)
 writes the READMEs from these templates ([mcp.md](mcp.md#generated-docs-checkout-and-publish)).
@@ -253,7 +255,7 @@ Two layers, compared by name:
 | Layer | Directory | Origin |
 |---|---|---|
 | shipped | the public collection `<hub>:k-playbook` under `defaults/` — what the hub fetched from the latest release; every kind is read there, with the same path below `defaults/` | `dist` |
-| local | `instructions/`, `includes/` and `reviews/` from the project collection under `k-playbook/` (`keph:/k-playbook/<kind>/`) since task 143; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; `guidelines/` (and `testdata/`) still from `k-playbook-local/`; never for `docs/`, the README templates (task 137) | `local`, or `override` when it replaces a shipped file of the same name |
+| local | `instructions/`, `includes/` and `reviews/` from the project collection under `k-playbook/` (`keph:/k-playbook/<kind>/`) since task 143; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; `testdata/` still from `k-playbook-local/`; never for `docs/`, the README templates (task 137), and never for `guidelines/` (task 148: `k-playbook-local/guidelines/` is no longer read) | `local`, or `override` when it replaces a shipped file of the same name |
 
 The shipped layer is read from Kephalaion since task 131 (`NewKephDefaultsSource` in
 `defaultsdocs.go`): the hub is the one of the project binding, the collection is always
@@ -303,11 +305,10 @@ catalogs of `k-playbook context` (`resolveCatalog`), the references here and the
 go through it. A test compares both ways for `reviews`: name, origin and
 `disabled` of every catalog entry are what `k-playbook:/<kind>/<name>` answers, and the
 content behind the reference is what the catalog's `path` names -- for a shipped entry that
-`path` is the reference itself. The one named exception is the
-field `guidelines` of the context output, which still lists only
-`k-playbook-local/guidelines/` until the context output is switched; for references and the
-briefing, `guidelines` is a regular overlay kind with shipped
-`<hub>:k-playbook/defaults/guidelines/` and local `k-playbook-local/guidelines/`.
+`path` is the reference itself. `guidelines` is not an overlay kind any more (task 148): for
+references and the briefing it has only the shipped layer
+`<hub>:k-playbook/defaults/guidelines/` (`docDistOnlyKinds`, like `docs/`), the overlay does
+not ask the local layer for it, and the context output has no field `guidelines`.
 
 ### A single file
 

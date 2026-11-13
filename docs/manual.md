@@ -26,14 +26,14 @@ project/
 ├── .k-playbook/
 │   └── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
 ├── k-playbook/           the installation, fully replaceable
-└── k-playbook-local/     project-owned, committed
+└── k-playbook-local/     being phased out: never created any more
 ```
 
 | Part | Owner | What happens on update |
 |---|---|---|
 | `.k-playbook/K-PLAYBOOK.yaml` | the project | remains untouched |
 | `k-playbook/` | k-playbook | is fully replaced |
-| `k-playbook-local/` | the project | remains untouched |
+| `k-playbook-local/` | the project | being phased out: k-playbook no longer creates it and reads neither `k-playbook.md` nor `guidelines/` there (task 148); what happens to leftovers is in [`k-playbook-format.md`](./k-playbook-format.md) |
 
 Because configuration is **beside**, rather than **in**, the installation,
 `k-playbook/` contains nothing project-owned. That is exactly why it can be
@@ -42,17 +42,18 @@ updated completely.
 ```mermaid
 flowchart LR
     Anchor[".k-playbook/K-PLAYBOOK.yaml"] --> Playbook["k-playbook/"]
-    Anchor --> Local["k-playbook-local/"]
+    Anchor --> Project[".k-playbook/"]
 
     Playbook --> Base["reviews/ · checks/<br>commands/ · skills/"]
     Playbook --> Tool["bin/ · scripts/"]
 
-    Local --> Overlay["reviews/<br>commands/ · skills/"]
-    Local --> Artifacts["guidelines/ · priv/"]
+    Project --> Overlay["commands/ · skills/"]
+    Anchor --> Layer["project collection: keph:/k-playbook/reviews/ · instructions/"]
     Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
 
     Base --> Effective["effective set"]
     Overlay --> Effective
+    Layer --> Effective
 
     Effective --> Assistant["Claude Code · OpenCode"]
 ```
@@ -60,9 +61,10 @@ flowchart LR
 ### Paths are derived, not stored in config
 
 There is no longer a `paths:` block. Every location derives from the location
-of `K-PLAYBOOK.yaml`: results are under `k-playbook-local/results/`, project
-knowledge under `keph:/docs/` in the project collection, and shipped checks under
-`k-playbook/checks/`. Tasks are documents in the project collection as well,
+of `K-PLAYBOOK.yaml`: project-owned commands and skills are under `.k-playbook/`,
+project knowledge under `keph:/docs/` in the project collection, and shipped checks under
+`k-playbook/checks/`. Review results have no place at present; review runs are paused
+(task 147). Tasks are documents in the project collection as well,
 `keph:/user/<user>/tasks/`, not files on disk. A command therefore neither guesses
 nor reads a path: it derives it, or it takes the reference.
 
@@ -94,9 +96,10 @@ k-playbook context
 ```
 
 The command outputs the resolved working state as JSON: directories,
-remediation policy, guidelines, and the
-three catalogs, already merged, including each entry's origin and marked
-disabled entries.
+remediation policy, and the
+catalogs, already merged, including each entry's origin and marked
+disabled entries. Guidelines are not part of it (task 148): they come shipped only,
+and the briefing names them under `documents.guidelines`.
 
 The same information is also available to an assistant as a tool:
 `k-playbook mcp` starts an MCP server whose only tool returns the working state.
@@ -109,7 +112,7 @@ it offers on request; see [`mcp.md`](./mcp.md).
 One answer also means once per session. The output does not change while work
 is underway, so the next command does not retrieve it again but continues with
 the existing result. Retrieve it again only after writing `K-PLAYBOOK.yaml`,
-changing the set of reviews, checks, or guidelines, or moving work to a
+changing the set of reviews or checks, or moving work to a
 different project.
 
 ### Instructions at two levels

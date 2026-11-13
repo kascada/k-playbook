@@ -155,7 +155,8 @@ ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zu
 `OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
 `reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
 Include-Ziele `includes/` und `testdata/` und die README-Vorlagen `docs/`, zusammen
-`docRefKinds`), lokal vor mitgeliefert — `docs/` nur mitgeliefert (`docDistOnlyKinds`) —
+`docRefKinds`), lokal vor mitgeliefert — `docs/` und seit Task 148 `guidelines/` nur
+mitgeliefert (`docDistOnlyKinds`) —
 mitgeliefert heißt seit Task 131 aus `<hub>:k-playbook/defaults/` über den Node (siehe „Die
 mitgelieferte Ebene aus `<hub>:k-playbook`“),
 ein Verweis mit `/` am Ende auf ein Verzeichnis aus `docAssembledDirs` (heute nur
@@ -179,13 +180,15 @@ Liste seiner Teile), dann als Daten, welche Anweisungen, Reviews und Leitlinien 
 das Projekt gelten — `always/` mit seinen Teilen, `on-demand/`, `reviews/`,
 `guidelines/`, je Eintrag Verweis, Titel,
 Beschreibung (Frontmatter, sonst erste Überschrift) und Herkunft (`dist`, `local`, `override`,
-`disabled`) — und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
+`disabled`; bei `guidelines/` immer `dist`, die Sorte hat seit Task 148 keine lokale Ebene) —
+und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
 Tasks und aktive Arbeitsstände (nicht in `done/`) mit Titel, die Zahl der offenen Befunde in
 `queue/findings/`; ist Kephalaion nicht nutzbar, steht das dort (`work.available`). Verweise,
 keine Pfade, keine Inhalte außer dem Text der immer geltenden Anweisungen. Umgebungsangaben stehen nur im Übergangsabschnitt `context` (Task
 091): der Rest der Kontextausgabe, den das Briefing nicht selbst abdeckt, aus `ContextForDir`
-— derselben Funktion wie `k-playbook context` — ohne `catalogs.reviews` und
-`guidelines` (Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code); lässt sich
+— derselben Funktion wie `k-playbook context` — ohne `catalogs.reviews`
+(Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code; ein Feld `guidelines` hat
+die Kontextausgabe seit Task 148 nicht mehr); lässt sich
 die Kontextausgabe nicht bauen, steht das dort (`context.available`). Weil der Rest über
 `ContextForDir` kommt, zieht auch das Briefing die Assistenten-Verlinkung nach
 (`context.links`). Ebenfalls nur `ContextForDir` füllt `context.github` (Task 119,
@@ -459,9 +462,10 @@ installer/
 │   │                            für resolveCatalog), ResolveDocRef für alle drei Präfixe —
 │   │                            project:/ ab der Projektwurzel, keph:/ über den Node,
 │   │                            k-playbook:/ instructions/…, reviews/…,
-│   │                            guidelines/…, commands/… (der Text, die Hülle liegt beim
-│   │                            Assistenten), includes/…, testdata/…, docs/… (nur
-│   │                            mitgeliefert) — und der docIncluder, der Include-Zeilen
+│   │                            guidelines/… (nur mitgeliefert), commands/… (der Text,
+│   │                            die Hülle liegt beim Assistenten), includes/…,
+│   │                            testdata/…, docs/… (nur mitgeliefert) — und der
+│   │                            docIncluder, der Include-Zeilen
 │   │                            einsetzt (Task 093)
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente;
 │   │                            Zugänge OpenKephDocs, OpenInventoryStore
@@ -786,9 +790,10 @@ unberührt; ein Projekt ohne das Verzeichnis bleibt nach Start der Oberfläche, 
 `project/local.go` trägt deshalb nur noch den Namen und den Pfad (`LocalDirName`,
 `LocalDir()`), für die Leser von Altbestand: die Gesundheitsprüfung, den Umzug in
 `k-playbook upgrade` und `/k-upgrade`, die lokale
-Ebene von `guidelines/` (bis zu ihrer Ablösung), die Liste der bisherigen Review-Läufe
-und die Vorprüfung beim Branchwechsel. Die Instruktionsdatei `k-playbook.md` liest seit
-Task 148 nichts mehr. Mit Task 147 entfallen sind:
+Ebene von `testdata/`, die Liste der bisherigen Review-Läufe
+und die Vorprüfung beim Branchwechsel. Die Instruktionsdatei `k-playbook.md` und die lokale
+Ebene `k-playbook-local/guidelines/` liest seit Task 148 nichts mehr. Mit Task 147 entfallen
+sind:
 
 - Die Liste der Einträge in `project/local.go` samt ihren Funktionen zum Prüfen und
   Anlegen, dazu die Vorlagen der READMEs und der projekteigenen `k-playbook.md`. Zuletzt
@@ -1209,8 +1214,12 @@ Seit Task 143 liest das Binary die projekteigene Ebene von `instructions/`, `inc
 mehr aus `k-playbook-local/`. Darunter gilt derselbe Baum wie unter `k-playbook:` —
 `k-playbook:/reviews/review-x.md` wird von `keph:/k-playbook/reviews/review-x.md` ersetzt
 oder, leer, abgeschaltet. `commands/` bleibt in `.k-playbook/commands/` (die Assistenten
-brauchen die Hüllen auf der Platte), `guidelines/` und `testdata/` bleiben vorerst in
-`k-playbook-local/`. Die Weiche ist `projectLocalDocSource.pick()` in `project/docref.go`.
+brauchen die Hüllen auf der Platte), `testdata/` bleibt vorerst in `k-playbook-local/`.
+`guidelines/` hat seit Task 148 keine projekteigene Ebene mehr: Die Sorte steht in
+`docDistOnlyKinds`, `k-playbook-local/guidelines/` liest nichts, projekteigene Guidelines
+liegen unter `keph:/docs/guidelines/` (Todo #40). Die Weiche ist
+`projectLocalDocSource.pick()` in `project/docref.go`; für eine Sorte ohne lokale Ebene gibt
+sie eine leere Quelle zurück (`noDocSource`).
 
 - **Zugang.** `OpenProjectLayerStore` (`project/projectlayer.go`) geht denselben Weg wie
   `OpenKephDocs` und gibt wie `OpenDefaultsStore` einen `kephalaion.ReaderPool` zurück.
@@ -1399,12 +1408,13 @@ Regel selbst steht einmal: `overlayDocDir()` in `project/docref.go` legt die bei
 eines Verzeichnisses übereinander, und `resolveCatalog()`, `ResolveDocRef()` und das Briefing
 rufen sie — dieselbe Sorte kommt über jeden Weg gleich heraus (Test
 `TestDocRefUndKatalogeStimmenUeberein`). Die Sorte `guidelines` hängt bewusst nicht in
-`catalogKinds()` (`guidelinesKind`): für Verweise und Briefing ist sie überlagert, das Feld
-`guidelines` der Kontextausgabe liest bis zu deren Umstellung weiter nur lokal — die eine
-benannte Ausnahme (Task 086). Die lokale Ebene `k-playbook-local/guidelines/` legt das
-Einrichten nicht mehr an, und `/k-upgrade` löscht sie: Projekteigene Guidelines liegen unter
-`keph:/docs/guidelines/`. Überlagerung und Kontextfeld bleiben bis zum Umbau aus Todo #40
-im Code und liefern ohne das Verzeichnis nichts.
+`catalogKinds()` (`guidelinesKind`): Die Kontextausgabe nennt keine Guidelines, das Briefing
+liefert sie unter `documents.guidelines`. Seit Task 148 gibt es sie nur mitgeliefert
+(`docDistOnlyKinds`): `ResolveDocRef()` und `overlayDocDir()` fragen die lokale Ebene für
+diese Sorte nicht, eine Datei unter `k-playbook-local/guidelines/` gewinnt nicht und schaltet
+nichts ab, und das Feld `guidelines` der Kontextausgabe ist entfernt. Das Einrichten legt das
+Verzeichnis nicht an, `/k-upgrade` löscht es; projekteigene Guidelines liegen unter
+`keph:/docs/guidelines/`, wie sie von dort gelesen werden, ist Todo #40.
 
 Zwei Sorten, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 135 entfallen:
 
@@ -3334,8 +3344,8 @@ per `display` zu überstimmen. `TestStylesheetHonorsHiddenAttribute` prüft, das
 ## Aufgelöster Kontext in der Oberfläche
 
 Der unterste Block der Setup-Seite zeigt, was `BuildContext()` liefert — dasselbe, was
-das Unterkommando `context` ausgibt: Pfade, die effektiven Kataloge
-und die Guidelines, dazu `kephalaion` aus dem Zwischenspeicher der Statusseite;
+das Unterkommando `context` ausgibt: Pfade und die effektiven Kataloge,
+dazu `kephalaion` aus dem Zwischenspeicher der Statusseite;
 `versionSources` steht nicht darin, die Quellenkonfiguration zeigt der Inventarbereich.
 
 Er ist ein `<details>` und der einzige Block, der **nicht** beim Seitenaufbau lädt.

@@ -280,8 +280,8 @@ Unterkommandos:
             dahinter steht: k-playbook read <verweis> [--raw] [--json].
             project: eine Datei des Projekts, keph: ein Dokument der
             Collection über den Node, k-playbook: die Sorten instructions/,
-            reviews/, guidelines/ und commands/, lokal vor
-            mitgeliefert; ein Verweis auf instructions/always/ mit / am Ende
+            reviews/ und commands/, lokal vor mitgeliefert, und guidelines/,
+            nur mitgeliefert; ein Verweis auf instructions/always/ mit / am Ende
             baut das Verzeichnis zu einem Text zusammen. Include-Zeilen
             (include: <verweis>) werden eingesetzt, --raw lässt sie stehen.
             Hinweise stehen auf stderr. Dasselbe wie das MCP-Werkzeug

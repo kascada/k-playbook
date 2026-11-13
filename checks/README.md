@@ -147,12 +147,12 @@ KI nach dieser Datei.
 - **Umfang** ist immer derselbe, unabhängig von `K_CHECK_MODE` und `K_CHECK_FILES_FROM`:
   alle `.md`- und `.md.template`-Dateien unter `<playbook.dir>/defaults/` (`commands/`,
   `instructions/`, `guidelines/`) und `<playbook.dir>/share/` (`commands/`,
-  `skills/`) und unter den projekteigenen Gegenstücken: `commands/` und `skills/` in
-  `<config-root>/.k-playbook/`, `instructions/` und `guidelines/` in
-  `<config-root>/k-playbook-local/`. Schlüssel ist der Pfad ab dem Playbook bzw. ab dem
-  Config-Root (`.k-playbook/…`, `k-playbook-local/…`); eine Ausnahme mit `datei` unter
-  `.k-playbook/commands/` oder `.k-playbook/skills/` ist gültig. Den früheren Ort
-  `k-playbook-local/commands/` und `k-playbook-local/skills/` liest der Check nicht mehr. Die Tasks in der
+  `skills/`) und unter den projekteigenen Gegenstücken `commands/` und `skills/` in
+  `<config-root>/.k-playbook/`. Schlüssel ist der Pfad ab dem Playbook bzw. ab dem
+  Config-Root (`.k-playbook/…`); eine Ausnahme mit `datei` unter
+  `.k-playbook/commands/` oder `.k-playbook/skills/` ist gültig. Aus
+  `k-playbook-local/` liest der Check nichts mehr, wie das Programm: `commands/` und
+  `skills/` seit Task 129, `instructions/` seit Task 143, `guidelines/` seit Task 148. Die Tasks in der
   Projekt-Collection durchsucht der Check noch nicht; das kommt mit dem Umbau der Checks.
 - **Gemeldet** werden relative Markdown-Links, deren Ziel mit `../` oder `./` beginnt, überall
   (Art `link`), und Pfade ohne Präfix in Backticks, die mit einer bekannten Wurzel beginnen

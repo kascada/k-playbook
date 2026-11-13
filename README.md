@@ -123,9 +123,8 @@ project/
 │   ├── reviews/ checks/
 │   ├── bin/
 │   └── installer/ docs/
-└── k-playbook-local/     being phased out: never created any more, only read
-    └── guidelines/       where it still exists, until its content has moved
-                          to the project collection
+└── k-playbook-local/     being phased out: never created any more; what is left
+                          there is only read to move, report or list it
 ```
 
 Tasks, todos, the project documentation and the source configuration of the version
@@ -144,7 +143,9 @@ commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/` si
 `/k-upgrade` removes them once empty or names each entry left there with its target. The former
 knowledge directories on disk are gone as well (task 123); `/k-upgrade` (3.0) clears what
 is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
-deletion.
+deletion. Guidelines come shipped only (task 148): `k-playbook-local/guidelines/` is no
+longer read, project-owned guidelines live in `keph:/docs/guidelines/`, and `/k-upgrade`
+deletes a leftover directory, naming every file.
 
 `k-playbook-local/` is being phased out. k-playbook no longer creates the directory or
 anything in it — not when the interface starts, not on a button, not as a side effect of

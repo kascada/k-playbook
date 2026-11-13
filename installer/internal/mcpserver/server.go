@@ -43,7 +43,7 @@ type contextInput struct {
 }
 
 const toolDescription = `Gibt den aufgelösten Arbeitsstand eines k-playbook-Projekts zurück: ` +
-	`Pfade, Remediation-Policy, Guidelines ` +
+	`Pfade, Remediation-Policy ` +
 	`und die effektiven Kataloge für reviews und checks — reviews mitgeliefert und ` +
 	`projekteigen bereits zusammengeführt, checks nur mitgeliefert (origin immer dist). Zieht dabei die Assistenten-Verlinkung ` +
 	`auf den Katalog nach und meldet unter "links", was sich geändert hat. ` +

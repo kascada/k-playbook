@@ -30,8 +30,8 @@ conversation, reuse that output — do not run it again. Chained commands share 
 Run it again only when one of these applies:
 
 - `K-PLAYBOOK.yaml` was written since the last call.
-- A rule, review, check or guideline file was added, removed or emptied since the last
-  call, or k-playbook was updated.
+- A review or check file was added, removed or emptied since the last call, or
+  k-playbook was updated.
 - The work moved to a different project. The command searches upwards for
   `K-PLAYBOOK.yaml`, so another working directory can resolve to another installation —
   check `project.dir` against the one you loaded.
@@ -55,7 +55,6 @@ fields from two loads.
 | `catalogs` | Effective `reviews` and `checks` — reviews shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`; checks are shipped only, `origin` always `dist`. |
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether the GitHub CLI is installed and logged in on this machine (a host finding). |
-| `guidelines` | Project guideline files. |
 | `versionSources` | State of the version-inventory source configuration `keph:/k-playbook/inventory.md`: whether it is there and readable, which extra sources it configures, which areas it excludes from the default scan and which Helm values it names explicitly. Read it from here — never read that document yourself. |
 
 `versionSources` carries the whole answer, so no command has to open the document: `ref`
@@ -130,10 +129,12 @@ Nothing reads or indexes it. Its subdirectory `material/befunde/` holds the find
 before they moved to `keph:/queue/findings/`; nothing writes there any more. Everything below
 `material/` is left untouched by every command.
 
-`<local.dir>/reviews/` and `guidelines/` are the project-local side of the
-catalogs. Do not read them directly — `catalogs` and `guidelines` already contain the
-merged result. Checks have no project-local side; a leftover `<local.dir>/checks/` is not
-read, and `/k-upgrade` removes it.
+The project-local side of `catalogs.reviews` lives in the project collection under
+`keph:/k-playbook/reviews/`. Do not read it directly — `catalogs` already contains the
+merged result. Guidelines and checks have no project-local side. Guidelines are shipped
+only: this output does not list them, the briefing names them under `documents.guidelines`,
+and they are read as `k-playbook:/guidelines/<name>.md`. A leftover `<local.dir>/guidelines/`
+or `<local.dir>/checks/` is not read, and `/k-upgrade` removes it.
 
 `<project.dir>/.k-playbook/commands/` and `skills/` overlay the shipped ones by the same
 rule, but they are not in `catalogs`: the assistant loaded them at startup, so by the time a

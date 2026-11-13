@@ -2,7 +2,7 @@
 
 k-playbook includes an MCP server. It gives an assistant the same information that
 `k-playbook context` provides on the command line: the resolved paths,
-the remediation policy, the guidelines, and the effective catalogs
+the remediation policy, and the effective catalogs
 for reviews and checks -- shipped and project-owned reviews already merged; checks are
 shipped only, their `origin` is always `dist`.
 
@@ -346,7 +346,7 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
 | `k_playbook_todo_delete` | remove a todo permanently |
-| `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/reviews/…`, `/guidelines/…` and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
+| `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/reviews/…`, `/guidelines/…` (shipped only) and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`, `docs`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones; an item whose frontmatter the node could not read, or whose title looks cut off at ` #`, carries `problem` (task 136) |
 | `k_playbook_doc_done` | move an own document into `done/` of its location; the answer carries the `revision` after the move |
@@ -747,9 +747,9 @@ All three prefixes are resolved (task 093; [verweisschema.md](verweisschema.md#a
 document of the project's collection through the node's replica (Kephalaion `read` via the
 client, access as for the `doc` tools, `~` replaced by `kephalaion.user`); `k-playbook:` the
 kinds `instructions/`, `reviews/`, `guidelines/` and `commands/`, each a single
-file local before shipped, and as include targets `includes/` and `testdata/`; the README
-templates `docs/<pfad>/README.md` only from the shipped layer, without a local version
-(task 137). Only
+file local before shipped, and as include targets `includes/` and `testdata/`; `guidelines/`
+(task 148) and the README templates `docs/<pfad>/README.md` (task 137) only from the shipped
+layer, without a local version. Only
 `instructions/always/` is assembled. The shipped layer of every kind is read from the public
 collection `<hub>:k-playbook` under `defaults/` through the node's replica (task 131): the hub
 of the project binding, the account Kephalaion chooses for it (`kephalaion node client`),
@@ -760,9 +760,10 @@ the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/command
 [verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
 `catalogs` in `k_playbook_context` (`overlayDocDir`): for `reviews`, name,
 `origin` and `disabled` of an entry are the same over both ways, which a test checks.
-`guidelines` is an overlay kind here -- shipped `<hub>:k-playbook/defaults/guidelines/` and local
-`k-playbook-local/guidelines/` -- while the field `guidelines` of the context output still
-lists only the local files (see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
+`guidelines` is not an overlay kind (task 148): it is read only from the shipped
+`<hub>:k-playbook/defaults/guidelines/`, a file under `k-playbook-local/guidelines/` neither
+replaces nor disables anything, and the context output has no field `guidelines` any more
+(see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
 
 Include lines (`include: <ref>`, absolute or relative within the same prefix) are replaced by
 the body of their target, recursively up to depth 10, in every document the tool reads;
@@ -1233,7 +1234,7 @@ projectDocs, health, context}`:
 | `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` in its first line (see "Head of the plain text" below) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
-| each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off) |
+| each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off; always `dist` under `documents.guidelines`, a kind without a local layer since task 148) |
 | `work.available` | whether the project's collection could be read; `false` with `work.message` when `kephalaion.ok` is not true, the node cannot be reached or a listing fails -- a state, not an error |
 | `work.user` | the own Kephalaion user whose work is listed |
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` and `problem` (unreadable frontmatter or a title that looks cut off at ` #`, as in `k_playbook_doc_list`; absent otherwise -- the plain text appends it to the line after ` — `) -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
@@ -1241,15 +1242,14 @@ projectDocs, health, context}`:
 | `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
-| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `playbook`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`) and `guidelines` (`documents.guidelines`; note the different meaning below). `catalogs` therefore carries only `checks` |
+| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `playbook`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`). `catalogs` therefore carries only `checks`. The context output has no field `guidelines` any more (task 148); guidelines stand only under `documents.guidelines` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as
 `catalogs` in `k_playbook_context` and `k_playbook_doc_read` (`overlayDocDir`): local before
-shipped, an empty local file disables. `guidelines` is an overlay kind here -- shipped
-`<hub>:k-playbook/defaults/guidelines/` and local `k-playbook-local/guidelines/` --, while the field
-`guidelines` of the context output still lists only the local files until the context output is
-switched.
+shipped, an empty local file disables. `guidelines` is the exception (task 148): the kind has
+no local layer, its entries come only from the shipped `<hub>:k-playbook/defaults/guidelines/`,
+and nothing reads `k-playbook-local/guidelines/`.
 
 Deliberately not in the briefing's own sections: contents (except `documents.always.content`,
 see above), commands, skills, checks, scripts,

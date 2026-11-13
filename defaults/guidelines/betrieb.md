@@ -54,8 +54,8 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Projekteigenes Rezept | `reviews/` | von Hand |
 | Projekteigener Command | `.k-playbook/commands/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command | von Hand |
 | Projekteigener Skill | `.k-playbook/skills/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |
-| Projekteigene Vorgabe | `guidelines/<thema>.md` | von Hand |
-| Projekteigene Instruktionsebene | `k-playbook.md` | von Hand |
+| Projekteigene Vorgabe | `keph:/docs/guidelines/<thema>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
+| Projekteigene Anweisung | `keph:/k-playbook/instructions/always/<nummer>-<thema>.md` (gilt in jeder Sitzung) oder `keph:/k-playbook/instructions/on-demand/<thema>.md` (auf Abruf) — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
 | Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
 
 **Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage, die

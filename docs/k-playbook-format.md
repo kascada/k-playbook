@@ -57,7 +57,7 @@ locations derive from the project root, the directory that holds
 | tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs`, not under `k-playbook-local/` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection, not under `k-playbook-local/` |
 | manually maintained docs | `keph:/docs/manual/` — in the project collection, not under `k-playbook-local/` |
-| project-owned guidelines | `keph:/docs/guidelines/` — in the project collection. Setup no longer creates `k-playbook-local/guidelines/`; `/k-upgrade` 3.4 deletes a leftover one even with content and names every file (todo #40) |
+| project-owned guidelines | `keph:/docs/guidelines/` — in the project collection. `k-playbook-local/guidelines/` is no longer read (task 148) and setup does not create it; `/k-upgrade` 3.4 deletes a leftover one even with content and names every file. How guidelines are read from the collection is todo #40 |
 | project-owned instructions | `keph:/k-playbook/instructions/always/`, `keph:/k-playbook/instructions/on-demand/` — in the project collection since task 143; `k-playbook-local/instructions/` is no longer read, `/k-upgrade` 3.4 removes it or names each file with its target |
 | project-owned includes | `keph:/k-playbook/includes/` — in the project collection since task 143; `k-playbook-local/includes/` is no longer read, `/k-upgrade` 3.4 handles it like `instructions/` |
 | open tasks | `keph:/user/<user>/tasks/` — in the project collection, not under `k-playbook-local/`; form in `k-playbook:/instructions/on-demand/tasks.md` |
@@ -313,17 +313,16 @@ A `k-playbook-local/docs/` that a producer still writes is not a pair with
 other the project. They are two different objects with the same name and nothing
 to merge.
 
-`guidelines/` is a pair since task 086 (2026-10-16): shipped
-`<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`)
-and project-owned `k-playbook-local/guidelines/`, merged by the same rule as `reviews/`
--- a file of the same name replaces, an empty one disables. `k_playbook_doc_read`
-(`k-playbook:/guidelines/<name>.md`) and the briefing resolve it that way. The field
-`guidelines` of the context output is the one named exception: it still lists only
-the project-owned files until the context output is switched (see the next section);
-`catalogs` does not list the kind. The local layer is on its way out: setup no longer
-creates `k-playbook-local/guidelines/`, `/k-upgrade` deletes it, and project-owned
-guidelines live in `keph:/docs/guidelines/`. The overlay code stays until todo #40 and
-yields nothing without the directory.
+`guidelines/` is not a pair either (task 148): the kind exists shipped only, in
+`<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`).
+`k_playbook_doc_read` (`k-playbook:/guidelines/<name>.md`) and the briefing
+(`documents.guidelines`) resolve only that layer, so the origin is always `dist`. Nothing
+reads `k-playbook-local/guidelines/` any more: a file there neither replaces nor disables
+a shipped guideline, setup does not create the directory, and `/k-upgrade` deletes it.
+`catalogs` does not list the kind, and the context output has no field `guidelines`.
+Project-owned guidelines live in `keph:/docs/guidelines/`; how a session is pointed to
+them is todo #40. From task 086 (2026-10-16) until task 148 the kind was a pair, merged
+by the same rule as `reviews/`.
 
 Nothing below `k-playbook/` may be written, including by commands that read
 recipes or checks there. An update replaces the directory completely.
@@ -350,7 +349,6 @@ configuration and the filesystem:
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
 | `catalogs` | `reviews`, merged with the project-owned side, and `checks`, shipped only (task 134); the shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131), the project-owned side from `keph:/k-playbook/reviews/` in the project collection (task 143) |
 | `catalogsProblem` | only when a layer of `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty, the project collection not readable): why that list is empty -- it is never shown from one layer alone; the rest of the output stays, and `kephalaion` says more |
-| `guidelines` | files from `k-playbook-local/guidelines/` only -- not merged with the shipped guidelines, unlike `k_playbook_doc_read` and the briefing; the one named exception until the context output is switched (task 086) |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
@@ -385,8 +383,8 @@ Since task 091 (2026-10-17) the briefing also carries **the rest of the context
 output**: everything in the table above that its own sections do not cover, in the
 section `context` (`--json`, MCP) resp. behind the separator line "Noch aus
 k-playbook context — wird abgebaut" (plain text). The rest comes from the same
-function as `k-playbook context` (`ContextForDir`), minus `catalogs.reviews`
-and `guidelines`, which are `documents.reviews` and `.guidelines` -- the list stands at one place in the code
+function as `k-playbook context` (`ContextForDir`), minus `catalogs.reviews`,
+which is `documents.reviews` -- the list stands at one place in the code
 (`briefingCoveredContextFields`). Nothing stands twice: environment facts are in
 the briefing only there. So one call is enough for the start of a session, and
 because the rest comes through `ContextForDir`, the briefing heals the assistant
@@ -396,8 +394,10 @@ transition: each later step takes one field out and gives it its own place in th
 briefing -- the authority is the table "Context field → future place" in
 [knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
 --, and when it is empty, `k-playbook context` and `k_playbook_context` go. The first
-field has gone that way: `instructions`, the list of the `k-playbook.md` files, no longer
-exists (task 148), because the reading order is `documents.always`. Today the `AGENTS.md`
+fields have gone that way (task 148): `instructions`, the list of the `k-playbook.md` files,
+no longer exists, because the reading order is `documents.always`, and `guidelines`, the
+list of the files in `k-playbook-local/guidelines/`, no longer exists, because guidelines
+are `documents.guidelines`. Today the `AGENTS.md`
 block, `k-playbook context` and `catalogs` are unchanged; the switch comes step by step. Contract: [mcp.md](mcp.md#briefing-contract).
 
 `links` is normally absent, intentionally: the invocation brings assistant

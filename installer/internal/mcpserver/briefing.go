@@ -46,7 +46,7 @@ func addBriefingTool(server *mcp.Server) {
 			"alles Weitere sind Verweise im Präfixschema, keine Pfade. session: die Kennung dieser Sitzung, je Aufruf " +
 			"neu vergeben — sie steht in allem, was die Sitzung später wiederfinden muss, etwa im Kopf eines Befunds. documents: always (ref, content, parts), " +
 			"onDemand, reviews, guidelines — lokal und " +
-			"mitgeliefert schon gegeneinander aufgelöst, je Eintrag ref, title, description und origin (dist, local, " +
+			"mitgeliefert schon gegeneinander aufgelöst, guidelines nur mitgeliefert (origin immer dist), je Eintrag ref, title, description und origin (dist, local, " +
 			"override, disabled), bei einem lokalen Eintrag aus der Collection des Projekts dazu location, sein " +
 			"keph:-Ort unter keph:/k-playbook/. work: die eigenen offenen Tasks und aktiven Arbeitsstände aus der Projekt-Collection " +
 			"mit Titel — und problem, wenn das Frontmatter nicht lesbar oder der Titel vermutlich an ‚ #‘ abgeschnitten " +
@@ -60,7 +60,7 @@ func addBriefingTool(server *mcp.Server) {
 			"dieselbe Antwort wie k_playbook_health. context: der Übergangsabschnitt " +
 			"mit dem Rest von k_playbook_context — die Umgebungsangaben (Pfade, Werkzeuge, gh, git, mcp, " +
 			"remediation, Kephalaion-Anbindung …) unter ihren Namen aus der Kontextausgabe, ohne " +
-			"catalogs.reviews und guidelines, die documents schon liefert; lässt sich die Kontextausgabe nicht " +
+			"catalogs.reviews, das documents schon liefert; lässt sich die Kontextausgabe nicht " +
 			"bauen, steht available false mit message. Ein Aufruf genügt damit für den Einstieg; k_playbook_context " +
 			"ist nicht zusätzlich nötig. Nebenwirkung wie dort: zieht die Assistenten-Verlinkung nach und meldet " +
 			"unter context.links, was sich geändert hat. Dieselbe Antwort wie `k-playbook briefing --json`.",

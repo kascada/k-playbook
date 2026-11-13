@@ -90,7 +90,7 @@ There is no list for this in the configuration.
 k-playbook context
 ```
 
-It outputs the resolved working state as JSON: directories, remediation policy, guidelines, and the three catalogs, with shipped and project-owned content already merged, an origin for each entry, and disabled entries marked.
+It outputs the resolved working state as JSON: directories, remediation policy, and the catalogs, with shipped and project-owned content already merged, an origin for each entry, and disabled entries marked.
 
 The interface presents the same information in readable form in the `Resolved context` section.
 

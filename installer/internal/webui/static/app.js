@@ -1063,8 +1063,6 @@ function renderContext(data) {
     addCatalogGroup(CATALOG_LABELS[kind] || kind, catalogs[kind] || [], root);
   }
 
-  addPathGroup("Guidelines", context.guidelines || [], root);
-
   elements.contextPill.className = "pill ok";
   elements.contextPill.textContent = `Schema ${context.schemaVersion || "?"}`;
 }
@@ -1098,18 +1096,6 @@ function addCatalogGroup(title, entries, root) {
     row.classList.toggle("disabled", Boolean(entry.disabled));
     // Welche Datei tatsächlich gilt, ist die eigentliche Auskunft des Overlays.
     row.title = relativePath(entry.path, root);
-  }
-}
-
-function addPathGroup(title, paths, root) {
-  const list = addContextGroup(`${title} (${paths.length})`);
-  if (paths.length === 0) {
-    addFact(list, "keine", "");
-    return;
-  }
-
-  for (const path of paths) {
-    addFact(list, relativePath(path, root), "");
   }
 }
 

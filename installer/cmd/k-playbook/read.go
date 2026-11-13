@@ -121,7 +121,6 @@ ab dem Arbeitsverzeichnis aufwärts.
             Fehler (kephalaion_unavailable), kein Rückfall.
   k-playbook:/instructions/on-demand/<name>.md
   k-playbook:/reviews/review-<name>.md
-  k-playbook:/guidelines/<name>.md
   k-playbook:/commands/<name>.md
             Eine Datei: die lokale, sonst die mitgelieferte, unverändert mit
             Frontmatter — dieselbe Überlagerung wie catalogs in k-playbook
@@ -129,8 +128,11 @@ ab dem Arbeitsverzeichnis aufwärts.
             Hinweis auf stderr, Exit 0. Die lokale Fassung von instructions
             und reviews liegt in der Collection des Projekts unter
             keph:/k-playbook/<sorte>/, die von commands/ unter
-            .k-playbook/commands/, die von guidelines/ unter
-            k-playbook-local/guidelines/.
+            .k-playbook/commands/.
+  k-playbook:/guidelines/<name>.md
+            Eine Leitlinie. Nur mitgeliefert: eine lokale Fassung gibt es
+            nicht, auch kein Abschalten durch eine leere Datei;
+            k-playbook-local/guidelines/ wird nicht gelesen.
   k-playbook:/docs/<pfad>/README.md
             Die Vorlage für keph:/docs/<pfad>/README.md (k-playbook docs
             readme). Nur mitgeliefert: eine lokale Fassung gibt es nicht,

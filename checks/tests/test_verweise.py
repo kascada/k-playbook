@@ -203,16 +203,15 @@ class SourceFilesTest(unittest.TestCase):
                 return path
             command = put(".k-playbook/commands/_x/eins.md")
             skill = put(".k-playbook/skills/forelle/SKILL.md")
-            guideline = put("k-playbook-local/guidelines/g.md")
+            put("k-playbook-local/guidelines/g.md")
             put("k-playbook-local/rules/r.md")
             put("k-playbook-local/commands/alt.md")
             put("k-playbook-local/skills/alt/SKILL.md")
             put("k-playbook-local/instructions/on-demand/alt.md")
-            files = source_files(root / "k-playbook", root / "k-playbook-local", root / ".k-playbook")
+            files = source_files(root / "k-playbook", root / ".k-playbook")
         self.assertEqual(files, {
             ".k-playbook/commands/_x/eins.md": command,
             ".k-playbook/skills/forelle/SKILL.md": skill,
-            "k-playbook-local/guidelines/g.md": guideline,
         })
 
     def test_dot_k_playbook_is_a_known_root(self) -> None:

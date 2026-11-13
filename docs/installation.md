@@ -280,7 +280,7 @@ Mermaid diagrams are rendered if the machine has network access: the library is 
 
 ## Inspect what applies
 
-At the bottom is the **Resolved context** section. When expanded, it shows what a command sees: resolved paths, effective catalogs for reviews and checks with their origin, shipped, project-owned, or replaced — checks are always shipped, they have no project-owned side since task 134 — plus guidelines. Disabled entries are included so their existence remains visible.
+At the bottom is the **Resolved context** section. When expanded, it shows what a command sees: resolved paths, effective catalogs for reviews and checks with their origin, shipped, project-owned, or replaced — checks are always shipped, they have no project-owned side since task 134. Guidelines are not listed there any more (task 148): they come shipped only, and the briefing names them. Disabled entries are included so their existence remains visible.
 
 It provides the same information as `k-playbook context`, only presented readably.
 
