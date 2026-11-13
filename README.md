@@ -126,7 +126,6 @@ project/
 │   └── installer/ docs/
 └── k-playbook-local/     project-owned, committed
     ├── reviews/          overlay onto k-playbook/reviews/
-    ├── results/          everything reviews produce; not versioned
     ├── guidelines/
     ├── priv/             notes and work in progress
     └── k-playbook.md     project-owned instruction layer
@@ -150,14 +149,16 @@ knowledge directories on disk are gone as well (task 123); `/k-upgrade` (3.0) cl
 is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
 deletion.
 
-`k-playbook-local/` belongs in the project's repository. Two directories inside it are
-a matter of choice — `results/` and `priv/`; `results/` is already created as private
-during setup, and both remain switchable. Review results are a snapshot from one machine
-and may contain found secrets in clear text. For `priv/` the project decides, and
+`k-playbook-local/` belongs in the project's repository. One directory inside it is
+a matter of choice — `priv/`: the project decides whether its content is versioned, and
 k-playbook writes no `.gitignore` there on its own. What currently applies is shown and
 switched by the **Local settings** block of the interface — measured with
 `git check-ignore`, not guessed. `material/` has no switch any more; a managed
-`.gitignore` already in place keeps working.
+`.gitignore` already in place keeps working. `results/` has left the structure as well
+(task 146): setup no longer creates it, it has no switch any more, and `/k-upgrade`
+deletes a leftover one without asking, even with content, naming every deleted file.
+Review results can be reproduced from the code; their content was usually not versioned
+and cannot be recovered from Git afterwards.
 
 An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty
 one disables it. This holds for `reviews/`, and in the same way for `commands/` and

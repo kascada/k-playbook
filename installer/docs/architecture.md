@@ -404,8 +404,7 @@ installer/
 │   ├── environment.go           was liegt hier vor
 │   ├── config.go                Config lesen, Ort vorschlagen, anlegen
 │   ├── local.go                 projekteigene Struktur prüfen und anlegen
-│   ├── local_private.go         messen und umschalten, ob results/ und priv/ privat
-│   │                            sind
+│   ├── local_private.go         messen und umschalten, ob priv/ privat ist
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── sharelink.go             Umweg-Link .k-playbook/share auf ~/.local/share/k-playbook
@@ -769,7 +768,7 @@ Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projek
 `k-playbook-local/` liegt:
 
 ```text
-results/  priv/
+priv/
 k-playbook.md
 ```
 
@@ -796,6 +795,16 @@ Review-Rezepte liegen in der Projekt-Collection unter `keph:/k-playbook/<sorte>/
 (`NewKephProjectLayerSource()` in `project/projectlayer.go`, unten unter „Kataloge auflösen“);
 `k-playbook-local/instructions/`, `includes/` und `reviews/` liest nichts mehr.
 `/k-upgrade` 3.4 löscht sie leer und nennt sonst je Datei ihr Ziel in der Collection.
+
+`results/` steht seit Task 146 nicht mehr darin. Review-Ergebnisse sind aus dem Code
+wiederholbar und ein Stand von einem Rechner; `/k-review`, `/k-audit` und `/k-remediation`
+sind abgeschaltet, bis der Review-Umbau ihnen eine neue Ablage gibt. `/k-upgrade` 3.4 löscht
+ein vorhandenes `results/` ohne Rückfrage, auch mit Inhalt, und nennt jede gelöschte Datei —
+der Inhalt war in der Regel nicht versioniert und ist danach nicht aus Git zurückzuholen.
+Wieder angelegt wird es nicht: `CreateLocal()` und `EnsureLocal()` waren die einzigen
+Anleger, und die Review-Wege melden ein fehlendes `results/` als Fehler, statt es anzulegen
+(`CreateRun()` in `review/run.go`). Der Review-Code selbst ist davon unberührt und schreibt
+weiter in ein vorhandenes Verzeichnis.
 
 `checks/` steht seit Task 134 nicht mehr darin. Projekteigene Checks gibt es nicht, bis sie
 eine neue Form bekommen: `bin/k-check` führt nur die mitgelieferten aus
@@ -825,14 +834,11 @@ Gesundheitsprüfung warnt, `k-playbook inventory` nennt sie, `/k-upgrade` 3.6 zi
 
 Jedes Verzeichnis der Struktur bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
 Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
-würden. Mehr schreibt `CreateLocal()` nicht — mit **einer** Ausnahme: Einträge mit
-`PrivateByDefault` bekommen die verwaltete `.gitignore`, und zwar nur, wenn das
-Verzeichnis in genau diesem Lauf entsteht. Deshalb wird vor `os.MkdirAll` geprüft, ob es
-schon da ist; `MkdirAll` selbst meldet das nicht. Die Bedingung löst zwei Fälle auf
-einmal: `makePublic()` entfernt die Datei bewusst, ein späterer `CreateLocal()`-Lauf —
-jedes „Struktur anlegen" — dürfte sie nicht still zurückbringen; und Bestandsprojekte
-mit getrackten Dateien unter `results/` landeten sonst im Zustand `PrivacyPartial`.
-Ansonsten gilt weiter: was ein Projekt versioniert, entscheidet das Projekt.
+würden. Mehr schreibt `CreateLocal()` nicht, auch keine `.gitignore`: was ein Projekt
+versioniert, entscheidet das Projekt. Bis Task 146 gab es davon eine Ausnahme — das Feld
+`PrivateByDefault`, das allein `results/` trug und über das `CreateLocal()` dem frisch
+angelegten Verzeichnis die verwaltete `.gitignore` mitgab. Mit `results/` ist das Feld samt
+dieser Logik entfernt; kein Eintrag wird mehr privat angelegt.
 
 **Zwei Einstiege.** `CreateLocal()` ist der ausdrückliche Weg: der Knopf „Anlegen"
 (`POST /api/local`), der auch ein unvollständiges Verzeichnis ergänzt. Der selbsttätige
@@ -842,27 +848,19 @@ Verzeichnis, auch ein unvollständiges, rührt er nicht an: `CreateLocal()` ist 
 und additiv heißt auch, dass eine bewusst gelöschte Strukturdatei bei jedem Start
 zurückkäme. Die Enge macht einen Vorher-nachher-Vergleich über `CheckLocal()`
 überflüssig — entweder entsteht alles, oder nichts wird angefasst — und sie lässt eine
-Umschaltung auf öffentlich ohnehin stehen, denn die setzt ein vorhandenes Verzeichnis
+Umschaltung über `SetPrivate()` ohnehin stehen, denn die setzt ein vorhandenes Verzeichnis
 voraus. Ein frisch geklontes Projekt ist damit nach dem ersten `k-playbook`-Aufruf
 eingerichtet, ohne dass jemand die Karte sieht.
 
 Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
-überhaupt ansteht — seit Task 107 `results/` und `priv/`. Bei `priv/` ist der Grund
-offensichtlich: dort liegen eigene Notizen und Zwischenstände. Beide bekommen über dasselbe
-`Private: true` denselben Weg zu einer eigenen `.gitignore`, die den Inhalt ausschließt und
-das Verzeichnis selbst versioniert lässt. Ihre README beschreibt den Weg. Das Feld geht als
-JSON an die Oberfläche und ist dort die Whitelist des Blocks
-[Lokale Einstellungen](#lokale-einstellungen). `material/` trug es bis Task 107 auch;
-mit dem Herausnehmen aus der Struktur hat es keine Schaltung mehr. Eine vorhandene
-verwaltete `.gitignore` bleibt liegen und wirkt weiter.
-
-`results/` unterscheidet sich in einem Punkt: es trägt zusätzlich `PrivateByDefault` und
-wird damit bei der Installation schon privat angelegt. Bei `priv/` geht es um Geschmack,
-dort ist Zurückhaltung richtig. Bei `results/` nicht: ein Werkzeug, das gefundene Secrets
-im Klartext ins Repository des Nutzers schreibt, ist ein Fehler von k-playbook und keine
-Projektentscheidung — und die Rohausgaben sind nur der schärfste Fall. Ein Review ist aus
-dem Code wiederholbar, sein Ergebnis ist ein Stand von einem Rechner. Umschaltbar bleibt es
-trotzdem, in beide Richtungen, und einmal umgeschaltet bleibt es dabei.
+überhaupt ansteht — seit Task 146 nur noch `priv/`. Der Grund ist offensichtlich: dort
+liegen eigene Notizen und Zwischenstände. Über `Private: true` bekommt es den Weg zu einer
+eigenen `.gitignore`, die den Inhalt ausschließt und das Verzeichnis selbst versioniert
+lässt. Seine README beschreibt den Weg. Das Feld geht als JSON an die Oberfläche und ist
+dort die Whitelist des Blocks [Lokale Einstellungen](#lokale-einstellungen). `material/`
+trug es bis Task 107 auch, `results/` bis Task 146; mit dem Herausnehmen aus der Struktur
+haben beide keine Schaltung mehr. Eine vorhandene verwaltete `.gitignore` in `material/`
+bleibt liegen und wirkt weiter; `results/` löscht `/k-upgrade` 3.4 als Ganzes.
 
 `writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
 bleiben unberührt.
@@ -873,14 +871,11 @@ Wie sie mit den mitgelieferten verrechnet werden, steht im nächsten Abschnitt.
 ## Lokale Einstellungen
 
 Der Block zeigt, was für dieses Projekt lokal entschieden ist, statt dass k-playbook es
-stillschweigend erzwingt. Bisher steht dort eine einzige Frage, für zwei Verzeichnisse:
-ob der **Inhalt** von `results/` und `priv/` aus der Versionskontrolle bleibt. `project/local_private.go` misst das und schaltet es um,
-`webui/local_private.go` reicht es an die Oberfläche.
-
-„Statt dass k-playbook es stillschweigend erzwingt" trägt auch für `results/`: dort ist
-die Antwort bei einer Neuinstallation zwar vorbelegt, aber sichtbar im selben Block und
-in beide Richtungen umschaltbar — und `CreateLocal()` nimmt eine Umschaltung nie zurück.
-Vorbelegt ist nicht erzwungen.
+stillschweigend erzwingt. Bisher steht dort eine einzige Frage, seit Task 146 für ein
+einziges Verzeichnis: ob der **Inhalt** von `priv/` aus der Versionskontrolle bleibt.
+`project/local_private.go` misst das und schaltet es um, `webui/local_private.go` reicht es
+an die Oberfläche. Vorbelegt ist nichts: `CreateLocal()` schreibt keine `.gitignore` und
+nimmt eine Umschaltung nie zurück.
 
 **Gemessen, nicht geraten.** Gefragt wird `git check-ignore -v --no-index` auf einen Pfad
 *innerhalb* des Verzeichnisses; das eigene Parsen von `.gitignore`-Dateien fiele über
@@ -4045,8 +4040,8 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
 | `GET` | `/api/local` | projekteigene Struktur prüfen |
 | `POST` | `/api/local` | fehlende Teile anlegen |
-| `GET` | `/api/local/private` | messen, ob der Inhalt von `results/` und `priv/` privat ist |
-| `POST` | `/api/local/private` | einen dieser Einträge umschalten; nur Einträge mit `Private` |
+| `GET` | `/api/local/private` | messen, ob der Inhalt von `priv/` privat ist |
+| `POST` | `/api/local/private` | den Eintrag umschalten; nur Einträge mit `Private`, seit Task 146 allein `priv` |
 | `GET` | `/api/assistant` | Verlinkung prüfen und dabei nachziehen, was sich nachziehen lässt |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/mcp` | MCP-Registrierung beider Assistenten prüfen |
@@ -4907,7 +4902,7 @@ selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 
 | Weg | Schreibt | Nur wenn |
 |---|---|---|
-| `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs und den vorbelegten `.gitignore` | das Verzeichnis ganz fehlt |
+| `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs | das Verzeichnis ganz fehlt |
 | `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
 | `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; die abgelösten Zusatzblöcke Session-Memory und Befunde; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
 

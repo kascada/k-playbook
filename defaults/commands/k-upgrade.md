@@ -75,8 +75,8 @@ Für alle Umstellungen gilt:
 - Gelöscht, verschoben oder überschrieben wird erst nach Bestätigung. Lege je Umstellung
   gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind zwei Fälle, und
   nur sie: `cache/`, `inbox/` und `queue/` aus 3.0 a), die 3.0 ohne Inhaltsprüfung löscht, und
-  die leeren Verzeichnisse aus 3.4. Beide löschen ohne Vorlage und ohne auf eine Antwort zu
-  warten.
+  die Verzeichnisse, die 3.4 löscht — die leeren, dazu `guidelines/` und `results/` auch mit
+  Inhalt. Beide löschen ohne Vorlage und ohne auf eine Antwort zu warten.
 - Bist du bei einem Eintrag unsicher, sag das in der Vorlage ausdrücklich, statt still zu
   entscheiden; in 3.4, das nichts vorlegt, steht es in der Meldung, ohne neue Rückfrage.
 - Braucht eine Umstellung die Projekt-Collection und steht `context.kephalaion.ok` nicht auf
@@ -552,7 +552,7 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 
 ### 3.4 — Aufräumen
 
-Das Einrichten legt elf Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
+Das Einrichten legt zwölf Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
 sie nicht mehr als fehlend: Der Inhalt der ersten fünf liegt in der Projekt-Collection, der von
 `commands/` und `skills/` in `<context.project.dir>/.k-playbook/commands/` und
 `<context.project.dir>/.k-playbook/skills/`. Projekteigene Instructions, Includes und
@@ -565,7 +565,10 @@ der Collection: Die Sorte gibt es nicht mehr, k-playbook liest dort nichts. Auch
 `checks/` hat keinen Nachfolger: `k-check` führt nur noch die mitgelieferten Checks aus,
 projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen. Projekteigene Guidelines
 liegen in der Projekt-Collection unter `keph:/docs/guidelines/`; `guidelines/` auf der Platte
-wird nicht umgezogen, sondern gelöscht (Ausnahme unten). Dazu kommt `tmp/`, das
+wird nicht umgezogen, sondern gelöscht (Ausnahme unten). `results/` nahm auf, was Reviews
+erzeugen: Ergebnisse je Lauf und Familie, dazu `log.md`. Auch es wird nicht umgezogen, sondern
+gelöscht (Ausnahme unten): Review-Ergebnisse sind aus dem Code wiederholbar, und die Reviews
+sind abgeschaltet, bis sie mit dem Review-Umbau eine neue Ablage bekommen. Dazu kommt `tmp/`, das
 das Einrichten nie angelegt hat: Sitzungen legten es zur Zeit der Wissensablage von Hand als
 Schmierzettel an, mit der verwalteten `.gitignore` und einer README, die einen Aufräumer
 versprach, den es nie gab. Nichts liest dort, nichts räumt dort auf; Notizen und Zwischenstände
@@ -573,7 +576,7 @@ gehören nach `priv/` (`k-playbook:/guidelines/betrieb.md`). In einem bestehende
 liegen die Verzeichnisse noch, oft nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
 Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
-`guidelines/` löscht sie immer, auch mit Inhalt.
+`guidelines/` und `results/` löscht sie immer, auch mit Inhalt.
 Sie läuft nach 3.0 bis 3.3, damit zählt, was dort umgezogen ist. Die Liste gehört zu dieser
 Fassung des Commands; das Programm nennt sie nicht:
 
@@ -590,6 +593,7 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `rules/`
 - `checks/`
 - `guidelines/`
+- `results/`
 - `tmp/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
@@ -630,6 +634,15 @@ zieht sie vorher von Hand dorthin um. Eine versionierte Datei bleibt in der Git-
 Weil hier Inhalt verschwinden kann, nennt die Meldung jede gelöschte Datei, ohne die Grenze
 von fünf Pfaden.
 
+**Ausnahme für `results/`.** Es wird wie `guidelines/` gelöscht, ob leer oder nicht, ohne
+Rückfrage und ohne Umzug, mit allem, was darin liegt — auch einer `known-decisions.md` vom
+alten Ort. Review-Ergebnisse sind aus dem Code wiederholbar: Sie sind ein Stand von einem
+Rechner und kein Projektwissen. Die Reviews sind abgeschaltet; ihre neue Ablage kommt mit dem
+Review-Umbau. Anders als bei `guidelines/` ist der Inhalt in der Regel nicht versioniert — die
+verwaltete `.gitignore` hält ihn aus dem Repository — und lässt sich nach dem Löschen nicht
+aus Git zurückholen. Deshalb nennt die Meldung jede gelöschte Datei, ohne die Grenze von fünf
+Pfaden: Sie ist danach der einzige Beleg dafür, was dort lag.
+
 Alles andere heißt „liegt anderes darin“: jede weitere Datei, eine `.gitignore` mit anderem
 Inhalt, ein anderes Dotfile, ein Symlink.
 
@@ -639,7 +652,7 @@ folgst du nicht. Danach ist jedes Verzeichnis leer oder nicht. Liegt `tasks/` le
 auch für `tasks/done/`; beide stehen dann in einer Zeile `tasks/`.
 
 **b) Einteilen.** Jedes Verzeichnis gehört danach in eine von zwei Gruppen: die leeren, die c)
-löscht, und die übrigen, die liegen bleiben. `guidelines/` gehört immer zu den ersten. Den Inhalt einer `README.md` prüfst und bewertest
+löscht, und die übrigen, die liegen bleiben. `guidelines/` und `results/` gehören immer zu den ersten. Den Inhalt einer `README.md` prüfst und bewertest
 du nicht; ob ein Verzeichnis leer ist, entscheidet allein die Definition oben. Vorgelegt wird
 nichts, und 3.4 stellt keine Frage: Auch wenn es nur Zeilen `bleibt: …` gibt, sind sie eine
 Meldung.
@@ -648,8 +661,9 @@ Meldung.
 es leer ist, für `data/` mit derselben Ausnahme; zwischen Erhebung und Löschen kann etwas
 hinzugekommen sein, etwa eine neue `data/todos.json`. Ist es leer, löschst du es samt Inhalt
 im Dateisystem. Ist es das nicht mehr, bleibt es und wird mit dem Grund gemeldet. `guidelines/`
-prüfst du nicht noch einmal auf leer, sondern listest es unmittelbar vor dem Löschen erneut,
-damit die Meldung jede Datei nennt, die tatsächlich gelöscht wurde. Committet wird nicht:
+und `results/` prüfst du nicht noch einmal auf leer, sondern listest jedes unmittelbar vor dem
+Löschen erneut — rekursiv und mit versteckten Dateien, wie in a) —, damit die Meldung jede
+Datei nennt, die tatsächlich gelöscht wurde. Committet wird nicht:
 Versionierte Dateien stehen danach als gelöscht in `git status`.
 
 **d) Melden.** Je Verzeichnis eine Zeile in der Reihenfolge der Liste: `gelöscht: <was darin
@@ -691,6 +705,10 @@ nichts um und fragt nicht.
 Für `guidelines/` gibt es nur die Zeile `gelöscht:`. Sie nennt jede Datei, auch über fünf, und
 dazu, dass projekteigene Guidelines unter `keph:/docs/guidelines/` liegen.
 
+Für `results/` gibt es ebenfalls nur die Zeile `gelöscht:`. Sie nennt jede Datei, auch über
+fünf und auch in Unterverzeichnissen, mit ihrem Pfad ab `results/`, und dazu, dass sich nicht
+aus Git zurückholen lässt, was davon nicht versioniert war.
+
 Für `tmp/` nennt die Zeile `bleibt:` ebenso höchstens fünf Pfade und dazu als Hinweis, dass
 dort niemand liest und niemand aufräumt: Was bleiben soll, gehört nach `priv/`, das Übrige
 löscht der Nutzer von Hand. 3.4 zieht nichts um und fragt nicht.
@@ -716,6 +734,7 @@ Aufräumen in k-playbook-local/
   rules/       gelöscht: README.md
   checks/      gelöscht: README.md
   guidelines/  gelöscht: README.md, stil.md — projekteigene Guidelines liegen unter keph:/docs/guidelines/
+  results/     gelöscht: README.md, .gitignore, log.md, known-decisions.md, 2026-08-19/review-triage.md, code/2026-08-19/review-input.json — was nicht versioniert war, ist nicht aus Git zurückzuholen
   tmp/         gelöscht: README.md
 ```
 

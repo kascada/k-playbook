@@ -478,11 +478,12 @@ tasks created by remediation. The cost is accepted deliberately: AI assessments 
 read in the repository.
 
 Because this scope is homogeneous, the usual managed ignore content (`*`, `!.gitignore`,
-`!README.md`) remains sufficient. `results/` is therefore the directory that k-playbook creates
-privately during setup; like `priv/`, it remains switchable through the **Local settings** section
-of the interface — since task 107 these two are the only switchable directories. `material/` has no
-switch any more; a managed `.gitignore` already in place keeps working. Nothing changes automatically for existing projects: the managed `.gitignore` is created only
-when the directory is first created.
+`!README.md`) remains sufficient. Until task 146, setup created the directory with exactly
+that file. Since then setup no longer creates it and the **Local settings** section of the
+interface no longer switches it; `/k-upgrade` 3.4 deletes a leftover one without asking, even
+with content, and names every deleted file — being unversioned, the content cannot be
+recovered from Git afterwards. Where review runs write from then on is decided by the rebuild
+of the review commands; until then this page describes the previous location.
 
 ## Artifacts Per Family
 

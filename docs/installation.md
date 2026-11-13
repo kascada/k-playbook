@@ -83,7 +83,6 @@ Alongside it, `k-playbook-local/` is created with everything owned by the projec
 ```text
 k-playbook-local/
 ├── reviews/       overlay for k-playbook/reviews/
-├── results/       everything reviews generate; see below
 ├── guidelines/
 ├── priv/          private notes; see below
 └── k-playbook.md  project-owned instruction layer
@@ -99,13 +98,13 @@ Since task 107, setup no longer creates `docs/`, `tasks/`, `tasks/done/`, `data/
 
 Every directory setup creates contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
 
-`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of two directories for which the project makes that decision: `results/` and `priv/`. For `priv/`, k-playbook does not write a `.gitignore` itself and does not decide what a project versions.
+`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of one directory for which the project makes that decision: `priv/`. k-playbook does not write a `.gitignore` there itself and does not decide what a project versions.
 
-`results/` is the exception: it is created as private on initial creation. A review is reproducible from the code, but its result is a state from this machine, and the raw output from a secret scanner does not belong in the repository anyway. This remains switchable, and k-playbook does not undo a switch: the managed `.gitignore` is created only when the directory is first created, not on every run. Existing projects that have previously versioned `results/` therefore notice nothing from the update.
+`results/` is no longer part of this structure (task 146). Setup does not create it, and it has no switch any more: review results are reproducible from the code and are a state from one machine, and the review commands are switched off until they get a new place for their results. In an existing project, `/k-upgrade` (conversion 3.4) deletes a leftover `results/` without asking, even with content, and names every deleted file — its content was usually not versioned, so it cannot be recovered from Git afterwards.
 
 `material/` was switchable as well; with task 107 it left the structure and has no switch any more. A managed `.gitignore` already in place stays and keeps working.
 
-This choice is visible and switchable in the **Local settings** section of the interface, for `results/` and `priv/`. For each directory, it uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
+This choice is visible and switchable in the **Local settings** section of the interface, for `priv/`. It uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
 
 | State | Meaning |
 |---|---|
@@ -677,7 +676,7 @@ Checklist for a project:
 - [ ] `schema_version: 3` is set.
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
 - [ ] `k-playbook/` is its own clone and contains no project-owned content.
-- [ ] `k-playbook-local/` exists completely and is committed in the project repository, except for the contents of `results/`, which are excluded from the outset in a new installation.
+- [ ] `k-playbook-local/` exists completely and is committed in the project repository; whether the contents of `priv/` are versioned is the project's choice, and nothing is excluded from the outset.
 - [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks through `.k-playbook/share/` or to `.k-playbook/commands/` and `.k-playbook/skills/`; the interface reports them as configured.
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; it matches `VERSION` in the clone or is newer.

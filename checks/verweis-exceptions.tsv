@@ -28,7 +28,7 @@
 datei	zeile	art	begründung
 defaults/commands/_task-run/diff-review.md	12	pfad	Ortsangabe: nennt das Modulverzeichnis, in dem die Datei liegt; gelesen wird das Modul über k-playbook:/commands/_task-run/diff-review.md.
 defaults/commands/k-doc-inventory.md	255	pfad	Plattenort in einem Verbot: die alte Quellenkonfiguration unter k-playbook-local/, die seit Task 144 nur noch als Altbestand erkannt wird; der Satz verbietet, sie selbst zu lesen.
-defaults/commands/k-upgrade.md	789	pfad	Ortsangabe: wo Hub und Collection heute stehen; „liest“ in der Zeile bezieht sich auf die alte Datei, kein Verweis.
+defaults/commands/k-upgrade.md	808	pfad	Ortsangabe: wo Hub und Collection heute stehen; „liest“ in der Zeile bezieht sich auf die alte Datei, kein Verweis.
 defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot (nie selbst aus k-playbook/ lesen); die Datei bleibt nach Task 108 unverändert.
 defaults/instructions/always/030-briefing.md	30	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/guidelines/betrieb.md	20	pfad	Ortsangabe: Beispiel der kurzen Schreibweise in Text für Menschen.

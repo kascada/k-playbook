@@ -55,34 +55,23 @@ func writeManagedIgnore(t *testing.T, root string) {
 	writeFile(t, filepath.Join(LocalDir(root), "priv", PrivateIgnoreFile), managedIgnoreContent())
 }
 
-// Die zwei privaten Verzeichnisse stehen zur Wahl — und nur sie. results/ ist
-// bei der Installation vorbelegt, umschaltbar bleibt es trotzdem. material/
-// steht seit Task 107 nicht mehr in der Struktur, cache/ und inbox/ gibt es
-// seit Task 123 nicht mehr; keines hat eine Schaltung.
-func TestPrivateEntriesNenntResultsUndPriv(t *testing.T) {
+// Zur Wahl steht ein einziges Verzeichnis: priv/. results/ gehört seit Task 146
+// nicht mehr zur Struktur und hat damit keine Schaltung mehr, material/ seit
+// Task 107 nicht, cache/ und inbox/ gibt es seit Task 123 nicht mehr.
+func TestPrivateEntriesNenntNurPriv(t *testing.T) {
 	paths := []string{}
 	for _, entry := range PrivateEntries() {
 		paths = append(paths, entry.Path)
 	}
 
-	erwartet := []string{"results", "priv"}
+	erwartet := []string{"priv"}
 	if !slices.Equal(paths, erwartet) {
 		t.Errorf("PrivateEntries = %v, erwartet %v", paths, erwartet)
 	}
-	for _, name := range []string{"reviews", "data", "cache", "inbox", "material"} {
+	for _, name := range []string{"results", "reviews", "data", "cache", "inbox", "material"} {
 		if _, ok := PrivateEntry(name); ok {
 			t.Errorf("%s gilt als privates Verzeichnis", name)
 		}
-	}
-
-	vorbelegt := []string{}
-	for _, entry := range PrivateEntries() {
-		if entry.PrivateByDefault {
-			vorbelegt = append(vorbelegt, entry.Path)
-		}
-	}
-	if !slices.Equal(vorbelegt, []string{"results"}) {
-		t.Errorf("vorbelegt = %v, erwartet [results]", vorbelegt)
 	}
 }
 

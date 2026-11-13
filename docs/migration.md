@@ -306,7 +306,7 @@ to the existing document and removes the file.
 
 Two directories arrived with it: `k-playbook-local/data/` for machine files that belong to the
 project's state, versioned and without a `.gitignore`, and `k-playbook-local/cache/` for derived
-content that can be rebuilt at any time, private by default like `results/`. Both left the
+content that can be rebuilt at any time, private by default as `results/` was then. Both left the
 project-owned structure again with task 107: the todos live in the collection. `cache/` was then
 created only by the index of the knowledge gate, which task 123 removed together with the other
 knowledge directories on disk; `/k-upgrade` 3.0 deletes a leftover `cache/`.

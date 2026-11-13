@@ -13,7 +13,7 @@ Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis d
 zur Verfügung, voraussichtlich bis zum 13. November 2026. Führe nichts von dem aus, was
 darunter steht — nichts lesen, nichts schreiben, nichts anbieten. Sag dem Nutzer in einem
 Satz, dass `/k-audit` gerade umzieht und voraussichtlich ab dem 13. November 2026 wieder
-geht. Bisherige Läufe unter `k-playbook-local/results/` bleiben unverändert liegen.
+geht. Bisherige Läufe unter `k-playbook-local/results/` löscht `/k-upgrade` ohne Rückfrage.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 

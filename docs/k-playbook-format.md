@@ -102,6 +102,14 @@ tool wrote an individual file. The `README.md` of each directory that has a temp
 is written by the program from that template, the same in every project — by `publish`,
 the inventory, setup and `k-playbook upgrade`, and `k-playbook docs readme` (task 137).
 
+Since task 146, setup does not create `results/` either. Review results can be reproduced
+from the code and are the state of one machine, not project knowledge; the review commands
+are switched off until they get a new place for their results. In an existing project,
+`/k-upgrade` 3.4 deletes a leftover `results/` without asking, even with content, and names
+every deleted file: its content was usually not versioned and cannot be recovered from Git
+afterwards. Nothing creates the directory again — the review tools report a missing one as
+an error and write only into an existing one.
+
 The former knowledge directories on disk, with their search index, are gone since task
 123; nothing writes there any more. In an existing project `/k-upgrade` 3.0 clears what
 is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
@@ -133,14 +141,14 @@ inventory` and `/k-doc-inventory`, writing into the project collection. The cont
 the inventory is updated right away through this run, and the profiles are queued
 (`erzeuger: tools`).
 
-Two directories are optional in this respect: `results/` and `priv/`.
-`results/` is made private during installation by default: review results are
-the state of one machine, not project knowledge. Both can be switched. The
-interface's **Local settings** block shows the measured current state and
-switches it for **both** directories; manually, this is controlled through a
-`.gitignore` in the directory itself, whose content is named by the relevant
-`README.md`. `material/` has no switch any more; a managed `.gitignore` already
-in place stays and keeps working.
+One directory is optional in this respect: `priv/`. Nothing is made private
+during installation; whether its content is versioned is the project's choice.
+The interface's **Local settings** block shows the measured current state and
+switches it; manually, this is controlled through a `.gitignore` in the
+directory itself, whose content is named by its `README.md`. `material/` has no
+switch any more; a managed `.gitignore` already in place stays and keeps
+working. `results/` has none either since task 146: it left the structure, and
+`/k-upgrade` 3.4 deletes a leftover one.
 Details are in [`installation.md`](./installation.md#2-create-project-owned-structure).
 
 ## Finding the anchor
@@ -298,10 +306,10 @@ Everything else has no counterpart on the other side:
 
 | | Directories |
 |---|---|
-| project-owned only | `results/`, `priv/` |
+| project-owned only | `priv/` |
 | shipped only | `docs/`, `scripts/`, `bin/`, `installer/` |
 
-`docs/`, `tasks/`, `data/`, `cache/` and `material/` were project-owned only as well;
+`docs/`, `tasks/`, `data/`, `cache/`, `material/` and `results/` were project-owned only as well;
 setup no longer creates them (see [What setup no longer creates](#what-setup-no-longer-creates)).
 A `k-playbook-local/docs/` that a producer still writes is not a pair with
 `k-playbook/docs/` either: `k-playbook/docs/` documents k-playbook itself, the

@@ -33,10 +33,14 @@ func TestCreateLocalLegtStrukturAn(t *testing.T) {
 	}
 
 	local := LocalDir(root)
-	for _, name := range []string{"results", "priv"} {
-		if !isDir(filepath.Join(local, name)) {
-			t.Errorf("%s fehlt", name)
-		}
+	if !isDir(filepath.Join(local, "priv")) {
+		t.Errorf("priv fehlt")
+	}
+	// Review-Ergebnisse haben unter k-playbook-local/ keinen Platz mehr (Task
+	// 146): /k-upgrade löscht ein altes results/, und das Einrichten legt es
+	// nicht wieder an.
+	if pathExists(filepath.Join(local, "results")) {
+		t.Errorf("results angelegt")
 	}
 	// Projekteigene Instructions, Includes und Review-Rezepte liegen in der
 	// Collection des Projekts unter keph:/k-playbook/ (Task 143); angelegt
@@ -92,15 +96,16 @@ func TestCreateLocalLegtReadmesAn(t *testing.T) {
 	}
 }
 
-// removedLocalEntries sind die elf Einträge, die nicht mehr zur Struktur
+// removedLocalEntries sind die zwölf Einträge, die nicht mehr zur Struktur
 // gehören: docs bis material hat Task 107 herausgenommen, ihr Inhalt liegt in
 // der Projekt-Collection; inbox, queue, knowledge und cache waren die
 // Wissensablage auf der Platte, die Task 123 entfernt hat; rules ist die
 // Sorte, die Task 135 entfernt hat, checks die lokale Ebene der Checks, die
-// Task 134 entfernt hat.
-var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", "inbox", "queue", "knowledge", "cache", "rules", "checks"}
+// Task 134 entfernt hat; results war die Ablage der Review-Ergebnisse, die
+// Task 146 herausgenommen hat.
+var removedLocalEntries = []string{"docs", "tasks", "tasks/done", "data", "material", "inbox", "queue", "knowledge", "cache", "rules", "checks", "results"}
 
-// Das Einrichten legt die elf Einträge nicht mehr an und zählt sie nicht als
+// Das Einrichten legt die zwölf Einträge nicht mehr an und zählt sie nicht als
 // fehlend; ein Projekt ohne sie ist vollständig. Auch cache/ entsteht nicht
 // nebenbei.
 func TestCreateLocalLegtEntfernteEintraegeNichtAn(t *testing.T) {
@@ -131,7 +136,7 @@ func TestCreateLocalLegtEntfernteEintraegeNichtAn(t *testing.T) {
 
 // Ein Bestandsprojekt, in dem die alten Verzeichnisse noch liegen, bleibt
 // vollständig, und CreateLocal lässt sie stehen: abgeräumt wird allein über
-// /k-upgrade, nach Bestätigung.
+// /k-upgrade.
 func TestCreateLocalLaesstAlteVerzeichnisseStehen(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range removedLocalEntries {
@@ -273,10 +278,10 @@ func TestCreateLocalLegtPrivateVerzeichnisseAn(t *testing.T) {
 	}
 }
 
-// CreateLocal schreibt eine .gitignore nur für Einträge mit PrivateByDefault.
-// Für alle anderen gilt weiterhin: was versioniert wird, entscheidet allein das
-// Projekt.
-func TestCreateLocalSchreibtGitignoreNurFuerVorbelegteEintraege(t *testing.T) {
+// CreateLocal schreibt keine .gitignore: was versioniert wird, entscheidet
+// allein das Projekt. Seit results/ nicht mehr zur Struktur gehört (Task 146),
+// gibt es keinen Eintrag mehr, den das Einrichten schon privat anlegt.
+func TestCreateLocalSchreibtKeineGitignore(t *testing.T) {
 	root := t.TempDir()
 
 	if _, err := CreateLocal(root); err != nil {
@@ -284,7 +289,7 @@ func TestCreateLocalSchreibtGitignoreNurFuerVorbelegteEintraege(t *testing.T) {
 	}
 
 	for _, entry := range LocalStructure() {
-		if entry.IsFile || entry.PrivateByDefault {
+		if entry.IsFile {
 			continue
 		}
 		if pathExists(filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)) {
@@ -293,64 +298,27 @@ func TestCreateLocalSchreibtGitignoreNurFuerVorbelegteEintraege(t *testing.T) {
 	}
 }
 
-// Ein frisch angelegter vorbelegter Eintrag bekommt genau den verwalteten
-// Inhalt — nicht mehr und nicht weniger.
-func TestCreateLocalLegtVorbelegteGitignoreAn(t *testing.T) {
-	root := t.TempDir()
-
-	if _, err := CreateLocal(root); err != nil {
-		t.Fatalf("CreateLocal: %v", err)
-	}
-
-	vorbelegt := 0
-	for _, entry := range LocalStructure() {
-		if !entry.PrivateByDefault {
-			continue
-		}
-		vorbelegt++
-		if !entry.Private {
-			t.Errorf("%s ist vorbelegt, aber nicht als privat geführt", entry.Path)
-		}
-		ignore := filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)
-		if !hasManagedContent(ignore) {
-			content, _ := os.ReadFile(ignore)
-			t.Errorf("%s trägt nicht den verwalteten Inhalt:\n%s", entry.Path, content)
-		}
-	}
-	if vorbelegt == 0 {
-		t.Fatalf("kein vorbelegter Eintrag in der Struktur")
-	}
-}
-
-// Zweiter Lauf über ein bestehendes Verzeichnis ohne .gitignore: nichts wird
-// geschrieben. Sonst käme der Default nach jedem makePublic() still zurück, und
-// Bestandsprojekte mit getrackten Dateien landeten in PrivacyPartial.
+// Ein zweiter Lauf über ein Verzeichnis, dessen verwaltete .gitignore wieder
+// entfernt wurde, bringt sie nicht zurück: die Umschaltung gehört dem Projekt.
 func TestCreateLocalBringtEntfernteGitignoreNichtZurueck(t *testing.T) {
 	root := t.TempDir()
 
 	if _, err := CreateLocal(root); err != nil {
 		t.Fatalf("CreateLocal: %v", err)
 	}
-	for _, entry := range LocalStructure() {
-		if !entry.PrivateByDefault {
-			continue
-		}
-		if err := os.Remove(filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)); err != nil {
-			t.Fatalf("%s/.gitignore entfernen: %v", entry.Path, err)
-		}
+	ignore := filepath.Join(LocalDir(root), "priv", PrivateIgnoreFile)
+	if err := os.WriteFile(ignore, []byte(managedIgnoreContent()), 0o644); err != nil {
+		t.Fatalf("priv/.gitignore schreiben: %v", err)
+	}
+	if err := os.Remove(ignore); err != nil {
+		t.Fatalf("priv/.gitignore entfernen: %v", err)
 	}
 
 	if _, err := CreateLocal(root); err != nil {
 		t.Fatalf("CreateLocal, zweiter Lauf: %v", err)
 	}
-
-	for _, entry := range LocalStructure() {
-		if !entry.PrivateByDefault {
-			continue
-		}
-		if pathExists(filepath.Join(LocalDir(root), entry.Path, PrivateIgnoreFile)) {
-			t.Errorf("%s hat die .gitignore still zurückbekommen", entry.Path)
-		}
+	if pathExists(ignore) {
+		t.Error("priv hat die .gitignore still zurückbekommen")
 	}
 }
 
@@ -411,10 +379,10 @@ func TestEnsureLocalLaesstUnvollstaendigesVerzeichnisStehen(t *testing.T) {
 	}
 }
 
-// Ein über makePublic() bewusst öffentlich geschaltetes Verzeichnis bleibt
-// öffentlich: der Startlauf fasst ein vorhandenes k-playbook-local/ nicht an
-// und bringt die verwaltete .gitignore nicht zurück.
-func TestEnsureLocalLaesstOeffentlichGeschaltetesVerzeichnisOeffentlich(t *testing.T) {
+// Eine Umschaltung bleibt über den Startlauf hinweg stehen, in beide
+// Richtungen: der fasst ein vorhandenes k-playbook-local/ nicht an, nimmt die
+// verwaltete .gitignore also weder weg noch bringt er sie zurück.
+func TestEnsureLocalLaesstUmschaltungStehen(t *testing.T) {
 	root := t.TempDir()
 	gitInit(t, root)
 	writeVCSConfig(t, root, "git")
@@ -422,29 +390,38 @@ func TestEnsureLocalLaesstOeffentlichGeschaltetesVerzeichnisOeffentlich(t *testi
 		t.Fatalf("CreateLocal: %v", err)
 	}
 
-	entry, ok := PrivateEntry("results")
+	entry, ok := PrivateEntry("priv")
 	if !ok {
-		t.Fatal("results steht nicht als privates Verzeichnis in der lokalen Struktur")
+		t.Fatal("priv steht nicht als privates Verzeichnis in der lokalen Struktur")
 	}
-	change, err := SetPrivate(root, entry, false)
-	if err != nil {
-		t.Fatalf("SetPrivate: %v", err)
-	}
-	if change.Status.State != PrivacyPublic {
-		t.Fatalf("State nach dem Umschalten = %q, erwartet %q (%s)", change.Status.State, PrivacyPublic, change.Status.Reason)
-	}
+	ignore := filepath.Join(LocalDir(root), "priv", PrivateIgnoreFile)
 
-	_, created, err := EnsureLocal(root)
-	if err != nil {
-		t.Fatalf("EnsureLocal: %v", err)
-	}
-	if created {
-		t.Error("ein vorhandenes Verzeichnis wurde als angelegt gemeldet")
-	}
-	if pathExists(filepath.Join(LocalDir(root), "results", PrivateIgnoreFile)) {
-		t.Error("die bewusst entfernte .gitignore ist beim Start zurückgekommen")
-	}
-	if status := PrivacyStatusFor(root, entry); status.State != PrivacyPublic {
-		t.Errorf("State nach dem Start = %q, erwartet %q (%s)", status.State, PrivacyPublic, status.Reason)
+	for _, private := range []bool{true, false} {
+		want := PrivacyPublic
+		if private {
+			want = PrivacyPrivate
+		}
+
+		change, err := SetPrivate(root, entry, private)
+		if err != nil {
+			t.Fatalf("SetPrivate(%v): %v", private, err)
+		}
+		if change.Status.State != want {
+			t.Fatalf("State nach dem Umschalten = %q, erwartet %q (%s)", change.Status.State, want, change.Status.Reason)
+		}
+
+		_, created, err := EnsureLocal(root)
+		if err != nil {
+			t.Fatalf("EnsureLocal: %v", err)
+		}
+		if created {
+			t.Error("ein vorhandenes Verzeichnis wurde als angelegt gemeldet")
+		}
+		if pathExists(ignore) != private {
+			t.Errorf("privat = %v, aber .gitignore vorhanden = %v nach dem Start", private, pathExists(ignore))
+		}
+		if status := PrivacyStatusFor(root, entry); status.State != want {
+			t.Errorf("State nach dem Start = %q, erwartet %q (%s)", status.State, want, status.Reason)
+		}
 	}
 }

@@ -833,7 +833,10 @@ func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
 // handgemachter Schmierzettel aus der Zeit der Wissensablage —, es wird wie
 // rules/ und checks/ behandelt. guidelines/ löscht 3.4 immer, auch mit
 // Inhalt, und nennt jede Datei: projekteigene Guidelines liegen unter
-// keph:/docs/guidelines/ (Todo #40). Die Hülle nennt alle Verzeichnisse in
+// keph:/docs/guidelines/ (Todo #40). results/ löscht 3.4 seit Task 146
+// ebenso, auch mit Inhalt: Review-Ergebnisse sind aus dem Code wiederholbar;
+// weil der Inhalt in der Regel nicht versioniert ist, übernimmt der Text den
+// Satz zur Git-Geschichte dafür nicht. Die Hülle nennt alle Verzeichnisse in
 // ihrer description.
 func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
@@ -843,12 +846,22 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"legt elf Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
+		"legt zwölf Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
 		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/` - `instructions/` - `includes/` - `reviews/` - `rules/` - `checks/` - `guidelines/` - `tmp/`",
+		"- `material/` - `commands/` - `skills/` - `instructions/` - `includes/` - `reviews/` - `rules/` - `checks/` - `guidelines/` - `results/` - `tmp/`",
 		"**Ausnahme für `guidelines/`.** Es wird gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
 		"nennt die Meldung jede gelöschte Datei, ohne die Grenze von fünf Pfaden",
 		"guidelines/ gelöscht: README.md, stil.md",
+		"`guidelines/` und `results/` löscht sie immer, auch mit Inhalt.",
+		"**Ausnahme für `results/`.** Es wird wie `guidelines/` gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
+		"Review-Ergebnisse sind aus dem Code wiederholbar: Sie sind ein Stand von einem Rechner und kein Projektwissen.",
+		"ihre neue Ablage kommt mit dem Review-Umbau",
+		"ist der Inhalt in der Regel nicht versioniert",
+		"lässt sich nach dem Löschen nicht aus Git zurückholen",
+		"`guidelines/` und `results/` gehören immer zu den ersten",
+		"`guidelines/` und `results/` prüfst du nicht noch einmal auf leer, sondern listest jedes unmittelbar vor dem Löschen erneut",
+		"Für `results/` gibt es ebenfalls nur die Zeile `gelöscht:`. Sie nennt jede Datei, auch über fünf und auch in Unterverzeichnissen",
+		"results/ gelöscht: README.md, .gitignore, log.md, known-decisions.md",
 		"Dazu kommt `tmp/`, das das Einrichten nie angelegt hat",
 		"dort niemand liest und niemand aufräumt",
 		"tmp/ gelöscht: README.md",
@@ -875,10 +888,23 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 			t.Errorf("3.4 nennt %q nicht", needle)
 		}
 	}
-	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse", "zehn Verzeichnisse"} {
+	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse", "zehn Verzeichnisse", "elf Verzeichnisse"} {
 		if strings.Contains(section, stale) {
 			t.Errorf("3.4 zählt noch %s", stale)
 		}
+	}
+	// Der Satz zur Git-Geschichte gilt nur für guidelines/: Der Inhalt von
+	// results/ ist in der Regel nicht versioniert.
+	_, exception, found := strings.Cut(section, "**Ausnahme für `results/`.**")
+	exception, _, closed := strings.Cut(exception, "Alles andere heißt")
+	if !found || !closed {
+		t.Fatal("Ausnahme für results/ nicht gefunden")
+	}
+	if strings.Contains(exception, "bleibt in der Git-Geschichte") {
+		t.Error("die Ausnahme für results/ verspricht die Git-Geschichte")
+	}
+	if general := squashSpace(file[:start]); !strings.Contains(general, "die Verzeichnisse, die 3.4 löscht — die leeren, dazu `guidelines/` und `results/` auch mit Inhalt") {
+		t.Error("die Regel zur Bestätigung in Schritt 3 nimmt guidelines/ und results/ nicht aus")
 	}
 
 	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
@@ -886,6 +912,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt",
+		"ebenso k-playbook-local/results/, weil Review-Ergebnisse aus dem Code wiederholbar sind",
 		"dazu instructions, includes und reviews, die k-playbook nicht mehr liest",
 		"jede Datei in instructions, includes oder reviews mit ihrem Ziel unter keph:/k-playbook/<sorte>/ in der Projekt-Collection, das der Nutzer beim Umzug ändern kann"} {
 		if !strings.Contains(string(hull), needle) {

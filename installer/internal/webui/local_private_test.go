@@ -80,25 +80,32 @@ func TestLocalPrivateHandlerLiefertAlleVerzeichnisse(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
 	}
-	if !response.Available || len(response.Entries) != 2 {
-		t.Fatalf("Available = %v, Einträge = %d, erwartet 2", response.Available, len(response.Entries))
+	if !response.Available || len(response.Entries) != 1 {
+		t.Fatalf("Available = %v, Einträge = %d, erwartet 1", response.Available, len(response.Entries))
 	}
 	if entry := privateEntry(t, response, "priv"); entry.State != project.PrivacyPublic {
 		t.Errorf("priv = %+v, erwartet %q", entry, project.PrivacyPublic)
 	}
-	privateEntry(t, response, "results")
 }
 
-// material/ steht seit Task 107 nicht mehr in der lokalen Struktur, cache/ und
-// inbox/ gibt es seit Task 123 nicht mehr; keines lässt sich umschalten.
+// material/ steht seit Task 107 nicht mehr in der lokalen Struktur, results/
+// seit Task 146 nicht, cache/ und inbox/ gibt es seit Task 123 nicht mehr;
+// keines lässt sich umschalten.
 func TestSetLocalPrivateHandlerWeistEntfernteVerzeichnisseAb(t *testing.T) {
-	privateProject(t)
+	root := privateProject(t)
 
-	for _, path := range []string{"cache", "inbox", "material"} {
+	// Ein results/, das in einem Bestandsprojekt noch liegt, ändert daran
+	// nichts: zulässig ist nur, was in der Struktur steht.
+	writeFile(t, filepath.Join(project.LocalDir(root), "results", "README.md"), "# results\n")
+
+	for _, path := range []string{"cache", "inbox", "material", "results"} {
 		status, _ := postPrivate(t, `{"path":"`+path+`","private":true}`)
 		if status != http.StatusBadRequest {
 			t.Errorf("%s: Status = %d, erwartet 400", path, status)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "results", project.PrivateIgnoreFile)); err == nil {
+		t.Error("für results/ wurde eine .gitignore geschrieben")
 	}
 }
 

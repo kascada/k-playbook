@@ -26,7 +26,7 @@ project/
 ├── .k-playbook/
 │   └── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
 ├── k-playbook/           the installation, fully replaceable
-└── k-playbook-local/     project-owned, committed (except the contents of results/)
+└── k-playbook-local/     project-owned, committed
 ```
 
 | Part | Owner | What happens on update |
@@ -48,7 +48,7 @@ flowchart LR
     Playbook --> Tool["bin/ · scripts/"]
 
     Local --> Overlay["reviews/<br>commands/ · skills/"]
-    Local --> Artifacts["results/ · guidelines/ · priv/"]
+    Local --> Artifacts["guidelines/ · priv/"]
     Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
 
     Base --> Effective["effective set"]
