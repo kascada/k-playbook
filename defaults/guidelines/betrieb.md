@@ -85,7 +85,8 @@ den falschen Nachzug.
 - **Läufe** tragen das Datum als `YYYY-MM-DD`, nie ein anderes Format: nur so sortiert
   das Verzeichnis chronologisch.
 - **Datei- und Verzeichnisnamen bleiben ASCII**, auch wenn der Text darin Umlaute
-  hat. Der Grund steht in `k-playbook/docs/writing-style.md`.
+  hat. macOS speichert Umlaute zerlegt, Linux zusammengesetzt; derselbe Name wäre auf zwei
+  Rechnern nicht dieselbe Zeichenkette.
 
 ## Was nirgends hingehört
 

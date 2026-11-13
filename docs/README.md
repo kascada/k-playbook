@@ -28,7 +28,6 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 | [`local-github-ssh.md`](./local-github-ssh.md) | Host-specific GitHub SSH aliases and deploy keys. Not part of the installation contract; absorbed into `github-access.md` in a later step, after availability. |
 | [`kephalaion-client.md`](./kephalaion-client.md) | The Kephalaion tools k-playbook calls itself (`whoami`, `list`, `create`, `rename`), what it expects of them — `create`/`rename` through the hub, `name_taken`, `list` from the replica and the replica lag measured, `request_id` with one retry, `replayed`, `outcome_unknown` versus `node_unreachable`, minimum node v0.3.1 —, and where the tools themselves are documented. |
 | [`verweisschema.md`](./verweisschema.md) | The reference scheme: one path with a prefix — `project:`, `k-playbook:`, `keph:` —, the access route per prefix, and how k-playbook resolves `k-playbook:` references and assembles directories such as `k-playbook:/instructions/always/`. |
-| [`writing-style.md`](./writing-style.md) | Umlauts instead of ASCII transliteration, and where ASCII remains. Applies to all repository text. |
 
 ## Tool and catalogs
 
@@ -107,7 +106,6 @@ questions and the ordered work list.
 - `evidence contract` / `review-input.json` schema / `stableId` generation -> [`../commands/_review-run/review-input-contract.md`](../commands/_review-run/review-input-contract.md)
 - `audit.mode` / `perspective` / `evidence recipe` / `scope.paths` / `ruleIds` -> [`review-runs.md`](./review-runs.md#catalog-recipes-in-the-run)
 - `known decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd)
-- `spelling` / `umlauts` / `orthography` -> [`writing-style.md`](./writing-style.md)
 - `reviews` -> [`code-review.md`](./code-review.md)
 - `review-code` / `code review recipe` / `diff of a task` -> [`code-review.md`](./code-review.md#code-review)
 - `schema_version` -> [`k-playbook-format.md`](./k-playbook-format.md#schema_version)
