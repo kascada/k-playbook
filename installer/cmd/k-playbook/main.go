@@ -81,11 +81,12 @@ func run(args []string) error {
 		return mcpserver.Run(context.Background())
 	case "scan":
 		// Ohne Wirt-Pflege: ein Scan liest nur und soll den Host nicht nebenbei
-		// anfassen, während er läuft.
+		// anfassen, während er läuft. Zurzeit gesperrt (review.Paused).
 		return runScan(args[1:])
 	case "merge":
 		// Wie scan: ein Merge arbeitet auf einem vorhandenen Lauf und fasst dessen
-		// Artefakte zusammen, ohne den Host nebenbei anzufassen.
+		// Artefakte zusammen, ohne den Host nebenbei anzufassen. Zurzeit gesperrt
+		// wie scan.
 		return runMerge(args[1:])
 	case "inventory":
 		// Wie scan und merge ohne Wirt-Pflege: die Erhebung liest die
@@ -249,14 +250,16 @@ Unterkommandos:
   mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
             als Werkzeug anbietet. Gedacht für den Aufruf durch einen
             Assistenten, nicht für die Hand.
-  scan      Führt die Werkzeug-Einträge eines Review-Laufs aus:
-            k-playbook scan <lauf> [eintrag …]. Ohne Eintragsangabe alle, die
-            noch nicht gelaufen sind. Die Namen sind die der Werkzeuge. Das
-            Kommando kehrt zurück, wenn alle Einträge durch sind; der
-            Fortschritt steht währenddessen unter entries/.
-  merge     Fasst einen bestehenden Review-Lauf zusammen:
-            k-playbook merge <lauf>. Das Ergebnis wird als Review-Input in das
-            Laufverzeichnis geschrieben.
+  scan      Vorübergehend nicht verfügbar: Die Ablage der Review-Ergebnisse
+            wird umgebaut; das Kommando endet mit der Sperre und Exit-Code 1
+            und schreibt nichts. Sonst: führt die Werkzeug-Einträge eines
+            Review-Laufs aus, k-playbook scan <lauf> [eintrag …]. Ohne
+            Eintragsangabe alle, die noch nicht gelaufen sind. Die Namen sind
+            die der Werkzeuge. Das Kommando kehrt zurück, wenn alle Einträge
+            durch sind; der Fortschritt steht währenddessen unter entries/.
+  merge     Vorübergehend nicht verfügbar, wie scan. Sonst: fasst einen
+            bestehenden Review-Lauf zusammen, k-playbook merge <lauf>. Das
+            Ergebnis wird als Review-Input in das Laufverzeichnis geschrieben.
   inventory Erhebt das Versionsinventar dieses Projekts und schreibt es in
             die Collection des Projekts nach
             keph:/docs/generated/versions/inventory.md: k-playbook inventory,

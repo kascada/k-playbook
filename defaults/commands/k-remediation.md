@@ -3,11 +3,11 @@
 ## Vorübergehend nicht verfügbar
 
 Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
-zur Verfügung, voraussichtlich bis zum 13. November 2026. Führe nichts von dem aus, was
-darunter steht — nichts lesen, nichts schreiben, nichts anbieten. Sag dem Nutzer in einem
-Satz, dass `/k-remediation` gerade umzieht und voraussichtlich ab dem 13. November 2026
-wieder geht. Vorhandene `review-triage.md` unter `k-playbook-local/results/` bleiben
-unverändert liegen und lassen sich danach wieder abarbeiten.
+zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen, nichts
+schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-remediation` gerade
+umzieht und erst nach dem Umbau wieder geht. Vorhandene `review-triage.md` unter
+`k-playbook-local/results/` bleiben unverändert liegen und lassen sich danach wieder
+abarbeiten.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 

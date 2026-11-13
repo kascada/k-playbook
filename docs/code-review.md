@@ -9,6 +9,15 @@ family. What differs is state, tooling, and scope. Either way, k-playbook separa
 audit, **store** its results under `k-playbook-local/results/`, and **work through** them with
 `/k-remediation`.
 
+**Paused (task 147).** The storage of review results is being rebuilt, and until it stands
+all of this is locked: `/k-review`, `/k-audit` and `/k-remediation` only say that they are
+temporarily unavailable, `k-playbook scan` and `k-playbook merge` end with an error, and the
+MCP tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry` answer
+`reviews_paused` and write nothing ([`mcp.md`](./mcp.md#review-tools-are-paused)). Only
+`k_playbook_review_status` still reads. k-playbook no longer creates
+`k-playbook-local/results/` or anything else under `k-playbook-local/`. This page describes
+the flow as it worked until then.
+
 **Which page owns what.** So that the boundary does not slip again: this page describes both
 paths, the family flow, and the family artifacts. [`review-runs.md`](./review-runs.md) describes
 the inside of a run — `run.json`, `entries/`, states, merge. [`mcp.md`](./mcp.md) describes the
@@ -479,8 +488,8 @@ read in the repository.
 
 Because this scope is homogeneous, the usual managed ignore content (`*`, `!.gitignore`,
 `!README.md`) remains sufficient. Until task 146, setup created the directory with exactly
-that file. Since then setup no longer creates it and the **Local settings** section of the
-interface no longer switches it; `/k-upgrade` 3.4 deletes a leftover one without asking, even
+that file. Since then setup no longer creates it, and the **Local settings** section of the
+interface, which switched it, is gone (task 147); `/k-upgrade` 3.4 deletes a leftover one without asking, even
 with content, and names every deleted file — being unversioned, the content cannot be
 recovered from Git afterwards. Where review runs write from then on is decided by the rebuild
 of the review commands; until then this page describes the previous location.

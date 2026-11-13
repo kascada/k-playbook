@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -359,6 +362,10 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	}
 }
 
+// Die Review-Werkzeuge über das Protokoll, so wie ein Client sie zurzeit
+// bekommt (Task 147): status liest, die vier schreibenden antworten mit
+// reviews_paused, als Fehler markiert — und am vorhandenen Lauf ändert sich
+// nichts, auch ein Lauf für einen neuen Tag entsteht nicht.
 func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	root := newMCPReviewProject(t)
 	runDir := mustCreateMCPRun(t, root)
@@ -376,31 +383,122 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 		t.Fatalf("tools/list meldet nicht achtundzwanzig Werkzeuge: %v", responses[1])
 	}
 
+	resultsDir := filepath.Join(project.LocalDir(root), review.ResultsDirName)
+	before := listTree(t, resultsDir)
+
 	for id, call := range []struct {
-		name string
-		args map[string]any
+		name   string
+		args   map[string]any
+		paused bool
 	}{
 		{name: "k_playbook_review_status", args: map[string]any{"projectDir": root}},
-		{name: "k_playbook_review_create", args: map[string]any{"projectDir": root, "day": "2026-08-20", "dryRun": true}},
-		{name: "k_playbook_review_scan", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
-		{name: "k_playbook_review_write_ai_entry", args: map[string]any{"projectDir": root, "run": "2026-08-19", "entry": "tech", "state": "done", "result": "review-tech.md"}},
-		{name: "k_playbook_review_merge", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
+		{name: "k_playbook_review_create", args: map[string]any{"projectDir": root, "day": "2026-08-20"}, paused: true},
+		{name: "k_playbook_review_scan", args: map[string]any{"projectDir": root, "run": "2026-08-19"}, paused: true},
+		{name: "k_playbook_review_write_ai_entry", args: map[string]any{"projectDir": root, "run": "2026-08-19", "entry": "tech", "state": "done", "result": "review-tech.md"}, paused: true},
+		{name: "k_playbook_review_merge", args: map[string]any{"projectDir": root, "run": "2026-08-19"}, paused: true},
 	} {
 		initID := 10 + id*2
 		callID := initID + 1
 		stdout := speak(t, root, 2, initialize(initID), initialized, callTool(callID, call.name, call.args))
 		responses := decodeResponses(t, stdout, initID, callID)
-		var envelope struct {
-			OK    bool   `json:"ok"`
-			Tool  string `json:"tool"`
-			Error any    `json:"error"`
-		}
+		var envelope toolEnvelope
 		if err := json.Unmarshal([]byte(toolText(t, responses[1])), &envelope); err != nil {
 			t.Fatalf("%s Antwort ist kein Envelope-JSON: %v", call.name, err)
 		}
-		if !envelope.OK {
-			t.Fatalf("%s schlug fehl: %v", envelope.Tool, envelope.Error)
+		if !call.paused {
+			if !envelope.OK {
+				t.Fatalf("%s schlug fehl: %+v", envelope.Tool, envelope.Error)
+			}
+			continue
 		}
+		if isError := result(t, responses[1])["isError"]; isError != true {
+			t.Errorf("%s: Ergebnis nicht als Fehler markiert: %v", call.name, responses[1])
+		}
+		if envelope.OK || envelope.Error == nil || envelope.Error.Code != review.PausedCode {
+			t.Errorf("%s: erwartet %s, bekommen %s", call.name, review.PausedCode, toolText(t, responses[1]))
+			continue
+		}
+		if envelope.Error.Message != review.PausedMessage {
+			t.Errorf("%s: Meldung = %q", call.name, envelope.Error.Message)
+		}
+	}
+
+	if after := listTree(t, resultsDir); !slices.Equal(before, after) {
+		t.Errorf("die gesperrten Werkzeuge haben %s verändert:\nvorher:  %v\nnachher: %v", resultsDir, before, after)
+	}
+}
+
+// listTree nennt jeden Pfad unter root mit Größe, sortiert — genug, um zu
+// sehen, ob eine Datei entstanden, verschwunden oder gewachsen ist.
+func listTree(t *testing.T, root string) []string {
+	t.Helper()
+
+	entries := []string{}
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			entries = append(entries, relative+"/")
+			return nil
+		}
+		entries = append(entries, fmt.Sprintf("%s (%d)", relative, info.Size()))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("%s durchlaufen: %v", root, err)
+	}
+	slices.Sort(entries)
+	return entries
+}
+
+// scan und merge sind gesperrt wie die MCP-Werkzeuge (Task 147): Sie enden vor
+// jedem Lesen mit der Sperre und einem Exit-Code ungleich 0 — mit und ohne
+// Argumente, mit einem vorhandenen Lauf und in einem Projekt ohne
+// k-playbook-local/, das dabei nicht entsteht.
+func TestScanUndMergeSindGesperrt(t *testing.T) {
+	root := newMCPReviewProject(t)
+	mustCreateMCPRun(t, root)
+	resultsDir := filepath.Join(project.LocalDir(root), review.ResultsDirName)
+	before := listTree(t, resultsDir)
+
+	bare := newProject(t)
+	if err := os.RemoveAll(project.LocalDir(bare)); err != nil {
+		t.Fatalf("%s entfernen: %v", project.LocalDirName, err)
+	}
+
+	for _, dir := range []string{root, bare} {
+		t.Chdir(dir)
+		for _, args := range [][]string{
+			{"scan", "2026-08-19"},
+			{"scan"},
+			{"merge", "2026-08-19"},
+			{"merge"},
+		} {
+			err := run(args)
+			if !errors.Is(err, review.ErrPaused) {
+				t.Errorf("%v in %s: Fehler = %v, erwartet die Sperre", args, dir, err)
+				continue
+			}
+			if exitCodeOf(err) == 0 {
+				t.Errorf("%v: Exit-Code 0", args)
+			}
+		}
+	}
+
+	if after := listTree(t, resultsDir); !slices.Equal(before, after) {
+		t.Errorf("scan oder merge haben %s verändert:\nvorher:  %v\nnachher: %v", resultsDir, before, after)
+	}
+	if _, err := os.Stat(project.LocalDir(bare)); !os.IsNotExist(err) {
+		t.Errorf("%s ist entstanden (Stat: %v)", project.LocalDirName, err)
 	}
 }
 
@@ -513,7 +611,10 @@ func withProjectDir(arguments map[string]any, projectDir any) map[string]any {
 }
 
 // projectDirCalls sind je Familie ein lesendes und ein schreibendes Werkzeug,
-// mit Argumenten, die bis auf projectDir dem Schema genügen.
+// mit Argumenten, die bis auf projectDir dem Schema genügen. Die Familie der
+// Review-Werkzeuge stellt nur das lesende: die schreibenden sind gesperrt und
+// antworten vor jeder Prüfung von projectDir mit reviews_paused
+// (TestReviewWerkzeugeUeberMCPProtokoll).
 var projectDirCalls = []struct {
 	name string
 	args map[string]any
@@ -523,7 +624,6 @@ var projectDirCalls = []struct {
 	{name: "k_playbook_todo_list", args: map[string]any{}},
 	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
 	{name: "k_playbook_review_status", args: map[string]any{}},
-	{name: "k_playbook_review_create", args: map[string]any{"day": "2026-09-16", "dryRun": true}},
 	{name: "k_playbook_doc_read", args: map[string]any{"ref": "k-playbook:/instructions/always/"}},
 	{name: "k_playbook_doc_create", args: map[string]any{"kind": "tasks", "name": "ohne-projectdir"}},
 }

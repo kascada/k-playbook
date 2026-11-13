@@ -14,7 +14,14 @@ import (
 // runMerge fasst einen bestehenden Review-Lauf zu Review-Input-Artefakten
 // zusammen. Die fachliche Arbeit liegt in review/merge; das Kommando löst nur
 // Argumente und Projektumgebung auf.
+//
+// Gesperrt, solange die Review-Wege pausieren (review.Paused, Task 147): das
+// Kommando endet dann vor jedem Lesen mit der Sperre und einem Exit-Code
+// ungleich 0.
 func runMerge(args []string) error {
+	if err := review.Paused(); err != nil {
+		return err
+	}
 	if len(args) != 1 {
 		return fmt.Errorf("erwartet genau ein Lauf: k-playbook merge <lauf>")
 	}

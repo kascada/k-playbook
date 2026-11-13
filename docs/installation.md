@@ -37,9 +37,9 @@ One special case exists on the first run on a fresh host or in a DevContainer: D
 
 **Host and DevContainer with a shared home.** `~/.local/bin/k-playbook` is a real file for each platform. If both environments share the same `$HOME`, they overwrite each other there. `bin/install` detects a binary for another platform and reports during replacement that the other environment also needs to run the bootstrap again. Calling the binary directly when it belongs to the wrong platform is not handled: the shell then reports `cannot execute binary file`. Separate homes are the clean state.
 
-## The four steps
+## The three steps
 
-The final call opens the interface in the browser. It guides you through four steps and writes each one only after confirmation.
+The final call opens the interface in the browser. It guides you through three steps and writes each one only after confirmation.
 
 ### 1. Create configuration
 
@@ -76,48 +76,56 @@ k-playbook config create --repo-root app /path/to/project
 
 An existing `K-PLAYBOOK.yaml` remains unchanged through this path as well.
 
-### 2. Create project-owned structure
+### `k-playbook-local/` is no longer created
 
-Alongside it, `k-playbook-local/` is created with everything owned by the project:
+Earlier versions created `k-playbook-local/` beside the configuration as the second step,
+with everything owned by the project. The directory is being phased out: k-playbook no
+longer creates it or anything in it (task 147) — not when the interface starts, not on a
+button, not as a side effect of a tool. The setup page has no **Project-owned structure**
+block with the button “Anlegen” any more and no **Local settings** block with the switch
+for `priv/`. A project without the directory stays without it after the interface has
+started and after `k-playbook briefing`, `setup` and `upgrade`.
 
-```text
-k-playbook-local/
-├── reviews/       overlay for k-playbook/reviews/
-├── guidelines/
-├── priv/          private notes; see below
-└── k-playbook.md  project-owned instruction layer
-```
+What a project owns lives elsewhere:
 
-The source configuration of the version inventory is not created on disk any more: since
-task 144 it is the document `keph:/k-playbook/inventory.md` in the project collection,
-created by `/k-doc-inventory` on the first confirmed addition; a
-`k-playbook-local/version-sources.yaml` from before is no longer read, and `/k-upgrade`
-(conversion 3.6) moves it.
+- tasks, todos and the project documentation in the project collection
+  (`keph:/user/<user>/tasks/`, `todos/`, `keph:/docs/`), since task 107;
+- project-owned commands and skills in `.k-playbook/commands/` and `.k-playbook/skills/`,
+  versioned next to the configuration, since task 129. Setup does not create these two;
+  they appear when the project puts something there;
+- project-owned instructions, includes and review recipes in the project collection under
+  `keph:/k-playbook/`, since task 143;
+- the source configuration of the version inventory as the document
+  `keph:/k-playbook/inventory.md`, created by `/k-doc-inventory` on the first confirmed
+  addition, since task 144.
 
-Since task 107, setup no longer creates `docs/`, `tasks/`, `tasks/done/`, `data/` and `material/`, and the setup page does not count them as missing: tasks, todos and the project documentation live in the project collection (`keph:/user/<user>/tasks/`, `todos/`, `keph:/docs/`). Since task 129 the same holds for `commands/` and `skills/`: project-owned commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/`, versioned next to the configuration. Setup does not create these two either; they appear when the project puts something there. The former place under `k-playbook-local/` is no longer read; `/k-upgrade` 3.4 names every entry left there with its target and moves only when asked. In an existing project, `/k-upgrade` (conversion 3.4) deletes each of them that holds nothing but `README.md` files and the managed `.gitignore` (directly under `data/` also the renamed leftovers `todos.json.migriert` and `todos.json.nachzuegler-<date>[-<n>]`; a `data/todos.json` not yet taken over keeps it), without asking (task 117); anything else keeps the directory and is only named. The former knowledge directories on disk, with their search index, are gone since task 123; in an existing project `/k-upgrade` (conversion 3.0) clears what is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for deletion.
+What still lies under `k-playbook-local/` in an existing project stays untouched by the
+program and is cleared by `/k-upgrade`:
 
-Every directory setup creates contains a `README.md` stating its purpose, also because Git does not store empty directories and they would otherwise be missing after cloning the project. Existing files remain untouched, including READMEs with their own content.
+- conversion 3.4 deletes each of `docs/`, `tasks/`, `data/`, `material/`, `commands/`,
+  `skills/` and the other former directories that holds nothing but `README.md` files and
+  the managed `.gitignore` (directly under `data/` also the renamed leftovers
+  `todos.json.migriert` and `todos.json.nachzuegler-<date>[-<n>]`; a `data/todos.json` not
+  yet taken over keeps it), without asking (task 117); anything else keeps the directory
+  and is only named, with its target;
+- conversion 3.4 deletes a leftover `results/` without asking, even with content, and
+  names every deleted file (task 146) — review results are reproducible from the code and
+  are a state from one machine; their content was usually not versioned, so it cannot be
+  recovered from Git afterwards;
+- conversion 3.6 moves a `k-playbook-local/version-sources.yaml`, which is no longer read;
+- conversion 3.0 clears what is left of the former knowledge directories on disk (gone
+  since task 123) and offers each knowledge file for a move to `keph:/docs/manual/` or for
+  deletion.
 
-`k-playbook-local/` belongs in the project's repository and is committed, except for the **contents** of one directory for which the project makes that decision: `priv/`. k-playbook does not write a `.gitignore` there itself and does not decide what a project versions.
+`priv/` and `material/` have no switch any more. A managed `.gitignore` already in place
+(`*`, `!.gitignore`, `!README.md`) stays and keeps working; whether such content is
+versioned is decided by hand, with a `.gitignore` in the directory itself and
+`git rm --cached` for files already in the index.
 
-`results/` is no longer part of this structure (task 146). Setup does not create it, and it has no switch any more: review results are reproducible from the code and are a state from one machine, and the review commands are switched off until they get a new place for their results. In an existing project, `/k-upgrade` (conversion 3.4) deletes a leftover `results/` without asking, even with content, and names every deleted file — its content was usually not versioned, so it cannot be recovered from Git afterwards.
+Review runs wrote to `k-playbook-local/results/`. Until the storage of review results has
+moved they are paused, see [Reviews and tasks](#reviews-and-tasks).
 
-`material/` was switchable as well; with task 107 it left the structure and has no switch any more. A managed `.gitignore` already in place stays and keeps working.
-
-This choice is visible and switchable in the **Local settings** section of the interface, for `priv/`. It uses `git check-ignore` to determine whether the content is actually excluded and identifies the repository to which the statement applies. If `k-playbook-local/` contains a repository of its own, it applies to that one. One of four states is shown:
-
-| State | Meaning |
-|---|---|
-| private | the content stays out |
-| versioned | no rule; the content is included in the repository |
-| partially private | a rule applies, but files are in the repository; the rule applies only to new files |
-| private only after the next commit | files were removed from the index but have not yet been committed |
-
-The last two look private but are not; they are therefore shown as a warning and name the affected files. Switching to private creates `.gitignore` and removes already versioned files from the index with `git rm --cached`; this takes effect only with the next commit, and anything already pushed remains in history.
-
-If the ignore rule comes from elsewhere, the `.gitignore` at the project root, `.git/info/exclude`, or global configuration, or if the file in the directory has its own content, nothing is written: the section then shows the state and identifies the source. Manually, the path continues to be a `.gitignore` in the relevant directory; the respective `README.md` names the content.
-
-### 3. Register the MCP server
+### 2. Register the MCP server
 
 The **k-playbook MCP** section registers the shipped MCP server with both assistants. This gives an assistant the resolved working state as a tool instead of making it retrieve it through the command line:
 
@@ -133,7 +141,7 @@ Both files belong to the project. Exactly the `k-playbook` key is touched; forei
 
 Everything else, the two schemas, handling foreign values, manual removal, and the `/mcp` page with the tools actually offered, is described in [`mcp.md`](./mcp.md).
 
-### 4. Link assistants
+### 3. Link assistants
 
 Links are created for Claude Code and OpenCode:
 
@@ -263,7 +271,7 @@ The **Workflows** section brings together the work queues, one page per kind: ta
 
 **Tasks** (`/workflows/tasks`) still reads the directory `k-playbook-local/tasks/`: it lists the open tasks there in numeric order; clicking displays the task as Markdown below the list. Completed tasks from `tasks/done/` appear in a collapsed section, with the highest number first, and can be read the same way. On the right of each task row, it shows whether it has already gone through `/k-task-refine`, with a date if the review log gives one. Tasks themselves live in the project collection since task 105 (`keph:/user/<user>/tasks/`, see [`task-flow.md`](./task-flow.md)); the commands no longer read or write the directory, and setup no longer creates it. Switching this page to the collection is a task of its own; until then the page shows only what is left on disk, and nothing once `/k-upgrade` has moved the files (3.3) and removed the empty directory (3.4).
 
-**Reviews** (`/workflows/reviews`) lists the previous runs with their state and entry count. **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
+**Reviews** (`/workflows/reviews`) lists the previous runs with their state and entry count. New runs are paused until the storage of review results has moved (task 147): `/k-review`, `/k-audit` and `/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error, and the MCP tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry` answer `reviews_paused` and write nothing ([`mcp.md`](./mcp.md#review-tools-are-paused)). **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
 
 Each of the four pages opens with a short help block. Its head carries a small link into the shipped documentation — the overview and the todos to `commands.md`, the tasks to `task-flow.md`, the reviews to `code-review.md` and `review-runs.md`. It opens the file in the Docs section, with the index and its cross-references; the address behind it is `/docs?file=<file>`, which any page can use.
 
@@ -676,7 +684,7 @@ Checklist for a project:
 - [ ] `schema_version: 3` is set.
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
 - [ ] `k-playbook/` is its own clone and contains no project-owned content.
-- [ ] `k-playbook-local/` exists completely and is committed in the project repository; whether the contents of `priv/` are versioned is the project's choice, and nothing is excluded from the outset.
+- [ ] `k-playbook-local/` was not created: a project that had none still has none. Where one is left from before, `/k-upgrade` clears it.
 - [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks through `.k-playbook/share/` or to `.k-playbook/commands/` and `.k-playbook/skills/`; the interface reports them as configured.
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; it matches `VERSION` in the clone or is newer.

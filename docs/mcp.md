@@ -338,10 +338,10 @@ then nothing is written and the interface says so.
 |---|---|
 | `k_playbook_context` | return the resolved working state like `k-playbook context` and synchronize assistant linking |
 | `k_playbook_review_status` | read the selection basis for new runs or the status of an existing run |
-| `k_playbook_review_create` | create a review run or return validated `run.json` in a dry run |
-| `k_playbook_review_scan` | execute a run's tool entries through `review.Execute` |
-| `k_playbook_review_merge` | consolidate a run through `merge.Run` into `review-input.json` and `review-input.md` |
-| `k_playbook_review_write_ai_entry` | write the status and result of an AI review entry |
+| `k_playbook_review_create` | **temporarily unavailable**, answers `reviews_paused` ([below](#review-tools-are-paused)); otherwise: create a review run or return validated `run.json` in a dry run |
+| `k_playbook_review_scan` | **temporarily unavailable**, answers `reviews_paused`; otherwise: execute a run's tool entries through `review.Execute` |
+| `k_playbook_review_merge` | **temporarily unavailable**, answers `reviews_paused`; otherwise: consolidate a run through `merge.Run` into `review-input.json` and `review-input.md` |
+| `k_playbook_review_write_ai_entry` | **temporarily unavailable**, answers `reviews_paused`; otherwise: write the status and result of an AI review entry |
 | `k_playbook_todo_list` | list the project todos; `includeDone` adds the completed ones, `search` filters by text |
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
@@ -367,6 +367,41 @@ then nothing is written and the interface says so.
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
+
+### Review Tools Are Paused
+
+The storage of review results is being rebuilt, and until it stands every writing review
+path is locked (task 147). `k_playbook_review_create`, `k_playbook_review_scan`,
+`k_playbook_review_merge` and `k_playbook_review_write_ai_entry` stay in the tool list with
+their names and schemas, but each call is answered with the error code `reviews_paused` and
+one sentence giving the reason, marked as a tool error:
+
+```json
+{
+  "ok": false,
+  "tool": "k_playbook_review_create",
+  "project": { "inputDir": "/provided/path" },
+  "error": {
+    "code": "reviews_paused",
+    "message": "Reviews sind vorübergehend nicht verfügbar: …",
+    "details": { "tool": "k_playbook_review_create" }
+  },
+  "warnings": []
+}
+```
+
+The answer comes before any check of the input and before the project is resolved: nothing
+is read, moved, created or written, no run and no `k-playbook-local/results/`. That holds
+for a dry run, for a `projectDir` that leads to no project, and for a missing one as well —
+these four tools do not answer `invalid_input` or `project_not_found` while they are
+paused. Their description in the tool list starts with “Vorübergehend nicht verfügbar”. The
+lock names no date; it holds until the new storage stands. The subcommands
+`k-playbook scan` and `k-playbook merge` are locked the same way and end with the same
+sentence and exit code 1.
+
+`k_playbook_review_status` stays open: it only reads runs, entry states and the selection
+basis and creates nothing. The sections below describe the contract of the four tools as
+it applies again once the lock is lifted.
 
 ### Review Response Contract
 
@@ -411,7 +446,7 @@ are stable and in `snake_case`, including `invalid_input`, `project_not_found`, 
 `invalid_mode`, `invalid_selection`, `selection_unknown`, `selection_unavailable`,
 `entry_not_found`, `entry_kind_invalid`, `entry_state_invalid`, `result_required`,
 `result_path_invalid`, `read_failed`, `write_failed`, `preflight_failed`, `execution_failed`,
-and `merge_failed`.
+`merge_failed`, and — while the review tools are paused — `reviews_paused`.
 
 `invalid_input` is the code for a missing, empty, or whitespace-only `projectDir`, with empty
 `details`; nothing was executed, and the call is to be repeated with `projectDir`.

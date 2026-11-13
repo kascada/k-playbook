@@ -5,6 +5,16 @@ progress in it. For the artifacts created by an individual review, see
 [`code-review.md`](./code-review.md); for the migration from which this
 emerged, see [`migration.md`](./migration.md).
 
+**Paused (task 147).** The storage of review results is being rebuilt. Until it stands,
+nothing creates or writes a run: `/k-audit`, `/k-review` and `/k-remediation` only say so,
+`k-playbook scan` and `k-playbook merge` end with an error and exit code 1, and the MCP
+tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry` answer
+`reviews_paused` ([`mcp.md`](./mcp.md#review-tools-are-paused)).
+`k_playbook_review_status` and the list of previous runs in the interface still read.
+`k-playbook-local/results/` is no longer created, and `/k-upgrade` deletes a leftover one.
+This page describes the run as it worked until then and as the code still implements it
+behind the lock.
+
 ## The Run Is the Container
 
 Previously, every review started its own tools and stored its results in its own location.
@@ -437,6 +447,9 @@ checked". The tool establishes the facts; assessment happens in the assessment s
 
 ## Running an Entry
 
+`k-playbook scan` is paused at present (see the top of this page): it ends with the lock
+and exit code 1 before reading anything.
+
 ```text
 k-playbook scan <lauf> [eintrag …]
 ```
@@ -686,6 +699,10 @@ manual path; MCP is intended for chat orchestration without shelling out to the
 | `k_playbook_review_merge` | write `review-input.json` and `review-input.md` | `k-playbook merge <lauf>` |
 | `k_playbook_review_write_ai_entry` | write an AI entry's status | no CLI equivalent |
 
+At present the four tools below `k_playbook_review_status` are paused: each call answers
+`reviews_paused` before the input is checked or the project is resolved, and writes
+nothing. What follows is their contract behind the lock.
+
 All tools require `projectDir`, search upward from there for `.k-playbook/K-PLAYBOOK.yaml`, and return
 structured JSON envelopes. Errors are domain tool results with `ok: false`, not MCP
 protocol errors. A missing, empty, or whitespace-only `projectDir` is `invalid_input` and
@@ -763,6 +780,8 @@ and never as `current`: an unsubstantiated assessment must not make a run look c
 run with `state: stale` is not complete; the triage step runs again.
 
 ## Consolidating with `k-playbook merge`
+
+`k-playbook merge` is paused at present, like `scan`.
 
 When a run is complete, a second step condenses its raw data into a review input that can
 be curated:

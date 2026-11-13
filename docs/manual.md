@@ -138,17 +138,15 @@ and installs it to `~/.local/bin/k-playbook`. If `kephalaion` is missing from th
 `PATH`, it then installs it as well, through the `install.sh` of the latest
 Kephalaion release. This one bootstrap needs network access, and `~/.local/bin`
 must be on `PATH`. The last command starts the
-interface, which guides four steps: create configuration, create
-project-owned structure, register the MCP server, and link assistants. Each
-write happens only after confirmation.
+interface, which guides three steps: create configuration, register the MCP
+server, and link assistants. Each write happens only after confirmation.
 
 ```mermaid
 flowchart TD
     A["git clone ..."] --> A2["make -C k-playbook install"]
     A2 --> B["k-playbook"]
     B --> C["Create K-PLAYBOOK.yaml"]
-    C --> D["Create k-playbook-local/"]
-    D --> E["Register MCP server"]
+    C --> E["Register MCP server"]
     E --> F["Link assistants"]
     F --> G["Restart assistant"]
 ```

@@ -17,7 +17,7 @@ configuration:
 │   ├── commands/          project-owned commands, committed (only when used)
 │   └── skills/            project-owned skills, committed (only when used)
 ├── k-playbook/            the installation, fully replaceable
-└── k-playbook-local/      project-owned, committed
+└── k-playbook-local/      being phased out: never created any more, only read
 ```
 
 Because configuration is **beside**, rather than **in**, the installation,
@@ -51,7 +51,7 @@ locations derive from the project root, the directory that holds
 | project-owned skills | `.k-playbook/skills/` — setup does not create it; it appears when the project puts a skill there |
 | project-owned review recipes | `keph:/k-playbook/reviews/` — in the project collection since task 143. Setup no longer creates `k-playbook-local/reviews/`; nothing reads it, `/k-upgrade` 3.4 removes it once it is empty and otherwise names every file with its target |
 | project-owned checks | none since task 134: `k-check` runs only the shipped checks from `k-playbook/checks/`; `/k-upgrade` 3.4 removes a leftover `k-playbook-local/checks/` |
-| review results | `k-playbook-local/results/` |
+| review results | none at present: review runs are paused until their results get a new place (task 147). `k-playbook-local/results/` is not created any more, and `/k-upgrade` 3.4 deletes a leftover one |
 | results kept to present | `keph:/results/` — in the project collection, project-wide, `.md` only, names start with the date (`<YYYY-MM-DD>-<name>.md`); written only when the user asks or a command provides for it, never as a duty, and cleaned up by the user. The rules are `k-playbook:/instructions/on-demand/ergebnisse.md`. Not the same as `k-playbook-local/results/`, which `/k-review` and `/k-audit` still use |
 | project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` and `/k-docs-tools` to `keph:/docs/generated/libs/`, both through `k-playbook docs checkout|publish` |
 | tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs`, not under `k-playbook-local/` |
@@ -64,7 +64,7 @@ locations derive from the project root, the directory that holds
 | completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; a `k-playbook-local/tasks/` from before is moved by `/k-upgrade` 3.3 and removed by 3.4 once empty |
 | project todos | `todos/` in the project collection; a `k-playbook-local/data/todos.json` from before is taken over by `k-playbook todo migrate` |
 | version sources | `keph:/k-playbook/inventory.md` — in the project collection since task 144, settings in the frontmatter; a `k-playbook-local/version-sources.yaml` is no longer read, `/k-upgrade` 3.6 moves it |
-| private content | `k-playbook-local/priv/` |
+| private content | no place created by k-playbook any more (task 147); a `k-playbook-local/priv/` from before stays untouched |
 | instructions, shipped | `k-playbook/k-playbook.md` |
 | instructions, project-owned | `k-playbook-local/k-playbook.md` |
 
@@ -141,15 +141,14 @@ inventory` and `/k-doc-inventory`, writing into the project collection. The cont
 the inventory is updated right away through this run, and the profiles are queued
 (`erzeuger: tools`).
 
-One directory is optional in this respect: `priv/`. Nothing is made private
-during installation; whether its content is versioned is the project's choice.
-The interface's **Local settings** block shows the measured current state and
-switches it; manually, this is controlled through a `.gitignore` in the
-directory itself, whose content is named by its `README.md`. `material/` has no
-switch any more; a managed `.gitignore` already in place stays and keeps
-working. `results/` has none either since task 146: it left the structure, and
-`/k-upgrade` 3.4 deletes a leftover one.
-Details are in [`installation.md`](./installation.md#2-create-project-owned-structure).
+`k-playbook-local/` itself is being phased out: k-playbook no longer creates the
+directory or anything in it (task 147), and the interface has neither the
+**Project-owned structure** block nor the **Local settings** block with the
+switch for `priv/` any more. What lies there stays untouched; a managed
+`.gitignore` in `priv/` or `material/` stays and keeps working, and whether that
+content is versioned is decided by hand. `/k-upgrade` 3.4 deletes a leftover
+`results/`.
+Details are in [`installation.md`](./installation.md#k-playbook-local-is-no-longer-created).
 
 ## Finding the anchor
 

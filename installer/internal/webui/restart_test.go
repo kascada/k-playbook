@@ -264,10 +264,13 @@ func TestProgrammaktualisierungStartetNeu(t *testing.T) {
 	if !f.wasStopped() {
 		t.Error("der alte Dienst beendet sich nicht")
 	}
-	// Die Startpflege lief im neuen Dienst: sie legt die fehlende
-	// projekteigene Struktur an.
-	if _, err := os.Stat(filepath.Join(f.projectDir, project.LocalDirName)); err != nil {
+	// Die Startpflege lief im neuen Dienst: sie legt die fehlende AGENTS.md
+	// aus der Vorlage an. k-playbook-local/ legt sie nicht an (Task 147).
+	if _, err := os.Stat(filepath.Join(f.projectDir, project.RootInstructionsFile)); err != nil {
 		t.Errorf("keine Startpflege im neuen Dienst: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.projectDir, project.LocalDirName)); !os.IsNotExist(err) {
+		t.Errorf("die Startpflege hat %s/ angelegt (Stat: %v)", project.LocalDirName, err)
 	}
 	if got := program.ReadVersion(f.target); got != "v0.9.91" {
 		t.Errorf("am Ziel liegt %q", got)

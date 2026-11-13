@@ -9,7 +9,7 @@ checks. It is cloned into a subdirectory of the project it is meant to support.
 |---|---|
 | [`overview.md`](./overview.md) | What k-playbook is for: the three kinds of work — building, diagnosis, quality — the means that apply to all of them, and the project documentation in `keph:/docs/` they share. One diagram. |
 | [`manual.md`](./manual.md) | Purpose, core model, standard workflows, operating rules. The central page. |
-| [`installation.md`](./installation.md) | Clone, the four setup steps, security tools, updating, troubleshooting. |
+| [`installation.md`](./installation.md) | Clone, the three setup steps, security tools, updating, troubleshooting. |
 | [`k-playbook-format.md`](./k-playbook-format.md) | The contract: `K-PLAYBOOK.yaml`, directory layout, overlay rules. |
 | [`commands.md`](./commands.md) | Index of slash commands and their responsibilities. |
 | [`faq.md`](./faq.md) | Short answers about installation, paths, overlays, and security tools. |
@@ -59,9 +59,9 @@ questions and the ordered work list.
 ## Keyword index
 
 - `anchor` / `K-PLAYBOOK.yaml` -> [`k-playbook-format.md`](./k-playbook-format.md)
-- `AGENTS.md` / `CLAUDE.md` / `include` / `@AGENTS.md` / `linking` / `renaming` / `conflict` -> [`installation.md`](./installation.md#4-link-assistants)
-- `assistants` / `Claude Code` / `OpenCode` -> [`installation.md`](./installation.md#4-link-assistants)
-- `.k-playbook/share` / `K_PLAYBOOK_SHARE_DIR` / `commands missing in DevContainer` -> [`installation.md`](./installation.md#4-link-assistants), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-umweg-link-k-playbookshare)
+- `AGENTS.md` / `CLAUDE.md` / `include` / `@AGENTS.md` / `linking` / `renaming` / `conflict` -> [`installation.md`](./installation.md#3-link-assistants)
+- `assistants` / `Claude Code` / `OpenCode` -> [`installation.md`](./installation.md#3-link-assistants)
+- `.k-playbook/share` / `K_PLAYBOOK_SHARE_DIR` / `commands missing in DevContainer` -> [`installation.md`](./installation.md#3-link-assistants), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-umweg-link-k-playbookshare)
 - `BROWSER` / `browser does not open` / `DevContainer` -> [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
 - `sections` / `setup` / `workflows` / `switch` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](./installation.md#reviews-and-tasks)
 - `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](./commands.md#k-check)
@@ -81,17 +81,17 @@ questions and the ordered work list.
 - `github.yaml` / `GitHub access file` / `service` / `k-playbook github` / `K_PLAYBOOK_GITHUB_CONFIG` / `health github` / `availability` / `k_playbook_github_test` / `/github-access` / `github run` -> [`github-access.md`](./github-access.md), [`mcp.md`](./mcp.md#github-test-contract), [`mcp.md`](./mcp.md#health-contract)
 - `installation` / `git clone` -> [`installation.md`](./installation.md)
 - `MCP` / `.mcp.json` / `mcpServers` / `approval` -> [`mcp.md`](./mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
-- `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#2-create-project-owned-structure)
+- `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](./k-playbook-format.md), [`installation.md`](./installation.md#k-playbook-local-is-no-longer-created)
 - `interface` / `k-gui` / `web API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
 - `health` / `k_playbook_health` / `k-playbook health` / `GET /api/environment` / `environment check` / `Umgebung: keine Probleme` / `briefing health` -> [`mcp.md`](./mcp.md#health-contract), [`mcp.md`](./mcp.md#briefing-contract)
 - `gui status` / `k_playbook_gui_status` / `is the interface running` / `runtime file state` -> [`mcp.md`](./mcp.md#gui-status-contract), [`installation.md`](./installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#zustand-erfragen-gui-status)
 - `notify` / `k_playbook_notify` / `k-playbook notify` / `desktop notification` / `toast` / `sound` / `done signal` -> [`mcp.md`](./mcp.md#notify-contract), [`task-flow.md`](./task-flow.md), [`../defaults/commands/_task/fertig-meldung.md`](../defaults/commands/_task/fertig-meldung.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#fertig-meldung-notify)
-- `priv` / `material` / `private` / `local settings` -> [`installation.md`](./installation.md#2-create-project-owned-structure), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#lokale-einstellungen)
+- `priv` / `material` / `private` / `local settings` -> [`installation.md`](./installation.md#k-playbook-local-is-no-longer-created), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#k-playbook-local-läuft-aus)
 - `read docs` / `Markdown view` / `Mermaid` -> [`installation.md`](./installation.md#read-documentation), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
 - `overlay` / `replace rule` / `disable` -> [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content), [`faq.md`](./faq.md)
 - `context` / `resolved working state` -> [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`commands.md`](./commands.md#the-resolved-working-state)
 - `k-playbook.md` / `instructions` / `prompt` -> [`k-playbook-format.md`](./k-playbook-format.md#instructions), [`faq.md`](./faq.md)
-- `legacy artifacts` / `old global linking` -> [`installation.md`](./installation.md#4-link-assistants)
+- `legacy artifacts` / `old global linking` -> [`installation.md`](./installation.md#3-link-assistants)
 - `command missing` / `dead symlink` / `update links` -> [`installation.md`](./installation.md#update), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
 - `overview` / `what is it for` / `three kinds of work` / `big picture` -> [`overview.md`](./overview.md)
 - `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)

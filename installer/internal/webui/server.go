@@ -217,10 +217,6 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/config", configHandler)
 	mux.HandleFunc("POST /api/config", state.createConfigHandler)
 	mux.HandleFunc("POST /api/config/reset", resetConfigHandler)
-	mux.HandleFunc("GET /api/local", localHandler)
-	mux.HandleFunc("POST /api/local", createLocalHandler)
-	mux.HandleFunc("GET /api/local/private", localPrivateHandler)
-	mux.HandleFunc("POST /api/local/private", setLocalPrivateHandler)
 	mux.HandleFunc("GET /api/assistant", assistantHandler)
 	mux.HandleFunc("POST /api/assistant", applyAssistantHandler)
 	mux.HandleFunc("GET /api/mcp", mcpHandler)
@@ -476,8 +472,8 @@ func statusPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, statusTemplate, areaStatus, "/", "Status")
 }
 
-// setupTemplate ist die Einrichtung: Projektkonfiguration, projekteigene
-// Struktur, Verlinkung, Werkzeuge und die Entscheidungen des Projekts.
+// setupTemplate ist die Einrichtung: Projektkonfiguration, MCP-Registrierung,
+// Verlinkung, Werkzeuge und die Entscheidungen des Projekts.
 var setupTemplate = pageTemplate("setup.html")
 
 func setupPageHandler(w http.ResponseWriter, r *http.Request) {

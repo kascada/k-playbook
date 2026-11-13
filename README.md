@@ -93,9 +93,9 @@ project/
 └── k-playbook/         the installation
 ```
 
-The same interface then creates the project-owned structure and sets up the linking for
-the assistants. If the environment has VS Code, it also installs the extension
-*k-playbook Workspace Tools* into the VS Code server there, in the background and without
+The same interface then registers the MCP server and sets up the linking for the
+assistants; it does not create `k-playbook-local/`. If the environment has VS Code, it
+also installs the extension *k-playbook Workspace Tools* into the VS Code server there, in the background and without
 a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. With Kephalaion
 set up, the extension also binds the public collection `k-playbook` and the project's own
 collection into the workspace whenever a window starts, opening or creating the project's
@@ -124,11 +124,9 @@ project/
 │   ├── bin/
 │   ├── k-playbook.md     shipped instruction layer
 │   └── installer/ docs/
-└── k-playbook-local/     project-owned, committed
-    ├── reviews/          overlay onto k-playbook/reviews/
-    ├── guidelines/
-    ├── priv/             notes and work in progress
-    └── k-playbook.md     project-owned instruction layer
+└── k-playbook-local/     being phased out: never created any more, only read
+    ├── guidelines/       where it still exists, until its content has moved
+    └── k-playbook.md     to the project collection
 ```
 
 Tasks, todos, the project documentation and the source configuration of the version
@@ -149,21 +147,24 @@ knowledge directories on disk are gone as well (task 123); `/k-upgrade` (3.0) cl
 is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
 deletion.
 
-`k-playbook-local/` belongs in the project's repository. One directory inside it is
-a matter of choice — `priv/`: the project decides whether its content is versioned, and
-k-playbook writes no `.gitignore` there on its own. What currently applies is shown and
-switched by the **Local settings** block of the interface — measured with
-`git check-ignore`, not guessed. `material/` has no switch any more; a managed
-`.gitignore` already in place keeps working. `results/` has left the structure as well
-(task 146): setup no longer creates it, it has no switch any more, and `/k-upgrade`
-deletes a leftover one without asking, even with content, naming every deleted file.
-Review results can be reproduced from the code; their content was usually not versioned
-and cannot be recovered from Git afterwards.
+`k-playbook-local/` is being phased out. k-playbook no longer creates the directory or
+anything in it — not when the interface starts, not on a button, not as a side effect of
+a tool; the **Project-owned structure** and **Local settings** blocks of the interface,
+with the button “Anlegen” and the switch for `priv/`, are gone. What still lies there
+stays untouched: a managed `.gitignore` in `priv/` or `material/` keeps working, and
+whether that content is versioned is decided by hand. `results/` is the exception:
+`/k-upgrade` deletes a leftover one without asking, even with content, naming every
+deleted file. Review results can be reproduced from the code; their content was usually
+not versioned and cannot be recovered from Git afterwards. Until the storage of review
+results has moved, the review commands and tools are paused: `/k-review`, `/k-audit` and
+`/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error,
+and the MCP tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry`
+answer `reviews_paused` and write nothing.
 
-An entry of the same name in `k-playbook-local/` fully replaces the shipped one; an empty
-one disables it. This holds for `reviews/`, and in the same way for `commands/` and
-`skills/` in `.k-playbook/`. Checks have no project-owned layer: only the shipped ones
-run.
+A project-owned entry of the same name fully replaces the shipped one; an empty one
+disables it. This holds for review recipes, instructions and includes in the project
+collection under `keph:/k-playbook/`, and in the same way for `commands/` and `skills/`
+in `.k-playbook/`. Checks have no project-owned layer: only the shipped ones run.
 
 That is why `.claude/commands/` and the other two targets are **real directories with
 individual symlinks**, not directory symlinks: only that way do both sources arrive. The
@@ -291,7 +292,7 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 - Installation and project ownership are strictly separated: `k-playbook/` is fully replaced on every update, everything beside it is never touched.
 - Shipped reviews and checks are not edited. A project deviates from a review by overlay: a local file of the same name replaces completely, an empty one disables. Checks have no overlay; only the shipped ones run.
 - Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
-- Reviews and results stay project-owned artifacts under `k-playbook-local/`; tasks and todos are documents in the project collection.
+- Tasks, todos, the project documentation and project-owned review recipes are documents in the project collection. `k-playbook-local/` is being phased out and is never created; review results get a new place, and until then review runs are paused.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
 - The base tools k-playbook calls itself — `git`, `curl` or `wget`, `tar`, `python3`, `rg` — are the second exception, and a different one: they are not scanners but the ground the commands stand on, so a missing one warns and never stops a run. `install-base-tools.sh` prefers the distribution package manager and falls back to a user-local release install; k-playbook never escalates to root by itself, it prints the `sudo` command.
 - Nothing is written except after confirmation, step by step.

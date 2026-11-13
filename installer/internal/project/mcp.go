@@ -973,7 +973,7 @@ func mcpGitTracked(projectRoot string, measure func(ctx context.Context, topleve
 		return false
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), privateGitTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), gitCallTimeout)
 	defer cancel()
 
 	toplevel, code, reason := runGitUntranslated(ctx, projectRoot, "rev-parse", "--show-toplevel")

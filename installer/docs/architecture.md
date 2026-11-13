@@ -5,8 +5,8 @@ bevor der Code erneut analysiert wird.
 
 ## Ziel
 
-`k-playbook` hat zwei Aufgaben. Es **richtet ein**: Anker finden, Konfiguration und
-projekteigene Struktur anlegen, den MCP-Server registrieren, Assistenten verlinken. Und es
+`k-playbook` hat zwei Aufgaben. Es **richtet ein**: Anker finden, Konfiguration anlegen,
+den MCP-Server registrieren, Assistenten verlinken. Und es
 **beantwortet, was gilt**:
 `context` löst Verzeichnisse, Instruktionen und Kataloge auf, damit kein Command das
 selbst tun muss. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug — siehe
@@ -101,6 +101,12 @@ stdout einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine 
 fremde Zeile macht ihn unbrauchbar. Bei `scan`, `merge` und `inventory` zählt ein anderer
 Grund: sie arbeiten auf dem Projekt und sollen den Host nicht nebenbei anfassen. Bei
 `stop`: wer beendet, will nichts einrichten.
+
+`scan` und `merge` sind zurzeit gesperrt (Task 147): Die Ablage der Review-Ergebnisse wird
+umgebaut, und bis dahin enden beide vor jedem Lesen mit der Sperre aus `review.Paused()`
+(`review/paused.go`) und Exit-Code 1 — derselbe Satz, mit dem die MCP-Werkzeuge antworten
+(§„Der MCP-Server"). Der Code darunter bleibt, wie er ist; die beiden folgenden Absätze
+beschreiben ihn.
 
 `scan <lauf> [eintrag …]` führt die Werkzeug-Einträge eines Laufs aus und blockiert, bis
 sie durch sind. Das Kommando sammelt nur zusammen, was der Lauf braucht — Installation,
@@ -282,7 +288,9 @@ installer/
 │   │                            notify.Send, --title, --body, --sound, --json
 │   ├── version.go               Subkommando version: die gestempelte Version, eine Zeile
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
+│   │                            (zurzeit gesperrt, review.Paused)
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
+│   │                            (zurzeit gesperrt, review.Paused)
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
 │   ├── todo.go                  Subkommando todo: list (--search), add, update, delete,
 │   │                            migrate
@@ -403,8 +411,10 @@ installer/
 │   ├── discover.go              Anker finden
 │   ├── environment.go           was liegt hier vor
 │   ├── config.go                Config lesen, Ort vorschlagen, anlegen
-│   ├── local.go                 projekteigene Struktur prüfen und anlegen
-│   ├── local_private.go         messen und umschalten, ob priv/ privat ist
+│   ├── local.go                 LocalDirName und LocalDir(): der Ort des Altbestands
+│   │                            k-playbook-local/; angelegt wird dort nichts mehr
+│   ├── gitrun.go                git-Aufrufe mit Timeout und Exit-Code (runGit,
+│   │                            runGitUntranslated)
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
 │   ├── links.go                 Assistenten-Verlinkung prüfen, herstellen, selbst heilen
 │   ├── sharelink.go             Umweg-Link .k-playbook/share auf ~/.local/share/k-playbook
@@ -507,7 +517,7 @@ installer/
 │   │                            (probeMCPCommand) und Werkzeug-Selbsttest
 │   ├── mcp_servers.go           Übersicht aller MCP-Server, Detail je Server, Messung
 │   │                            per POST
-│   ├── config.go local.go local_private.go assistant.go tools.go
+│   ├── config.go assistant.go tools.go
 │   ├── remediation.go context.go
 │   ├── gh.go update.go reviews.go
 │   ├── kephalaion.go            Anbindung an die Kephalaion-Collection: Anzeige mit
@@ -554,7 +564,8 @@ installer/
 │                                (RunEnv: mit eigener Umgebung)
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
-│   ├── review.go                Werkzeuge k_playbook_review_*
+│   ├── review.go                Werkzeuge k_playbook_review_*; create, scan, merge und
+│   │                            write_ai_entry zurzeit hinter pausedReviewTool gesperrt
 │   ├── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
 │   │                            dünne Hüllen über internal/project
 │   ├── docs.go                  Werkzeuge k_playbook_doc_read (Hülle über
@@ -581,6 +592,8 @@ installer/
 │   ├── candidates.go            zählen, was ein Job hätte prüfen können — je
 │   │                            Bezugspunkt und Sorte einmal im Lauf
 │   ├── entries.go               entries/<name>.json, Zustandsableitung, atomares Schreiben
+│   ├── paused.go                die Sperre der Review-Wege: Paused(), PausedCode,
+│   │                            PausedMessage (Task 147)
 │   └── execute.go               Jobs starten, je Modul auffächern, SARIF zählen,
 │                                Fortschritt fortschreiben
 ├── internal/inventory/
@@ -762,208 +775,103 @@ reicht: der `paths.`-Block der alten Datei nennt die Orte genau, und der Zustand
 Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projekt, mit
 `.git` ist es das Untracked. Gemeldet wird die Vereinigung; verschoben wird nichts.
 
-## Projekteigene Struktur
+## `k-playbook-local/` läuft aus
 
-`LocalStructure()` in `project/local.go` ist die einzige Quelle für das, was unter
-`k-playbook-local/` liegt:
+`k-playbook-local/` war das Verzeichnis für alles, was dem Projekt gehört. Es läuft aus:
+**Kein Weg im Programm legt es oder etwas darin noch an** (Task 147) — weder der Start der
+Oberfläche noch ein Knopf noch ein Werkzeug als Nebenwirkung. Was dort noch liegt, bleibt
+unberührt; ein Projekt ohne das Verzeichnis bleibt nach Start der Oberfläche, `briefing`,
+`setup` und `upgrade` ohne es.
 
-```text
-priv/
-k-playbook.md
-```
+`project/local.go` trägt deshalb nur noch den Namen und den Pfad (`LocalDirName`,
+`LocalDir()`), für die Leser von Altbestand: die Gesundheitsprüfung, den Umzug in
+`k-playbook upgrade` und `/k-upgrade`, die Instruktionsdatei `k-playbook.md` und die lokale
+Ebene von `guidelines/` (beide bis zu ihrer Ablösung), die Liste der bisherigen Review-Läufe
+und die Vorprüfung beim Branchwechsel. Mit Task 147 entfallen sind:
 
-Fünf Einträge stehen seit Task 107 nicht mehr darin: `docs/`, `tasks/`, `tasks/done/`,
-`data/` und `material/`. Ihr Inhalt liegt in der Projekt-Collection — Tasks
-(`keph:/user/<user>/tasks/`), Todos (`todos/`), die Projektdoku (`keph:/docs/`), Befunde
-(`queue/findings/`). Herausnehmen war nötig, Löschen hätte nicht gereicht: `CreateLocal()`
-legt jeden fehlenden Eintrag samt README wieder an, und `LocalOK()` ist falsch, sobald
-einer fehlt. Ein Bestandsprojekt räumt `/k-upgrade` 3.4 auf: es löscht ein solches
-Verzeichnis ohne Rückfrage (Task 117), wenn darin nur `README.md` und die verwaltete `.gitignore`
-liegen. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
-bei aktuellem Programm, denn ein älteres legte beim Knopf „Anlegen" alles wieder an.
+- Die Liste der Einträge in `project/local.go` samt ihren Funktionen zum Prüfen und
+  Anlegen, dazu die Vorlagen der READMEs und der projekteigenen `k-playbook.md`. Zuletzt
+  standen noch `priv/` und `k-playbook.md` in der Liste.
+- Der selbsttätige Weg in der Startpflege (`careForHost()` in `cmd/k-playbook/gui.go`), der
+  das ganz fehlende Verzeichnis anlegte.
+- Die Karte „Projekteigene Struktur" der Setup-Seite mit dem Knopf „Anlegen"
+  (`GET`/`POST /api/local`).
+- Die Karte „Lokale Einstellungen" mit dem Schalter, ob der Inhalt von `priv/` aus der
+  Versionskontrolle bleibt (`GET`/`POST /api/local/private`, `project/local_private.go`,
+  `webui/local_private.go`). Eine vorhandene verwaltete `.gitignore` bleibt liegen und
+  wirkt weiter; umgeschaltet wird sie nur noch von Hand.
 
-`commands/` und `skills/` stehen seit Task 129 ebenfalls nicht mehr darin. Projekteigene
-Commands und Skills liegen in `.k-playbook/commands/` und `.k-playbook/skills/`
-(`ProjectAssetDir()` in `project/registry.go`), versioniert neben der Konfiguration; das
-Einrichten legt beide nicht an. Den alten Ort liest nichts mehr, auch nicht als Übergang:
-weder die Registry (`registryDirs()`) noch die lokale Ebene von `k-playbook:/commands/`
-(`NewProjectLocalDocSource()` in `project/docref.go`). `/k-upgrade` 3.4 löscht die leeren alten
-Verzeichnisse und nennt sonst jeden Eintrag mit seinem Ziel.
+Die git-Helfer, die die Schaltung mit anderen teilte (`runGit()`, `runGitUntranslated()`,
+`gitCallTimeout`), liegen in `project/gitrun.go`.
 
-`reviews/` steht seit Task 143 nicht mehr darin. Projekteigene Instructions, Includes und
-Review-Rezepte liegen in der Projekt-Collection unter `keph:/k-playbook/<sorte>/`
-(`NewKephProjectLayerSource()` in `project/projectlayer.go`, unten unter „Kataloge auflösen“);
-`k-playbook-local/instructions/`, `includes/` und `reviews/` liest nichts mehr.
-`/k-upgrade` 3.4 löscht sie leer und nennt sonst je Datei ihr Ziel in der Collection.
+Was früher in der Liste stand und wohin es gegangen ist:
 
-`results/` steht seit Task 146 nicht mehr darin. Review-Ergebnisse sind aus dem Code
-wiederholbar und ein Stand von einem Rechner; `/k-review`, `/k-audit` und `/k-remediation`
-sind abgeschaltet, bis der Review-Umbau ihnen eine neue Ablage gibt. `/k-upgrade` 3.4 löscht
-ein vorhandenes `results/` ohne Rückfrage, auch mit Inhalt, und nennt jede gelöschte Datei —
-der Inhalt war in der Regel nicht versioniert und ist danach nicht aus Git zurückzuholen.
-Wieder angelegt wird es nicht: `CreateLocal()` und `EnsureLocal()` waren die einzigen
-Anleger, und die Review-Wege melden ein fehlendes `results/` als Fehler, statt es anzulegen
-(`CreateRun()` in `review/run.go`). Der Review-Code selbst ist davon unberührt und schreibt
-weiter in ein vorhandenes Verzeichnis.
+- `docs/`, `tasks/`, `tasks/done/`, `data/` und `material/` (Task 107): Ihr Inhalt liegt in
+  der Projekt-Collection — Tasks (`keph:/user/<user>/tasks/`), Todos (`todos/`), die
+  Projektdoku (`keph:/docs/`), Befunde (`queue/findings/`).
+- `commands/` und `skills/` (Task 129): Projekteigene Commands und Skills liegen in
+  `.k-playbook/commands/` und `.k-playbook/skills/` (`ProjectAssetDir()` in
+  `project/registry.go`), versioniert neben der Konfiguration; das Einrichten legt beide
+  nicht an. Den alten Ort liest nichts mehr, auch nicht als Übergang: weder die Registry
+  (`registryDirs()`) noch die lokale Ebene von `k-playbook:/commands/`
+  (`NewProjectLocalDocSource()` in `project/docref.go`).
+- `reviews/` (Task 143): Projekteigene Instructions, Includes und Review-Rezepte liegen in
+  der Projekt-Collection unter `keph:/k-playbook/<sorte>/` (`NewKephProjectLayerSource()` in
+  `project/projectlayer.go`, unten unter „Kataloge auflösen“);
+  `k-playbook-local/instructions/`, `includes/` und `reviews/` liest nichts mehr.
+- `checks/` (Task 134): Projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen:
+  `bin/k-check` führt nur die mitgelieferten aus `k-playbook/checks/` aus, und der Katalog
+  `checks` hat keine lokale Ebene (`resolveCatalog()`, unten).
+- Die Quellenkonfiguration des Versionsinventars (Task 144): Sie ist das Dokument
+  `keph:/k-playbook/inventory.md` in der Projekt-Collection (`versionsources.DocName`),
+  angelegt von `/k-doc-inventory` bei der ersten bestätigten Ergänzung. Liegt die alte
+  `version-sources.yaml` noch, erkennt `project/versionsources.go` sie nur als Altbestand
+  (`LegacyVersionSources`) — die Gesundheitsprüfung warnt, `k-playbook inventory` nennt sie,
+  `/k-upgrade` 3.6 zieht um.
+- `results/` (Task 146): Review-Ergebnisse sind aus dem Code wiederholbar und ein Stand von
+  einem Rechner. `/k-upgrade` 3.4 löscht ein vorhandenes `results/` ohne Rückfrage, auch mit
+  Inhalt, und nennt jede gelöschte Datei — der Inhalt war in der Regel nicht versioniert
+  und ist danach nicht aus Git zurückzuholen. Die Review-Wege pausieren, bis der
+  Review-Umbau ihnen eine neue Ablage gibt (unten).
+- Die frühere Wissensablage auf der Platte samt Suchindex (Task 123): Nichts im Programm
+  schreibt oder liest dort noch.
 
-`checks/` steht seit Task 134 nicht mehr darin. Projekteigene Checks gibt es nicht, bis sie
-eine neue Form bekommen: `bin/k-check` führt nur die mitgelieferten aus
-`k-playbook/checks/` aus, und der Katalog `checks` hat keine lokale Ebene
-(`resolveCatalog()`, unten). `/k-upgrade` 3.4 löscht ein leeres `checks/` und meldet sonst,
-dass das, was darin liegt, nicht mehr läuft.
+**Aufräumen im Bestandsprojekt.** `/k-upgrade` 3.4 löscht ein solches Verzeichnis ohne
+Rückfrage (Task 117), wenn darin nur `README.md` und die verwaltete `.gitignore` liegen,
+und nennt sonst jeden Eintrag mit seinem Ziel; `/k-upgrade` 3.0 räumt die Reste der
+Wissensablage ab, Abgeleitetes und Rohmaterial ohne Rückfrage, jede Wissensdatei nach
+Vorlage. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
+bei aktuellem Programm, denn ein älteres legte die Verzeichnisse wieder an.
 
-Die frühere Wissensablage auf der Platte samt Suchindex hat Task 123 mit dem Wissenstor
-entfernt; nichts im Programm schreibt oder liest dort noch. Ein Bestandsprojekt räumt
-`/k-upgrade` 3.0 auf: Abgeleitetes und Rohmaterial ohne Rückfrage, jede Wissensdatei nach
-Vorlage.
 `project.ListTasks()` nimmt ein fehlendes `tasks/` als „keine Tasks"; die Seite Tasks der
 Oberfläche zeigt bis zu ihrer Umstellung nur, was noch auf der Platte liegt. Die
-Todo-Migration prüft nur, ob `data/todos.json` noch liegt, und braucht den Eintrag nicht.
+Todo-Migration prüft nur, ob `data/todos.json` noch liegt.
 
-Datei-Einträge bekommen ihren Erstinhalt aus `fileTemplate()`. Jeder Eintrag mit einem
-eigenen Format braucht dort einen eigenen Zweig; der `default:`-Zweig baut aus
-`entry.Purpose` einen neutralen Markdown-Rumpf — Überschrift plus Zweck —, damit ein
-neuer Eintrag ohne Zweig nicht still das Format eines fremden bekommt.
+### Die Review-Wege pausieren
 
-Die Quellenkonfiguration des Versionsinventars steht seit Task 144 nicht mehr darin: Sie ist
-das Dokument `keph:/k-playbook/inventory.md` in der Projekt-Collection
-(`versionsources.DocName`), angelegt von `/k-doc-inventory` bei der ersten bestätigten
-Ergänzung. Das Einrichten legt die alte `version-sources.yaml` nicht mehr an; liegt sie noch,
-erkennt `project/versionsources.go` sie nur als Altbestand (`LegacyVersionSources`) — die
-Gesundheitsprüfung warnt, `k-playbook inventory` nennt sie, `/k-upgrade` 3.6 zieht um.
+Mit dem Anlegen ist auch das Schreiben nach `k-playbook-local/results/` gesperrt (Task 147):
+Die Ablage der Review-Ergebnisse wird umgebaut, und bis dahin antworten alle schreibenden
+Review-Wege mit einer sichtbaren Sperre, ohne etwas zu lesen, aufzulösen oder zu schreiben.
+Ein Termin steht nicht darin; die Sperre gilt, bis die neue Ablage steht.
 
-Jedes Verzeichnis der Struktur bekommt eine `README.md` mit seinem Zweck — **auch weil Git leere
-Verzeichnisse nicht speichert** und sie sonst nach einem Clone des Projekts fehlen
-würden. Mehr schreibt `CreateLocal()` nicht, auch keine `.gitignore`: was ein Projekt
-versioniert, entscheidet das Projekt. Bis Task 146 gab es davon eine Ausnahme — das Feld
-`PrivateByDefault`, das allein `results/` trug und über das `CreateLocal()` dem frisch
-angelegten Verzeichnis die verwaltete `.gitignore` mitgab. Mit `results/` ist das Feld samt
-dieser Logik entfernt; kein Eintrag wird mehr privat angelegt.
+| Weg | Antwort |
+|---|---|
+| MCP `k_playbook_review_create`, `_scan`, `_merge`, `_write_ai_entry` | Umschlag mit `error.code` `reviews_paused` und dem Satz mit dem Grund, als Fehler markiert; die Beschreibung in der Werkzeugliste beginnt mit „Vorübergehend nicht verfügbar“ |
+| `k-playbook scan`, `k-playbook merge` | derselbe Satz als Fehler, Exit-Code 1 |
+| `/k-review`, `/k-audit`, `/k-remediation` | der Hinweis „Vorübergehend nicht verfügbar“ in der Hülle; der Command führt nichts aus |
 
-**Zwei Einstiege.** `CreateLocal()` ist der ausdrückliche Weg: der Knopf „Anlegen"
-(`POST /api/local`), der auch ein unvollständiges Verzeichnis ergänzt. Der selbsttätige
-Weg ist `EnsureLocal()`, gerufen von `ensureLocalStructure()` in `runGUI()` bei jedem
-Start — und der legt nur an, wenn `k-playbook-local/` **ganz fehlt**. Ein vorhandenes
-Verzeichnis, auch ein unvollständiges, rührt er nicht an: `CreateLocal()` ist additiv,
-und additiv heißt auch, dass eine bewusst gelöschte Strukturdatei bei jedem Start
-zurückkäme. Die Enge macht einen Vorher-nachher-Vergleich über `CheckLocal()`
-überflüssig — entweder entsteht alles, oder nichts wird angefasst — und sie lässt eine
-Umschaltung über `SetPrivate()` ohnehin stehen, denn die setzt ein vorhandenes Verzeichnis
-voraus. Ein frisch geklontes Projekt ist damit nach dem ersten `k-playbook`-Aufruf
-eingerichtet, ohne dass jemand die Karte sieht.
+Die Sperre hat eine Quelle: `review.Paused()` in `review/paused.go` mit `PausedCode` und
+`PausedMessage`. Die Subkommandos fragen dort als Erstes nach; die vier MCP-Werkzeuge sind
+in `addReviewTools()` über `pausedReviewTool()` angemeldet, das vor dem Handler antwortet —
+vor jeder Prüfung der Eingabe und vor dem Auflösen des Projekts, damit auch kein Umzug des
+Ankers geschieht. Namen und Schema der Werkzeuge bleiben in der Werkzeugliste. Der
+Review-Code darunter (`internal/review`, die Handler in `mcpserver/review.go`) ist
+unverändert und weiter unter Test; fällt die Sperre, fallen `paused.go`, die Hülle und die
+beiden Abfragen.
 
-Das Feld `Private` an einem `LocalEntry` markiert, für welche Verzeichnisse diese Wahl
-überhaupt ansteht — seit Task 146 nur noch `priv/`. Der Grund ist offensichtlich: dort
-liegen eigene Notizen und Zwischenstände. Über `Private: true` bekommt es den Weg zu einer
-eigenen `.gitignore`, die den Inhalt ausschließt und das Verzeichnis selbst versioniert
-lässt. Seine README beschreibt den Weg. Das Feld geht als JSON an die Oberfläche und ist
-dort die Whitelist des Blocks [Lokale Einstellungen](#lokale-einstellungen). `material/`
-trug es bis Task 107 auch, `results/` bis Task 146; mit dem Herausnehmen aus der Struktur
-haben beide keine Schaltung mehr. Eine vorhandene verwaltete `.gitignore` in `material/`
-bleibt liegen und wirkt weiter; `results/` löscht `/k-upgrade` 3.4 als Ganzes.
-
-`writeIfMissing()` schreibt nur, wenn nichts da ist. Vorhandene READMEs mit eigenem Text
-bleiben unberührt.
-
-`commands/` und `skills/` sind darin die zwei Sorten, die ein Assistent direkt liest.
-Wie sie mit den mitgelieferten verrechnet werden, steht im nächsten Abschnitt.
-
-## Lokale Einstellungen
-
-Der Block zeigt, was für dieses Projekt lokal entschieden ist, statt dass k-playbook es
-stillschweigend erzwingt. Bisher steht dort eine einzige Frage, seit Task 146 für ein
-einziges Verzeichnis: ob der **Inhalt** von `priv/` aus der Versionskontrolle bleibt.
-`project/local_private.go` misst das und schaltet es um, `webui/local_private.go` reicht es
-an die Oberfläche. Vorbelegt ist nichts: `CreateLocal()` schreibt keine `.gitignore` und
-nimmt eine Umschaltung nie zurück.
-
-**Gemessen, nicht geraten.** Gefragt wird `git check-ignore -v --no-index` auf einen Pfad
-*innerhalb* des Verzeichnisses; das eigene Parsen von `.gitignore`-Dateien fiele über
-alle Ebenen, die globale Konfiguration und `.git/info/exclude` her, die git ohnehin schon
-kennt. Der Pfad muss innen liegen, weil eine `.gitignore` **im** Verzeichnis mit `*`
-dessen Inhalt ignoriert und nicht den Verzeichniseintrag — auf `priv` selbst gefragt
-meldete check-ignore „nicht ignoriert". Ist das Verzeichnis von einer höheren Ebene
-ignoriert, ist sein Inhalt es ebenfalls; dieser gleichwertige Weg fällt damit
-automatisch mit ab.
-
-`--no-index` ist Pflicht: per Default zieht git den Index heran und meldet eine getrackte
-Datei als nicht ignoriert. Für genau die Zustände, die privat aussehen und keiner sind,
-gäbe es dann gar keine Aussage.
-
-Gemessen wird am nächstgelegenen Repository des jeweiligen Verzeichnisses, nicht zwingend
-an `project.repo_root`: `project.repo_root` ist der Code-Zielbaum, während
-`k-playbook-local/` auch in einem eigenen oder übergeordneten Repository liegen kann. Gibt
-es dort kein Repository, meldet der Block das gezielt statt den rohen
-`fatal: not a git repository`-Text von Git anzuzeigen.
-
-Vier Zustände beschreiben ein Repository, nicht zwei:
-
-| Zustand | Erkennung | Anzeige |
-|---|---|---|
-| `private` | Regel greift, weder Index noch HEAD tragen erfasste Dateien | privat |
-| `public` | keine Regel | wird versioniert |
-| `partial` | Regel greift, Dateien stehen im Index | teilweise privat: N Dateien stehen weiterhin im Repository |
-| `pending-commit` | Regel greift, Index leer, HEAD trägt noch Dateien | privat erst nach dem nächsten Commit |
-
-Die letzten beiden sind der Grund für den Block: beide sehen privat aus und sind es
-nicht. Nach einem `git rm --cached` ist die Löschung nur gestaget; ohne Commit trägt jeder
-Clone die Dateien weiter. Deshalb wird getrennt gegen den Index (`ls-files`) **und** gegen
-`HEAD` (`ls-tree`) gehalten. Und was schon gepusht ist, bleibt in der Historie — kein
-Zustand dieser Oberfläche macht das rückgängig; die Abfrage vor dem Umschalten sagt es.
-
-Beide Listen laufen durch `check-ignore --stdin`, bevor sie zählen: der verwaltete Inhalt
-lässt `README.md` und die `.gitignore` selbst ausdrücklich drin, ungefiltert stünde jedes
-verwaltete Verzeichnis dauerhaft als `partial` da.
-
-Der **Repo-Root** (`rev-parse --show-toplevel`) gehört zum Zustand und in die Anzeige:
-`git -C <verzeichnis>` findet das nächstgelegene Repository, und liegt in
-`k-playbook-local/` ein eigenes, gilt die Aussage für dieses. Ohne die Angabe wäre sie
-mehrdeutig.
-
-Drei Zustände sagen, dass es nichts zu messen gab, und sind trotzdem kein Fehler:
-`no-vcs` (`project.vcs` ist nicht `git`), `missing` (Verzeichnis noch nicht angelegt) und
-`unknown` mit Grund (kein git, kein Repository, Timeout, Exit 128). Vorbedingungen und
-Timeout folgen `agentsIgnored`, mit einer bewussten Abweichung: **Exit 1 wird nicht wie
-jeder andere Nicht-Null-Ausgang behandelt.** Er ist die reguläre Antwort „keine Regel",
-während 128 heißt, dass die Frage gar nicht beantwortet wurde — sonst stünde ein kaputter
-git-Aufruf als „nicht privat" da. Ein Repository ohne Commits wird vorher abgefangen:
-`ls-tree HEAD` scheitert dort mit Exit 128, und ein frisch initialisiertes Repository
-stünde ohne diesen Vorabtest als `unknown` statt als `private` da.
-
-### Gemessen wird über alle Ebenen, geschrieben nur eine Datei
-
-Umschalten wird **nur angeboten, wenn die von `check-ignore -v` gemeldete Quelle genau die
-verwaltete `.gitignore` im Verzeichnis mit genau ihrem Inhalt ist** (`*`, `!.gitignore`,
-`!README.md`). Stammt die Regel von woanders — Projekt-Root-`.gitignore`,
-`.git/info/exclude`, globale Konfiguration — oder trägt die Datei eigenen Inhalt, wird
-nichts geschrieben: der Zustand wird angezeigt und die fremde Quelle benannt. Sonst wäre
-ein Ausschalten entweder wirkungslos oder es löschte eine Datei, die dem Projekt gehört.
-
-`SetPrivate()` schreibt die Datei und nimmt die davon erfassten Dateien mit
-`git rm --cached` aus dem Index — als Teil derselben Operation, sonst bliebe genau der
-Zwischenzustand stehen, den der Block sichtbar machen soll. Welche Dateien das sind,
-beantwortet nach dem Schreiben eine erneute Messung, keine eigene Ableitung aus dem
-Dateiinhalt. Zurück kommt der neue Zustand plus die Liste der genommenen Dateien und der
-Hinweis auf den ausstehenden Commit. Der Aufruf ist idempotent.
-
-### Kontrakt des POST
-
-Eingabe ist ein **Eintrag plus Zielzustand**, kein freier Pfad — der Handler führt
-schreibende git-Operationen aus. Zulässig ist nur, was in `LocalStructure()` steht und
-dort `Private` trägt; alles andere wird mit 400 abgelehnt. Kein Projekt konfiguriert:
-dieselbe Behandlung wie in `createLocalHandler`.
-
-### Abgrenzung zum Block „Projekteigene Struktur"
-
-Der zeigt weiterhin, welche Verzeichnisse es gibt und wozu sie da sind, `private`-Flag als
-Eigenschaft des Eintrags eingeschlossen. „Lokale Einstellungen" zeigt ausschließlich den
-gemessenen Ist-Zustand dieser Entscheidung im Repository. Der Zustand hat nur eine Quelle:
-`PrivacyStatuses()`. Die Struktur-Liste bleibt unverändert.
-
-Die Handanleitung selbst steht in den `Purpose`-Texten in `project/local.go`, aus denen
-die READMEs entstehen; sie verweisen auf den Block. `writeIfMissing()` überschreibt eine
-vorhandene README nie — in bestehenden Projekten bleibt der alte Text stehen. Das bleibt
-so und wird nicht umgangen.
+`k_playbook_review_status` bleibt offen: Es liest Läufe, Eintragszustände und die
+Auswahlbasis und legt nichts an. Ebenso `GET /api/reviews`, die Liste der bisherigen Läufe
+in der Oberfläche. `known-decisions.md` hat mit `merge` seinen einzigen Leser verloren.
 
 ## Commands und Skills auflösen
 
@@ -3667,8 +3575,8 @@ die unveränderte — dieselbe Spur, an der `/k-task-run` Schritt 2 das prüft. 
 wird das jüngste. Codeblöcke bleiben außen vor, sonst gälte eine zitierte Vorlage als
 Nachweis. Ein Task ohne Log ist kein Fehler, aber der Grund, warum `/k-task-run` vor der
 Ausführung nachfragt — deshalb steht er in Warnfarbe. Ein fehlendes Task-Verzeichnis ist anders als bei der
-Doku **kein** Befund: die projekteigene Struktur wird erst angelegt, und "noch keine
-Tasks" ist dieselbe Auskunft wie ein leeres Verzeichnis.
+Doku **kein** Befund: angelegt wird es nicht mehr, und „keine Tasks" ist dieselbe Auskunft
+wie ein leeres Verzeichnis.
 
 Die Liste stellt die offenen Tasks untereinander — die Zeile trägt Dateinamen
 und Titel, das liest sich nebeneinander schlecht. Ein Klick zeigt den Task als Markdown
@@ -4038,10 +3946,6 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/shutdown` | Dienst beenden, für alle Fenster |
 | `GET` | `/api/config` | Anker suchen bzw. Ort vorschlagen |
 | `POST` | `/api/config` | `K-PLAYBOOK.yaml` anlegen |
-| `GET` | `/api/local` | projekteigene Struktur prüfen |
-| `POST` | `/api/local` | fehlende Teile anlegen |
-| `GET` | `/api/local/private` | messen, ob der Inhalt von `priv/` privat ist |
-| `POST` | `/api/local/private` | den Eintrag umschalten; nur Einträge mit `Private`, seit Task 146 allein `priv` |
 | `GET` | `/api/assistant` | Verlinkung prüfen und dabei nachziehen, was sich nachziehen lässt |
 | `POST` | `/api/assistant` | Verlinkung herstellen |
 | `GET` | `/api/mcp` | MCP-Registrierung beider Assistenten prüfen |
@@ -4233,7 +4137,8 @@ zwangsläufig eine abweichende Antwort.
 Das erste Werkzeug ist `k_playbook_context`. Es gibt dasselbe JSON zurück wie das
 Subkommando — dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen
 lassen. Dazu kommen zwei Familien nach demselben Muster „Subkommando trägt, MCP ist
-Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik und `k_playbook_todo_*`
+Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik — vier der fünf zurzeit
+gesperrt, sie antworten mit `reviews_paused` (§„Die Review-Wege pausieren") — und `k_playbook_todo_*`
 (`todos.go`) um `project/todos.go`. Dazu kommt `k_playbook_doc_read`
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
 `k_playbook_doc_create/list/done/reopen` (ebenfalls `docs.go`) um `project.UserDocs`, wie
@@ -4489,8 +4394,8 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   `$HOME` stammen und dort gültig sein, und sonst gibt es nichts Eindeutiges zu
   schreiben.
 - **Nicht von git erfasst** misst `mcpTargetTracked()` im Hauptverzeichnis, denn dort
-  liegen die Dateien, mit Vorbedingung und Timeout wie `agentsIgnored()` und
-  `local_private.go`. Drei Stufen, und jede unbeantwortete Frage fällt auf „erfasst",
+  liegen die Dateien, mit Vorbedingung und Timeout wie `agentsIgnored()`
+  (`gitCallTimeout` in `gitrun.go`). Drei Stufen, und jede unbeantwortete Frage fällt auf „erfasst",
   also nicht schreiben: `K-PLAYBOOK.yaml` nicht lesbar → erfasst; `project.vcs` nicht
   `git` → nicht erfasst; dann `git rev-parse --show-toplevel`; erst nach dessen Erfolg
   `git ls-files --error-unmatch`, Exit 0 erfasst, Exit 1 nicht erfasst, alles andere
@@ -4902,9 +4807,11 @@ selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 
 | Weg | Schreibt | Nur wenn |
 |---|---|---|
-| `ensureLocalStructure()` → `EnsureLocal()` | `k-playbook-local/` samt READMEs | das Verzeichnis ganz fehlt |
 | `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
 | `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; die abgelösten Zusatzblöcke Session-Memory und Befunde; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
+
+`k-playbook-local/` legt die Startpflege nicht an, auch nicht, wenn es ganz fehlt (Task 147,
+§„`k-playbook-local/` läuft aus"); der frühere erste Weg dieser Tabelle ist entfernt.
 
 Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
 Neue, nicht erfasste Dateien darf er anlegen — ob sie eingecheckt werden, entscheidet das
@@ -4920,7 +4827,7 @@ geschehen ist. Diese Wege sitzen bewusst hier und nicht auf dem Lesepfad: `Conte
 heilt ausschließlich Symlinks unter `.claude/` und `.opencode/`; Dateien im
 Projekt anzulegen darf nicht bei jedem Command-Aufruf einer KI-Sitzung passieren, der
 ausdrückliche `k-playbook`-Aufruf ist die richtige Stelle. Was nicht selbsttätig läuft
-und warum — gh-Entscheidung, Remediation-Modus, Update, Privat-Schalter, Tool-Installation,
+und warum — gh-Entscheidung, Remediation-Modus, Update, Tool-Installation,
 `MCPStateStale` —, steht in den jeweiligen Abschnitten. Von „Tool-Installation läuft nicht
 selbsttätig" gibt es genau eine, vom Nutzer entschiedene Ausnahme: die VS-Code-Erweiterung,
 die der **Dienst** beim Start im Hintergrund einspielt und nachzieht
@@ -5300,7 +5207,6 @@ Wenn ein laufendes Werkzeug eine URL wie `http://127.0.0.1:34531/` ausgibt:
 
 ```bash
 curl -sS http://127.0.0.1:34531/api/config
-curl -sS http://127.0.0.1:34531/api/local
 curl -sS http://127.0.0.1:34531/api/assistant
 curl -sS http://127.0.0.1:34531/api/docs
 curl -sS -X POST http://127.0.0.1:34531/api/shutdown
@@ -5334,7 +5240,5 @@ Commit `02f78d3`, zum Beispiel mit
   in Prosa, ob die Installation unverändert ist, der Rest billige Existenzprüfungen auf
   der `context`-Ausgabe. Der Zustand kommt jetzt aus der Oberfläche.
 - Kaum automatisierte Tests für die HTTP-Handler; getestet ist im Wesentlichen
-  `internal/project`. Ausnahme sind die schreibenden Endpunkte unter
-  `/api/local/private` — dort hängt an der Whitelist eine git-Operation, deshalb steht
-  sie in `webui/local_private_test.go` unter Test.
+  `internal/project`.
 - Release-Artefakte gibt es für macOS und Linux. Windows ist offen.

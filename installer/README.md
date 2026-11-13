@@ -55,7 +55,6 @@ ohnehin nur die gestartet wird.
 | Schritt | Ergebnis |
 |---|---|
 | Konfiguration anlegen | `.k-playbook/K-PLAYBOOK.yaml` im Hauptverzeichnis |
-| Projekteigene Struktur anlegen | `k-playbook-local/` mit READMEs je Verzeichnis |
 | Assistenten verlinken | `.claude/`, `.opencode/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer älteren Fassung durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
 | VS-Code-Erweiterung installieren | „k-playbook Workspace Tools“ im VS-Code-Server der Umgebung; beim Start des Dienstes im Hintergrund, ausdrücklich mit `k-playbook vscode install` |
 
@@ -68,6 +67,12 @@ temporär beschreibbar.
 Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt. Eine vorhandene
 `K-PLAYBOOK.yaml` wird nie überschrieben.
 
+`k-playbook-local/` legt das Werkzeug nicht mehr an, weder beim Start noch auf Knopfdruck
+noch als Nebenwirkung eines Werkzeugs; was dort noch liegt, bleibt unberührt. Die
+schreibenden Review-Wege (`k-playbook scan`, `k-playbook merge` und die MCP-Werkzeuge
+`k_playbook_review_create`, `_scan`, `_merge`, `_write_ai_entry`) sind vorübergehend
+gesperrt, bis die Ablage der Review-Ergebnisse umgebaut ist.
+
 Wenn die Oberfläche wegen eines Ankers in einem übergeordneten Verzeichnis nicht die
 Ersteinrichtung zeigt, legt `k-playbook config create` den Anker bewusst ohne Suche an.
 Optional nimmt der Befehl ein Hauptverzeichnis und mit `--repo-root` ein relativ dazu
@@ -78,7 +83,7 @@ liegendes Repository entgegen.
 ```text
 installer/
 ├── cmd/k-playbook/main.go
-├── internal/project/          Anker, Config, Struktur, Verlinkung, Kontext, Update, Tools
+├── internal/project/          Anker, Config, Verlinkung, Kontext, Update, Tools
 ├── internal/legacy/           host-globale Altlasten des alten Modells entfernen
 ├── internal/guiproc/          Laufzeitdatei des Hintergrunddienstes, Prozessidentität, Abkoppeln
 ├── internal/webui/            Server, Endpunkte, eingebettete Oberfläche

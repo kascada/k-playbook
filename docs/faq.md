@@ -4,9 +4,9 @@
 
 `/k-gui` starts the interface. It is useful:
 
-- after cloning k-playbook into a project, for the four setup steps.
+- after cloning k-playbook into a project, for the three setup steps.
 - when linking is stuck and you want to see why: it is brought up to date automatically, but an actual project file in the way or a conflict in `CLAUDE.md` does not resolve itself. The assistants section explains the resolution.
-- when parts of the project-owned structure are missing or symlinks are broken.
+- when symlinks are broken. It no longer creates `k-playbook-local/` or anything in it; a missing directory there is not a defect.
 
 If you only want to know whether everything is correct, open the interface and look without confirming any of the steps: it writes only after confirmation.
 

@@ -244,6 +244,16 @@ func gitInit(t *testing.T, root string) {
 	}
 }
 
+// gitRun führt git im Verzeichnis aus und bricht den Test bei einem Fehler ab.
+func gitRun(t *testing.T, dir string, args ...string) {
+	t.Helper()
+
+	command := append([]string{"-C", dir}, args...)
+	if output, err := exec.Command("git", command...).CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v — %s", strings.Join(args, " "), err, output)
+	}
+}
+
 // Ist AGENTS.md ignoriert, nähme die Umbenennung versionierten Inhalt still aus
 // der Versionskontrolle. Das ist der eine Fall, der blockiert.
 func TestUmbenennenBlocktBeiIgnoriertemAgents(t *testing.T) {

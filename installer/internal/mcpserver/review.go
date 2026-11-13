@@ -205,27 +205,67 @@ const (
 	reviewInputMarkdown    = "review-input.md"
 )
 
+// reviewPausedPrefix steht vorn in der Beschreibung der gesperrten Werkzeuge,
+// damit ein Assistent die Sperre schon in der Werkzeugliste sieht.
+const reviewPausedPrefix = "Vorübergehend nicht verfügbar: Die Ablage der Review-Ergebnisse wird umgebaut; " +
+	"das Werkzeug antwortet mit " + review.PausedCode + " und schreibt nichts. Sonst: "
+
+// addReviewTools meldet die fünf Review-Werkzeuge an.
+//
+// Vier davon sind gesperrt, solange die Review-Wege pausieren (review.Paused,
+// Task 147): create, scan, merge und write_ai_entry bleiben mit Namen und
+// Schema in der Werkzeugliste, antworten aber über pausedReviewTool mit
+// reviews_paused, ohne das Projekt aufzulösen oder etwas zu schreiben. Ihre
+// Handler bleiben stehen und werden hier nur durchgereicht — fällt die Sperre,
+// fällt allein die Hülle. k_playbook_review_status liest nur (Läufe,
+// Eintragszustände, Auswahlbasis) und legt nichts an; es bleibt offen.
 func addReviewTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolStatus,
-		Description: "Liest den Status eines Review-Laufs oder berechnet die Auswahlbasis für einen neuen Lauf.",
+		Description: "Liest den Status eines Review-Laufs oder berechnet die Auswahlbasis für einen neuen Lauf. Schreibt nichts.",
 	}, reviewStatusTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolCreate,
-		Description: "Legt einen Review-Lauf an oder gibt im Dry-Run die validierte run.json-Struktur zurück.",
-	}, reviewCreateTool)
+		Description: reviewPausedPrefix + "Legt einen Review-Lauf an oder gibt im Dry-Run die validierte run.json-Struktur zurück.",
+	}, pausedReviewTool(reviewToolCreate, reviewCreateTool))
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolScan,
-		Description: "Führt Werkzeug-Einträge eines Review-Laufs über die bestehende Scan-Fachlogik aus.",
-	}, reviewScanTool)
+		Description: reviewPausedPrefix + "Führt Werkzeug-Einträge eines Review-Laufs über die bestehende Scan-Fachlogik aus.",
+	}, pausedReviewTool(reviewToolScan, reviewScanTool))
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolMerge,
-		Description: "Fasst einen Review-Lauf über die bestehende Merge-Fachlogik zu review-input.* zusammen.",
-	}, reviewMergeTool)
+		Description: reviewPausedPrefix + "Fasst einen Review-Lauf über die bestehende Merge-Fachlogik zu review-input.* zusammen.",
+	}, pausedReviewTool(reviewToolMerge, reviewMergeTool))
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolWriteAIEntry,
-		Description: "Schreibt den Status eines AI-Review-Eintrags in dessen eigene Entry-Datei.",
-	}, reviewWriteAIEntryTool)
+		Description: reviewPausedPrefix + "Schreibt den Status eines AI-Review-Eintrags in dessen eigene Entry-Datei.",
+	}, pausedReviewTool(reviewToolWriteAIEntry, reviewWriteAIEntryTool))
+}
+
+// reviewProjectInput ist, was jede Eingabe eines Review-Werkzeugs über
+// reviewBaseInput mitbringt: das projectDir für den Umschlag.
+type reviewProjectInput interface {
+	reviewProjectDir() string
+}
+
+func (b reviewBaseInput) reviewProjectDir() string { return b.ProjectDir }
+
+// pausedReviewTool legt die Sperre vor einen Handler: Solange review.Paused
+// einen Fehler meldet, antwortet das Werkzeug mit reviews_paused und dem Satz
+// mit dem Grund — vor jeder Prüfung der Eingabe und vor dem Auflösen des
+// Projekts, damit sicher nichts gelesen, umgezogen oder geschrieben wird. Der
+// Umschlag nennt nur das übergebene projectDir.
+func pausedReviewTool[In reviewProjectInput](tool string, handler mcp.ToolHandlerFor[In, any]) mcp.ToolHandlerFor[In, any] {
+	return func(ctx context.Context, req *mcp.CallToolRequest, input In) (*mcp.CallToolResult, any, error) {
+		if err := review.Paused(); err != nil {
+			return reviewErrorResult(tool, reviewProjectEnvelope{InputDir: input.reviewProjectDir()}, reviewToolError{
+				Code:    review.PausedCode,
+				Message: err.Error(),
+				Details: map[string]any{"tool": tool},
+			}), nil, nil
+		}
+		return handler(ctx, req, input)
+	}
 }
 
 func reviewStatusTool(ctx context.Context, req *mcp.CallToolRequest, input reviewStatusInput) (*mcp.CallToolResult, any, error) {

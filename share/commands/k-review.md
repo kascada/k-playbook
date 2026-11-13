@@ -1,5 +1,5 @@
 ---
-description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage, voraussichtlich bis 2026-11-13) — Führt ein einzelnes Review-Rezept aus; ohne Argument Auswahl aus aktivierten Review-Rezepten, mit Handoff im Report-Modus als review-input.json und review-triage.md.
+description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage) — Führt ein einzelnes Review-Rezept aus; ohne Argument Auswahl aus aktivierten Review-Rezepten, mit Handoff im Report-Modus als review-input.json und review-triage.md.
 argument-hint: [review-name]
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
@@ -10,10 +10,10 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
 ## Vorübergehend nicht verfügbar
 
 Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
-zur Verfügung, voraussichtlich bis zum 13. November 2026. Führe nichts von dem aus, was
-darunter steht — nichts lesen, nichts schreiben, nichts anbieten. Sag dem Nutzer in einem
-Satz, dass `/k-review` gerade umzieht und voraussichtlich ab dem 13. November 2026 wieder
-geht. Bisherige Läufe unter `k-playbook-local/results/` löscht `/k-upgrade` ohne Rückfrage.
+zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen, nichts
+schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-review` gerade umzieht
+und erst nach dem Umbau wieder geht. Bisherige Läufe unter `k-playbook-local/results/`
+löscht `/k-upgrade` ohne Rückfrage.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 

@@ -145,10 +145,11 @@ one — put it there, never into `playbook.dir` and no longer into `<local.dir>/
 after the next `k-playbook briefing` or `/k-gui` has linked it and the assistant has been
 restarted.
 
-If a directory listed here is missing, ask whether to create exactly that directory or to
-run `/k-gui`, which restores the project-local structure. Do not stop hard, do not create
-it silently, and never substitute another path. This applies only to the directories that
-setting up creates — those in `LocalStructure()`. The rows marked „entsteht beim ersten
+If a directory listed here is missing, ask before creating exactly that directory. Do not
+stop hard, do not create it silently, and never substitute another path. `/k-gui` restores
+nothing here: k-playbook no longer creates `<local.dir>` or anything in it — not on
+startup, not on a button, not through a tool —, so a missing directory under `local.dir`
+is the normal state, not a defect of the setup. The rows marked „entsteht beim ersten
 Lauf von …" are exempt: there, a missing directory is the normal state before the first
 run, and the producing command creates its own directory without asking.
 

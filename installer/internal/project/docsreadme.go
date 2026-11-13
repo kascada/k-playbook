@@ -353,7 +353,7 @@ func docsReadmeError(err error) error {
 // wenn Node oder Hub nicht antworten. Sie liegt zwischen der Grenze einer
 // Prüfung der Anbindung (kephalaion.DefaultTimeout, 3 s) und der eines
 // einzelnen Werkzeugaufrufs (kephalaion.ToolTimeout, 15 s) und entspricht
-// den git-Aufrufen des Einrichtens (privateGitTimeout, checkIgnoreTimeout).
+// den git-Aufrufen des Einrichtens (gitCallTimeout, checkIgnoreTimeout).
 // Austauschbar für Tests.
 var docsReadmeSetupTimeout = 10 * time.Second
 

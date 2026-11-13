@@ -18,7 +18,14 @@ import (
 // Das Kommando blockiert, bis alle ausgewählten Einträge durch sind. Einen
 // Anstoß-und-Zurück-Modus gibt es nicht: der Fortschritt wird währenddessen
 // allein aus entries/ gelesen.
+//
+// Gesperrt, solange die Review-Wege pausieren (review.Paused, Task 147): das
+// Kommando endet dann vor jedem Lesen mit der Sperre und einem Exit-Code
+// ungleich 0.
 func runScan(args []string) error {
+	if err := review.Paused(); err != nil {
+		return err
+	}
 	if len(args) == 0 {
 		return fmt.Errorf("kein Lauf angegeben: k-playbook scan <lauf> [eintrag …]")
 	}

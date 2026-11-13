@@ -66,9 +66,8 @@ func ListDoneTasks(projectDir string) ([]Task, error) {
 // gefundenen Tasks werden relativ zu root gebildet, damit erledigte ihr
 // "done/" behalten und damit wieder angefragt werden können.
 //
-// Ein fehlendes Verzeichnis ist kein Fehler: die projekteigene Struktur wird
-// erst angelegt, und "noch keine Tasks" ist dieselbe Auskunft wie ein leeres
-// Verzeichnis.
+// Ein fehlendes Verzeichnis ist kein Fehler: angelegt wird es nicht mehr, und
+// "keine Tasks" ist dieselbe Auskunft wie ein leeres Verzeichnis.
 func listTasksIn(root string, dir string) ([]Task, error) {
 	if !isDir(dir) {
 		return []Task{}, nil

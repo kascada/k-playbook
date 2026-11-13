@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -102,7 +103,7 @@ func TestResetConfigBlocktBeiProjektinhalten(t *testing.T) {
 	if !errors.As(err, &legacy) {
 		t.Fatalf("Fehlertyp = %T, erwartet *LegacyContentError", err)
 	}
-	if want := filepath.Join(PlaybookDirName, "tasks"); !contains(legacy.Paths, want) {
+	if want := filepath.Join(PlaybookDirName, "tasks"); !slices.Contains(legacy.Paths, want) {
 		t.Errorf("Paths = %v, erwartet einen Eintrag %q", legacy.Paths, want)
 	}
 

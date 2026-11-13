@@ -370,6 +370,14 @@ func TestReviewScan(t *testing.T) {
 	}
 }
 
+// addUnpausedScanTool meldet den Scan-Handler ohne die Sperre an. Die beiden
+// Progress-Tests brauchen eine echte Sitzung und prüfen den Handler hinter der
+// Sperre; was ein Client über addReviewTools zurzeit bekommt, prüft
+// review_paused_test.go.
+func addUnpausedScanTool(server *mcp.Server) {
+	mcp.AddTool(server, &mcp.Tool{Name: reviewToolScan}, reviewScanTool)
+}
+
 func TestReviewScanSendetProgressMitToken(t *testing.T) {
 	root := newReviewProject(t)
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nalpha\talpha\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\nbeta\tbeta\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\ngamma\tgamma\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
@@ -384,7 +392,7 @@ func TestReviewScanSendetProgressMitToken(t *testing.T) {
 
 	ctx := context.Background()
 	server := mcp.NewServer(&mcp.Implementation{Name: "server", Version: "v0.0.1"}, nil)
-	addReviewTools(server)
+	addUnpausedScanTool(server)
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
@@ -454,7 +462,7 @@ func TestReviewScanOhneProgressTokenSendetKeineNotifications(t *testing.T) {
 	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}})
 	ctx := context.Background()
 	server := mcp.NewServer(&mcp.Implementation{Name: "server", Version: "v0.0.1"}, nil)
-	addReviewTools(server)
+	addUnpausedScanTool(server)
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {

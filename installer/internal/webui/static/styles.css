@@ -926,8 +926,8 @@ details[open] > summary.disclosure .disclosure-marker {
   white-space: pre-line;
 }
 
-/* Eine lokale Entscheidung je Kasten: oben Verzeichnis, Zustand und Schalter,
-   darunter die Belege, auf denen der Zustand beruht. */
+/* Ein Eintrag je Kasten: oben Name und Zustand, darunter die Belege, auf denen
+   der Zustand beruht. */
 .settings {
   display: grid;
   gap: var(--space-6);
@@ -958,8 +958,7 @@ details[open] > summary.disclosure .disclosure-marker {
   font-size: var(--text-md);
 }
 
-/* Ein Zustand, der privat aussieht und keiner ist, muss beim Überfliegen
-   auffallen — er ist der Grund für diesen Block. */
+/* Ein Zustand, der eine Warnung ist, muss beim Überfliegen auffallen. */
 .setting-state.warn,
 .setting-note.warn {
   color: var(--warn);
@@ -971,14 +970,6 @@ details[open] > summary.disclosure .disclosure-marker {
   color: var(--muted);
   font-size: var(--text-md);
   overflow-wrap: anywhere;
-}
-
-/* Steht statt des Schalters die fremde Regelquelle, braucht sie Breite — sonst
-   drängt sie die Zustandszeile daneben zusammen. */
-.setting-blocked {
-  max-width: 46ch;
-  margin: 0;
-  text-align: right;
 }
 
 .setting .facts {

@@ -44,12 +44,15 @@ func runGUI() error {
 // ohne Schaden geht. Sie läuft bei jedem argumentlosen Aufruf und im Server,
 // den eine Programmaktualisierung neu startet (guiproc.HostCareEnv) — dort
 // gibt es keinen Aufruf, der sie sonst übernähme. Einen Browser öffnet sie nie.
+//
+// k-playbook-local/ legt sie nicht an (Task 147): das Verzeichnis läuft aus,
+// und kein Weg im Programm erzeugt es oder etwas darin. Was dort noch liegt,
+// bleibt unberührt.
 func careForHost() {
 	cleanUpLegacy()
 	cleanUpFormerHostInstall()
 	cleanUpLegacyWrapper()
 	protectProjectInstallation()
-	ensureLocalStructure()
 	repairMCPRegistration()
 	repairRootInstructions()
 }
@@ -128,35 +131,6 @@ func protectProjectInstallation() {
 	}
 	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: Installation konnte nicht read-only gesetzt werden: %v\n", err)
-	}
-}
-
-// ensureLocalStructure legt die projekteigene Struktur an, wenn sie ganz
-// fehlt — der erste der selbsttätigen Einrichtungswege beim Start.
-//
-// Ein frisch geklontes Projekt soll nach dem ersten Aufruf einsatzbereit sein,
-// ohne dass jemand die Karte „Struktur" sieht und klickt. Angelegt wird nur,
-// wenn k-playbook-local/ ganz fehlt: ein vorhandenes Verzeichnis, auch ein
-// unvollständiges, bleibt dem Knopf „Anlegen" — dort kann ein Teil bewusst
-// entfernt worden sein, und der käme sonst bei jedem Start zurück. Ein Fehler
-// hält den Start nicht auf.
-func ensureLocalStructure() {
-	environment := project.Detect()
-	if !environment.Installed {
-		return
-	}
-
-	statuses, created, err := project.EnsureLocal(environment.ProjectDir)
-	if created {
-		fmt.Printf("Projekteigene Struktur angelegt: %s/\n", project.LocalDirName)
-		for _, status := range statuses {
-			if status.Present {
-				fmt.Printf("  - %s\n", status.Path)
-			}
-		}
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: projekteigene Struktur nicht vollständig angelegt: %v\n", err)
 	}
 }
 
