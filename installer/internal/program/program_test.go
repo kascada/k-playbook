@@ -1,8 +1,8 @@
 package program
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release"
+	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 )
 
 // isolate gibt dem Test ein eigenes HOME und einen PATH, der mit dessen
@@ -48,119 +50,133 @@ func programScript(version string) string {
 	return fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = version ]; then echo %s; exit 0; fi\nexit 3\n", version)
 }
 
-func sum(content string) string {
-	hash := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(hash[:])
-}
-
-// stubClone baut ein Projekt mit Clone: VERSION, SHA256SUMS mit der Summe von
-// asset und ein Stub-Bootstrap, der asset ans Ziel kopiert, einen Marker
-// schreibt und mit exitCode endet. Gibt Hauptverzeichnis und Marker zurück.
-func stubClone(t *testing.T, version string, asset string, sums string, exitCode int) (string, string) {
-	t.Helper()
-
-	projectDir := t.TempDir()
-	playbook := filepath.Join(projectDir, project.PlaybookDirName)
-	source := filepath.Join(t.TempDir(), "asset")
-	writeExecutable(t, source, asset)
-	if err := os.MkdirAll(playbook, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(playbook, project.VersionFileName), []byte(version+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if sums == "" {
-		sums = sum(asset)
-	}
-	if err := os.WriteFile(filepath.Join(playbook, SumsFileName), []byte(sums+"  "+AssetName()+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	marker := filepath.Join(t.TempDir(), "bootstrap-gelaufen")
-	writeExecutable(t, filepath.Join(playbook, "bin", "install"), fmt.Sprintf(
-		"#!/bin/sh\necho \"Lade Stub aus $(pwd)\"\n: > %q\ncp %q \"$HOME/.local/bin/k-playbook\"\nexit %d\n",
-		marker, source, exitCode))
-	return projectDir, marker
-}
-
 func ran(marker string) bool {
 	_, err := os.Stat(marker)
 	return err == nil
 }
 
-// Erfolg: das Programm am Ziel ist älter, der Bootstrap läuft aus dem
-// Hauptverzeichnis, und die Datei danach passt zu SHA256SUMS.
-func TestInstallBootstrapErfolg(t *testing.T) {
+// TestMain: Kein Test dieses Pakets fragt das echte GitHub nach dem neuesten
+// Release-Tag oder lädt ein Release-Binary. Wer die Quelle braucht, stellt mit
+// releasetest.Serve eine Ersatzquelle hin.
+func TestMain(m *testing.M) {
+	cleanup := releasetest.Isolate()
+	code := m.Run()
+	cleanup()
+	os.Exit(code)
+}
+
+// Erfolg: das Programm am Ziel ist älter, das Release-Binary des Tags wird
+// geladen, gegen die SHA256SUMS des Tags geprüft und ersetzt die Datei. Ein
+// Clone wird dafür weder gelesen noch gebraucht.
+func TestInstallLaedtDasReleaseDesTags(t *testing.T) {
 	_, target := isolate(t)
 	writeExecutable(t, target, programScript("v0.9.3"))
-	asset := programScript("v0.9.4")
-	projectDir, marker := stubClone(t, "v0.9.4", asset, "", 0)
+	source := releasetest.Serve(t)
+	source.AddRelease("v0.9.4", []byte(programScript("v0.9.4")))
 
-	result, err := Install(projectDir)
+	result, err := Install(context.Background(), "v0.9.4")
 	if err != nil {
 		t.Fatalf("Install: %v\n%s", err, result.Output)
 	}
-	if !ran(marker) || !result.Bootstrapped {
-		t.Fatalf("der Bootstrap ist nicht gelaufen: %+v", result)
-	}
-	if result.Expected != "v0.9.4" || result.Target != target || result.ExitCode != 0 {
+	if !result.Installed || result.Expected != "v0.9.4" || result.Target != target {
 		t.Errorf("Ergebnis = %+v", result)
 	}
-	// Aus dem Hauptverzeichnis aufgerufen, wie die Doku es sagt.
-	resolved, _ := filepath.EvalSymlinks(projectDir)
-	if !strings.Contains(result.Output, projectDir) && !strings.Contains(result.Output, resolved) {
-		t.Errorf("Bootstrap lief nicht im Hauptverzeichnis: %q", result.Output)
+	for _, want := range []string{source.URL() + "/download/v0.9.4/" + AssetName(), "Geprüft gegen SHA256SUMS von v0.9.4"} {
+		if !strings.Contains(result.Output, want) {
+			t.Errorf("Ausgabe nennt %q nicht: %q", want, result.Output)
+		}
 	}
 	if got := ReadVersion(target); got != "v0.9.4" {
 		t.Errorf("Version am Ziel = %q", got)
 	}
-}
-
-// Exit ≠ 0: Fehler mit Ausgabe und Exit-Code.
-func TestInstallBootstrapScheitert(t *testing.T) {
-	_, target := isolate(t)
+	if err := Verify(context.Background(), "v0.9.4", target); err != nil {
+		t.Errorf("Verify gegen die Summen des Tags: %v", err)
+	}
+	// Eine Datei, die nicht das Release-Binary ist, besteht Verify nicht.
 	writeExecutable(t, target, programScript("v0.9.3"))
-	projectDir, _ := stubClone(t, "v0.9.4", programScript("v0.9.4"), "", 7)
-
-	result, err := Install(projectDir)
-	if err == nil {
-		t.Fatal("kein Fehler bei Exit 7")
-	}
-	if result.ExitCode != 7 || !strings.Contains(err.Error(), "Exit-Code 7") || !strings.Contains(result.Output, "Lade Stub") {
-		t.Errorf("Ergebnis = %+v, Fehler %v", result, err)
+	if err := Verify(context.Background(), "v0.9.4", target); err == nil || !strings.Contains(err.Error(), "SHA256SUMS") {
+		t.Errorf("Verify an fremder Datei: %v", err)
 	}
 }
 
-// Exit 0, aber die Datei passt nicht zu SHA256SUMS: geprüft wird die Datei,
-// nicht der Exit-Code.
-func TestInstallDateiPasstNichtZuSHA256SUMS(t *testing.T) {
-	_, target := isolate(t)
-	writeExecutable(t, target, programScript("v0.9.3"))
-	projectDir, marker := stubClone(t, "v0.9.4", programScript("v0.9.4"), strings.Repeat("0", 64), 0)
+// Die Installation scheitert, ohne etwas zu ersetzen: das Asset fehlt noch
+// (der Tag steht, die CI baut), die Prüfsumme weicht ab, oder die Quelle ist
+// nicht erreichbar.
+func TestInstallScheitertOhneZuErsetzen(t *testing.T) {
+	old := programScript("v0.9.3")
 
-	_, err := Install(projectDir)
-	if err == nil || !strings.Contains(err.Error(), SumsFileName) {
-		t.Fatalf("Fehler = %v, erwartet Abweichung gegen %s", err, SumsFileName)
-	}
-	if !ran(marker) {
-		t.Error("der Bootstrap ist nicht gelaufen")
-	}
+	t.Run("Asset fehlt", func(t *testing.T) {
+		_, target := isolate(t)
+		writeExecutable(t, target, old)
+		source := releasetest.Serve(t)
+		source.AddRelease("v0.9.4", []byte(programScript("v0.9.4")))
+		source.RemoveAsset("v0.9.4", AssetName())
+
+		result, err := Install(context.Background(), "v0.9.4")
+		if err == nil || !strings.Contains(err.Error(), "noch nicht fertig") || result.Installed {
+			t.Fatalf("Ergebnis = %+v, Fehler %v", result, err)
+		}
+		if content, _ := os.ReadFile(target); string(content) != old {
+			t.Error("die Datei am Ziel wurde ersetzt")
+		}
+	})
+
+	t.Run("Prüfsumme weicht ab", func(t *testing.T) {
+		_, target := isolate(t)
+		writeExecutable(t, target, old)
+		source := releasetest.Serve(t)
+		source.AddAsset("v0.9.4", AssetName(), []byte(programScript("v0.9.4")))
+		source.SetSums("v0.9.4", strings.Repeat("0", 64)+"  "+AssetName()+"\n")
+
+		_, err := Install(context.Background(), "v0.9.4")
+		if err == nil || !strings.Contains(err.Error(), "Prüfsumme weicht ab") {
+			t.Fatalf("Fehler = %v", err)
+		}
+		if content, _ := os.ReadFile(target); string(content) != old {
+			t.Error("die Datei am Ziel wurde ersetzt")
+		}
+	})
+
+	t.Run("Quelle abgeschaltet", func(t *testing.T) {
+		_, target := isolate(t)
+		writeExecutable(t, target, old)
+		releasetest.Off(t)
+
+		if _, err := Install(context.Background(), "v0.9.4"); !errors.Is(err, release.ErrDisabled) {
+			t.Fatalf("Fehler = %v", err)
+		}
+		if content, _ := os.ReadFile(target); string(content) != old {
+			t.Error("die Datei am Ziel wurde ersetzt")
+		}
+	})
+
+	t.Run("kein Tag", func(t *testing.T) {
+		_, target := isolate(t)
+		writeExecutable(t, target, old)
+		for _, tag := range []string{"", "unbekannt", "v0.9.4-rc.1"} {
+			if _, err := Install(context.Background(), tag); err == nil || !strings.Contains(err.Error(), "kein Release-Tag") {
+				t.Errorf("Tag %q: %v", tag, err)
+			}
+		}
+	})
 }
 
-// Die Datei am Ziel ist gleich alt oder neuer als VERSION: kein Download,
+// Die Datei am Ziel ist gleich alt oder neuer als der Tag: kein Download,
 // erwartet wird die an der Datei gelesene Version. Herabgestuft wird nie.
-func TestInstallOhneBootstrapBeiGleicherOderNeuererDatei(t *testing.T) {
+func TestInstallOhneDownloadBeiGleicherOderNeuererDatei(t *testing.T) {
 	for _, have := range []string{"v0.9.4", "v0.10.0"} {
 		t.Run(have, func(t *testing.T) {
 			_, target := isolate(t)
 			writeExecutable(t, target, programScript(have))
-			projectDir, marker := stubClone(t, "v0.9.4", programScript("v0.9.4"), "", 0)
+			source := releasetest.Serve(t)
+			source.AddRelease("v0.9.4", []byte(programScript("v0.9.4")))
 
-			result, err := Install(projectDir)
+			result, err := Install(context.Background(), "v0.9.4")
 			if err != nil {
 				t.Fatalf("Install: %v", err)
 			}
-			if ran(marker) || result.Bootstrapped {
-				t.Error("der Bootstrap ist gelaufen")
+			if result.Installed || len(source.Requests()) != 0 {
+				t.Errorf("es wurde geladen: %+v, Anfragen %v", result, source.Requests())
 			}
 			if result.Expected != have {
 				t.Errorf("erwartete Version = %q, gelesen war %q", result.Expected, have)
@@ -170,17 +186,19 @@ func TestInstallOhneBootstrapBeiGleicherOderNeuererDatei(t *testing.T) {
 }
 
 // Ein Programm ohne Subkommando version — eines vor 076 — ist „unbekannt",
-// und unbekannt heißt: Bootstrap.
-func TestInstallBootstrapBeiDateiOhneVersion(t *testing.T) {
+// und unbekannt heißt: installieren.
+func TestInstallBeiDateiOhneVersion(t *testing.T) {
 	_, target := isolate(t)
 	writeExecutable(t, target, programScript(""))
-	projectDir, marker := stubClone(t, "v0.9.4", programScript("v0.9.4"), "", 0)
+	source := releasetest.Serve(t)
+	source.AddRelease("v0.9.4", []byte(programScript("v0.9.4")))
 
-	if _, err := Install(projectDir); err != nil {
-		t.Fatalf("Install: %v", err)
+	result, err := Install(context.Background(), "v0.9.4")
+	if err != nil || !result.Installed {
+		t.Fatalf("Install: %+v, %v", result, err)
 	}
-	if !ran(marker) {
-		t.Error("der Bootstrap ist nicht gelaufen")
+	if got := ReadVersion(target); got != "v0.9.4" {
+		t.Errorf("Version am Ziel = %q", got)
 	}
 }
 
@@ -192,14 +210,80 @@ func TestInstallNichtBeiFalschemPath(t *testing.T) {
 	other := filepath.Join(t.TempDir(), "anderswo")
 	writeExecutable(t, filepath.Join(other, project.InstalledCommandName), programScript("v0.9.3"))
 	t.Setenv("PATH", other+string(os.PathListSeparator)+os.Getenv("PATH"))
-	projectDir, marker := stubClone(t, "v0.9.4", programScript("v0.9.4"), "", 0)
+	source := releasetest.Serve(t)
+	source.AddRelease("v0.9.4", []byte(programScript("v0.9.4")))
 
-	if _, err := Install(projectDir); err == nil {
+	if _, err := Install(context.Background(), "v0.9.4"); err == nil {
 		t.Fatal("kein Fehler bei falschem PATH")
 	}
-	if ran(marker) {
-		t.Error("der Bootstrap ist trotz falschem PATH gelaufen")
+	if len(source.Requests()) != 0 {
+		t.Errorf("trotz falschem PATH wurde gefragt: %v", source.Requests())
 	}
+}
+
+// CheckStatus vergleicht laufend gegen den neuesten Tag: älter meldet, gleich
+// und neuer nicht. Ohne eigene Version wird nichts abgerufen, und ein
+// unbekannter Tag ist kein Nachweis.
+func TestCheckStatus(t *testing.T) {
+	t.Run("älter, gleich, neuer", func(t *testing.T) {
+		_, target := isolate(t)
+		writeExecutable(t, target, programScript("v0.9.3"))
+		source := releasetest.Serve(t)
+		source.AddTag("v0.9.4")
+		source.AddTag("v0.9.5-rc.1")
+
+		older := CheckStatus(context.Background(), "v0.9.3")
+		if !older.Outdated || older.Latest != "v0.9.4" || older.Order != "älter" || !older.Installable || older.Target != target || older.Hint != "" {
+			t.Errorf("älter: %+v", older)
+		}
+		for running, order := range map[string]string{"v0.9.4": "gleich", "v0.10.0": "neuer"} {
+			status := CheckStatus(context.Background(), running)
+			if status.Outdated || status.Latest != "v0.9.4" || status.Order != order || status.LatestError != "" {
+				t.Errorf("%s: %+v", running, status)
+			}
+		}
+	})
+
+	t.Run("älter, aber der PATH zeigt woandershin", func(t *testing.T) {
+		isolate(t)
+		source := releasetest.Serve(t)
+		source.AddTag("v0.9.4")
+
+		status := CheckStatus(context.Background(), "v0.9.3")
+		if !status.Outdated || status.Installable || !strings.Contains(status.Hint, project.FirstInstallCommand) {
+			t.Errorf("Status = %+v", status)
+		}
+	})
+
+	t.Run("ohne Version kein Abruf", func(t *testing.T) {
+		source := releasetest.Serve(t)
+		source.AddTag("v0.9.4")
+		for _, running := range []string{"", "dev"} {
+			status := CheckStatus(context.Background(), running)
+			if status.Outdated || status.Latest != "" || status.LatestError != "" || status.Order != "unbekannt" {
+				t.Errorf("laufend %q: %+v", running, status)
+			}
+		}
+		if requests := source.Requests(); len(requests) != 0 {
+			t.Errorf("ohne eigene Version wurde gefragt: %v", requests)
+		}
+	})
+
+	t.Run("Tag unbekannt", func(t *testing.T) {
+		releasetest.Off(t)
+		status := CheckStatus(context.Background(), "v0.9.3")
+		if status.Outdated || status.Latest != "" || status.Order != "unbekannt" || !strings.Contains(status.LatestError, "abgeschaltet") {
+			t.Errorf("abgeschaltet: %+v", status)
+		}
+
+		// Die Quelle antwortet, nennt aber keinen Release-Tag.
+		source := releasetest.Serve(t)
+		source.AddTag("v0.9.5-rc.1")
+		status = CheckStatus(context.Background(), "v0.9.3")
+		if status.Outdated || status.Latest != "" || status.LatestError == "" {
+			t.Errorf("ohne Release-Tag: %+v", status)
+		}
+	})
 }
 
 func TestReadVersion(t *testing.T) {
@@ -265,7 +349,7 @@ func TestCheckPath(t *testing.T) {
 		if check.OK || check.Found != other {
 			t.Errorf("CheckPath = %+v", check)
 		}
-		for _, want := range []string{other, target, project.BootstrapCommand} {
+		for _, want := range []string{other, target, project.FirstInstallCommand} {
 			if !strings.Contains(check.Hint(), want) {
 				t.Errorf("Hinweis nennt %q nicht: %s", want, check.Hint())
 			}
@@ -278,7 +362,7 @@ func TestCheckPath(t *testing.T) {
 		if check.OK || check.Found != "" {
 			t.Errorf("CheckPath = %+v", check)
 		}
-		for _, want := range []string{target, "nicht zu finden", filepath.Dir(target)} {
+		for _, want := range []string{target, "nicht zu finden", filepath.Dir(target), project.FirstInstallCommand} {
 			if !strings.Contains(check.Hint(), want) {
 				t.Errorf("Hinweis nennt %q nicht: %s", want, check.Hint())
 			}

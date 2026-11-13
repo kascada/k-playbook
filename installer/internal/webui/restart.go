@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -15,11 +16,11 @@ import (
 
 // Programmaktualisierung und Neustart.
 //
-// Ist das laufende Programm älter als die VERSION des Clones, installiert der
-// Dienst auf Knopfdruck das passende Release-Programm über den Bootstrap des
-// Clones und startet sich daraus neu. Das Herunterladen liegt ganz bei
-// k-playbook/bin/install; hier wird es nur angestoßen und danach an der Datei
-// geprüft (program.Install).
+// Ist das laufende Programm älter als der neueste Release-Tag, installiert der
+// Dienst auf Knopfdruck das Release-Programm dieses Tags und startet sich
+// daraus neu. Laden, Prüfen gegen die SHA256SUMS des Tags und Ersetzen liegen
+// bei program.Install (über release.Install); der Clone des Projekts wird
+// dafür weder gelesen noch gebraucht.
 //
 // Die Übergabe der Laufzeitdatei hält eine Invariante: **nie zwei registrierte
 // Dienste für ein Projekt.** Die Datei entsteht mit O_CREAT|O_EXCL, ein neuer
@@ -72,12 +73,13 @@ func (o restartOutcome) applyTo(response *updateResponse) {
 	}
 }
 
-// applyProgramHandler installiert das zum Clone passende Programm und startet
-// den Dienst daraus neu. Er läuft nur auf ausdrücklichen Klick.
+// applyProgramHandler installiert das Release-Programm des neuesten Tags und
+// startet den Dienst daraus neu. Er läuft nur auf ausdrücklichen Klick, und er
+// läuft, ob es den Clone gibt oder nicht.
 //
 // Abgelehnt wird mit 409, wenn schon ein Ablauf läuft, wenn das laufende
-// Programm nicht älter ist als der Clone oder wenn der PATH nicht auf das
-// Installationsziel zeigt. Laufen Befehle oder Chats, antwortet er ohne
+// Programm nicht älter ist als der neueste Tag — auch dann, wenn der Tag
+// unbekannt ist — oder wenn der PATH nicht auf das Installationsziel zeigt. Laufen Befehle oder Chats, antwortet er ohne
 // Bestätigung (?confirm=1) mit 428 und der Rückfrage; die Seite stellt sie und
 // schickt den Aufruf bestätigt erneut. Scheitert die Installation oder der
 // Neustart, läuft der Dienst weiter, und die Antwort trägt Fehler, Ausgabe und
@@ -94,12 +96,16 @@ func (state *serverState) applyProgramHandler(w http.ResponseWriter, r *http.Req
 	}
 	defer state.updateMu.Unlock()
 
-	status := checkProgram(state.version, environment.PlaybookDir)
+	status := checkProgram(r.Context(), state.version)
 	response := updateResponse{Program: status}
 	switch {
+	case status.Latest == "" && status.LatestError != "":
+		response.Message = "Der neueste Release-Tag ist unbekannt — " + status.LatestError + "; es gibt nichts zu aktualisieren."
+		writeJSON(w, http.StatusConflict, response)
+		return
 	case !status.Outdated:
-		response.Message = fmt.Sprintf("Das laufende Programm (%s) ist nicht älter als die Installation (%s); es gibt nichts zu aktualisieren.",
-			displayVersion(status.Running), displayVersion(status.Clone))
+		response.Message = fmt.Sprintf("Das laufende Programm (%s) ist nicht älter als das neueste Release (%s); es gibt nichts zu aktualisieren.",
+			displayVersion(status.Running), displayVersion(status.Latest))
 		writeJSON(w, http.StatusConflict, response)
 		return
 	case !status.Installable:
@@ -114,7 +120,7 @@ func (state *serverState) applyProgramHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	outcome := state.installAndRestart(environment.ProjectDir)
+	outcome := state.installAndRestart(status.Latest)
 	outcome.applyTo(&response)
 	if !outcome.Restarted {
 		writeJSON(w, http.StatusInternalServerError, response)
@@ -154,17 +160,21 @@ func (state *serverState) activeWork() string {
 	return "Noch in Arbeit: " + text + "."
 }
 
-// installAndRestart ist der gemeinsame Ablauf beider POSTs: Programm
-// installieren, falls nötig, dann neu starten. Der Leerlaufwächter ruht
-// solange.
-func (state *serverState) installAndRestart(projectDir string) restartOutcome {
+// installAndRestart ist der gemeinsame Ablauf beider POSTs: das Release-Programm
+// des Tags installieren, falls nötig, dann neu starten. Der Leerlaufwächter
+// ruht solange.
+//
+// Der Kontext ist nicht der der Anfrage: Bricht die Seite die Verbindung ab,
+// soll eine begonnene Installation nicht mitten im Neustart enden. Die Frist
+// setzt program.Install selbst.
+func (state *serverState) installAndRestart(tag string) restartOutcome {
 	state.restarting.Store(true)
 	defer func() {
 		state.noteRequest(time.Now())
 		state.restarting.Store(false)
 	}()
 
-	result, err := program.Install(projectDir)
+	result, err := program.Install(context.Background(), tag)
 	if err != nil {
 		return restartOutcome{
 			Failed:  true,
@@ -181,11 +191,12 @@ func (state *serverState) installAndRestart(projectDir string) restartOutcome {
 
 // installFailureMessage nennt den Fehler und den Weg im Terminal. Der Dienst
 // läuft in diesem Fall weiter; danach meldet die Prüfung wieder „Programm
-// älter".
+// älter". Der Weg im Terminal ist `k-playbook upgrade`: es installiert
+// dasselbe Release ohne die Oberfläche und nennt, woran es scheitert.
 func installFailureMessage(err error) string {
 	return "Programm nicht aktualisiert: " + strings.TrimSuffix(err.Error(), ".") + ". " +
 		"Der Dienst läuft mit dem bisherigen Programm weiter. Nachholen im Terminal: " +
-		project.BootstrapHint + ", danach k-playbook aufrufen."
+		project.UpgradeCommand + ", danach k-playbook aufrufen."
 }
 
 // restartFrom übergibt die Laufzeitdatei an einen neuen Dienst aus target und

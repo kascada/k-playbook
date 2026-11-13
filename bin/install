@@ -1,11 +1,61 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installiert das passende Release-Binary dieses Clones in ~/.local/bin. Der
-# Installer bleibt im Clone, damit VERSION und SHA256SUMS unabhängig vom
-# heruntergeladenen Asset geprüft werden können.
+# Installiert k-playbook nach ~/.local/bin: das Release-Binary des neuesten
+# Release-Tags, geprüft gegen die SHA256SUMS dieses Tags. Danach Kephalaion,
+# wenn es auf diesem Rechner fehlt.
+#
+# Das Skript ist eigenständig — es liest nichts neben sich:
+#
+#   curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
+#
+# Aus einem Clone aufgerufen (make -C k-playbook install, k-playbook/bin/install)
+# verhält es sich genauso: Es liest weder VERSION noch SHA256SUMS des Clones
+# und installiert den neuesten Tag, nicht den Stand des Clones.
+#
+# Tag und Prüfsumme bestimmt es wie das Programm selbst (installer/internal/
+# release): der Tag ist der höchste der Form vX.Y.Z aus
+# `git ls-remote --tags --refs`, über HTTPS und anonym; die erwartete Summe
+# kommt aus der committeten SHA256SUMS des Tags (raw.githubusercontent.com),
+# das Binary aus den Assets des Releases. Summe über den Git-Stand, Binary
+# über das Release: ein ausgetauschtes Asset fällt auf. Dafür braucht das
+# Skript git — neben curl oder wget und sha256sum oder shasum.
+#
+# Der Tag steht, bevor die CI die Assets gebaut hat. In diesem Fenster fehlt
+# das Asset; das Skript sagt dann, dass das Release noch nicht fertig ist, und
+# ersetzt nichts.
+#
+# Der ganze Ablauf steht in main und wird erst in der letzten Zeile gerufen:
+# Über `curl | bash` liest bash das Skript von stdin. So ist es vollständig
+# gelesen, bevor etwas läuft — ein abgebrochener Download führt nichts aus —,
+# und kein Kindprozess kann den Rest des Skripts von stdin wegfressen.
 
+repo_url="https://github.com/kascada/k-playbook.git"
+raw_base_url="https://raw.githubusercontent.com/kascada/k-playbook"
 release_base_url="https://github.com/kascada/k-playbook/releases/download"
+install_script_url="https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install"
+kephalaion_install_url="https://github.com/kephalaion/kephalaion/releases/latest/download/install.sh"
+
+# K_PLAYBOOK_RELEASE_SOURCE ersetzt die Quelle oder schaltet sie ab — dieselbe
+# Variable mit derselben Bedeutung wie im Programm (release.EnvSource), die
+# Naht für Tests: leer ist GitHub, "off" heißt kein Abruf, sonst eine
+# Basis-URL mit <basis>/k-playbook.git, <basis>/raw/<tag>/SHA256SUMS,
+# <basis>/download/<tag>/<asset> und <basis>/kephalaion/install.sh.
+source_note=""
+case "${K_PLAYBOOK_RELEASE_SOURCE:-}" in
+  "") ;;
+  off) source_note="off" ;;
+  *)
+    source_base="${K_PLAYBOOK_RELEASE_SOURCE%/}"
+    repo_url="${source_base}/k-playbook.git"
+    raw_base_url="${source_base}/raw"
+    release_base_url="${source_base}/download"
+    kephalaion_install_url="${source_base}/kephalaion/install.sh"
+    source_note="${source_base}"
+    ;;
+esac
+
+install_command="curl -fsSL ${install_script_url} | bash"
 
 fail() {
   printf '%s\n' "$@" >&2
@@ -13,73 +63,22 @@ fail() {
 }
 
 usage() {
-  cat <<'EOF'
-Verwendung: make -C k-playbook install
-   ohne make: k-playbook/bin/install
+  cat <<EOF
+Verwendung: ${install_command}
+   aus einem Clone: make -C k-playbook install
+         ohne make: k-playbook/bin/install
 
-Aufgerufen wird beides aus dem Hauptverzeichnis des Projekts; ein Zielprojekt
-hat kein eigenes install-Target.
+Bestimmt den neuesten Release-Tag von k-playbook (git ls-remote über HTTPS),
+lädt das Release-Binary dieser Plattform, prüft es gegen die SHA256SUMS des
+Tags und installiert es nach ~/.local/bin/k-playbook. Fehlt Kephalaion auf
+diesem Rechner, installiert es danach über das install.sh des neuesten
+Kephalaion-Releases.
 
-Lädt das Release-Binary, das VERSION in diesem Clone nennt, prüft es gegen
-SHA256SUMS und installiert es nach ~/.local/bin/k-playbook. Fehlt Kephalaion
-auf diesem Rechner, installiert es danach bin/install-kephalaion.
+Aus einem Clone aufgerufen verhält es sich gleich: VERSION und SHA256SUMS des
+Clones liest es nicht. Gebraucht werden git, curl oder wget und sha256sum
+oder shasum.
 EOF
 }
-
-case "${1:-}" in
-  "") ;;
-  help|-h|--help)
-    usage
-    exit 0
-    ;;
-  *)
-    usage >&2
-    exit 1
-    ;;
-esac
-
-script_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-root_dir="$(dirname "${script_dir}")"
-
-version_file="${root_dir}/VERSION"
-sums_file="${root_dir}/SHA256SUMS"
-[[ -f "${version_file}" ]] || fail "VERSION fehlt: ${version_file}"
-[[ -f "${sums_file}" ]] || fail "SHA256SUMS fehlt: ${sums_file}"
-
-version="$(tr -d '[:space:]' < "${version_file}")"
-[[ -n "${version}" ]] || fail "VERSION ist leer: ${version_file}"
-
-case "$(uname -s)" in
-  Linux) os="linux" ;;
-  Darwin) os="darwin" ;;
-  *) fail "Nicht unterstütztes Betriebssystem: $(uname -s)" ;;
-esac
-
-case "$(uname -m)" in
-  x86_64|amd64) arch="amd64" ;;
-  arm64|aarch64) arch="arm64" ;;
-  *) fail "Nicht unterstützte Architektur: $(uname -m)" ;;
-esac
-
-binary="k-playbook-${os}-${arch}"
-expected="$(awk -v name="${binary}" '$2 == name || $2 == "*" name { print $1; exit }' "${sums_file}")"
-[[ -n "${expected}" ]] || fail "Keine Prüfsumme für ${binary} in ${sums_file}"
-
-if command -v sha256sum >/dev/null 2>&1; then
-  sha256_of() { sha256sum "$1" | awk '{ print $1 }'; }
-elif command -v shasum >/dev/null 2>&1; then
-  sha256_of() { shasum -a 256 "$1" | awk '{ print $1 }'; }
-else
-  fail "Weder sha256sum noch shasum verfügbar; Download kann nicht geprüft werden."
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  download() { curl -fL --retry 2 --connect-timeout 15 --output "$1" "$2"; }
-elif command -v wget >/dev/null 2>&1; then
-  download() { wget --output-document="$1" "$2"; }
-else
-  fail "Weder curl noch wget verfügbar; Release-Binary kann nicht geladen werden."
-fi
 
 # physical_path löst Symlinks im Pfad auf, soweit das Verzeichnis existiert.
 # Auf macOS ist $HOME über /System/Volumes/Data verlinkt; ohne die Auflösung
@@ -118,14 +117,13 @@ path_contains() {
 # require_target_dir_in_path bricht ab, wenn das Zielverzeichnis nicht im PATH
 # liegt.
 #
-# Das ist kein Hinweis am Rand: nach dem Ausstieg aus dem projektlokalen
-# Wrapper ist `k-playbook` der einzige Aufruf. Ein installiertes, aber nicht
-# auffindbares Binary wäre ein stiller Totalausfall — Commands, Instruktionen
-# und die MCP-Registrierung liefen alle ins Leere, ohne dass der Bootstrap je
-# etwas gemeldet hätte.
+# Das ist kein Hinweis am Rand: `k-playbook` ist der einzige Aufruf. Ein
+# installiertes, aber nicht auffindbares Binary wäre ein stiller Totalausfall —
+# Commands, Instruktionen und die MCP-Registrierung liefen alle ins Leere, ohne
+# dass die Installation je etwas gemeldet hätte.
 # Geprüft wird erst, nachdem das Zielverzeichnis angelegt ist: sonst bewertet
-# die Prüfung eine Lage, die der Bootstrap selbst gerade aufgelöst hat. Welcher
-# Hinweis richtig ist, hängt genau daran — deshalb der Blick auf
+# die Prüfung eine Lage, die die Installation selbst gerade aufgelöst hat.
+# Welcher Hinweis richtig ist, hängt genau daran — deshalb der Blick auf
 # target_dir_created.
 require_target_dir_in_path() {
   if path_contains "${target_dir}"; then
@@ -135,18 +133,18 @@ require_target_dir_in_path() {
   local -a hint
   if [[ -n "${target_dir_created}" ]]; then
     # Der Debian-Fall: dort steht die Aufnahme von ~/.local/bin bereits in
-    # ~/.profile, aber unter `if [ -d "$HOME/.local/bin" ]`. Beim allerersten
-    # Bootstrap auf einem frischen Host oder in einem DevContainer gab es das
-    # Verzeichnis beim Anmelden noch nicht — das Profil ist also richtig und
-    # greift ab der nächsten Anmeldung von selbst.
+    # ~/.profile, aber unter `if [ -d "$HOME/.local/bin" ]`. Bei der
+    # allerersten Installation auf einem frischen Host oder in einem
+    # DevContainer gab es das Verzeichnis beim Anmelden noch nicht — das Profil
+    # ist also richtig und greift ab der nächsten Anmeldung von selbst.
     hint=(
       "Das Verzeichnis gab es bis eben nicht; angelegt ist es jetzt. Debian und"
       "Ubuntu nehmen ~/.local/bin in ~/.profile nur auf, wenn es beim Anmelden"
       "bereits existiert — dort ist nichts zu ändern. Melde dich neu an oder"
-      "lade dein Profil neu (bash: . ~/.profile) und rufe den Bootstrap erneut"
-      "auf:"
+      "lade dein Profil neu (bash: . ~/.profile) und rufe die Installation"
+      "erneut auf:"
       ""
-      "  make -C k-playbook install"
+      "  ${install_command}"
       ""
       "Bleibt das Verzeichnis auch danach draußen, kennt dein Profil den Eintrag"
       "nicht. Dann aufnehmen — ~/.zprofile bei zsh, ~/.bashrc bei bash:"
@@ -159,7 +157,7 @@ require_target_dir_in_path() {
       ""
       '  export PATH="$HOME/.local/bin:$PATH"'
       ""
-      "Danach eine neue Shell öffnen und den Bootstrap erneut aufrufen."
+      "Danach eine neue Shell öffnen und die Installation erneut aufrufen."
     )
   fi
 
@@ -167,7 +165,7 @@ require_target_dir_in_path() {
     "" \
     "k-playbook wird ausschließlich unter seinem Namen aufgerufen; ohne diesen" \
     "Eintrag wäre es zwar installiert, aber nirgends auffindbar. Deshalb bricht" \
-    "der Bootstrap hier ab, statt einen stillen Erfolg zu melden." \
+    "die Installation hier ab, statt einen stillen Erfolg zu melden." \
     "" \
     "${hint[@]}"
 }
@@ -192,87 +190,221 @@ foreign_platform_kind() {
   esac
 }
 
-target_dir="${HOME:?HOME ist nicht gesetzt}/.local/bin"
-target="${target_dir}/k-playbook"
-url="${release_base_url}/${version}/${binary}"
-
-# Das Zielverzeichnis entsteht **vor** der PATH-Prüfung. Debians und Ubuntus
-# ~/.profile nimmt ~/.local/bin nur auf, `if [ -d "$HOME/.local/bin" ]`; auf
-# einem frischen Host oder in einem DevContainer gibt es das Verzeichnis beim
-# allerersten Bootstrap noch nicht. Andersherum bewertete die Prüfung eine Lage,
-# die eine Zeile später ohnehin aufgelöst war, und verwies auf ein Profil, das
-# längst richtig ist.
-target_dir_created=""
-[[ -d "${target_dir}" ]] || target_dir_created="ja"
-mkdir -p "${target_dir}"
-
-# Beide Prüfungen laufen **vor** dem Download: sie brauchen kein Release-Asset,
-# und ein Abbruch soll nichts geladen und nichts ersetzt haben. Das angelegte
-# Zielverzeichnis bleibt dabei stehen — leer und genau dort, wo das Profil bei
-# der nächsten Anmeldung nachsieht.
-require_target_dir_in_path
-foreign="$(foreign_platform_kind "${target}")"
-
-temporary="$(mktemp "${target_dir}/.k-playbook.XXXXXX")"
-trap 'rm -f "${temporary}"' EXIT
-
-printf 'Lade %s ...\n' "${url}"
-download "${temporary}" "${url}"
-
-actual="$(sha256_of "${temporary}")"
-if [[ "${actual}" != "${expected}" ]]; then
-  fail "Prüfsumme weicht ab für ${binary}
-  erwartet: ${expected}
-  erhalten: ${actual}"
-fi
-
-# Ein alter Symlink muss selbst ersetzt werden, nicht sein bisheriges Ziel.
-if [[ -L "${target}" ]]; then
-  rm -f "${target}"
-fi
-chmod 0755 "${temporary}"
-mv -f "${temporary}" "${target}"
-temporary=""
-
-# Der alte Wrapper legte seine Spiegelung und Downloads außerhalb von bin/ ab.
-# Security-Tool-venvs liegen ebenfalls unter ~/.local/share/k-playbook und
-# bleiben deshalb ausdrücklich außerhalb dieser Bereinigung.
-rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook"
-
-printf 'Installiert: %s (%s)\n' "${target}" "${version}"
-
-# Host und DevContainer, die sich dasselbe $HOME teilen, überschreiben einander
-# an dieser Datei. Das ist kein Fehler dieses Laufs — hier steht jetzt das
-# richtige Binary —, aber die andere Umgebung ist damit lahmgelegt und muss
-# denselben Bootstrap noch einmal ausführen. Deshalb wird das Ersetzen genannt
-# und nicht stillschweigend getan.
+# latest_tag nennt den höchsten Tag der Form vX.Y.Z. Ein Tag mit Zusatz
+# (v1.0.0-rc.1) ist kein Release. Verglichen wird numerisch je Stelle, nicht
+# als Zeichenkette — sonst stünde v0.9.4 über v0.10.0.
 #
-# Die Grenze dieser Erkennung: sie sitzt allein hier. Ruft jemand
-# ~/.local/bin/k-playbook direkt auf, während dort ein plattformfremdes Binary
-# liegt, fängt das niemand ab — der Aufruf endet mit der Meldung der Shell
-# ("cannot execute binary file"). Die make-Targets tragen die Erkennung
-# ebenfalls nicht: `make dev-install` und `make gui` bauen vorher unbedingt für
-# die eigene Plattform, dort kann nie ein fremdes Binary stehen.
-if [[ -n "${foreign}" ]]; then
-  printf '\n'
-  printf 'Ersetzt wurde ein %s-Binary — offenbar teilen sich Host und Container\n' "${foreign}"
-  printf 'dasselbe HOME (%s).\n' "${HOME}"
-  printf 'In der anderen Umgebung ist k-playbook damit bis auf Weiteres tot; dort\n'
-  printf 'den Bootstrap erneut ausführen:\n\n'
-  printf '  make -C k-playbook install\n'
-  printf '  oder ohne make: k-playbook/bin/install\n'
-fi
+# Leer und Rückgabe 1, wenn git die Tags nicht lesen konnte; leer und
+# Rückgabe 0, wenn das Repo keinen solchen Tag nennt.
+latest_tag() {
+  local refs
+  # Nie nach Zugangsdaten fragen: das Repo ist öffentlich, und ein Prompt
+  # hinge unter curl | bash an einem stdin, das das Skript selbst ist.
+  refs="$(GIT_TERMINAL_PROMPT=0 git ls-remote --tags --refs "${repo_url}" 'v*' </dev/null)" || return 1
+  printf '%s\n' "${refs}" |
+    awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/) print substr($2, 2) }' |
+    sort -t. -k1,1n -k2,2n -k3,3n |
+    tail -n 1 |
+    awk 'NF { print "v" $0 }'
+}
 
-# Kephalaion gehört zu jedem Rechner, auf dem k-playbook läuft; fehlt es, holt
-# install-kephalaion es nach. Scheitert das, endet dieser Lauf trotzdem mit 0:
-# k-playbook selbst ist installiert, und program.Install — der Weg von
-# `k-playbook upgrade` und der Oberfläche — misst den Erfolg an diesem Exit-Code.
-# Ein Fehlschlag hier meldete dort ein gescheitertes Programm-Update, das es
-# nicht gab. `k-playbook upgrade` holt Kephalaion in einem eigenen Schritt nach,
-# und k-playbook health nennt es, solange es fehlt.
-printf '\n'
-if ! "${script_dir}/install-kephalaion"; then
-  printf '\n' >&2
-  printf 'Kephalaion ist nicht installiert (siehe oben); k-playbook selbst ist es.\n' >&2
-  printf 'Nachholen: k-playbook/bin/install-kephalaion oder k-playbook upgrade\n' >&2
-fi
+# install_kephalaion installiert Kephalaion, wenn es im PATH fehlt — über das
+# install.sh aus dem neuesten Kephalaion-Release: Asset-Namen, Plattformen und
+# Prüfsumme bleiben damit Sache von Kephalaion. Ein vorhandenes Kephalaion
+# bleibt unangetastet, herabgestuft wird nie; aktualisiert wird über
+# `k-playbook upgrade`, das `kephalaion upgrade --auto` aufruft.
+#
+# Nur das Binary. node init, service install und Token gehören nicht hierher:
+# Im DevContainer kommt die config read-only vom Host, und der Node ist der des
+# Hosts.
+install_kephalaion() {
+  local found work
+  if found="$(command -v kephalaion 2>/dev/null)"; then
+    printf 'Kephalaion vorhanden: %s\n' "${found}"
+    return 0
+  fi
+
+  work="$(mktemp -d)"
+  # Erst ganz laden, dann ausführen: Bricht der Download ab, läuft kein halbes
+  # Skript, und ein Fehler beim Laden ist von einem Fehler der Installation zu
+  # unterscheiden.
+  printf 'Kephalaion fehlt; lade %s ...\n' "${kephalaion_install_url}"
+  if ! download_quiet "${work}/install.sh" "${kephalaion_install_url}"; then
+    rm -rf "${work}"
+    printf 'install.sh von Kephalaion nicht ladbar: %s\n' "${kephalaion_install_url}" >&2
+    return 1
+  fi
+  local status=0
+  sh "${work}/install.sh" </dev/null || status=$?
+  rm -rf "${work}"
+  return "${status}"
+}
+
+main() {
+  case "${1:-}" in
+    "") ;;
+    help|-h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ "${source_note}" == "off" ]]; then
+    fail "Die Release-Abfrage ist abgeschaltet (K_PLAYBOOK_RELEASE_SOURCE=off); installiert wird nichts."
+  fi
+  if [[ -n "${source_note}" ]]; then
+    printf 'Release-Quelle ersetzt über K_PLAYBOOK_RELEASE_SOURCE: %s\n' "${source_note}"
+  fi
+
+  case "$(uname -s)" in
+    Linux) os="linux" ;;
+    Darwin) os="darwin" ;;
+    *) fail "Nicht unterstütztes Betriebssystem: $(uname -s)" ;;
+  esac
+
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64" ;;
+    arm64|aarch64) arch="arm64" ;;
+    *) fail "Nicht unterstützte Architektur: $(uname -m)" ;;
+  esac
+
+  binary="k-playbook-${os}-${arch}"
+
+  # git ist Voraussetzung: Der neueste Release-Tag wird über git ls-remote
+  # gelesen. Geprüft wird vor allem anderen, damit ein Abbruch nichts angelegt,
+  # nichts geladen und nichts ersetzt hat.
+  command -v git >/dev/null 2>&1 ||
+    fail "git fehlt im PATH." \
+      "" \
+      "k-playbook wird aus dem neuesten Release installiert, und den neuesten" \
+      "Release-Tag liest diese Installation über git ls-remote. git ist deshalb" \
+      "Voraussetzung. Installiere git und rufe die Installation erneut auf:" \
+      "" \
+      "  ${install_command}"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256_of() { sha256sum "$1" | awk '{ print $1 }'; }
+  elif command -v shasum >/dev/null 2>&1; then
+    sha256_of() { shasum -a 256 "$1" | awk '{ print $1 }'; }
+  else
+    fail "Weder sha256sum noch shasum verfügbar; Download kann nicht geprüft werden."
+  fi
+
+  # Alle Downloads ohne stdin: Unter curl | bash ist stdin das Skript selbst.
+  if command -v curl >/dev/null 2>&1; then
+    download() { curl -fL --retry 2 --connect-timeout 15 --output "$1" "$2" </dev/null; }
+    download_quiet() { curl -fsSL --retry 2 --connect-timeout 15 --output "$1" "$2" </dev/null; }
+  elif command -v wget >/dev/null 2>&1; then
+    download() { wget --output-document="$1" "$2" </dev/null; }
+    download_quiet() { wget -q --output-document="$1" "$2" </dev/null; }
+  else
+    fail "Weder curl noch wget verfügbar; Release-Binary kann nicht geladen werden."
+  fi
+
+  target_dir="${HOME:?HOME ist nicht gesetzt}/.local/bin"
+  target="${target_dir}/k-playbook"
+
+  # Das Zielverzeichnis entsteht **vor** der PATH-Prüfung. Debians und Ubuntus
+  # ~/.profile nimmt ~/.local/bin nur auf, `if [ -d "$HOME/.local/bin" ]`; auf
+  # einem frischen Host oder in einem DevContainer gibt es das Verzeichnis bei
+  # der allerersten Installation noch nicht. Andersherum bewertete die Prüfung
+  # eine Lage, die eine Zeile später ohnehin aufgelöst war, und verwies auf ein
+  # Profil, das längst richtig ist.
+  target_dir_created=""
+  [[ -d "${target_dir}" ]] || target_dir_created="ja"
+  mkdir -p "${target_dir}"
+
+  # Beide Prüfungen laufen **vor** jedem Abruf: sie brauchen kein Netz, und
+  # ein Abbruch soll nichts geladen und nichts ersetzt haben. Das angelegte
+  # Zielverzeichnis bleibt dabei stehen — leer und genau dort, wo das Profil
+  # bei der nächsten Anmeldung nachsieht.
+  require_target_dir_in_path
+  foreign="$(foreign_platform_kind "${target}")"
+
+  version="$(latest_tag)" ||
+    fail "Der neueste Release-Tag ließ sich nicht lesen (git ls-remote ${repo_url})." \
+      "Ohne Netz ist das zu erwarten; installiert wurde nichts."
+  [[ -n "${version}" ]] || fail "Das Repo nennt keinen Release-Tag der Form vX.Y.Z: ${repo_url}"
+  printf 'Neuestes Release: %s\n' "${version}"
+
+  sums="$(mktemp)"
+  temporary="$(mktemp "${target_dir}/.k-playbook.XXXXXX")"
+  trap 'rm -f "${temporary}" "${sums}"' EXIT
+
+  sums_url="${raw_base_url}/${version}/SHA256SUMS"
+  download_quiet "${sums}" "${sums_url}" ||
+    fail "SHA256SUMS von ${version} nicht ladbar: ${sums_url}"
+  expected="$(awk -v name="${binary}" '$2 == name || $2 == "*" name { print $1; exit }' "${sums}")"
+  [[ -n "${expected}" ]] || fail "Keine Prüfsumme für ${binary} in SHA256SUMS von ${version} (${sums_url})"
+
+  url="${release_base_url}/${version}/${binary}"
+  printf 'Lade %s ...\n' "${url}"
+  download "${temporary}" "${url}" ||
+    fail "Das Release-Binary ließ sich nicht laden: ${url}" \
+      "Fehlt das Asset (404), ist das Release ${version} noch nicht fertig: Der Tag" \
+      "steht, bevor die Assets gebaut sind. Später erneut aufrufen. Ersetzt wurde nichts."
+
+  actual="$(sha256_of "${temporary}")"
+  if [[ "${actual}" != "${expected}" ]]; then
+    fail "Prüfsumme weicht ab für ${binary}
+  erwartet: ${expected}
+  erhalten: ${actual}
+Ersetzt wurde nichts."
+  fi
+
+  # Ein alter Symlink muss selbst ersetzt werden, nicht sein bisheriges Ziel.
+  if [[ -L "${target}" ]]; then
+    rm -f "${target}"
+  fi
+  chmod 0755 "${temporary}"
+  mv -f "${temporary}" "${target}"
+  temporary=""
+
+  # Der alte Wrapper legte seine Spiegelung und Downloads außerhalb von bin/ ab.
+  # Security-Tool-venvs liegen ebenfalls unter ~/.local/share/k-playbook und
+  # bleiben deshalb ausdrücklich außerhalb dieser Bereinigung.
+  rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook"
+
+  printf 'Installiert: %s (%s, sha256 %s)\n' "${target}" "${version}" "${actual}"
+
+  # Host und DevContainer, die sich dasselbe $HOME teilen, überschreiben
+  # einander an dieser Datei. Das ist kein Fehler dieses Laufs — hier steht
+  # jetzt das richtige Binary —, aber die andere Umgebung ist damit lahmgelegt
+  # und muss dieselbe Installation noch einmal ausführen. Deshalb wird das
+  # Ersetzen genannt und nicht stillschweigend getan. Genannt wird dieses
+  # Skript, nicht `k-playbook upgrade`: Das Binary dort lässt sich nicht mehr
+  # ausführen.
+  #
+  # Die Grenze dieser Erkennung: sie sitzt hier und in `k-playbook upgrade`
+  # (release.Install). Ruft jemand ~/.local/bin/k-playbook direkt auf, während
+  # dort ein plattformfremdes Binary liegt, fängt das niemand ab — der Aufruf
+  # endet mit der Meldung der Shell ("cannot execute binary file").
+  if [[ -n "${foreign}" ]]; then
+    printf '\n'
+    printf 'Ersetzt wurde ein %s-Binary — offenbar teilen sich Host und Container\n' "${foreign}"
+    printf 'dasselbe HOME (%s).\n' "${HOME}"
+    printf 'In der anderen Umgebung ist k-playbook damit bis auf Weiteres tot; dort\n'
+    printf 'erneut installieren:\n\n'
+    printf '  %s\n' "${install_command}"
+  fi
+
+  # Kephalaion gehört zu jedem Rechner, auf dem k-playbook läuft; fehlt es,
+  # wird es hier nachgeholt. Scheitert das, endet dieser Lauf trotzdem mit 0:
+  # k-playbook selbst ist installiert, und Binaries von vor Task 149 messen
+  # den Erfolg ihres Programm-Updates an diesem Exit-Code. Ein Fehlschlag hier
+  # meldete dort ein gescheitertes Programm-Update, das es nicht gab.
+  # `k-playbook upgrade` holt Kephalaion in einem eigenen Schritt nach, und
+  # k-playbook health nennt es, solange es fehlt.
+  printf '\n'
+  if ! install_kephalaion; then
+    printf '\n' >&2
+    printf 'Kephalaion ist nicht installiert (siehe oben); k-playbook selbst ist es.\n' >&2
+    printf 'Nachholen: k-playbook upgrade\n' >&2
+  fi
+}
+
+main "$@"

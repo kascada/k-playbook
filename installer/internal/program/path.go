@@ -68,6 +68,10 @@ func sameFile(a string, b string) bool {
 
 // Hint ist der Hinweis, der statt des Knopfes erscheint. Er nennt beide Pfade
 // und den Weg im Terminal. Leer, wenn der PATH stimmt.
+//
+// Der Weg im Terminal ist die Erstinstallation (project.FirstInstallCommand),
+// nicht `k-playbook upgrade`: upgrade prüft denselben PATH und lehnte aus
+// demselben Grund ab.
 func (c PathCheck) Hint() string {
 	if c.OK {
 		return ""
@@ -78,10 +82,10 @@ func (c PathCheck) Hint() string {
 	}
 	if c.Found == "" {
 		return fmt.Sprintf("Programm nicht aktualisierbar: %s ist im PATH nicht zu finden, installiert wird aber nach %s. "+
-			"Ein neues Programm dort startete der nächste Aufruf nicht. %s in den PATH aufnehmen, dann im Terminal: %s.",
-			project.InstalledCommandName, target, filepath.Dir(target), project.BootstrapHint)
+			"Ein neues Programm dort startete der nächste Aufruf nicht. %s in den PATH aufnehmen, dann im Terminal: %s",
+			project.InstalledCommandName, target, filepath.Dir(target), project.FirstInstallCommand)
 	}
 	return fmt.Sprintf("Programm nicht aktualisierbar: %s im PATH ist %s, installiert wird aber nach %s. "+
-		"Ein neues Programm dort startete der nächste Aufruf nicht. Die andere Datei entfernen oder %s im PATH nach vorn stellen, dann im Terminal: %s.",
-		project.InstalledCommandName, c.Found, target, filepath.Dir(target), project.BootstrapHint)
+		"Ein neues Programm dort startete der nächste Aufruf nicht. Die andere Datei entfernen oder %s im PATH nach vorn stellen, dann im Terminal: %s",
+		project.InstalledCommandName, c.Found, target, filepath.Dir(target), project.FirstInstallCommand)
 }

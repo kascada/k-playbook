@@ -26,16 +26,6 @@ const ConfigFileName = "K-PLAYBOOK.yaml"
 // fest; wie das Projektverzeichnis selbst heißt, spielt keine Rolle.
 const PlaybookDirName = "k-playbook"
 
-// VersionFileName koppelt einen Clone-Stand an ein Binary. Die Datei liegt im
-// Wurzelverzeichnis der Installation und nennt den Release-Tag, dessen Assets
-// zu diesem Stand gehören. Content-Commits ändern sie nicht.
-const VersionFileName = "VERSION"
-
-// SumsFileName trägt die Prüfsummen der Release-Assets. Sie liegt versioniert
-// im Repo, damit die erwartete Summe über den Git-Remote kommt und nicht über
-// dieselbe HTTPS-Quelle wie das Binary.
-const SumsFileName = "SHA256SUMS"
-
 // ErrNotFound meldet, dass oberhalb des Startverzeichnisses keine Installation liegt.
 var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 

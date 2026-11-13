@@ -1,6 +1,8 @@
 package webui
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -20,9 +22,9 @@ type updateResponse struct {
 	// geändert hat.
 	Links   project.LinkChanges `json:"links"`
 	Message string              `json:"message"`
-	// Program vergleicht das laufende Programm mit der VERSION des Clones.
-	// Die Angabe hängt nicht am Remote: sie steht auch dann da, wenn
-	// ls-remote scheitert.
+	// Program vergleicht das laufende Programm mit dem neuesten Release-Tag.
+	// Die Angabe hängt nicht am Clone und nicht an dessen Remote: sie steht
+	// auch dann da, wenn es keinen Clone gibt oder dessen ls-remote scheitert.
 	Program *programStatus `json:"program,omitempty"`
 
 	// Die Felder darunter trägt nur die Antwort auf einen POST, der
@@ -37,40 +39,41 @@ type updateResponse struct {
 	// InstallFailed: Installation oder Neustart sind gescheitert, dieser
 	// Dienst läuft weiter. Message nennt Fehler und Befehl zum Nachholen.
 	InstallFailed bool `json:"installFailed,omitempty"`
-	// InstallOutput ist die Ausgabe von bin/install, sofern es lief, und bei
-	// einem gescheiterten Start das Log des neuen Dienstes.
+	// InstallOutput nennt, was die Installation geladen und geprüft hat, und
+	// bei einem gescheiterten Start das Log des neuen Dienstes.
 	InstallOutput string `json:"installOutput,omitempty"`
 	// Busy: es laufen Befehle oder Chats, und der Aufruf trug keine
 	// Bestätigung. Message ist die Rückfrage.
 	Busy bool `json:"busy,omitempty"`
 }
 
-// programStatus ist der Vergleich des laufenden Programms mit dem Clone. Die
-// Prüfung liegt in program.CheckStatus, weil `k-playbook upgrade` dieselbe
-// braucht; hier bleibt der Name, den die Seite kennt.
+// programStatus ist der Vergleich des laufenden Programms mit dem neuesten
+// Release-Tag. Die Prüfung liegt in program.CheckStatus, weil
+// `k-playbook upgrade` dieselbe braucht; hier bleibt der Name, den die Seite
+// kennt.
 type programStatus = program.Status
 
-// checkProgram vergleicht die Version dieses Dienstes mit der VERSION des
-// Clones — die gemeinsame Prüfung für GET /api/update, den Versionswechsel im
-// POST und POST /api/update/program. Nur „älter" meldet; Begründung bei
-// program.CheckStatus.
-func checkProgram(running string, playbookDir string) *programStatus {
-	return program.CheckStatus(running, playbookDir)
+// checkProgram vergleicht die Version dieses Dienstes mit dem neuesten
+// Release-Tag — die gemeinsame Prüfung für GET /api/update, POST /api/update
+// und POST /api/update/program. Nur „älter" meldet; Begründung bei
+// program.CheckStatus. Ohne eigene Version fragt sie nichts ab.
+func checkProgram(ctx context.Context, running string) *programStatus {
+	return program.CheckStatus(ctx, running)
 }
 
-// updateCheckHandler prüft den Remote-Stand und das laufende Programm. Rein
-// lesend: heruntergeladen wird hier nie etwas.
+// updateCheckHandler prüft den Remote-Stand des Clones und das laufende
+// Programm. Rein lesend: heruntergeladen wird hier nie etwas.
 //
 // Beides steht nebeneinander in der Antwort. Trifft beides zu, hat das ältere
-// Programm Vorrang in der Oberfläche, denn ein Pull allein hilft dann nicht —
-// der Clone ist schon weiter als das Programm, das ihn bedient.
+// Programm Vorrang in der Oberfläche: Der Knopf installiert dann das neueste
+// Release, und der Pull dient nur noch den Inhalten des Clones.
 func (state *serverState) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, updateResponse{})
 		return
 	}
-	programState := checkProgram(state.version, environment.PlaybookDir)
+	programState := checkProgram(r.Context(), state.version)
 
 	status, err := project.CheckUpdate(environment.ProjectDir)
 	if err != nil {
@@ -91,13 +94,32 @@ func (state *serverState) updateCheckHandler(w http.ResponseWriter, r *http.Requ
 // läuft.
 const updateBusyMessage = "Aktualisierung läuft bereits."
 
-// applyUpdateHandler holt den neuen Stand.
+// updatePull und updateRepairMCP sind austauschbar, damit die Abfolge nach
+// einem gescheiterten Pull ohne Clone und ohne Netz prüfbar ist.
+var (
+	updatePull      = project.Update
+	updateRepairMCP = project.RepairMCPReport
+)
+
+// applyUpdateHandler holt den neuen Stand des Clones und prüft danach das
+// Programm.
 //
-// Bewegt der Pull die VERSION und ist das laufende Programm älter als die
-// neue, installiert der Dienst das passende Programm über den Bootstrap des
-// Clones und startet daraus neu — derselbe Ablauf wie
-// POST /api/update/program. Ist das laufende Programm gleich alt oder neuer,
-// läuft er weiter wie bei einem Update ohne Versionswechsel.
+// Der Pull dient nur noch den Inhalten des Clones; über Version und
+// Installation des Programms entscheidet er nicht. Deshalb kehrt der Handler
+// nach einem gescheiterten Pull nicht zurück, bevor zwei Dinge erledigt sind:
+//
+//   - die MCP-Registrierung: veraltete Einträge werden korrigiert
+//     (MCPWriteOutdatedOnly), ob der Pull gelang oder nicht — sie liegt im
+//     Hauptverzeichnis und hängt nicht am Clone;
+//   - das Programm: Ist das laufende älter als der neueste Release-Tag,
+//     installiert der Dienst das Release-Binary und startet daraus neu —
+//     derselbe Ablauf wie POST /api/update/program. Knopf und Neustart hängen
+//     am Tag, nicht daran, ob der Pull etwas bewegt hat. Ist das laufende
+//     Programm gleich alt oder neuer, läuft der Dienst weiter.
+//
+// Ein gescheiterter Pull wird weiter gemeldet, mit 409 wie bisher — außer der
+// Dienst hat neu gestartet: dann muss die Seite der neuen Adresse folgen, und
+// die Meldung nennt den Pull trotzdem.
 //
 // Zeigt der PATH auf ein anderes Programm, bleibt es beim Pull: der Dienst
 // läuft weiter, und die Antwort trägt den Hinweis statt eines Neustarts. Laufen
@@ -117,72 +139,63 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 	}
 	defer state.updateMu.Unlock()
 
-	result, err := project.Update(environment.ProjectDir)
-	if err != nil {
-		writeJSON(w, http.StatusConflict, updateResponse{
-			Output:  result.Output,
-			Message: err.Error(),
-		})
-		return
+	var result project.UpdateResult
+	var pullErr error
+	if environment.PlaybookPresent {
+		result, pullErr = updatePull(environment.ProjectDir)
+	} else {
+		pullErr = errors.New("Die Installation " + project.PlaybookDirName + "/ fehlt; der Pull entfällt")
 	}
-
-	response := updateResponse{
-		Output:  result.Output,
-		Message: "Aktualisiert.",
+	response := updateResponse{Output: result.Output, Message: "Aktualisiert."}
+	status := http.StatusOK
+	if pullErr != nil {
+		response.Message = strings.TrimSuffix(pullErr.Error(), ".") + "."
+		status = http.StatusConflict
 	}
-	if note := describeMCPRepair(result); note != "" {
+	if note := describeMCPRepair(updateRepairMCP(environment.ProjectDir, project.MCPWriteOutdatedOnly)); note != "" {
 		response.Message += " " + note
 	}
-	response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
+	if pullErr == nil {
+		response.Links, response.Message = relinkAfterUpdate(environment.ProjectDir, response.Message)
 
-	// Nach dem Pull erneut prüfen, damit Button und Karte den neuen Zustand
-	// zeigen. Der Pull selbst kann den lokalen Zustand verändert haben.
-	if status, err := project.CheckUpdate(environment.ProjectDir); err == nil {
-		response.Available = status.Available
-		response.Branch = status.Branch
-		response.Local = shortCommit(status.Local)
-		response.Remote = shortCommit(status.Remote)
+		// Nach dem Pull erneut prüfen, damit Button und Karte den neuen Zustand
+		// zeigen. Der Pull selbst kann den lokalen Zustand verändert haben.
+		if update, err := project.CheckUpdate(environment.ProjectDir); err == nil {
+			response.Available = update.Available
+			response.Branch = update.Branch
+			response.Local = shortCommit(update.Local)
+			response.Remote = shortCommit(update.Remote)
+		}
 	}
-	response.Program = checkProgram(state.version, environment.PlaybookDir)
+	response.Program = checkProgram(r.Context(), state.version)
 
-	if !restartAfterPull(state.version, result) {
-		writeJSON(w, http.StatusOK, response)
+	if !response.Program.Outdated {
+		writeJSON(w, status, response)
 		return
 	}
+	newer := fmt.Sprintf(" Das laufende Programm (%s) ist älter als das neueste Release (%s).",
+		displayVersion(response.Program.Running), displayVersion(response.Program.Latest))
 	if !response.Program.Installable {
-		response.Message += " Zum neuen Stand gehört ein neueres Programm. " + response.Program.Hint
-		writeJSON(w, http.StatusOK, response)
+		response.Message += newer + " " + response.Program.Hint
+		writeJSON(w, status, response)
 		return
 	}
 	if activity := state.activeWork(); activity != "" && !confirmed(r) {
-		response.Message += " Zum neuen Stand gehört ein neueres Programm. " + activity +
+		response.Message += newer + " " + activity +
 			" Deshalb startet der Dienst jetzt nicht neu; „Programm aktualisieren“ holt das nach."
-		writeJSON(w, http.StatusOK, response)
+		writeJSON(w, status, response)
 		return
 	}
 
-	outcome := state.installAndRestart(environment.ProjectDir)
+	outcome := state.installAndRestart(response.Program.Latest)
 	outcome.applyTo(&response)
-	writeJSON(w, http.StatusOK, response)
 	if outcome.Restarted {
+		// Die Seite folgt der neuen Adresse; ein 409 hielte sie davon ab.
+		writeJSON(w, http.StatusOK, response)
 		state.shutdownAfterResponse()
+		return
 	}
-}
-
-// restartAfterPull meldet, ob nach dem Pull installiert und neu gestartet
-// wird: die VERSION hat gewechselt, und das laufende Programm ist älter als
-// die neue.
-//
-// Beide Bedingungen werden gebraucht. Ohne Versionswechsel verhält sich ein
-// Update wie immer — Pull, Verlinkung, der Dienst läuft weiter. Und nur
-// „älter" löst aus, nie „ungleich": im Entwicklungsrepo ist das Programm
-// regelmäßig neuer als der Clone, weil `make dev-install` es gebaut hat,
-// während der Clone noch dem zuletzt gepushten Commit folgt. Holt er ihn
-// nach, wechselt dort die VERSION; ein Vergleich auf Ungleichheit stufte das
-// Programm dann herab. Fehlt eine Angabe oder ist sie nicht lesbar, wird
-// nichts verlangt.
-func restartAfterPull(running string, result project.UpdateResult) bool {
-	return result.VersionChanged && program.Compare(running, result.Version) == program.Older
+	writeJSON(w, status, response)
 }
 
 // relinkAfterUpdate zieht die Assistenten-Einrichtung auf den neuen Stand nach
@@ -240,22 +253,25 @@ func relinkAfterUpdate(projectDir string, message string) (project.LinkChanges, 
 // schreibt in einer erfassten Datei — oder bei unbeantworteter Tracking-Frage —
 // den bloßen Kommandonamen. Dann gilt derselbe Hinweis wie beim Start: ein aus
 // Dock oder Finder gestarteter Client findet den Namen nicht. Er hängt wie dort
-// an der geschriebenen Form (UpdateResult.MCPRepairedPortable). Ohne ihn läse
+// an der geschriebenen Form (MCPRepairReport.Portable). Ohne ihn läse
 // „auf das installierte k-playbook korrigiert" sich wie ein absoluter Pfad.
-func describeMCPRepair(result project.UpdateResult) string {
+//
+// Repariert wird nach dem Pull, auch wenn er gescheitert ist
+// (applyUpdateHandler): die Reparatur hängt nicht mehr am Pull.
+func describeMCPRepair(repair project.MCPRepairReport) string {
 	parts := []string{}
-	if len(result.MCPRepaired) > 0 {
+	if len(repair.Repaired) > 0 {
 		parts = append(parts, "MCP-Registrierung auf das installierte k-playbook korrigiert: "+
-			strings.Join(result.MCPRepaired, ", ")+".")
+			strings.Join(repair.Repaired, ", ")+".")
 	}
-	if len(result.MCPRepairedPortable) > 0 {
-		parts = append(parts, "In "+strings.Join(result.MCPRepairedPortable, ", ")+
+	if len(repair.Portable) > 0 {
+		parts = append(parts, "In "+strings.Join(repair.Portable, ", ")+
 			" steht jetzt der bloße Name "+project.InstalledCommandName+
 			", weil die Datei von git erfasst ist oder sich das nicht klären ließ. "+
 			"Ein aus Dock oder Finder gestarteter Client findet ihn nicht und braucht den absoluten Pfad, von Hand eingetragen.")
 	}
-	if result.Message != "" {
-		parts = append(parts, result.Message)
+	if repair.Message != "" {
+		parts = append(parts, repair.Message)
 	}
 	return strings.Join(parts, " ")
 }

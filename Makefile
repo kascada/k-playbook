@@ -225,10 +225,19 @@ vscode-vsix: ## Baut die VSIX der VS-Code-Erweiterung neu (braucht Node)
 #   ... CI baut, prüft gegen SHA256SUMS und lädt die Assets hoch ...
 #   make release-publish VERSION=v0.1.0   bringt denselben Commit auf main
 #
-# Andersherum zeigte VERSION eine Zeit lang auf einen Tag ohne Downloads, und
-# jede Installation, die in diesem Fenster aktualisiert, startet nicht mehr.
-# Einen Versions-Fallback gibt es dafür nicht: bin/install lädt genau das
-# Asset, das VERSION nennt, oder gar keins.
+# Andersherum zeigte VERSION auf main eine Zeit lang auf einen Tag ohne
+# Downloads. Für Binaries von vor Task 149 ist das weiter der Schutz: Sie
+# installieren erst, wenn VERSION im Clone wechselt, und prüfen danach gegen
+# VERSION und SHA256SUMS des Clones.
+#
+# Neuere Programme und bin/install selbst schützt die Reihenfolge nicht mehr:
+# Sie lesen nicht VERSION, sondern den neuesten Tag (git ls-remote), und der
+# steht schon nach dem ersten Schritt. In dem Fenster, bis CI die Assets
+# hochgeladen hat, warnt die Umgebungsprüfung bereits, und k-playbook upgrade
+# wie bin/install melden, dass das Release noch nicht fertig ist; ersetzt wird
+# dann nichts. Scheitert CI, bleibt das so, bis der Tag entfernt ist oder ein
+# Nachfolger erschienen ist. Einen Versions-Fallback gibt es dafür nicht:
+# geladen wird das Asset des neuesten Tags oder gar keins.
 #
 # Gefragt wird in installer/, nicht hier: `go env GOVERSION` beantwortet die
 # Frage modulabhängig. Im Wurzelverzeichnis gibt es keine go.mod, dort nennt es

@@ -25,11 +25,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release"
 	"github.com/kascada/k-playbook/installer/internal/vscodeext"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
@@ -168,16 +170,39 @@ func run(args []string) error {
 	}
 }
 
+// Für Tests austauschbar: wohin der Hinweis auf --all geht (stderr) und ob
+// stdout ein Terminal ist.
+var (
+	versionHintOut          io.Writer = os.Stderr
+	versionStdoutIsTerminal           = func() bool {
+		info, err := os.Stdout.Stat()
+		return err == nil && info.Mode()&os.ModeCharDevice != 0
+	}
+)
+
+// versionAllHint ist der Hinweis von `version` auf `version --all`.
+const versionAllHint = "Hinweis: k-playbook version --all nennt zusätzlich die mitgereiste VS-Code-Erweiterung und das neueste Release."
+
 // runVersion gibt die gestempelte Version aus, eine Zeile, sonst nichts. Ein
 // Programm ohne Version — ein Ad-hoc-`go build` ohne Build-Flags — endet mit
 // Fehler und leerer Standardausgabe: eine erfundene Angabe wäre schlechter als
 // keine, denn der Leser vergleicht sie.
 //
 // `version --all` nennt zusätzlich die Version der mitgereisten
-// VS-Code-Erweiterung. Nur hinter dem Schalter: `program.ReadVersion` führt
-// `<datei> version` aus und verwirft die Antwort, sobald sie mehr als eine
-// Zeile trägt — mit einer zweiten Zeile am Standardweg erkennt kein Aufruf
-// mehr einen Programmwechsel.
+// VS-Code-Erweiterung und den neuesten Release-Tag auf GitHub. Nur hinter dem
+// Schalter: `program.ReadVersion` führt `<datei> version` aus und verwirft die
+// Antwort, sobald sie mehr als eine Zeile trägt — mit einer zweiten Zeile am
+// Standardweg erkennt kein Aufruf mehr einen Programmwechsel. Aus demselben
+// Grund ruft `version` ohne Schalter den Tag nicht ab: kein Netzaufruf, auch
+// nicht ohne Netz ein Warten.
+//
+// Auf `--all` weist `version` selbst hin — nur auf stderr und nur, wenn stdout
+// ein Terminal ist: Wer die Ausgabe liest oder umleitet (ReadVersion, ein
+// Skript), bekommt genau die eine Zeile.
+//
+// Ist der neueste Tag unbekannt (ohne Netz, ohne git, Zeitüberschreitung),
+// steht dort „unbekannt“ mit dem Grund; der Exit-Code ändert sich dadurch
+// nicht. Eine über K_PLAYBOOK_RELEASE_SOURCE ersetzte Quelle wird genannt.
 func runVersion(out io.Writer, args []string) error {
 	all := false
 	switch {
@@ -196,6 +221,9 @@ func runVersion(out io.Writer, args []string) error {
 		return err
 	}
 	if !all {
+		if versionStdoutIsTerminal() {
+			fmt.Fprintln(versionHintOut, versionAllHint)
+		}
 		return nil
 	}
 
@@ -207,6 +235,19 @@ func runVersion(out io.Writer, args []string) error {
 		_, err = fmt.Fprintf(out, "Erweiterung: keine — %s\n", vscodeext.NoVSIX)
 	default:
 		_, err = fmt.Fprintf(out, "Erweiterung: %s\n", extension)
+	}
+	if err != nil {
+		return err
+	}
+
+	latest, tagErr := release.LatestTag(context.Background())
+	switch note := release.CurrentSource().Note(); {
+	case tagErr != nil:
+		_, err = fmt.Fprintf(out, "Neuestes Release: unbekannt — %s\n", strings.TrimSuffix(tagErr.Error(), "."))
+	case note != "":
+		_, err = fmt.Fprintf(out, "Neuestes Release: %s (%s)\n", latest, note)
+	default:
+		_, err = fmt.Fprintf(out, "Neuestes Release: %s\n", latest)
 	}
 	return err
 }
@@ -300,7 +341,8 @@ Unterkommandos:
             MCP-Werkzeug k_playbook_briefing.
   health    Nennt Fehler und Warnungen über die Umgebung des Projekts:
             k-playbook health [--json]. Je Eintrag Stufe (error, warning),
-            Bereich (kephalaion, gh, baseTools, versionSources, github), ein
+            Bereich (kephalaion, gh, baseTools, versionSources, github,
+            program), ein
             Satz und die Abhilfe; alle auf einmal, nichts wird repariert
             oder angelegt, kein Token oder Wert steht darin. Ohne Problem die eine Zeile
             „Umgebung: keine Probleme“ — derselbe Block wie im Briefing.
@@ -344,12 +386,14 @@ Unterkommandos:
             Ausschlüsse für den Code-Scan in docs.exclude von K-PLAYBOOK.yaml
             ein. Dasselbe wie die MCP-Werkzeuge k_playbook_docs_checkout,
             _publish und _exclude_add.
-  upgrade   Aktualisiert das Programm und zieht das Projekt nach:
-            k-playbook upgrade [--check] [--json]. Erst git pull im Clone
-            und das Binary über k-playbook/bin/install, nur wenn das laufende
-            Programm älter ist als der Clone; dann Kephalaion, wenn es im
-            PATH fehlt (k-playbook/bin/install-kephalaion); dann AGENTS.md
-            (Anstoß, abgelöste Blöcke), CLAUDE.md, Verlinkung und
+  upgrade   Aktualisiert Kephalaion und das Programm und zieht das Projekt
+            nach: k-playbook upgrade [--check] [--json]. Zuerst Kephalaion
+            (kephalaion upgrade --auto; fehlt es im PATH, wird es
+            installiert); dann git pull im Clone, solange es ihn gibt, und
+            das Release-Binary des neuesten Tags direkt von GitHub, geprüft
+            gegen die SHA256SUMS des Tags — nur wenn das laufende Programm
+            älter ist als der neueste Release-Tag, auch ohne Clone; dann
+            AGENTS.md (Anstoß, abgelöste Blöcke), CLAUDE.md, Verlinkung und
             MCP-Einträge. Je
             Schritt eine Meldung, am Ende der Hinweis auf den Neustart der
             Sitzung, wenn das Binary gewechselt hat. --check schreibt nichts
@@ -360,8 +404,10 @@ Unterkommandos:
             installiert und nachgezogen; dieses Kommando ist der
             ausdrückliche Weg für den, der die Oberfläche nie startet.
   version   Gibt die Version dieses Programms aus, eine Zeile, sonst nichts.
-            Ohne gestempelte Version endet es mit Fehler. Mit --all steht
-            darunter die Version der mitgereisten VS-Code-Erweiterung.
+            Ohne gestempelte Version endet es mit Fehler. Mit --all stehen
+            darunter die Version der mitgereisten VS-Code-Erweiterung und der
+            neueste Release-Tag auf GitHub (ohne Netz: unbekannt, mit Grund);
+            im Terminal weist version auf stderr auf --all hin.
   gui       Auskunft über die Oberfläche dieses Projekts, ohne sie anzufassen:
             k-playbook gui status. Die Antwort ist JSON mit "state" (none,
             running, otherVersion, orphaned, unresponsive) und dazu, soweit

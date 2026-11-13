@@ -48,32 +48,53 @@ ohne Browser, die Ausgaben gehen ins Log.
 
 `upgrade` ist der eine Nachzug im Terminal, das Gegenstück zu /k-upgrade
 (`cmd/k-playbook/upgrade.go`): zuerst Kephalaion (Absatz „Kephalaion“ unter
-„Direktinstallation“), dann das Programm — `project.Update()` im Clone, danach
-`program.Install()`, aber nur, wenn das laufende Programm älter ist als die `VERSION` des
-Clones (`program.CheckStatus()`, dieselbe Regel wie `restartAfterPull()`; im
-Entwicklungsrepo ist das Programm regelmäßig neuer, und herabgestuft wird nie) —, dann
-das Projekt: zuerst der Umzug der Anbindung aus einer alten
+„Direktinstallation“), dann das Programm, dann das Projekt.
+
+Der Programmschritt hat zwei Teile, in dieser Reihenfolge. Erst `project.Update()`, der
+Pull im Clone, solange es ihn gibt: Er dient nur noch den Inhalten, die am Clone hängen, und
+entscheidet nicht mehr über Version und Installation. Dann der Vergleich der eigenen
+Version mit dem neuesten Release-Tag auf GitHub (`program.CheckStatus()`, Abschnitt „Version
+und Installation aus dem Release“) und — nur wenn das laufende Programm älter ist —
+`program.Install()`: das Release-Binary dieses Tags, geprüft gegen die `SHA256SUMS` des
+Tags. Ein Build über dem neuesten Tag (`make dev-install VERSION=…`) gilt als aktuell, und
+herabgestuft wird nie. Vergleich und Installation laufen, ob es den Clone gibt oder nicht
+und ob der Pull gelingt oder nicht; ein fehlender Clone und ein gescheiterter Pull werden
+gemeldet. Ohne eigene Version wird der Tag nicht abgerufen; ist er unbekannt — ohne Netz,
+ohne git, Zeitüberschreitung —, sagt die Meldung das, und das Projekt wird trotzdem
+nachgezogen.
+
+Der Projektschritt: zuerst der Umzug der Anbindung aus einer alten
 `k-playbook-local/K-PLAYBOOK.local.yaml` in den Block `kephalaion:` von `K-PLAYBOOK.yaml`
 (`project.MigrateKephalaionBinding()`, Abschnitt „Altbestand `K-PLAYBOOK.local.yaml`“), dann
-`ApplyAssistantSetup()`. Hat der Bootstrap das Binary ersetzt, führt
+`ApplyAssistantSetup()`, dann immer die MCP-Einträge: `project.RepairMCPReport()` mit der
+Schreibregel des Starts (`MCPWriteOutdatedAndUnversioned`), auch unter `--project-only`.
+Die Reparatur hängt nicht mehr am Pull — `project.Update()` repariert nicht selbst. Das
+ist gewollt mehr als früher nach einem gelungenen Pull, der nur veraltete Einträge
+ersetzte: Ein Lauf ergänzt auch einen fehlenden Eintrag bzw. eine fehlende Datei, wenn die
+Zieldatei nicht von git erfasst ist. Hat die Installation das Binary ersetzt, führt
 nicht der noch laufende alte Prozess den Projektschritt aus — er hätte alte Vorlagen und
 alte Erkennung —, sondern er startet das neu installierte Programm mit
 `upgrade --project-only` als Subprozess (`reexecProjectStep()`); im Klartext gehen dessen
 Zeilen direkt durch, mit `--json` wird seine Antwort als `project` eingebettet, so wie sie
-kam. Die MCP-Einträge korrigiert der Pull (`UpdateResult.MCPRepaired`); nur wenn der Pull
-entfiel — kein Clone, kein Git, kein Netz —, läuft `RepairMCP()` mit der Schreibregel des
-Starts. Ob der Pull entfiel, weiß nur der alte Prozess; er gibt es dem Subprozess als
-`--repair-mcp` mit, damit das neue Programm dieselbe Regel anwendet. Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
-Abbruchs, ein gescheiterter Download oder Install eine eigene; am Ende, wenn das Binary
+kam. Den Schalter `--repair-mcp` nimmt `--project-only` weiter an, er entscheidet aber
+nichts mehr: Ein Binary von vor Task 149 gab damit mit, dass sein Pull entfiel, und startet
+das neu installierte Programm noch so.
+
+Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
+Abbruchs, ein gescheiterter Download oder Install eine eigene — mit der Erstinstallation
+(`curl … | bash`, `project.FirstInstallCommand`) als Weg im Terminal, denn `upgrade` selbst
+ist dann gescheitert; am Ende, wenn das Binary
 gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
 behält das alte Programm, und ein eigener, wenn Kephalaion aktualisiert oder sein Node neu
-gestartet wurde. Hat der Pull die `VERSION` bewegt (`program.versionChanged`) oder das Binary
-gewechselt, sagt die letzte Zeile, dass /k-upgrade in einer (bei Neustart: neuen) Sitzung die
-Umstellungen nachzieht — `--check` gibt dafür eine Vorschauzeile aus, `--project-only` nichts —,
+gestartet wurde. Hat der Lauf das Binary
+gewechselt, sagt die letzte Zeile, dass /k-upgrade in einer neuen Sitzung die
+Umstellungen nachzieht — der Hinweis hängt allein am Binärwechsel; `--check` gibt dafür eine
+Vorschauzeile aus, wenn das Programm älter als der neueste Tag und installierbar ist oder der
+Clone hinter seinem Remote liegt, `--project-only` nichts —,
 außer `K_PLAYBOOK_VIA_COMMAND=1` ist gesetzt (gelesen allein in `upgradeViaCommand`), wie es
 Hülle und Ersatzaufruf von /k-upgrade tun: eine Variable statt eines Schalters, weil ein altes
 Binary einen unbekannten Schalter abwiese und die Einbettung scheitern ließe. `--check` schreibt nichts: `kephalaion upgrade --check --json` für
-Kephalaion (nie `--auto`), `CheckUpdate()` und
+Kephalaion (nie `--auto`), `CheckUpdate()` für den Clone und
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
 `PendingLinkChanges()`, `CheckMCP()` und `MigrateKephalaionBinding()` mit `check` für das,
 was ein Lauf am Projekt täte — kein
@@ -1368,7 +1389,7 @@ Drei Einstiege, wie bei MCP:
 
 | Weg | Einstieg | Tut |
 |---|---|---|
-| ausdrücklich | `ApplyRootInstructions()`, Einrichten und Clone-Update über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Zusatzblöcke entfernen, `opencode.json` registrieren |
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten, „Aktualisieren“ nach gelungenem Pull und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Zusatzblöcke entfernen, `opencode.json` registrieren |
 | ausdrücklich, im Terminal | `k-playbook upgrade` (`cmd/k-playbook/upgrade.go`), über `ApplyAssistantSetup()` | dasselbe, nach dem Programm-Update; `--check` meldet aus `CheckRootInstructions()`, was ein Lauf täte |
 | selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen, Zusatzblöcke entfernen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
 
@@ -1531,28 +1552,93 @@ ist keine Sicherheitsgrenze gegen den Besitzer des Verzeichnisses, sondern eine 
 Barriere gegen versehentliche Schreibwerkzeuge: in `k-playbook/` wird nur noch in
 gezielten Wartungswegen geschrieben.
 
-### Der Versionswechsel beim Update
+### Version und Installation aus dem Release
 
-Vor und nach dem Pull wird `VERSION` gelesen. `BinaryChanged` meldet, ob sie gewechselt
-hat — **nur dann** gehört zum neuen Stand ein anderes Binary, und nur dann bringt ein
-Neustart eine andere Programmversion. Unter Linux behält der laufende Prozess ohnehin
-seinen Inode und arbeitet mit dem alten Code weiter.
+Es gibt genau zwei Versionsquellen: die eigene Version im Binary (`buildinfo.Version`) und
+den neuesten Release-Tag auf GitHub. Jeder Vergleich und jede Installation des Programms
+geht von diesen beiden aus (Task 149). Der Clone `<projekt>/k-playbook/` spielt dabei keine
+Rolle mehr: Kein Vergleich und keine Installation liest seine `VERSION`, seine
+`SHA256SUMS` oder ruft sein `bin/install` auf. Der Pull im Clone bleibt vorerst für die
+Inhalte, die noch an ihm hängen; über Version und Installation entscheidet er nicht.
 
-Früher wurden dafür die Dateien unter `dist/` gehasht. Seit die Binaries Release-Assets
-sind, liegt im Clone keins mehr, das sich vergleichen ließe; `VERSION` ist an diese
-Stelle getreten und trennt zugleich sauber: Commits an Anweisungen, Reviews, Commands oder
-Docs ändern sie nicht.
+Die zweite Quelle kennt das Blattpaket `internal/release` — gelesen wird über HTTPS und
+anonym, weil das Repo öffentlich ist und kein Nutzer einen Schlüssel brauchen soll; das ist
+eine bewusste Ausnahme von der Regel, Netzbefehle von git über `k-playbook github run` zu
+führen:
 
-Hat `VERSION` gewechselt und ist das laufende Programm **älter** als die neue, installiert
-der Dienst das passende Programm und startet sich daraus neu (siehe
+| Funktion | Quelle | Was |
+|---|---|---|
+| `LatestTag()` | `git ls-remote --tags --refs https://github.com/kascada/k-playbook.git 'v*'` | der höchste Tag der Form `vX.Y.Z` (ohne Zusatz), verglichen nach `version.Compare()`; Frist `TagTimeout` (3 s) |
+| `Checksums()` | `https://raw.githubusercontent.com/kascada/k-playbook/<tag>/SHA256SUMS` | die committete Prüfsummendatei des Tags |
+| `Install()` | `https://github.com/kascada/k-playbook/releases/download/<tag>/<asset>` | das Release-Binary dieser Plattform |
+
+Die Prüfsummen bleiben committet und kommen je Tag aus dem Repo, nicht als Release-Asset:
+erwartete Summe über den Git-Stand, Binary über das Release — ein ausgetauschtes Asset
+fällt auf. `Install()` hat die Reihenfolge von `bin/install` übernommen: Zielverzeichnis
+anlegen, PATH prüfen (`DirInPath()`), Prüfsumme des Tags lesen — alles vor dem Download —,
+dann Download in eine temporäre Datei neben dem Ziel, Prüfsumme, `chmod 0755`, Umbenennen
+auf das Ziel. Atomar; ein Symlink am Ziel wird selbst ersetzt, nicht sein bisheriges Ziel;
+ein plattformfremdes Binary am Ziel wird an den Magic-Bytes erkannt und genannt
+(`Installed.ForeignNote()`). Fehlt das Asset (404), sagt `AssetMissingError`, dass das
+Release noch nicht fertig ist, und nichts wird ersetzt.
+
+`version.Compare()` und `Order` liegen im Blattpaket `internal/version`, damit `project`
+(Umgebungsprüfung), `program` und `release` denselben Vergleich nutzen. Nur „älter“ löst
+etwas aus, nie „ungleich“: Ein Build über dem neuesten Tag (`make dev-install VERSION=…`)
+gilt als aktuell, und herabgestuft wird nie.
+
+Wer vergleicht:
+
+- `program.CheckStatus()` — die gemeinsame Auskunft für `k-playbook upgrade`, den
+  Update-Knopf und den Start der Oberfläche: `running`, `latest`, `latestError`, `order`,
+  `outdated`, dazu der PATH-Befund. Ohne eigene Version ruft sie den Tag nicht ab.
+- `healthProgram()` in `project/health_release.go` — die Quelle `program` der
+  Umgebungsprüfung: Warnung „Das Programm (vA) ist älter als das neueste Release (vB)“,
+  Abhilfe `k-playbook upgrade`; ohne Netz, ohne eigene Version und bei gleicher bzw. neuerer
+  Version schweigt sie.
+- `k-playbook version --all` — nennt den Tag in einer eigenen Zeile, „unbekannt“ mit Grund
+  ohne Netz; der Exit-Code ändert sich dadurch nicht. `version` ohne Schalter bleibt
+  einzeilig und ruft nichts ab: `program.ReadVersion()` erkennt den Programmwechsel an genau
+  einer Zeile von `<datei> version`. Im Terminal weist es auf stderr auf `--all` hin.
+
+Drei Folgen, die man kennen muss:
+
+- **Der Tag steht vor den Assets.** `make release` pusht den Tag, die CI baut danach. In
+  dem Fenster dazwischen warnt die Umgebungsprüfung schon, und `upgrade` wie `bin/install`
+  melden, dass das Release noch nicht fertig ist; `k-playbook upgrade` hilft dann nicht.
+  Scheitert die CI, bleiben Warnung und Fehlschlag, bis der Tag entfernt ist oder ein
+  Nachfolger erschienen ist. Hingenommen (Task 149); ob der Release-Ablauf oder die Quelle
+  des neuesten Tags angepasst wird, ist offen.
+- **Die Umgebungsprüfung ruft das Netz.** Sie läuft beim Briefing, bei `k_playbook_health`,
+  `k-playbook health` und beim Laden der Statusseite. Einen Cache gibt es nicht. Gemessen am
+  2026-11-13 (Median über 15 Läufe, `k-playbook briefing`, beide Builds mit derselben
+  Version): 401 ms ohne, 816 ms mit dem Abruf — rund 0,4 s je Briefing; ist GitHub nicht
+  erreichbar, endet er sofort (447 ms), hängt die Verbindung, nach der Frist (3,4 s).
+  Läuft die Frist ab, endet git samt seinem Kindprozess `git-remote-https` — sonst hielte
+  der die Ausgabe eine weitere Sekunde offen (gemessen: 4,5 s statt 3,4 s). Eine Schwelle
+  für die Laufzeit ist nicht festgelegt.
+- **Ohne eigene Version kein Netzaufruf.** Ein Ad-hoc-`go build` ohne Build-Flags fragt
+  nichts ab, weder in der Umgebungsprüfung noch in `CheckStatus()`.
+
+Für Tests ist die Quelle austauschbar, auch für gebaute Unterprozesse, über die
+Umgebungsvariable `K_PLAYBOOK_RELEASE_SOURCE` (`release.EnvSource`): leer ist GitHub, `off`
+schaltet jeden Abruf ab, sonst eine Basis-URL mit `<basis>/k-playbook.git`,
+`<basis>/raw/<tag>/SHA256SUMS`, `<basis>/download/<tag>/<asset>` und
+`<basis>/kephalaion/install.sh`. `releasetest.Isolate()` schaltet sie in `TestMain` jedes
+Testpakets ab, das Programm-Stand, Installation oder Umgebungsprüfung erreicht
+(`cmd/k-playbook`, `internal/webui`, `internal/mcpserver`, `internal/project`,
+`internal/program`); `releasetest.Serve()` stellt eine Ersatzquelle hin, die mit dem echten
+git (einfaches HTTP-Protokoll) und dem echten HTTP-Client gefragt wird. Kein Test berührt
+das echte Netz. Die Variable wirkt auch im ausgelieferten Programm; `version --all` und
+`upgrade` nennen deshalb eine ersetzte oder abgeschaltete Quelle. `bin/install` liest
+dieselbe Variable mit derselben Bedeutung.
+
+In der Oberfläche: Ist das laufende Programm **älter** als der neueste Tag, installiert der
+Dienst auf Knopfdruck das Release-Programm und startet sich daraus neu (siehe
 [Programm aktualisieren und neu starten](#programm-aktualisieren-und-neu-starten)). Ist das
-laufende Programm gleich alt oder neuer — der Entwicklungsfall nach `make dev-install` —,
-geschieht nichts weiter: der Dienst läuft, wie bei einem Update ohne Versionswechsel.
-
-Die frühere Aussage „der Update-Pfad lädt oder ersetzt keine Host-Binaries selbst" gilt
-**nicht mehr** (Task 076). Neu gilt: geladen wird nur auf ausdrücklichen Klick und nur über
-`k-playbook/bin/install` des Clones, das gegen `SHA256SUMS` prüft. Eigenen Download-Code
-gibt es im Go-Programm nicht, und weder der Start noch die Prüfung lädt je etwas.
+laufende Programm gleich alt oder neuer, geschieht nichts weiter. Geladen wird nur auf
+ausdrücklichen Klick bzw. im ausdrücklichen `k-playbook upgrade`; weder der Start noch die
+Prüfung lädt je etwas.
 
 ### Die Verlinkung wird mitgezogen
 
@@ -1587,31 +1673,35 @@ er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
 
 ## Direktinstallation
 
-**Kephalaion.** Am Ende ruft `bin/install` `bin/install-kephalaion` auf: Liegt kein
+**Kephalaion.** Am Ende installiert `bin/install` Kephalaion, wenn es fehlt: Liegt kein
 `kephalaion` im PATH, lädt das Skript das `install.sh` des neuesten Kephalaion-Releases und
 führt es aus; Asset-Namen, Plattformen und Prüfsumme bleiben damit Sache von Kephalaion. Ein
 vorhandenes `kephalaion` lässt das Skript stehen; aktualisiert wird es über `k-playbook
 upgrade` (unten). Installiert wird nur das Binary, nicht Node, Dienst oder Token — im DevContainer kommt die
 config read-only vom Host, und der Node ist der des Hosts. Scheitert der Schritt, endet
-`bin/install` trotzdem mit 0: `program.Install()` misst den Erfolg des Programm-Updates an
-diesem Exit-Code, und Oberfläche wie `k-playbook upgrade` meldeten sonst ein gescheitertes
-Update, das es nicht gab.
+`bin/install` trotzdem mit 0: Binaries von vor Task 149 rufen das Skript aus dem Clone auf
+und messen den Erfolg ihres Programm-Updates an diesem Exit-Code; sie meldeten sonst ein
+gescheitertes Update, das es nicht gab. Das Skript `bin/install-kephalaion` bleibt aus
+demselben Grund vorerst im Repo — alte Binaries rufen es noch aus dem Clone auf —, das
+Programm selbst ruft es nicht mehr auf.
 
 `k-playbook upgrade` hat für Kephalaion einen eigenen, ersten Schritt (Task 141), vor Programm
 und Projekt: k-playbook hängt von Kephalaion ab, nicht umgekehrt — neue k-playbook-Releases
 setzen neue Kephalaion-Fähigkeiten voraus (zuletzt `node client --format 1`), während
 Kephalaion alte Clients über `--format` trägt —, Projektschritt und `/k-upgrade` brauchen den
 Node, und ein Neustart des Nodes ist so einmal am Anfang erledigt. Drei Wege
-(`upgradeKephalaion()`): Fehlt `kephalaion`, läuft `bin/install-kephalaion`
-(`program.InstallKephalaion()`), weil `bin/install` nur bei „älter" läuft; ohne Clone nur
-eine Meldung. Liegt es da, ruft der Schritt `kephalaion upgrade --auto --json`
+(`upgradeKephalaion()`): Fehlt `kephalaion`, lädt `program.InstallKephalaion()` das
+`install.sh` des neuesten Kephalaion-Releases (`release.KephalaionInstallURL`, über
+`release.Fetch()` erst ganz geladen, dann mit `sh` ausgeführt) — auch ohne Clone; Erfolg
+heißt, dass `kephalaion.FindBinary()` das Binary danach findet. Scheitert es, nennt die
+Meldung die Installation von Hand (`kephalaion.InstallCommand`). Liegt es da, ruft der Schritt `kephalaion upgrade --auto --json`
 (`program.KephalaionAutoUpgrade()`) und meldet allein nach dessen Antwort (`outcome`,
 `reason`, `from`, `to`, `restarted`, `rolled_back`, `warnings`, `error`, `hint`): Ob ein
 Upgrade gefahrlos ist — Hub, globale config, dev build, Hub noch nicht so neu, DevContainer —,
 entscheidet Kephalaion, k-playbook hat dafür keine eigene Regel. Kennt das Binary `--auto`
 nicht (Exit 2), folgt `upgrade --check --json` (`program.KephalaionCheckUpgrade()`) und die
-Meldung, ob ein neueres Release da ist. Weg 2 und 3 laufen auch ohne Clone. `--check` ruft
-nur `--check --json`. Die Frist für `--auto` ist `KephalaionAutoTimeout` (3 Minuten), für
+Meldung, ob ein neueres Release da ist. Kein Weg braucht den Clone. `--check` ruft
+nur `--check --json` und meldet ein fehlendes `kephalaion` samt dem, was ein Lauf täte. Die Frist für `--auto` ist `KephalaionAutoTimeout` (3 Minuten), für
 `--check` `KephalaionCheckTimeout` (30 s); stdout (JSON) und stderr werden getrennt gelesen.
 Bei Fristablauf bekommt der Prozess SIGTERM und `KephalaionStopGrace` Zeit, kein sofortiges
 SIGKILL (`cmd.Cancel`, `cmd.WaitDelay`): ein SIGKILL mitten im Ersetzen, Neustart oder
@@ -1621,7 +1711,9 @@ Lauf auf. Bei `upgraded` und immer, wenn der Node neu gestartet wurde (`restarte
 `failed` mit `reason` `restart` auch ohne das Feld), setzt der Schritt `restartRequired` und
 die Ausgabe verlangt den Neustart der Sitzung — das trifft auch andere Sitzungen am selben
 Node. Im JSON stehen `auto`, `check`, `autoUnsupported`, `outcomeUnknown` und
-`restartRequired` unter `kephalaion`, additiv bei `schemaVersion` 1.
+`restartRequired` unter `kephalaion`. `schemaVersion` ist seit Task 149 `2`:
+`program.status` trägt `latest` (dazu `latestError`) statt `clone`, `program.versionChanged`
+und `program.mcpRepaired` entfallen, `project` trägt `mcpRepairedPortable` und `mcpMessage`.
 
 Der Schritt läuft im aufrufenden Prozess, vor dem Pull; das neue Programm nach einem
 Binärwechsel führt nur `upgrade --project-only` aus und fasst Kephalaion nicht an. Einmal beim
@@ -1632,11 +1724,28 @@ Kephalaion folgt erst im zweiten `/k-upgrade`, den der Programmwechsel ohnehin v
 Installation als Abhilfe, solange `kephalaion` fehlt und die Anbindung nicht ok ist; bei ok
 schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein.
 
-`bin/install` bleibt im Projekt-Clone und installiert das passende, gegen `SHA256SUMS`
-geprüfte Release-Binary direkt nach `~/.local/bin/k-playbook`. Der normale Aufruf ist danach
-immer `k-playbook`; der GUI-**Start** installiert oder aktualisiert kein Binary selbst. Auf
-Knopfdruck ruft die Oberfläche dagegen genau dieses Skript auf — sie lädt nichts selbst,
-und sie tut es nie ungefragt.
+`bin/install` ist die Erstinstallation und eigenständig: über
+`curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`
+aufrufbar, bestimmt es Tag und Prüfsumme wie das Paket `release` (neuester Tag über
+`git ls-remote`, `SHA256SUMS` des Tags über HTTPS) und installiert das Release-Binary direkt
+nach `~/.local/bin/k-playbook`, danach Kephalaion. Aus einem Clone aufgerufen
+(`make -C k-playbook install`, `k-playbook/bin/install`) verhält es sich gleich: Es liest
+weder `VERSION` noch `SHA256SUMS` neben sich und installiert den neuesten Tag. Dafür braucht
+es `git`; ohne bricht es mit einer Meldung ab, die `git` als Voraussetzung nennt, bevor
+etwas angelegt oder geladen ist. Der ganze Ablauf steht in `main` und wird erst in der
+letzten Zeile gerufen: Unter `curl | bash` liest bash das Skript von stdin, und so führt ein
+abgebrochener Download nichts aus, und kein Kindprozess frisst den Rest des Skripts.
+
+Der normale Aufruf ist danach immer `k-playbook`; der GUI-**Start** installiert oder
+aktualisiert kein Binary selbst. Aktualisiert wird über `k-playbook upgrade` und über den
+Update-Knopf der Oberfläche — beide über `program.Install()`, also ohne `bin/install` und
+ohne Clone, und nie ungefragt.
+
+Hingenommen für Binaries von vor Task 149, die `bin/install` noch aus dem Clone aufrufen
+und danach die Datei gegen `SHA256SUMS` und `VERSION` **des Clones** prüfen: Steht der Clone
+hinter dem neuesten Tag (kein Pull vor „Programm aktualisieren“, oder das Fenster vor
+`make release-publish`), melden sie einen Fehlschlag, obwohl die Datei ersetzt ist; sobald
+der Clone den Tag trägt, stimmt es wieder.
 
 Der globale Aufruf ist überhaupt möglich, weil das Programm sein Projekt aus dem
 **Arbeitsverzeichnis** ableitet (`Detect()` über `os.Getwd()`) und nicht aus seinem
@@ -1651,8 +1760,11 @@ Nutzer. Ein installiertes, aber nicht auffindbares Binary wäre deshalb ein stil
 Totalausfall.
 
 `bin/install` bricht in diesem Fall ab und nennt die Zeile fürs Shell-Profil. Die Prüfung
-liegt **vor** dem Download: sie braucht kein Release-Asset, und ein Abbruch soll nichts
-geladen und nichts ersetzt haben.
+liegt **vor** jedem Abruf: sie braucht kein Netz, und ein Abbruch soll nichts
+geladen und nichts ersetzt haben. `release.Install()` prüft dasselbe (`PathError`), und
+davor fragt `program.CheckPath()`, ob `k-playbook` im PATH genau auf das Installationsziel
+zeigt — sonst gibt es keinen Knopf und keine Installation, sondern den Hinweis mit beiden
+Pfaden und der Erstinstallation als Weg im Terminal.
 
 ### Ein Binary je Plattform, ein Ort
 
@@ -1661,13 +1773,15 @@ Laufzeit. Jede Arbeitsumgebung installiert die Fassung ihrer eigenen Plattform: 
 macOS-Host ein Darwin-Binary, der DevContainer ein Linux-Binary.
 
 Teilen sich beide dasselbe `$HOME`, überschreiben sie einander an dieser einen Datei.
-Getrennte HOMEs sind der saubere Zustand, aber nicht erzwingbar. `bin/install` liest
+Getrennte HOMEs sind der saubere Zustand, aber nicht erzwingbar. `bin/install` und
+`release.Install()` (`foreignPlatformKind()`) lesen
 deshalb vor dem Ersetzen die Magic-Bytes einer vorhandenen Datei — ELF gegen Mach-O,
-ohne `file`, das in schlanken Containern fehlt — und meldet beim Ersetzen, dass die
-andere Umgebung denselben Bootstrap noch einmal braucht.
+ohne `file`, das in schlanken Containern fehlt — und melden beim Ersetzen, dass die
+andere Umgebung dieselbe Installation noch einmal braucht: über `curl … | bash`, denn das
+Binary dort lässt sich nicht mehr ausführen.
 
-**Die Grenze davon steht hier ausdrücklich:** Träger der Erkennung ist allein
-`bin/install`. Wer `~/.local/bin/k-playbook` direkt aufruft, während dort ein
+**Die Grenze davon steht hier ausdrücklich:** Träger der Erkennung sind allein
+`bin/install` und die Installation über `release.Install()`. Wer `~/.local/bin/k-playbook` direkt aufruft, während dort ein
 plattformfremdes Binary liegt, bekommt weiterhin die Meldung der Shell
 (`cannot execute binary file`) — nach dem Wrapper-Ausstieg fängt das nichts mehr ab. Die
 make-Targets tragen die Erkennung ebenfalls nicht: `make dev-install` und `make gui`
@@ -1710,11 +1824,12 @@ Arbeitsverzeichnis und dem Anker ab.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
-| `~/.local/bin/k-playbook` | direkt installiertes Binary | `make -C k-playbook install`, ohne make `k-playbook/bin/install`; im Entwicklungsrepo `make dev-install` |
+| `~/.local/bin/k-playbook` | direkt installiertes Binary | `k-playbook upgrade` und der Update-Knopf der Oberfläche; erstmals `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install \| bash` (aus einem Clone: `make -C k-playbook install`, ohne make `k-playbook/bin/install`); im Entwicklungsrepo `make dev-install` |
 | `<entwicklungsrepo>/dist/` | Build des Arbeitsstands | `make dist` / `make dist-host` |
 
-`bin/install` ermittelt die Plattform, lädt das Release-Asset zu `VERSION`, prüft es
-gegen `SHA256SUMS` und ersetzt `~/.local/bin/k-playbook` atomar. Es gibt keinen
+`bin/install` und `release.Install()` ermitteln die Plattform, laden das Release-Asset des
+neuesten Tags, prüfen es gegen die `SHA256SUMS` dieses Tags und ersetzen
+`~/.local/bin/k-playbook` atomar. Es gibt keinen
 Programm-Binary-Cache und keine Laufzeit-Auflösung mehr. Die Zuordnung eines laufenden
 Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
 
@@ -3985,9 +4100,9 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/kephalaion/save` | prüft erneut und schreibt nur bei `ok` `hub` und `collection` zeilenweise in den Block `kephalaion:` von `K-PLAYBOOK.yaml`, nie einen Account; Antwort mit Hinweis auf das Committen; 409 mit Zustand bei nicht bestandenem Test oder einer Form, die sich nicht sicher ändern lässt; verwirft den Zwischenspeicher |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
-| `GET` | `/api/update` | per `git ls-remote` prüfen, ob die Installation zurückliegt, und zusätzlich, ob das laufende Programm älter ist als die `VERSION` des Clones (`program`, samt PATH-Befund); rein lesend, lädt nie etwas |
-| `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er, trägt die Antwort seine Ausgabe; hat `VERSION` gewechselt und ist das laufende Programm älter, folgen Installation und Neustart wie bei `/api/update/program` |
-| `POST` | `/api/update/program` | das zum Clone passende Programm über `k-playbook/bin/install` installieren und den Dienst daraus neu starten; 409 bei laufendem Ablauf, nicht älterem Programm oder falschem PATH, 428 mit Rückfrage bei laufender Arbeit (`?confirm=1` bestätigt), 500 mit Fehler und Ausgabe, wenn der Dienst weiterläuft |
+| `GET` | `/api/update` | per `git ls-remote` prüfen, ob der Clone zurückliegt, und zusätzlich, ob das laufende Programm älter ist als der neueste Release-Tag (`program` mit `running`, `latest`, `latestError`, samt PATH-Befund; auch ohne Clone); rein lesend, lädt nie etwas |
+| `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er oder fehlt der Clone, trägt die Antwort Meldung und Ausgabe mit 409 — aber erst, nachdem veraltete MCP-Einträge korrigiert und das Programm geprüft sind; ist das laufende Programm älter als der neueste Tag, folgen Installation und Neustart wie bei `/api/update/program` (dann 200, damit die Seite der neuen Adresse folgt) |
+| `POST` | `/api/update/program` | das Release-Programm des neuesten Tags installieren (`program.Install()`, geprüft gegen die `SHA256SUMS` des Tags, ohne Clone) und den Dienst daraus neu starten; 409 bei laufendem Ablauf, nicht älterem Programm, unbekanntem Tag oder falschem PATH, 428 mit Rückfrage bei laufender Arbeit (`?confirm=1` bestätigt), 500 mit Fehler und Ausgabe, wenn der Dienst weiterläuft |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
@@ -4387,16 +4502,25 @@ hängen, obwohl es einen Projektpfad meint.
 | Weg | Einstieg | Modus (`MCPWriteScope`) | Schreibt bei | Geschriebene Form |
 |---|---|---|---|---|
 | ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört | absoluter Pfad |
-| selbsttätig | `RepairMCP()`, Clone-Update | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` | erfasst oder unbeantwortet `k-playbook`, sonst absoluter Pfad |
-| selbsttätig | `RepairMCP()`, jeder Start | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | `MCPStateOutdated` wie beim Clone-Update; Ergänzen und Anlegen absoluter Pfad |
+| selbsttätig | `RepairMCP()`, „Aktualisieren“ in der Oberfläche (`applyUpdateHandler()`), nach dem Pull — auch wenn er gescheitert ist | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` | erfasst oder unbeantwortet `k-playbook`, sonst absoluter Pfad |
+| selbsttätig | `RepairMCP()`, jeder Start und der Projektschritt von `k-playbook upgrade` (`upgradeProject()`, auch unter `--project-only`) | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | `MCPStateOutdated` wie nach „Aktualisieren“; Ergänzen und Anlegen absoluter Pfad |
 
 Alle gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied, und er
-ist ein Parameter von `RepairMCP()`, weil die beiden selbsttätigen Aufrufer verschieden
-weit gehen dürfen. Das Clone-Update (`Update()` in `project/update.go`, Ergebnis in
-`UpdateResult.MCPRepaired`, die Dateien mit bloßem Namen zusätzlich in
-`UpdateResult.MCPRepairedPortable`) soll den Eintrag auf den abgelösten Wrapper nachziehen
-und sonst nichts. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) darf
-mehr, und die Grenze ist gemessen, nicht geraten:
+ist ein Parameter von `RepairMCP()`, weil die selbsttätigen Aufrufer verschieden
+weit gehen dürfen. Am Pull im Clone hängt die Reparatur nicht mehr (Task 149):
+`Update()` in `project/update.go` repariert nicht selbst — die Registrierung liegt im
+Hauptverzeichnis, nicht im Clone, und soll auch dann nachgezogen werden, wenn der Pull
+scheitert oder es keinen Clone gibt. Die Aufrufer tun es über `project.RepairMCPReport()`
+(Ergebnis `MCPRepairReport.Repaired`, die Dateien mit bloßem Namen zusätzlich in
+`MCPRepairReport.Portable`, ein Fehlschlag in `Message`). „Aktualisieren“ in der
+Oberfläche soll den Eintrag auf den abgelösten Wrapper nachziehen
+und sonst nichts. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) und der
+Projektschritt von `k-playbook upgrade` dürfen
+mehr — `upgrade` repariert immer im Umfang des Starts, ob ein Pull lief oder nicht; das
+ist gewollt mehr als früher nach einem gelungenen Pull, der nur veraltete Einträge
+ersetzte. `upgrade --check` meldet weiter nur veraltete Einträge (`MCPStateOutdated`) und
+sagt damit weniger, als ein Lauf täte; die Lücke ist hingenommen. Die Grenze ist gemessen,
+nicht geraten:
 
 - **`MCPStateOutdated`** wird in beiden Modi ersetzt, unabhängig von der Versionierung —
   eine Reparatur an Inhalt, den k-playbook selbst geschrieben hat.
@@ -4440,7 +4564,7 @@ mehr, und die Grenze ist gemessen, nicht geraten:
   die übergeht der Start nicht. Beim Auflösen kämen neue offene Fragen hinzu: ein Ziel
   außerhalb des Repos, eines in einem anderen Repo, ein toter Link. Die Prüfung sitzt im
   Startzweig von `mcpTargetNeedsWrite()`, nicht in `applyMCPTarget()`. Der Knopf schreibt
-  deshalb weiter durch den Link, das Clone-Update bleibt unverändert, und
+  deshalb weiter durch den Link, der enge Modus nach „Aktualisieren“ bleibt unverändert, und
   `MCPStateOutdated` wird auch hinter einem Link korrigiert; für dessen Form wird dort
   das Linkziel gemessen (nächster Punkt). Offen bleiben harte Links:
   `os.Lstat` erkennt sie nicht, `ls-files` misst den nicht erfassten Linkpfad, und
@@ -4475,8 +4599,9 @@ eingecheckt. Die Startmeldung sagt beim Eintragen deshalb dazu, dass die Datei e
 rechnerbezogenen Pfad trägt und unversioniert bleiben sollte, und unterscheidet
 „eingetragen" von „korrigiert" anhand des Zustands vor dem Lauf. Welche Form geschrieben
 wurde, liefert `RepairMCP()` selbst zurück (`[]MCPWrite` mit `Path` und `Command`). Steht
-der bloße Name darin, sagen die Startmeldung und `describeMCPRepair()` nach dem
-Clone-Update das und nennen den Preis: ein aus Dock oder Finder gestarteter Client braucht
+der bloße Name darin, sagen die Startmeldung, `describeMCPRepair()` nach „Aktualisieren“
+in der Oberfläche — auch nach einem gescheiterten Pull — und der Projektschritt von
+`k-playbook upgrade` (`upgradeProjectReport.messages()`) das und nennen den Preis: ein aus Dock oder Finder gestarteter Client braucht
 den absoluten Pfad, von Hand eingetragen. Die Meldung hängt an der geschriebenen Form,
 nicht am Tracking-Ergebnis. Fremde Einträge bleiben in jedem Fall unangetastet — gepatcht
 wird nur der eigene Schlüssel.
@@ -4845,10 +4970,12 @@ die der **Dienst** beim Start im Hintergrund einspielt und nachzieht
 (§„Die VS-Code-Erweiterung"). Sie steht bewusst dort und nicht hier: eine Installation
 dauert Sekunden, und dieser Pfad läuft bei jedem Aufruf.
 
-Davor steht noch eine Zeile, wenn das aufrufende Programm **älter** ist als die `VERSION`
-des Clones (`noteOutdatedProgram()`): ein Hinweis, dass die Oberfläche die Aktualisierung
-als Knopf anbietet, und der Bootstrap für die Hand. Geladen wird beim Start nichts. Ohne
-diese Zeile bliebe der Zustand „Clone neu, Programm alt" im Terminal unsichtbar.
+Davor steht noch eine Zeile, wenn das aufrufende Programm **älter** ist als der neueste
+Release-Tag (`noteOutdatedProgram()` über `program.CheckStatus()`): ein Hinweis, dass die
+Oberfläche die Aktualisierung als Knopf anbietet, und `k-playbook upgrade` für die Hand.
+Geladen wird beim Start nichts; gefragt wird der Tag — ein Netzaufruf mit kurzer Frist, und
+nur, wenn das Programm eine Version trägt. Ist der Tag unbekannt, bleibt die Zeile aus.
+Ohne diese Zeile bliebe der Zustand „neueres Release, Programm alt" im Terminal unsichtbar.
 
 Dann entscheidet `reuseOrStart()` nach dem Ergebnis der Einordnung:
 
@@ -4896,27 +5023,28 @@ damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Statusseite 
 und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
 
-`POST /api/update` holt den neuen Stand und installiert danach, wenn nötig, auch das
-Programm: hat der Pull die `VERSION` bewegt **und** ist das laufende Programm älter als die
-neue (`restartAfterPull()` in `webui/update.go`), läuft derselbe Ablauf wie hinter dem Knopf
-„Programm aktualisieren". Sonst läuft der Dienst weiter und liest den neuen Stand bei der
-nächsten Anfrage.
+`POST /api/update` holt den neuen Stand des Clones und prüft danach das Programm
+(`applyUpdateHandler()` in `webui/update.go`): Ist das laufende Programm älter als der
+neueste Release-Tag (`checkProgram()`, also `program.CheckStatus()`), läuft derselbe Ablauf
+wie hinter dem Knopf „Programm aktualisieren". Sonst läuft der Dienst weiter und liest den
+neuen Stand bei der nächsten Anfrage.
 
-Beide Bedingungen werden gebraucht. Ohne Versionswechsel ist der Stand derselbe wie vorher,
-und ein Programm, das vorher passte, passt weiter. Und nur „älter" löst aus, nie
-„ungleich": im Entwicklungsrepo steht unter `~/.local/bin` längst das Programm des neuen
-Standes, weil `make dev-install` es gebaut hat, während der Clone noch dem zuletzt
-gepushten Commit folgt. Holt er ihn nach, wechselt dort die `VERSION` — bei einem Vergleich
-auf Ungleichheit stufte der Dienst sich selbst auf ein älteres Release herab, das vor dem
-Release nicht einmal als Asset existiert. Fehlt eine der beiden Angaben oder ist sie nicht
-lesbar, wird nichts verlangt: eine Version, die sich nicht lesen lässt, ist kein Nachweis.
+Knopf und Neustart hängen am Tag, nicht am Pull: Ob der Pull etwas bewegt hat, spielt
+keine Rolle, und der Handler kehrt nach einem gescheiterten Pull — oder ohne Clone — nicht
+zurück, bevor die veralteten MCP-Einträge korrigiert (`project.RepairMCPReport()` mit
+`MCPWriteOutdatedOnly`) und das Programm geprüft sind. Der gescheiterte Pull wird weiter
+gemeldet, mit 409; hat der Dienst neu gestartet, mit 200, damit die Seite der neuen Adresse
+folgt. Nur „älter" löst aus, nie „ungleich": Ein Programm über dem neuesten Tag
+(`make dev-install VERSION=…`) gilt als aktuell, und bei einem Vergleich auf Ungleichheit
+stufte der Dienst sich selbst auf ein älteres Release herab. Ist der Tag unbekannt oder
+trägt das Programm keine Version, wird nichts verlangt: eine Version, die sich nicht lesen
+lässt, ist kein Nachweis.
 
-Die Entscheidung liegt bewusst in `webui` und nicht in `project.Update()`: nur der Server
-kennt die Version, aus der er selbst läuft. `UpdateResult` meldet deshalb die Tatsache
-(`VersionChanged`, `Version`), nicht die Aufforderung. Das deckt den Weg über die
-Oberfläche; nach einem `git pull` von Hand greift der Standvergleich des Clients beim
-nächsten Aufruf — und der erkennt über die Build-Kennung auch ein frisch gebautes Binary
-bei unveränderter `VERSION`.
+`project.Update()` weiß davon nichts mehr: `UpdateResult` trägt nur noch die Ausgabe des
+Pulls und eine umgestellte Remote-Adresse; `VersionChanged`, `Version` und das Lesen von
+`VERSION` sind entfallen, ebenso `project.InstalledVersion()`. Nach einem `git pull` von
+Hand greift der Standvergleich des Clients beim nächsten Aufruf — und der erkennt über die
+Build-Kennung auch ein frisch gebautes Binary bei unveränderter Version.
 
 `k-playbook stop` nutzt dieselbe Einordnung: läuft der eigene Server, `POST
 /api/shutdown` und warten; antwortet er nicht, SIGTERM an die PID — die Identitätsprüfung
@@ -4972,14 +5100,17 @@ Fehler — ein Startweg ist das nicht, Starten bleibt der argumentlose Aufruf.
 
 ### Programm aktualisieren und neu starten
 
-Ist das laufende Programm älter als die `VERSION` des Clones, meldet `GET /api/update` das
-zusätzlich zum Remote-Vergleich (`checkProgram()`), und die Oberfläche zeigt statt „Update
-verfügbar" den Knopf „Programm aktualisieren (v0.9.3 → v0.9.4)". Der Vergleich ist lokal
-und hängt nicht am Remote: ohne Netz meldet die Prüfung ihn trotzdem. Trifft beides zu, hat
-das ältere Programm Vorrang — ein Pull allein hilft dann nicht, der Clone ist dem Programm
-schon voraus.
+Ist das laufende Programm älter als der neueste Release-Tag, meldet `GET /api/update` das
+zusätzlich zum Remote-Vergleich des Clones (`checkProgram()`), und die Oberfläche zeigt statt
+„Update verfügbar" den Knopf „Programm aktualisieren (v0.9.3 → v0.9.4)" (`program.latest` in
+der Antwort, gelesen in `static/service.js`). Der Vergleich hängt weder am Clone noch an
+dessen Remote: Er steht auch da, wenn es keinen Clone gibt oder dessen `ls-remote`
+scheitert. Er braucht aber selbst das Netz — den Tag liest `release.LatestTag()`; ist er
+unbekannt, meldet die Prüfung nichts und nennt den Grund in `program.latestError`. Trifft
+beides zu, hat das ältere Programm Vorrang — ein Pull allein hilft dann nicht, das Programm
+kommt aus dem Release, nicht aus dem Clone.
 
-Verglichen wird **semantisch** (`internal/program`, `Compare()`): `v0.10.0` ist neuer als
+Verglichen wird **semantisch** (`internal/version`, `Compare()`): `v0.10.0` ist neuer als
 `v0.9.4`, obwohl es lexikalisch davor steht. Nur „älter" löst aus; „unbekannt" ist kein
 Nachweis.
 
@@ -4989,30 +5120,38 @@ Datei trifft wie `~/.local/bin/k-playbook` (`program.CheckPath()`, Vergleich üb
 neues Programm am Installationsziel startete der nächste `k-playbook`-Aufruf nicht, dessen
 `reuseOrStart()` beendete den neuen Dienst als „anderen Stand", und der Fehler wäre zurück.
 Der Dienst entfernt keine fremde Datei und installiert nicht an einen anderen Ort; dass der
-Nutzer dann doch im Terminal handeln muss, ist eine bewusst hingenommene Abweichung.
+Nutzer dann doch im Terminal handeln muss, ist eine bewusst hingenommene Abweichung. Der
+Weg im Terminal ist dann die Erstinstallation (`curl … | bash`), nicht `k-playbook upgrade`:
+`upgrade` prüft denselben PATH und lehnte aus demselben Grund ab.
 
-**Nie herabstufen.** Vor dem Bootstrap liest `program.Install()` die Version der Datei am
+**Nie herabstufen.** Vor dem Download liest `program.Install()` die Version der Datei am
 Installationsziel über das Subkommando `k-playbook version`. Ist sie gleich oder neuer als
-`VERSION`, wird nichts geladen und nur aus ihr neu gestartet — sonst überschriebe der
-Dienst, was ein anderes Projekt oder `make dev-install` dort abgelegt hat. Nur bei älter
-oder unbekannt läuft der Bootstrap; „unbekannt" ist auch ein Programm, das das Subkommando
+der neueste Tag, wird nichts geladen und nur aus ihr neu gestartet — sonst überschriebe der
+Dienst, was ein anderer Lauf oder `make dev-install` dort abgelegt hat. Nur bei älter
+oder unbekannt wird geladen; „unbekannt" ist auch ein Programm, das das Subkommando
 noch nicht kennt.
 
 **`version` bleibt einzeilig.** `ReadVersion()` verwirft jede Antwort, die `\n` oder `\r`
 trägt, und gibt dann „unbekannt" zurück — eine zweite Zeile auf stdout nähme dem Programm
 also die Erkennung eines Programmwechsels und den Neustart nach einer Aktualisierung. Was
 noch zu dem Programm gehört, steht deshalb hinter einem Schalter: `version --all` nennt
-zusätzlich die Fassung der mitgereisten VS-Code-Erweiterung. Entschieden hat das der
-Nutzer am 2026-10-09; `version_test.go` hält die Einzeiligkeit fest.
+zusätzlich die Fassung der mitgereisten VS-Code-Erweiterung und den neuesten Release-Tag
+(„unbekannt“ mit Grund, wenn er sich nicht lesen ließ; der Exit-Code bleibt). Aus demselben
+Grund ruft `version` ohne Schalter den Tag nicht ab, und sein Hinweis auf `--all` geht nur
+auf stderr und nur, wenn stdout ein Terminal ist. Entschieden hat die Einzeiligkeit der
+Nutzer am 2026-10-09; `version_test.go` hält sie fest.
 
-**Geprüft wird die Datei, nicht der Exit-Code.** Nach einem Bootstrap-Lauf vergleicht
-`program.Verify()` die sha256 der Datei am Ziel mit dem Eintrag des Plattform-Assets in
-`SHA256SUMS` des Clones — dieselbe Quelle, gegen die `bin/install` den Download prüft, und
-ohne die Datei auszuführen. Ein Skript kann mit 0 enden und trotzdem nichts ersetzt haben;
-gemessen am 2026-09-22 mit einem Stub-Bootstrap, der mit `cp` über die laufende
-Programmdatei schrieb: `cp` scheiterte mit „Text file busy", das nächste `echo` gelang, der
-Exit-Code war 0. `bin/install` selbst hat das Problem nicht, es lädt nach `mktemp` und
-ersetzt atomar per `mv -f`.
+**Geprüft wird die Datei, nicht ein Exit-Code.** `release.Install()` rechnet die sha256 des
+Downloads, während es ihn schreibt, vergleicht sie mit dem Eintrag des Plattform-Assets in
+der `SHA256SUMS` des Tags und benennt erst danach auf das Ziel um — ohne die Datei
+auszuführen. `program.Install()` rechnet danach an der Datei am Ziel nach, dass sie die
+geprüfte Summe trägt; `program.Verify()` ist dieselbe Frage für eine Datei, die schon
+liegt, gegen die Summen eines Tags. Der Anlass war ein Skript, das mit 0 endete und
+trotzdem nichts ersetzt hatte (gemessen am 2026-09-22 mit einem Stub-Bootstrap, der mit
+`cp` über die laufende Programmdatei schrieb: `cp` scheiterte mit „Text file busy", das
+nächste `echo` gelang, der Exit-Code war 0). Geladen wird deshalb in eine temporäre Datei
+neben dem Ziel und atomar per Umbenennen ersetzt — in `release.Install()` wie in
+`bin/install`.
 
 **Die Übergabe der Laufzeitdatei.** Invariante: **nie zwei registrierte Dienste für ein
 Projekt**; ein kurzer Moment mit zwei Prozessen ist zulässig. Weil die Datei mit
@@ -5023,8 +5162,8 @@ dann übergeben" ist damit unmöglich. Der Ablauf in `webui/restart.go`:
 2. Er startet den neuen abgekoppelt **aus dem Installationsziel**, im selben
    Arbeitsverzeichnis, mit `K_PLAYBOOK_SERVE=1` und `K_PLAYBOOK_HOST_CARE=1`.
 3. Er wartet, bis die Laufzeitdatei die PID des neuen trägt und `/api/health` mit demselben
-   Schlüssel, derselben PID und der **erwarteten Version** antwortet — nach einem Bootstrap
-   die `VERSION` des Clones, im Pfad ohne Download die an der Datei gelesene.
+   Schlüssel, derselben PID und der **erwarteten Version** antwortet — nach einer
+   Installation der Tag, im Pfad ohne Download die an der Datei gelesene.
 4. Gelingt das, antwortet er der Seite mit der neuen Adresse und beendet sich. Sein
    `defer registration.Remove()` fasst die Datei nach der Freigabe nicht mehr an.
 5. Gelingt es nicht, beendet er den Nachfolger, meldet sich mit `Reclaim()` wieder an,
@@ -5044,14 +5183,14 @@ Dienst über `guiproc.StartupTimeout`.
 **Sperre und Zeitbudget.** Beide POSTs nehmen `updateMu` mit `TryLock`; ein zweiter Aufruf
 bekommt 409 „Aktualisierung läuft bereits". Zwei gleichzeitige Abläufe gäben dieselbe Datei
 zweimal frei. Solange installiert und gestartet wird, gilt der Dienst nie als leer
-(`restarting`), denn der Bootstrap darf Minuten dauern. Das Budget ist
-`program.BootstrapTimeout` (3 Minuten) plus `restartStartupTimeout`.
+(`restarting`), denn der Download darf Minuten dauern. Das Budget ist
+`program.InstallTimeout` (3 Minuten) plus `restartStartupTimeout`.
 
 **Laufende Arbeit.** Läuft ein Command oder hängt eine Chat-Ansicht am Ereignisstrom,
 antwortet `POST /api/update/program` ohne `?confirm=1` mit 428 und der Rückfrage; die Seite
 stellt sie und schickt den Aufruf bestätigt erneut. Im Pfad über `POST /api/update` wird in
-diesem Fall gar nicht neu gestartet — der Pull ist durch, und die Prüfung meldet danach
-„Programm älter".
+diesem Fall gar nicht neu gestartet — der Pull ist gelaufen oder gemeldet, und die Prüfung
+meldet danach „Programm älter".
 
 **Wie die Seite den neuen Dienst findet.** Der Port ist zufällig, ein `reconnect()` auf die
 alte Adresse fände nur den Dienst, der sich gerade beendet. Die Antwort trägt deshalb die
@@ -5064,11 +5203,13 @@ Terminal — im DevContainer muss der neue Port weitergeleitet sein. Browser-Spe
 alten Adresse geht nicht mit über; das ist hingenommen.
 
 **Im Fehlerfall läuft der Dienst weiter.** Die Seite zeigt dann eine Meldung mit Fehler,
-Ausgabe und `make -C k-playbook install`, **nicht** die Sperrfläche — die wäre falsch, der
-Dienst antwortet ja. Danach meldet die Prüfung wieder „Programm älter". Scheitert die
-Installation nach einem Pull, ist „Clone neu, Programm alt" ein zulässiger Zustand, denn
-die Prüfung erkennt und meldet ihn; „nichts bleibt halb ersetzt" bezieht sich auf die
-Programmdatei — `bin/install` ersetzt atomar — und auf die Registrierung. Andere offene
+Ausgabe und `k-playbook upgrade` als Weg im Terminal (`installFailureMessage()`), **nicht**
+die Sperrfläche — die wäre falsch, der Dienst antwortet ja. Danach meldet die Prüfung wieder
+„Programm älter". Scheitert die Installation, ist „neueres Release, Programm alt" ein
+zulässiger Zustand, denn die Prüfung erkennt und meldet ihn — auch dann, wenn der Tag schon
+steht und die Assets des Releases noch gebaut werden; „nichts bleibt halb ersetzt" bezieht
+sich auf die Programmdatei — `release.Install()` ersetzt atomar — und auf die
+Registrierung. Andere offene
 Fenster des alten Dienstes zeigen nach einem erfolgreichen Neustart die Sperrfläche mit dem
 Hinweis, die Oberfläche über `k-playbook` neu zu öffnen.
 

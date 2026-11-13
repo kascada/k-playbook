@@ -106,8 +106,8 @@ func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 
 // kephalaionMissingHint ist die Abhilfe, wenn kephalaion nirgends liegt.
 const kephalaionMissingHint = "Kephalaion ist auf diesem Rechner nicht installiert (kein " + kephalaion.BinaryName +
-	" im PATH, unter ~/.local/bin oder unter /usr/local/bin). Installieren mit " + InstalledCommandName + " upgrade oder " +
-	KephalaionInstallCommand + "; danach die Anbindung prüfen (kephalaion status, k-playbook context)."
+	" im PATH, unter ~/.local/bin oder unter /usr/local/bin). Installieren mit " + UpgradeCommand + " oder " +
+	kephalaion.InstallCommand + "; danach die Anbindung prüfen (kephalaion status, k-playbook context)."
 
 // kephalaionHint nennt je Zustand den nächsten Schritt, wenn die Meldung
 // keine eigene Abhilfe trägt.

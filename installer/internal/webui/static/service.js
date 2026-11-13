@@ -28,8 +28,8 @@ const serviceElements = {
 };
 
 // updateMode steuert, was ein Klick auf den Button tut: "" prüft erneut,
-// "pull" holt den neuen Stand des Clones, "program" installiert das zum Clone
-// passende Programm und startet den Dienst daraus neu.
+// "pull" holt den neuen Stand des Clones, "program" installiert das
+// Release-Programm des neuesten Tags und startet den Dienst daraus neu.
 let updateMode = "";
 
 serviceElements.closedReconnect.addEventListener("click", onReconnectClick);
@@ -64,7 +64,7 @@ function updateNotice(data) {
   const program = data.program || {};
   if (program.outdated) {
     const text =
-      `Das laufende Programm (${program.running}) ist älter als die Installation (${program.clone}).`;
+      `Das laufende Programm (${program.running}) ist älter als das neueste Release (${program.latest}).`;
     return program.installable ? text : `${text} ${program.hint}`;
   }
   return data.available ? "" : data.message;
@@ -91,8 +91,8 @@ async function onUpdateClick() {
     }
     renderUpdate(data);
     // Ein gescheitertes Aktualisieren verbirgt den Knopf; ohne Meldung wäre
-    // es wortlos verschwunden. Nach einem Pull, der ein neueres Programm
-    // verlangt, das nicht installiert wurde, steht der Grund in der Meldung.
+    // es wortlos verschwunden. Ist das Programm älter als das neueste Release
+    // und wurde es nicht installiert, steht der Grund in der Meldung.
     if (!response.ok || data.installFailed || (data.program && data.program.outdated)) {
       showUpdateMessage(withOutput(data.message, data.installOutput));
     }
@@ -102,8 +102,8 @@ async function onUpdateClick() {
   }
 }
 
-// updateProgram installiert das zum Clone passende Programm und startet den
-// Dienst daraus neu. Laufen Befehle oder Chats, antwortet der Server mit 428
+// updateProgram installiert das Release-Programm des neuesten Tags und startet
+// den Dienst daraus neu. Laufen Befehle oder Chats, antwortet der Server mit 428
 // und der Rückfrage; bestätigt geht derselbe Aufruf noch einmal hinaus.
 async function updateProgram(confirmed) {
   serviceElements.update.disabled = true;
@@ -126,15 +126,13 @@ async function updateProgram(confirmed) {
     }
     // Gescheitert: der Dienst läuft weiter. Die Meldung nennt Fehler, Ausgabe
     // und den Befehl zum Nachholen; die Sperrfläche wäre hier falsch.
-    // Fällt die Antwort ohne Text aus, bleibt es beim Bootstrap in derselben
-    // kanonischen Form wie in project.BootstrapHint: make -C k-playbook install
-    // (ohne make: k-playbook/bin/install).
+    // Fällt die Antwort ohne Text aus, bleibt es bei demselben Weg wie in
+    // installFailureMessage (webui/restart.go): k-playbook upgrade.
     await checkUpdate();
     showUpdateMessage(
       withOutput(
         data.message ||
-          "Das Programm wurde nicht aktualisiert. Nachholen im Terminal: make -C k-playbook install " +
-            "(ohne make: k-playbook/bin/install).",
+          "Das Programm wurde nicht aktualisiert. Nachholen im Terminal: k-playbook upgrade.",
         data.installOutput
       )
     );
@@ -142,7 +140,7 @@ async function updateProgram(confirmed) {
     resetUpdateButton();
     showUpdateMessage(
       "Die Programmaktualisierung hat keine Antwort bekommen. Läuft der Dienst nicht mehr, im Terminal " +
-        "make -C k-playbook install (ohne make: k-playbook/bin/install) und danach k-playbook aufrufen."
+        "k-playbook upgrade und danach k-playbook aufrufen."
     );
   }
 }
@@ -197,19 +195,19 @@ async function followRestart(data) {
 // siehe showUpdateMessage.
 //
 // Ein älteres Programm hat Vorrang vor einem Update des Clones: ein Pull allein
-// hilft dann nicht, der Clone ist dem Programm schon voraus. Zeigt der PATH auf
-// ein anderes Programm, gibt es dafür keinen Knopf, nur den Hinweis — ein
-// installiertes Programm, das der nächste Aufruf nicht startet, brächte den
-// Fehler zurück.
+// hilft dann nicht, das Programm kommt aus dem Release, nicht aus dem Clone.
+// Zeigt der PATH auf ein anderes Programm, gibt es dafür keinen Knopf, nur den
+// Hinweis — ein installiertes Programm, das der nächste Aufruf nicht startet,
+// brächte den Fehler zurück.
 function renderUpdate(data) {
   const program = data.program || {};
   if (program.outdated && program.installable) {
     updateMode = "program";
     serviceElements.update.className = "primary attention-highlight";
-    serviceElements.update.textContent = `Programm aktualisieren (${program.running} → ${program.clone})`;
+    serviceElements.update.textContent = `Programm aktualisieren (${program.running} → ${program.latest})`;
     serviceElements.update.title =
-      `Installiert das zum Clone passende Programm nach ${program.target} ` +
-      "über k-playbook/bin/install und startet den Dienst daraus neu.";
+      `Installiert das Release-Programm ${program.latest} von GitHub nach ${program.target}, ` +
+      "geprüft gegen die SHA256SUMS des Tags, und startet den Dienst daraus neu.";
     serviceElements.update.disabled = false;
     return;
   }

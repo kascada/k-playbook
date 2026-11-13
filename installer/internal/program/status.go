@@ -1,19 +1,31 @@
 package program
 
-import "github.com/kascada/k-playbook/installer/internal/project"
+import (
+	"context"
+	"strings"
 
-// Status ist der Vergleich des laufenden Programms mit der VERSION des
-// Clones — die gemeinsame Auskunft für die Oberfläche (GET /api/update, der
-// Versionswechsel im POST, POST /api/update/program) und `k-playbook upgrade`.
+	"github.com/kascada/k-playbook/installer/internal/release"
+	"github.com/kascada/k-playbook/installer/internal/version"
+)
+
+// Status ist der Vergleich des laufenden Programms mit dem neuesten
+// Release-Tag — die gemeinsame Auskunft für die Oberfläche (GET /api/update,
+// POST /api/update, POST /api/update/program), den Start der Oberfläche und
+// `k-playbook upgrade`.
 type Status struct {
-	// Running ist die Version dieses Programms, Clone die VERSION der
-	// Installation.
+	// Running ist die Version dieses Programms, Latest der neueste Release-Tag
+	// auf GitHub. Latest ist leer, wenn er unbekannt ist — nicht gefragt (keine
+	// eigene Version) oder nicht bestimmbar (LatestError).
 	Running string `json:"running"`
-	Clone   string `json:"clone"`
+	Latest  string `json:"latest"`
+	// LatestError sagt, warum der neueste Tag unbekannt ist: ohne Netz, ohne
+	// git, Zeitüberschreitung. Leer, wenn er bekannt ist oder gar nicht
+	// gefragt wurde.
+	LatestError string `json:"latestError,omitempty"`
 	// Order ist das Ergebnis des Vergleichs: älter, gleich, neuer, unbekannt.
 	Order string `json:"order"`
-	// Outdated: das laufende Programm ist älter als der Clone. Nur das löst
-	// eine Meldung oder eine Installation aus.
+	// Outdated: das laufende Programm ist älter als der neueste Tag. Nur das
+	// löst eine Meldung oder eine Installation aus.
 	Outdated bool `json:"outdated"`
 	// Installable: `k-playbook` im PATH zeigt auf das Installationsziel. Nur
 	// dann wird installiert; sonst steht Hint da, mit beiden Pfaden.
@@ -23,16 +35,31 @@ type Status struct {
 	Hint        string `json:"hint,omitempty"`
 }
 
-// CheckStatus vergleicht die Version des laufenden Programms mit der VERSION
-// des Clones.
+// CheckStatus vergleicht die Version des laufenden Programms mit dem neuesten
+// Release-Tag.
 //
-// Nur „älter" meldet. Gleich oder neuer ist im Entwicklungsrepo nach
-// `make dev-install` der Normalfall, und eine nicht lesbare Version ist kein
-// Nachweis. Den PATH prüft sie nur, wenn es etwas anzubieten gäbe.
-func CheckStatus(running string, playbookDir string) *Status {
-	clone := project.InstalledVersion(playbookDir)
-	order := Compare(running, clone)
-	status := &Status{Running: running, Clone: clone, Order: order.String(), Outdated: order == Older}
+// Ohne eigene Version wird nichts abgerufen, kein Netzaufruf: Ein Programm
+// ohne Version löst weder Warnung noch Installation aus, und ein Ad-hoc-Build
+// berührt das Netz so nie. Ist der Tag unbekannt, bleibt der Vergleich
+// „unbekannt“ — kein Nachweis für irgendetwas.
+//
+// Nur „älter" meldet. Gleich ist der Normalfall; neuer ist ein Build über dem
+// neuesten Tag (`make dev-install VERSION=…`) und gilt als aktuell. Den PATH
+// prüft sie nur, wenn es etwas anzubieten gäbe.
+func CheckStatus(ctx context.Context, running string) *Status {
+	status := &Status{Running: running, Order: version.Unknown.String()}
+	if !version.Valid(running) {
+		return status
+	}
+	latest, err := release.LatestTag(ctx)
+	if err != nil {
+		status.LatestError = strings.TrimSuffix(err.Error(), ".")
+		return status
+	}
+	status.Latest = latest
+	order := version.Compare(running, latest)
+	status.Order = order.String()
+	status.Outdated = order == version.Older
 	if !status.Outdated {
 		return status
 	}

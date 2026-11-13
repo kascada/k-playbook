@@ -1,22 +1,17 @@
 package program
 
 import (
-	"bufio"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
-	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release"
+	"github.com/kascada/k-playbook/installer/internal/version"
 )
 
 // VersionCommand ist das Subkommando, mit dem eine installierte Datei ihre
@@ -24,19 +19,14 @@ import (
 // einem Fehler; das ergibt „unbekannt".
 const VersionCommand = "version"
 
-// SumsFileName ist die Prüfsummendatei im Clone, dieselbe, gegen die
-// bin/install prüft.
-const SumsFileName = "SHA256SUMS"
-
 var (
 	// versionTimeout begrenzt `k-playbook version`. Das Subkommando rechnet
 	// nichts; wer länger braucht, ist kein Programm, dessen Antwort zählt.
 	versionTimeout = 10 * time.Second
-	// BootstrapTimeout begrenzt den Lauf von bin/install: ein Download von
-	// rund 12 MB, dazu curl mit 15 Sekunden Verbindungsfrist und zwei
-	// Wiederholungen. Eine Variable, damit Tests den Weg über die Frist gehen
-	// können.
-	BootstrapTimeout = 3 * time.Minute
+	// InstallTimeout begrenzt Download und Prüfung des Release-Binaries: rund
+	// 20 MB und eine kleine Prüfsummendatei. Eine Variable, damit Tests den
+	// Weg über die Frist gehen können.
+	InstallTimeout = 3 * time.Minute
 )
 
 // ReadVersion liest die Version der Datei unter path über
@@ -64,7 +54,7 @@ func ReadVersion(path string) string {
 	if text == "" || strings.ContainsAny(text, "\n\r") {
 		return ""
 	}
-	if _, ok := parse(text); !ok {
+	if !version.Valid(text) {
 		return ""
 	}
 	return text
@@ -85,163 +75,100 @@ func withoutServeMarker(environ []string) []string {
 type Result struct {
 	// Target ist das Installationsziel, aus dem neu gestartet wird.
 	Target string `json:"target"`
-	// Expected ist die Version, die der neue Dienst melden muss: nach einem
-	// Bootstrap die VERSION des Clones, sonst die an der Datei gelesene.
+	// Expected ist die Version, die der neue Dienst melden muss: nach einer
+	// Installation der Tag, sonst die an der Datei gelesene.
 	Expected string `json:"expected"`
-	// Bootstrapped: bin/install ist gelaufen.
-	Bootstrapped bool `json:"bootstrapped"`
-	// Output ist die Ausgabe von bin/install, stdout und stderr zusammen.
+	// Installed: das Release-Binary des Tags wurde geladen und hat die Datei
+	// am Ziel ersetzt.
+	Installed bool `json:"installed"`
+	// Output nennt, was geladen und geprüft wurde, und den Hinweis zu einem
+	// ersetzten plattformfremden Binary.
 	Output string `json:"output,omitempty"`
-	// ExitCode von bin/install; -1, wenn es nicht bis zu einem Ende kam.
-	ExitCode int `json:"exitCode"`
 }
 
-// Install sorgt dafür, dass am Installationsziel ein Programm liegt, das zur
-// VERSION des Clones passt oder neuer ist.
+// Install sorgt dafür, dass am Installationsziel ein Programm liegt, das dem
+// Release-Tag tag entspricht oder neuer ist. tag ist der neueste Tag, so wie
+// CheckStatus ihn gelesen hat (Status.Latest).
 //
 // Zuerst wird der PATH geprüft (CheckPath): zeigt `k-playbook` nicht auf das
 // Ziel, geschieht nichts. Dann wird die Version der Datei am Ziel gelesen.
-// Gleich oder neuer als VERSION: kein Download — die Datei hat ein anderes
-// Projekt oder `make dev-install` dort abgelegt, und herabgestuft wird nie.
-// Älter oder unbekannt: bin/install des Clones läuft, aus dem
-// Hauptverzeichnis, mit Zeitlimit.
+// Gleich oder neuer als der Tag: kein Download — die Datei hat ein anderer
+// Lauf oder `make dev-install` dort abgelegt, und herabgestuft wird nie.
+// Älter oder unbekannt: release.Install lädt das Asset dieser Plattform,
+// prüft es gegen die SHA256SUMS des Tags und ersetzt die Datei atomar; halb
+// ersetzt bleibt sie nie.
 //
-// Erfolg nach einem Bootstrap heißt nicht Exit 0, sondern: die Datei am Ziel
-// trägt die sha256 aus SHA256SUMS des Clones für diese Plattform. Das ist
-// dieselbe Quelle, gegen die bin/install den Download prüft, und die Prüfung
-// kommt ohne Ausführen der Datei aus.
+// Erfolg heißt: die Datei am Ziel trägt die sha256, die release.Install gegen
+// die SHA256SUMS des Tags geprüft hat. Nachgerechnet wird an der Datei selbst,
+// ohne sie auszuführen und ohne zweiten Abruf.
 //
-// Ein Fehler lässt den Aufrufer weiterlaufen. bin/install ersetzt die Datei
-// atomar per mv; halb ersetzt bleibt sie nicht.
-func Install(projectDir string) (Result, error) {
-	result := Result{ExitCode: -1}
+// Ein Fehler lässt den Aufrufer weiterlaufen. Der Clone des Projekts wird
+// weder gelesen noch gebraucht.
+func Install(ctx context.Context, tag string) (Result, error) {
+	result := Result{}
 
 	path := CheckPath()
 	result.Target = path.Target
 	if !path.OK {
 		return result, errors.New(path.Hint())
 	}
-
-	playbookDir := project.PlaybookDir(projectDir)
-	clone := project.InstalledVersion(playbookDir)
-	if _, ok := parse(clone); !ok {
-		return result, fmt.Errorf("die Installation nennt keine lesbare VERSION (%q)", clone)
+	if !release.IsReleaseTag(tag) {
+		return result, fmt.Errorf("kein Release-Tag, gegen den installiert werden könnte (%q)", tag)
 	}
 
-	if have := ReadVersion(path.Target); Compare(have, clone) == Equal || Compare(have, clone) == Newer {
+	if have := ReadVersion(path.Target); version.Compare(have, tag) == version.Equal || version.Compare(have, tag) == version.Newer {
 		result.Expected = have
 		return result, nil
 	}
 
-	result.Bootstrapped = true
-	output, exitCode, err := runBootstrap(projectDir, playbookDir)
-	result.Output, result.ExitCode = output, exitCode
+	ctx, cancel := context.WithTimeout(ctx, InstallTimeout)
+	defer cancel()
+	installed, err := release.Install(ctx, tag, path.Target)
+	if ctx.Err() == context.DeadlineExceeded {
+		return result, fmt.Errorf("der Download von %s hat nach %s nicht geendet", installed.URL, InstallTimeout)
+	}
 	if err != nil {
 		return result, err
 	}
-	if err := Verify(playbookDir, path.Target); err != nil {
-		return result, err
+	result.Installed = true
+	result.Output = describeInstalled(installed)
+
+	actual, err := release.FileSum(path.Target)
+	if err != nil {
+		return result, fmt.Errorf("installierte Datei nicht lesbar: %w", err)
 	}
-	result.Expected = clone
+	if actual != installed.Sum {
+		return result, fmt.Errorf("die installierte Datei %s trägt nicht die geprüfte Summe (erwartet %s, gefunden %s)",
+			path.Target, installed.Sum, actual)
+	}
+	result.Expected = tag
 	return result, nil
 }
 
-// runBootstrap ruft k-playbook/bin/install aus dem Hauptverzeichnis auf — so,
-// wie die Doku es einem Nutzer sagt.
-func runBootstrap(projectDir string, playbookDir string) (string, int, error) {
-	script := filepath.Join(playbookDir, "bin", "install")
-	if _, err := os.Stat(script); err != nil {
-		return "", -1, fmt.Errorf("Bootstrap nicht gefunden: %s", script)
+// describeInstalled nennt Quelle und geprüfte Summe, dazu den Hinweis auf ein
+// ersetztes plattformfremdes Binary.
+func describeInstalled(installed release.Installed) string {
+	lines := []string{
+		"Geladen: " + installed.URL,
+		"Geprüft gegen " + release.SumsFileName + " von " + installed.Tag + ": sha256 " + installed.Sum,
 	}
-	return runScript(projectDir, script, project.BootstrapCommandNoMake)
-}
-
-// runScript führt ein Skript des Clones aus dem Hauptverzeichnis aus, mit
-// BootstrapTimeout; label ist der Aufruf, wie die Meldungen ihn nennen.
-func runScript(projectDir string, script string, label string) (string, int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), BootstrapTimeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, script)
-	cmd.Dir = projectDir
-	cmd.Env = withoutServeMarker(os.Environ())
-	// Ohne WaitDelay hielte ein Enkelprozess — curl — die Pipe nach dem
-	// Abbruch offen, und CombinedOutput kehrte erst mit ihm zurück.
-	cmd.WaitDelay = 5 * time.Second
-	output, err := cmd.CombinedOutput()
-	text := strings.TrimSpace(string(output))
-
-	if ctx.Err() == context.DeadlineExceeded {
-		return text, -1, fmt.Errorf("%s hat nach %s nicht geendet", label, BootstrapTimeout)
+	if note := installed.ForeignNote(); note != "" {
+		lines = append(lines, note)
 	}
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return text, exitErr.ExitCode(), fmt.Errorf("%s endete mit Exit-Code %d", label, exitErr.ExitCode())
-		}
-		return text, -1, fmt.Errorf("%s nicht ausführbar: %v", label, err)
-	}
-	return text, 0, nil
+	return strings.Join(lines, "\n")
 }
 
 // AssetName ist der Name des Release-Assets dieser Plattform, wie er in
 // SHA256SUMS steht.
 func AssetName() string {
-	return project.InstalledCommandName + "-" + runtime.GOOS + "-" + runtime.GOARCH
+	return release.AssetName()
 }
 
 // Verify prüft die Datei unter target gegen den Eintrag des Plattform-Assets
-// in SHA256SUMS des Clones.
-func Verify(playbookDir string, target string) error {
-	expected, err := expectedSum(filepath.Join(playbookDir, SumsFileName), AssetName())
-	if err != nil {
-		return err
-	}
-	actual, err := fileSum(target)
-	if err != nil {
-		return fmt.Errorf("installierte Datei nicht lesbar: %w", err)
-	}
-	if actual != expected {
-		return fmt.Errorf("die installierte Datei %s passt nicht zu %s (erwartet %s, gefunden %s)",
-			target, SumsFileName, expected, actual)
-	}
-	return nil
-}
-
-// expectedSum liest den Eintrag für asset, in der Form „<sha256>  <name>"
-// oder „<sha256> *<name>" — dieselben beiden, die bin/install annimmt.
-func expectedSum(sumsFile string, asset string) (string, error) {
-	file, err := os.Open(sumsFile)
-	if err != nil {
-		return "", fmt.Errorf("%s nicht lesbar: %w", SumsFileName, err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) != 2 {
-			continue
-		}
-		if fields[1] == asset || fields[1] == "*"+asset {
-			return strings.ToLower(fields[0]), nil
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("%s nicht lesbar: %w", SumsFileName, err)
-	}
-	return "", fmt.Errorf("keine Prüfsumme für %s in %s", asset, sumsFile)
-}
-
-func fileSum(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+// in der SHA256SUMS des Release-Tags tag — geladen aus dem Repo, nicht aus
+// dem Clone. Install braucht sie nicht: release.Install prüft vor dem
+// Ersetzen. Sie ist die Frage „ist das am Ziel das Release-Binary von tag?“
+// für eine Datei, die schon liegt.
+func Verify(ctx context.Context, tag string, target string) error {
+	return release.Verify(ctx, tag, target)
 }

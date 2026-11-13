@@ -92,36 +92,29 @@ func CheckUpdate(projectDir string) (UpdateStatus, error) {
 }
 
 // UpdateResult ist das Ergebnis eines Pull-Laufs.
+//
+// Über Version und Installation des Programms sagt es nichts: Die entscheiden
+// sich am neuesten Release-Tag (Paket release), nicht am Clone. Der Pull dient
+// nur noch den Inhalten, die am Clone hängen.
 type UpdateResult struct {
 	Output string `json:"output"`
-	// VersionChanged meldet, ob der Pull die VERSION der Installation bewegt
-	// hat. Das ist eine Tatsache über den Clone, noch keine Aufforderung: ob
-	// dazu auch ein anderes Binary gehört, entscheidet der Aufrufer anhand von
-	// Version — er allein weiß, aus welcher Version er selbst läuft.
-	VersionChanged bool `json:"versionChanged"`
-	// Version ist die VERSION der Installation nach dem Pull.
-	Version string `json:"version"`
-	Message string `json:"message"`
 	// RemoteSwitched ist die HTTPS-Adresse, auf die der Upstream vor dem Pull
 	// umgestellt wurde, weil er die SSH-Form des offiziellen Repos trug.
 	RemoteSwitched string `json:"remoteSwitched,omitempty"`
-	// MCPRepaired nennt die MCP-Dateien, deren veralteter Eintrag beim Update
-	// selbsttätig korrigiert wurde — relativ zum Hauptverzeichnis.
-	MCPRepaired []string `json:"mcpRepaired,omitempty"`
-	// MCPRepairedPortable nennt die Dateien aus MCPRepaired, in denen danach
-	// der bloße Kommandoname steht — die Datei ist erfasst, oder die
-	// Tracking-Frage blieb unbeantwortet. Die Meldung hängt an dieser Form.
-	MCPRepairedPortable []string `json:"mcpRepairedPortable,omitempty"`
 }
 
 // Update holt den neuen Stand per Fast-Forward.
 //
 // Nur `--ff-only`: ein Merge im Clone würde eine lokale Historie erzeugen, die
 // niemand pflegt. Wer dort committet hat, soll das selbst auflösen.
+//
+// Die MCP-Registrierung repariert der Pull nicht mehr selbst: Sie liegt im
+// Hauptverzeichnis, nicht im Clone, und hängt nicht daran, ob der Pull
+// gelingt. Das tun die Aufrufer — `k-playbook upgrade` im Projektschritt, die
+// Oberfläche nach dem Pull (RepairMCPReport).
 func Update(projectDir string) (result UpdateResult, err error) {
 	dir := PlaybookDir(projectDir)
 
-	versionBefore := InstalledVersion(dir)
 	if err := setInstallationWritable(projectDir); err != nil {
 		return UpdateResult{}, fmt.Errorf("Installation beschreibbar machen: %w", err)
 	}
@@ -146,43 +139,46 @@ func Update(projectDir string) (result UpdateResult, err error) {
 	if err != nil {
 		return UpdateResult{Output: text, RemoteSwitched: switched}, fmt.Errorf("git pull --ff-only fehlgeschlagen")
 	}
-
-	result = UpdateResult{Output: text, RemoteSwitched: switched}
-
-	versionAfter := InstalledVersion(dir)
-	// Seit die Binaries Release-Assets sind, hängt alles an VERSION: der Clone
-	// trägt kein Binary mehr, das sich vergleichen ließe.
-	result.VersionChanged = versionBefore != versionAfter
-	result.Version = versionAfter
-
-	// Die MCP-Registrierung liegt im Hauptverzeichnis, nicht im Clone — der
-	// Pull erreicht sie nicht. Ein Bestandsprojekt käme sonst mit einem Eintrag
-	// aus dem Update, der auf den abgelösten Wrapper zeigt. Korrigiert wird nur
-	// dieser eine Fall — das Update ergänzt keinen fehlenden Eintrag, das ist
-	// Sache des Starts —, und ein Fehlschlag entwertet das Update nicht: der
-	// Pull ist durch, und der nächste Start versucht es erneut.
-	repaired, repairErr := RepairMCP(projectDir, MCPWriteOutdatedOnly)
-	result.MCPRepaired = MCPWritePaths(repaired)
-	for _, write := range repaired {
-		if write.Portable() {
-			result.MCPRepairedPortable = append(result.MCPRepairedPortable, write.Path)
-		}
-	}
-	if repairErr != nil {
-		result.Message = "MCP-Registrierung nicht vollständig korrigiert: " + repairErr.Error()
-	}
-
-	return result, nil
+	return UpdateResult{Output: text, RemoteSwitched: switched}, nil
 }
 
-// InstalledVersion liest die VERSION der Installation. Leer, wenn es keine
-// gibt — dann gehört zu diesem Stand kein Release.
-func InstalledVersion(playbookDir string) string {
-	content, err := os.ReadFile(filepath.Join(playbookDir, VersionFileName))
-	if err != nil {
-		return ""
+// MCPRepairReport ist der Ausgang einer selbsttätigen Reparatur der
+// MCP-Registrierung, so wie die Meldungen ihn brauchen.
+type MCPRepairReport struct {
+	// Repaired nennt die geschriebenen MCP-Dateien, relativ zum
+	// Hauptverzeichnis.
+	Repaired []string `json:"mcpRepaired,omitempty"`
+	// Portable nennt die Dateien aus Repaired, in denen danach der bloße
+	// Kommandoname steht — die Datei ist erfasst, oder die Tracking-Frage
+	// blieb unbeantwortet. Der Hinweis auf den absoluten Pfad hängt an dieser
+	// Form.
+	Portable []string `json:"mcpRepairedPortable,omitempty"`
+	// Message nennt, was nicht vollständig gelang. Ein Fehlschlag entwertet
+	// den Lauf nicht: Der nächste Start versucht es erneut.
+	Message string `json:"message,omitempty"`
+}
+
+// RepairMCPReport repariert die MCP-Registrierung im Umfang scope
+// (RepairMCP) und fasst das Ergebnis für die Meldungen zusammen.
+//
+// Die Registrierung liegt im Hauptverzeichnis, nicht im Clone — ein Pull
+// erreicht sie nicht. Ein Bestandsprojekt bliebe sonst bei einem Eintrag, der
+// auf den abgelösten Wrapper zeigt. Wer wie weit geht: die Oberfläche nach
+// „Aktualisieren“ mit MCPWriteOutdatedOnly, `k-playbook upgrade` im
+// Projektschritt mit MCPWriteOutdatedAndUnversioned.
+func RepairMCPReport(projectDir string, scope MCPWriteScope) MCPRepairReport {
+	var report MCPRepairReport
+	repaired, err := RepairMCP(projectDir, scope)
+	report.Repaired = MCPWritePaths(repaired)
+	for _, write := range repaired {
+		if write.Portable() {
+			report.Portable = append(report.Portable, write.Path)
+		}
 	}
-	return strings.TrimSpace(string(content))
+	if err != nil {
+		report.Message = "MCP-Registrierung nicht vollständig korrigiert: " + err.Error()
+	}
+	return report
 }
 
 // GitOutput führt ein Git-Kommando in dir aus und liefert die getrimmte

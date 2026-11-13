@@ -139,8 +139,9 @@ const (
 	// Start ergänzt ihn von sich aus, wenn die Datei nicht von git erfasst ist.
 	MCPStateMissingEntry MCPState = "missing-entry"
 	// MCPStateOutdated: der Eintrag trägt das Kommando des abgelösten
-	// Wrapper-Modells. Das ist der eine Fall, den die Auto-Korrektur beim
-	// Clone-Update und beim Start unabhängig von der Versionierung
+	// Wrapper-Modells. Das ist der eine Fall, den die Auto-Korrektur nach
+	// „Aktualisieren“ in der Oberfläche, im Projektschritt von
+	// `k-playbook upgrade` und beim Start unabhängig von der Versionierung
 	// richtigstellt — eine Reparatur an Inhalt, den k-playbook selbst
 	// geschrieben hat.
 	MCPStateOutdated MCPState = "outdated"
@@ -389,21 +390,28 @@ const (
 	// MCPWriteAll: alles, was nicht zur Menge der akzeptierten Formen gehört
 	// — der Klick auf „Einrichten" (ApplyMCP).
 	MCPWriteAll MCPWriteScope = iota
-	// MCPWriteOutdatedOnly: ausschließlich MCPStateOutdated — das
-	// Clone-Update. Es soll den Eintrag auf den abgelösten Wrapper
-	// nachziehen und sonst nichts.
+	// MCPWriteOutdatedOnly: ausschließlich MCPStateOutdated —
+	// „Aktualisieren“ in der Oberfläche (applyUpdateHandler), nach dem Pull,
+	// auch wenn er gescheitert ist. Es soll den Eintrag auf den abgelösten
+	// Wrapper nachziehen und sonst nichts.
 	MCPWriteOutdatedOnly
 	// MCPWriteOutdatedAndUnversioned: MCPStateOutdated, dazu eine fehlende
 	// Datei und ein fehlender Eintrag, wenn die Zieldatei nicht von git
-	// erfasst ist — der Start. Die fehlende Datei zusätzlich nur, wenn der
-	// Assistent eine eigene Spur im Projekt hat.
+	// erfasst ist — der Start und der Projektschritt von `k-playbook upgrade`,
+	// der immer in diesem Umfang repariert, ob ein Pull lief oder nicht. Die
+	// fehlende Datei zusätzlich nur, wenn der Assistent eine eigene Spur im
+	// Projekt hat.
 	MCPWriteOutdatedAndUnversioned
 )
 
-// RepairMCP ist der **selbsttätige** Weg: er läuft beim Clone-Update und bei
-// jedem Start, ohne dass jemand einen Knopf drückt. Wie weit er gehen darf,
-// sagt der Modus — das Update übergibt MCPWriteOutdatedOnly, der Start
-// MCPWriteOutdatedAndUnversioned.
+// RepairMCP ist der **selbsttätige** Weg: er läuft nach „Aktualisieren“ in der
+// Oberfläche, im Projektschritt von `k-playbook upgrade` und bei jedem Start,
+// ohne dass jemand eigens einen Knopf dafür drückt. Wie weit er gehen darf,
+// sagt der Modus — die Oberfläche übergibt nach „Aktualisieren“
+// MCPWriteOutdatedOnly, der Start und `k-playbook upgrade`
+// MCPWriteOutdatedAndUnversioned. Am Pull im Clone hängt er nicht mehr
+// (Task 149): project.Update repariert nicht selbst, die Aufrufer tun es über
+// RepairMCPReport.
 //
 // Zurück kommen die geschriebenen Dateien, relativ zum Hauptverzeichnis, je mit
 // dem Kommando, das jetzt darin steht — leer, wenn nichts zu tun war. Die Form
@@ -847,11 +855,12 @@ func mcpRepairTargetTracked(projectRoot string, path string) bool {
 // mcpTargetNeedsWrite ist die eine Stelle, an der alle Schreibwege ihre
 // Entscheidung treffen.
 //
-// Clone-Update (MCPWriteOutdatedOnly): ausschließlich ein vorhandener, im
-// engen Sinn veralteter Eintrag. Eine fehlende Datei, ein fehlender Eintrag
-// und jede akzeptierte Form bleiben unangetastet.
+// „Aktualisieren“ in der Oberfläche (MCPWriteOutdatedOnly): ausschließlich ein
+// vorhandener, im engen Sinn veralteter Eintrag. Eine fehlende Datei, ein
+// fehlender Eintrag und jede akzeptierte Form bleiben unangetastet.
 //
-// Start (MCPWriteOutdatedAndUnversioned): dasselbe, dazu der fehlende Eintrag
+// Start und `k-playbook upgrade` (MCPWriteOutdatedAndUnversioned): dasselbe,
+// dazu der fehlende Eintrag
 // und die fehlende Datei — aber nur, wenn die Zieldatei nicht von git erfasst
 // ist, und die fehlende Datei nur, wenn der Assistent eine eigene Spur im
 // Projekt hat. Führt der Weg vom Hauptverzeichnis zur Zieldatei über einen

@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 )
 
 // isolateHome gibt dem Test ein eigenes HOME, einen PATH, der mit dessen
@@ -54,22 +56,26 @@ func gitCmd(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// gitProject baut ein Projekt, dessen Clone ein Git-Repo mit Upstream ist und
-// VERSION version trägt. Zurück kommen Hauptverzeichnis und eine zweite
-// Arbeitskopie des Remotes, über die Tests neue Stände einspielen.
-func gitProject(t *testing.T, version string) (string, string) {
+// gitProject baut ein Projekt, dessen Clone ein Git-Repo mit Upstream ist, und
+// stellt eine Ersatzquelle hin, die latest als neuesten Release-Tag nennt —
+// ohne Assets; wer eines braucht, legt es mit releasetest.Serve selbst an. Die
+// VERSION im Clone weicht bewusst ab: Sie wird nicht mehr gelesen. Zurück
+// kommen Hauptverzeichnis und eine zweite Arbeitskopie des Remotes, über die
+// Tests neue Stände einspielen.
+func gitProject(t *testing.T, latest string) (string, string) {
 	t.Helper()
 
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git nicht verfügbar")
 	}
+	releasetest.Serve(t).AddTag(latest)
 	base := t.TempDir()
 	remote := filepath.Join(base, "remote.git")
 	gitCmd(t, base, "init", "--bare", "-b", "main", remote)
 
 	upstream := filepath.Join(base, "upstream")
 	gitCmd(t, base, "clone", remote, upstream)
-	writeFile(t, filepath.Join(upstream, project.VersionFileName), version+"\n")
+	writeFile(t, filepath.Join(upstream, "VERSION"), "v0.0.1\n")
 	writeFile(t, filepath.Join(upstream, "commands", "k-test.md"), "test\n")
 	gitCmd(t, upstream, "add", "-A")
 	gitCmd(t, upstream, "commit", "-m", "erster Stand")
@@ -118,7 +124,8 @@ func getUpdate(t *testing.T, state *serverState) updateResponse {
 }
 
 // Nur „älter" meldet. Gleich, neuer und unbekannt melden nichts — und das,
-// obwohl Clone und Remote gleich sind: der Vergleich ist lokal.
+// obwohl Clone und Remote gleich sind: verglichen wird mit dem neuesten
+// Release-Tag, nicht mit dem Clone.
 func TestUpdatePruefungMeldetAelteresProgramm(t *testing.T) {
 	target := isolateHome(t)
 	writeExecutable(t, target, versionScript("v0.9.3"))
@@ -144,13 +151,64 @@ func TestUpdatePruefungMeldetAelteresProgramm(t *testing.T) {
 		if response.Available {
 			t.Errorf("laufend %q: Clone gleich Remote, aber available", test.running)
 		}
-		if test.outdated && (!response.Program.Installable || response.Program.Clone != "v0.9.4" || response.Program.Running != "v0.9.3") {
+		if test.outdated && (!response.Program.Installable || response.Program.Latest != "v0.9.4" || response.Program.Running != "v0.9.3") {
 			t.Errorf("laufend %q: nicht angeboten: %+v", test.running, response.Program)
 		}
 	}
 }
 
-// Ohne Remote — kein Netz — meldet die Prüfung das ältere Programm trotzdem.
+// Ohne eigene Version wird der neueste Tag nicht abgerufen; ist er unbekannt,
+// meldet die Prüfung nichts und nennt den Grund.
+func TestUpdatePruefungOhneVersionUndOhneTag(t *testing.T) {
+	target := isolateHome(t)
+	writeExecutable(t, target, versionScript("v0.9.3"))
+	projectDir, _ := gitProject(t, "v0.9.4")
+	chdir(t, projectDir)
+	source := releasetest.Serve(t)
+	source.AddTag("v0.9.4")
+
+	for _, running := range []string{"", "dev"} {
+		response := getUpdate(t, &serverState{version: running})
+		if response.Program.Outdated || response.Program.Latest != "" || response.Program.LatestError != "" {
+			t.Errorf("laufend %q: Program = %+v", running, response.Program)
+		}
+	}
+	if requests := source.Requests(); len(requests) != 0 {
+		t.Errorf("ohne eigene Version wurde die Release-Quelle gefragt: %v", requests)
+	}
+
+	releasetest.Off(t)
+	response := getUpdate(t, &serverState{version: "v0.9.3"})
+	if response.Program.Outdated || response.Program.Latest != "" || !strings.Contains(response.Program.LatestError, "abgeschaltet") {
+		t.Errorf("Tag unbekannt: Program = %+v", response.Program)
+	}
+	code, post := postUpdate(t, &serverState{version: "v0.9.3"}, programHandler, "/api/update/program")
+	if code != http.StatusConflict || !strings.Contains(post.Message, "Der neueste Release-Tag ist unbekannt") {
+		t.Errorf("Knopf bei unbekanntem Tag: Status %d, Meldung %q", code, post.Message)
+	}
+}
+
+// Ohne Clone meldet die Prüfung das ältere Programm trotzdem: Der Vergleich
+// hängt nicht am Clone.
+func TestUpdatePruefungMeldetAelteresProgrammOhneClone(t *testing.T) {
+	target := isolateHome(t)
+	writeExecutable(t, target, versionScript("v0.9.3"))
+	projectDir := t.TempDir()
+	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
+	chdir(t, projectDir)
+	releasetest.Serve(t).AddTag("v0.9.4")
+
+	response := getUpdate(t, &serverState{version: "v0.9.3"})
+	if !response.Program.Outdated || !response.Program.Installable || response.Program.Latest != "v0.9.4" {
+		t.Errorf("Program = %+v", response.Program)
+	}
+	if response.Available {
+		t.Error("ohne Clone ein Update des Clones gemeldet")
+	}
+}
+
+// Ohne Remote des Clones — kein Netz dorthin — meldet die Prüfung das ältere
+// Programm trotzdem.
 func TestUpdatePruefungMeldetAelteresProgrammOhneRemote(t *testing.T) {
 	target := isolateHome(t)
 	writeExecutable(t, target, versionScript("v0.9.3"))
@@ -238,9 +296,9 @@ func shutdownProbe() (func(), func() bool) {
 		}
 }
 
-// Regression: ein Update ohne Versionswechsel zieht den Stand, verlinkt und
-// lässt den Dienst laufen.
-func TestUpdateOhneVersionswechselLaeuftWeiter(t *testing.T) {
+// Regression: ein Update bei aktuellem Programm zieht den Stand des Clones,
+// verlinkt und lässt den Dienst laufen.
+func TestUpdateBeiAktuellemProgrammLaeuftWeiter(t *testing.T) {
 	target := isolateHome(t)
 	writeExecutable(t, target, versionScript("v0.9.4"))
 	projectDir, upstream := gitProject(t, "v0.9.4")
@@ -268,43 +326,49 @@ func TestUpdateOhneVersionswechselLaeuftWeiter(t *testing.T) {
 	}
 }
 
-// Versionswechsel bei neuerem laufendem Programm — das Entwicklungsrepo nach
-// `make dev-install`: keine Installation, der Dienst läuft weiter.
-func TestUpdateMitVersionswechselBeiNeueremProgrammInstalliertNicht(t *testing.T) {
+// Ein laufendes Programm über dem neuesten Tag — ein Build mit
+// `make dev-install VERSION=…` — gilt als aktuell: keine Installation, der
+// Dienst läuft weiter, auch wenn der Pull die VERSION im Clone bewegt.
+func TestUpdateBeiNeueremProgrammInstalliertNicht(t *testing.T) {
 	target := isolateHome(t)
 	writeExecutable(t, target, versionScript("v0.9.3"))
 	projectDir, upstream := gitProject(t, "v0.9.4")
-	marker := filepath.Join(t.TempDir(), "bootstrap-gelaufen")
-	pushChange(t, upstream, "bin/install", "#!/bin/sh\n: > "+marker+"\n")
-	pushChange(t, upstream, project.VersionFileName, "v0.9.5\n")
+	pushChange(t, upstream, "VERSION", "v0.9.5\n")
 	chdir(t, projectDir)
+	source := releasetest.Serve(t)
+	source.AddRelease("v0.9.4", []byte(versionScript("v0.9.4")))
 
 	shutdown, wasShutdown := shutdownProbe()
 	code, response := postUpdate(t, &serverState{version: "v0.10.0", shutdown: shutdown}, pullHandler, "/api/update")
 	if code != http.StatusOK || response.Restarted || response.InstallFailed {
 		t.Fatalf("Status %d, Antwort %+v", code, response)
 	}
-	if response.Program.Outdated {
+	if response.Program.Outdated || response.Program.Latest != "v0.9.4" {
 		t.Errorf("neueres Programm als veraltet gemeldet: %+v", response.Program)
 	}
-	if _, err := os.Stat(marker); err == nil {
-		t.Error("der Bootstrap ist gelaufen")
+	for _, request := range source.Requests() {
+		if strings.HasPrefix(request, "/download/") || strings.HasPrefix(request, "/raw/") {
+			t.Errorf("es wurde geladen: %s", request)
+		}
+	}
+	if got := program.ReadVersion(target); got != "v0.9.3" {
+		t.Errorf("am Ziel liegt %q, die Datei wurde ersetzt", got)
 	}
 	if wasShutdown() {
 		t.Error("der Dienst hat sich beendet")
 	}
 }
 
-// Versionswechsel bei älterem Programm, aber der PATH zeigt woandershin: Pull
-// ja, der Dienst läuft weiter, Hinweis statt Neustart.
-func TestUpdateMitVersionswechselBeiFalschemPath(t *testing.T) {
+// Älteres Programm, aber der PATH zeigt woandershin: Pull ja, der Dienst läuft
+// weiter, Hinweis statt Neustart.
+func TestUpdateBeiAelteremProgrammUndFalschemPath(t *testing.T) {
 	target := isolateHome(t)
 	writeExecutable(t, target, versionScript("v0.9.4"))
 	other := filepath.Join(t.TempDir(), project.InstalledCommandName)
 	writeExecutable(t, other, versionScript("v0.9.4"))
 	t.Setenv("PATH", filepath.Dir(other)+string(os.PathListSeparator)+os.Getenv("PATH"))
-	projectDir, upstream := gitProject(t, "v0.9.4")
-	pushChange(t, upstream, project.VersionFileName, "v0.9.5\n")
+	projectDir, upstream := gitProject(t, "v0.9.5")
+	pushChange(t, upstream, filepath.Join("commands", "k-neu.md"), "neu\n")
 	chdir(t, projectDir)
 
 	shutdown, wasShutdown := shutdownProbe()
@@ -312,17 +376,95 @@ func TestUpdateMitVersionswechselBeiFalschemPath(t *testing.T) {
 	if code != http.StatusOK || response.Restarted {
 		t.Fatalf("Status %d, Antwort %+v", code, response)
 	}
-	if project.InstalledVersion(filepath.Join(projectDir, project.PlaybookDirName)) != "v0.9.5" {
-		t.Error("der Pull kam nicht an")
+	if _, err := os.Stat(filepath.Join(projectDir, project.PlaybookDirName, "commands", "k-neu.md")); err != nil {
+		t.Errorf("der Pull kam nicht an: %v", err)
 	}
-	if !strings.Contains(response.Message, other) || !strings.Contains(response.Message, target) {
-		t.Errorf("der Hinweis nennt nicht beide Pfade: %s", response.Message)
+	for _, want := range []string{other, target, "älter als das neueste Release (v0.9.5)", project.FirstInstallCommand} {
+		if !strings.Contains(response.Message, want) {
+			t.Errorf("der Hinweis nennt %q nicht: %s", want, response.Message)
+		}
 	}
 	if !response.Program.Outdated || response.Program.Installable {
 		t.Errorf("Program = %+v", response.Program)
 	}
 	if wasShutdown() {
 		t.Error("der Dienst hat sich beendet")
+	}
+}
+
+// staleMCPEntry zeigt auf den abgelösten Wrapper — MCPStateOutdated.
+const staleMCPEntry = `{"mcpServers":{"` + project.MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
+
+// Nach einem gescheiterten Pull kehrt „Aktualisieren“ nicht zurück, bevor die
+// MCP-Registrierung repariert und das Programm geprüft ist. Der gescheiterte
+// Pull wird weiter gemeldet, mit 409.
+func TestUpdateNachGescheitertemPullRepariertMCPUndPrueftProgramm(t *testing.T) {
+	target := isolateHome(t)
+	writeExecutable(t, target, versionScript("v0.9.4"))
+	projectDir, _ := gitProject(t, "v0.9.4")
+	gitCmd(t, filepath.Join(projectDir, project.PlaybookDirName), "remote", "set-url", "origin", filepath.Join(t.TempDir(), "gibt-es-nicht.git"))
+	writeFile(t, filepath.Join(projectDir, ".mcp.json"), staleMCPEntry)
+	chdir(t, projectDir)
+
+	shutdown, wasShutdown := shutdownProbe()
+	code, response := postUpdate(t, &serverState{version: "v0.9.4", shutdown: shutdown}, pullHandler, "/api/update")
+	if code != http.StatusConflict || response.Restarted {
+		t.Fatalf("Status %d, Antwort %+v", code, response)
+	}
+	for _, want := range []string{"git pull --ff-only fehlgeschlagen", "MCP-Registrierung auf das installierte k-playbook korrigiert: .mcp.json"} {
+		if !strings.Contains(response.Message, want) {
+			t.Errorf("Meldung ohne %q: %s", want, response.Message)
+		}
+	}
+	if strings.Contains(response.Message, "Aktualisiert.") {
+		t.Errorf("ein gescheiterter Pull meldet „Aktualisiert.“: %s", response.Message)
+	}
+	if response.Program == nil || response.Program.Latest != "v0.9.4" || response.Program.Outdated {
+		t.Errorf("das Programm wurde nach dem gescheiterten Pull nicht geprüft: %+v", response.Program)
+	}
+	if content := readFile(t, filepath.Join(projectDir, ".mcp.json")); strings.Contains(content, "k-playbook/bin/k-playbook") {
+		t.Errorf("der veraltete Eintrag steht noch:\n%s", content)
+	}
+	// Eingerichtet wird nach einem gescheiterten Pull nicht — wie bisher.
+	if _, err := os.Stat(filepath.Join(projectDir, project.RootInstructionsFile)); err == nil {
+		t.Error("nach dem gescheiterten Pull lief die Einrichtung")
+	}
+	if wasShutdown() {
+		t.Error("der Dienst hat sich beendet")
+	}
+}
+
+// Ohne Clone meldet „Aktualisieren“ den fehlenden Clone, repariert die
+// MCP-Registrierung und prüft das Programm: Ist es älter, aber nicht
+// installierbar, steht der Hinweis da.
+func TestUpdateOhneCloneMeldetUndPrueftProgramm(t *testing.T) {
+	target := isolateHome(t)
+	writeExecutable(t, target, versionScript("v0.9.3"))
+	other := filepath.Join(t.TempDir(), project.InstalledCommandName)
+	writeExecutable(t, other, versionScript("v0.9.3"))
+	t.Setenv("PATH", filepath.Dir(other)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	projectDir := t.TempDir()
+	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
+	writeFile(t, filepath.Join(projectDir, ".mcp.json"), staleMCPEntry)
+	chdir(t, projectDir)
+	releasetest.Serve(t).AddTag("v0.9.4")
+
+	code, response := postUpdate(t, &serverState{version: "v0.9.3"}, pullHandler, "/api/update")
+	if code != http.StatusConflict || response.Restarted {
+		t.Fatalf("Status %d, Antwort %+v", code, response)
+	}
+	for _, want := range []string{
+		"Die Installation " + project.PlaybookDirName + "/ fehlt; der Pull entfällt.",
+		"MCP-Registrierung auf das installierte k-playbook korrigiert: .mcp.json",
+		"älter als das neueste Release (v0.9.4)",
+		other,
+	} {
+		if !strings.Contains(response.Message, want) {
+			t.Errorf("Meldung ohne %q: %s", want, response.Message)
+		}
+	}
+	if !response.Program.Outdated || response.Program.Installable {
+		t.Errorf("Program = %+v", response.Program)
 	}
 }
 
@@ -357,9 +499,9 @@ func TestProgrammaktualisierungFragtBeiLaufenderArbeit(t *testing.T) {
 	target := isolateHome(t)
 	writeExecutable(t, target, versionScript("v0.9.3"))
 	projectDir, _ := gitProject(t, "v0.9.4")
-	marker := filepath.Join(t.TempDir(), "bootstrap-gelaufen")
-	writeExecutable(t, filepath.Join(projectDir, project.PlaybookDirName, "bin", "install"), "#!/bin/sh\n: > "+marker+"\n")
 	chdir(t, projectDir)
+	source := releasetest.Serve(t)
+	source.AddRelease("v0.9.4", []byte(versionScript("v0.9.4")))
 
 	state := &serverState{version: "v0.9.3"}
 	state.openStreams.Store(1)
@@ -374,8 +516,13 @@ func TestProgrammaktualisierungFragtBeiLaufenderArbeit(t *testing.T) {
 			t.Errorf("Rückfrage ohne %q: %s", want, response.Message)
 		}
 	}
-	if _, err := os.Stat(marker); err == nil {
-		t.Error("der Bootstrap ist ohne Bestätigung gelaufen")
+	for _, request := range source.Requests() {
+		if strings.HasPrefix(request, "/download/") {
+			t.Errorf("ohne Bestätigung wurde geladen: %s", request)
+		}
+	}
+	if got := program.ReadVersion(target); got != "v0.9.3" {
+		t.Errorf("am Ziel liegt %q, ohne Bestätigung wurde installiert", got)
 	}
 }
 

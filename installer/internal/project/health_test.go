@@ -182,7 +182,7 @@ func TestHealthKephalaionOhneBinaryNenntInstallation(t *testing.T) {
 			t.Fatalf("%s: Problems = %+v", status.State, problems)
 		}
 		got := problems[0]
-		if got.Message != status.Message || !strings.Contains(got.Hint, "k-playbook upgrade") || !strings.Contains(got.Hint, KephalaionInstallCommand) {
+		if got.Message != status.Message || !strings.Contains(got.Hint, "k-playbook upgrade") || !strings.Contains(got.Hint, kephalaion.InstallCommand) {
 			t.Errorf("%s: %+v", status.State, got)
 		}
 	}

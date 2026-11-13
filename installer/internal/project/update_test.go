@@ -1,9 +1,11 @@
 package project
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -34,7 +36,7 @@ func newGitInstallation(t *testing.T) (projectDir string, remoteDir string) {
 	if err := os.WriteFile(filepath.Join(dir, "dist", "k-playbook-linux-amd64"), []byte("alt"), 0o755); err != nil {
 		t.Fatalf("Datei anlegen: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, VersionFileName), []byte("v0.0.1\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "VERSION"), []byte("v0.0.1\n"), 0o644); err != nil {
 		t.Fatalf("VERSION anlegen: %v", err)
 	}
 
@@ -157,15 +159,17 @@ func TestUpdateMachtReadOnlyInstallationTemporärBeschreibbar(t *testing.T) {
 	assertNotWritable(t, filepath.Join(dir, ".git", "config"))
 }
 
-// Nur wenn VERSION wechselt, bringt ein Neustart eine andere Version.
-func TestUpdateMeldetVersionswechsel(t *testing.T) {
+// Der Pull holt den neuen Stand des Clones — auch eine bewegte VERSION —,
+// sagt aber nichts mehr über Version und Installation des Programms: Die
+// entscheiden sich am neuesten Release-Tag, nicht am Clone.
+func TestUpdateHoltBewegteVersionOhneSieZuLesen(t *testing.T) {
 	projectDir, remoteDir := newGitInstallation(t)
 
 	other := filepath.Join(t.TempDir(), "anderer")
 	run(t, filepath.Dir(other), "git", "clone", remoteDir, other)
 	run(t, other, "git", "config", "user.email", "test@example.com")
 	run(t, other, "git", "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(other, VersionFileName), []byte("v0.0.2\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(other, "VERSION"), []byte("v0.0.2\n"), 0o644); err != nil {
 		t.Fatalf("VERSION ändern: %v", err)
 	}
 	run(t, other, "git", "add", "-A")
@@ -176,11 +180,18 @@ func TestUpdateMeldetVersionswechsel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if !result.VersionChanged {
-		t.Error("VersionChanged = false, obwohl VERSION gewechselt hat")
+	if content := readRaw(t, filepath.Join(PlaybookDir(projectDir), "VERSION")); content != "v0.0.2\n" {
+		t.Errorf("VERSION im Clone = %q, der Pull hat den neuen Stand nicht geholt", content)
 	}
-	if result.Version != "v0.0.2" {
-		t.Errorf("Version = %q, erwartet v0.0.2", result.Version)
+	// Die Antwort trägt nur, was der Pull selbst war.
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []string{"versionChanged", `"version"`, "mcpRepaired"} {
+		if strings.Contains(string(encoded), gone) {
+			t.Errorf("UpdateResult trägt noch %s: %s", gone, encoded)
+		}
 	}
 
 	status, err := CheckUpdate(projectDir)
@@ -189,29 +200,6 @@ func TestUpdateMeldetVersionswechsel(t *testing.T) {
 	}
 	if status.Available {
 		t.Error("nach dem Update wird weiterhin ein Update gemeldet")
-	}
-}
-
-func TestUpdateOhneVersionswechsel(t *testing.T) {
-	projectDir, remoteDir := newGitInstallation(t)
-
-	other := filepath.Join(t.TempDir(), "anderer")
-	run(t, filepath.Dir(other), "git", "clone", remoteDir, other)
-	run(t, other, "git", "config", "user.email", "test@example.com")
-	run(t, other, "git", "config", "user.name", "Test")
-	if err := os.WriteFile(filepath.Join(other, "doku.md"), []byte("nur Text"), 0o644); err != nil {
-		t.Fatalf("Datei anlegen: %v", err)
-	}
-	run(t, other, "git", "add", "-A")
-	run(t, other, "git", "commit", "-m", "nur Doku")
-	run(t, other, "git", "push")
-
-	result, err := Update(projectDir)
-	if err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-	if result.VersionChanged {
-		t.Error("VersionChanged = true, obwohl VERSION gleich geblieben ist")
 	}
 }
 
@@ -230,37 +218,47 @@ func TestCheckUpdateOhneGit(t *testing.T) {
 	}
 }
 
-// Nach dem Clone-Update darf kein Bestandsprojekt mit einer kaputten
-// MCP-Registrierung zurückbleiben. Der Pull erreicht die Datei nicht — sie
-// liegt im Hauptverzeichnis, nicht im Clone —, also korrigiert das Update sie
-// selbst.
+// Kein Bestandsprojekt darf mit einer kaputten MCP-Registrierung
+// zurückbleiben. Der Pull erreicht die Datei nicht — sie liegt im
+// Hauptverzeichnis, nicht im Clone —, und er repariert sie auch nicht mehr
+// selbst: Das tun die Aufrufer über RepairMCPReport, ob der Pull gelang oder
+// nicht.
 //
 // Das Hauptverzeichnis hat keine K-PLAYBOOK.yaml: die Tracking-Frage ist
 // unbeantwortet, geschrieben wird seit Task 062 der bloße Name.
-func TestUpdateKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
+func TestRepairMCPReportKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
 	projectDir, _ := newGitInstallation(t)
 
 	installTestBinary(t)
-	writeFile(t, filepath.Join(projectDir, ".mcp.json"),
-		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
+	stale := `{"mcpServers":{"` + MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
+	writeFile(t, filepath.Join(projectDir, ".mcp.json"), stale)
 
-	result, err := Update(projectDir)
-	if err != nil {
+	if _, err := Update(projectDir); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if len(result.MCPRepaired) != 1 || result.MCPRepaired[0] != ".mcp.json" {
-		t.Fatalf("MCPRepaired = %v, erwartet [.mcp.json]", result.MCPRepaired)
+	if readRaw(t, filepath.Join(projectDir, ".mcp.json")) != stale {
+		t.Fatal("der Pull hat die MCP-Registrierung selbst repariert")
+	}
+
+	report := RepairMCPReport(projectDir, MCPWriteOutdatedOnly)
+	if len(report.Repaired) != 1 || report.Repaired[0] != ".mcp.json" || report.Message != "" {
+		t.Fatalf("Repaired = %v, Message %q, erwartet [.mcp.json]", report.Repaired, report.Message)
 	}
 
 	status := mcpStatusFor(t, CheckMCP(projectDir), ".mcp.json")
 	if !status.OK() {
-		t.Fatalf("nach dem Update nicht korrigiert: %+v", status)
+		t.Fatalf("nach der Reparatur nicht korrigiert: %+v", status)
 	}
 	if status.Detail != "-> "+InstalledCommandName {
 		t.Errorf("Detail = %q, erwartet den bloßen Namen %s", status.Detail, InstalledCommandName)
 	}
-	if len(result.MCPRepairedPortable) != 1 || result.MCPRepairedPortable[0] != ".mcp.json" {
-		t.Errorf("MCPRepairedPortable = %v, erwartet [.mcp.json]", result.MCPRepairedPortable)
+	if len(report.Portable) != 1 || report.Portable[0] != ".mcp.json" {
+		t.Errorf("Portable = %v, erwartet [.mcp.json]", report.Portable)
+	}
+
+	// Der zweite Lauf hat nichts zu tun.
+	if again := RepairMCPReport(projectDir, MCPWriteOutdatedOnly); len(again.Repaired) != 0 || len(again.Portable) != 0 {
+		t.Errorf("zweiter Lauf: %+v", again)
 	}
 }
 

@@ -309,10 +309,12 @@ func TestStartLaesstStaleLiegen(t *testing.T) {
 	}
 }
 
-// Das Clone-Update behält den engen Modus: es zieht nur den abgelösten Wrapper
-// nach und ergänzt keinen fehlenden Eintrag — auch nicht in einer nicht
-// erfassten Datei mit Spur des Assistenten.
-func TestUpdateErgaenztKeinenFehlendenEintrag(t *testing.T) {
+// Die Oberfläche behält nach „Aktualisieren“ den engen Modus
+// (MCPWriteOutdatedOnly): er zieht nur den abgelösten Wrapper nach und ergänzt
+// keinen fehlenden Eintrag — auch nicht in einer nicht erfassten Datei mit
+// Spur des Assistenten. Der Umfang des Starts (MCPWriteOutdatedAndUnversioned),
+// den der Projektschritt von `k-playbook upgrade` nimmt, ergänzt ihn.
+func TestRepairMCPReportEngerModusErgaenztKeinenFehlendenEintrag(t *testing.T) {
 	projectDir, _ := newGitInstallation(t)
 	installTestBinary(t)
 	writeVCSConfig(t, projectDir, "none")
@@ -320,15 +322,22 @@ func TestUpdateErgaenztKeinenFehlendenEintrag(t *testing.T) {
 	writeFile(t, file, fremderEintrag)
 	writeFile(t, filepath.Join(projectDir, ".claude", "settings.json"), "{}\n")
 
-	result, err := Update(projectDir)
-	if err != nil {
+	if _, err := Update(projectDir); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if len(result.MCPRepaired) != 0 {
-		t.Errorf("MCPRepaired = %v, erwartet nichts", result.MCPRepaired)
+	if report := RepairMCPReport(projectDir, MCPWriteOutdatedOnly); len(report.Repaired) != 0 {
+		t.Errorf("Repaired = %v, erwartet nichts", report.Repaired)
 	}
 	if readRaw(t, file) != fremderEintrag {
-		t.Errorf("das Update hat den fehlenden Eintrag ergänzt:\n%s", readRaw(t, file))
+		t.Errorf("der enge Modus hat den fehlenden Eintrag ergänzt:\n%s", readRaw(t, file))
+	}
+
+	report := RepairMCPReport(projectDir, MCPWriteOutdatedAndUnversioned)
+	if len(report.Repaired) != 1 || report.Repaired[0] != ".mcp.json" {
+		t.Errorf("Umfang des Starts: Repaired = %v, erwartet [.mcp.json]", report.Repaired)
+	}
+	if readRaw(t, file) == fremderEintrag {
+		t.Error("der Umfang des Starts hat den fehlenden Eintrag nicht ergänzt")
 	}
 }
 
@@ -486,8 +495,9 @@ func TestKnopfSchreibtDurchSymlink(t *testing.T) {
 	assertSymlink(t, link, sharedLinkTarget)
 }
 
-// Das Clone-Update ergänzt auch über einen Link keinen fehlenden Eintrag.
-// Update() ruft RepairMCP mit genau diesem Modus (update.go).
+// Der enge Modus ergänzt auch über einen Link keinen fehlenden Eintrag.
+// „Aktualisieren“ in der Oberfläche ruft RepairMCP mit genau diesem Modus
+// (applyUpdateHandler in webui/update.go).
 func TestUpdateLaesstSymlinkEinrichtungUnberuehrt(t *testing.T) {
 	root, shared, link := symlinkRepo(t)
 

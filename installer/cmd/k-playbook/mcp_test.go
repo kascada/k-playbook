@@ -21,6 +21,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
+	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 	"github.com/kascada/k-playbook/installer/internal/review"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
@@ -94,7 +95,16 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	// Kein Test fragt das echte GitHub nach dem neuesten Release-Tag oder
+	// lädt ein Release-Binary (Task 149): Tests mit eigener Version
+	// (setOwnVersion) erreichten sonst über Umgebungsprüfung, Programm-Stand
+	// und upgrade die Release-Quelle. Wer sie braucht, stellt mit
+	// releasetest.Serve eine Ersatzquelle hin. Erst hier, nach den Zweigen
+	// für Kindprozesse oben: Die erben die Umgebung des Tests — abgeschaltet
+	// oder die Ersatzquelle —, und ein Abschalten dort überschriebe sie.
+	cleanupRelease := releasetest.Isolate()
 	code := m.Run()
+	cleanupRelease()
 	cleanupDefaults()
 	cleanupGitHub()
 	cleanup()

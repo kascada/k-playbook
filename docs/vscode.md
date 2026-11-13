@@ -158,14 +158,18 @@ k-playbook vscode install          # install or catch up
 k-playbook vscode status           # embedded version, installations, chosen CLI
 k-playbook vscode vsix -o ext.vsix # write the VSIX only
 k-playbook vscode collections      # the Kephalaion folders a window should have
-k-playbook version --all           # program version plus the extension version
+k-playbook version --all           # program version, the extension version, the newest release
 ```
 
 `k-playbook version` stays **one line** — the version and nothing else. The interface reads
 it from the file at the install target to recognise a program change, and `ReadVersion`
 discards an answer that carries more than one line. The extension version therefore sits
 behind `version --all`, which is also where the committed VSIX is inspected, and that
-counts as the way to see it.
+counts as the way to see it. `version --all` prints three lines: the program version, the
+line `Erweiterung:` with the extension version, and the line `Neuestes Release:` with the
+newest release tag of k-playbook on GitHub — `unbekannt` with the reason when it cannot be
+read, without changing the exit code. In a terminal, `version` points to `--all` on stderr;
+stdout stays the one line.
 
 `k-playbook vscode status` and the card **VS-Code-Erweiterung** on the setup page of the
 interface show the same thing: the embedded version, what `extensions.json` lists, the CLI

@@ -10,7 +10,9 @@ import (
 // Tracking-Messung je Zieldatei das Kommando — erfasst oder unbeantwortet der
 // bloße Name, nicht erfasst der absolute Pfad.
 
-// repairScopes sind die beiden selbsttätigen Wege: Clone-Update und Start.
+// repairScopes sind die beiden Umfänge der selbsttätigen Wege: der enge von
+// „Aktualisieren“ in der Oberfläche und der des Starts, den auch der
+// Projektschritt von `k-playbook upgrade` nimmt.
 var repairScopes = []struct {
 	name  string
 	scope MCPWriteScope

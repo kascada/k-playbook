@@ -1,7 +1,8 @@
 # k-playbook — das Werkzeug
 
-Go-Modul hinter dem direkt installierten Befehl `k-playbook`. Der Bootstrap liegt als
-`bin/install` im Projekt-Clone; das Go-Programm richtet das Projekt selbst ein.
+Go-Modul hinter dem direkt installierten Befehl `k-playbook`. Die Erstinstallation ist
+`bin/install` — eigenständig über `curl … | bash` aufrufbar —; das Go-Programm richtet das
+Projekt selbst ein und aktualisiert sich selbst aus dem Release.
 
 Das Werkzeug heißt `k-playbook`, nicht `k-playbook-installer`. Einrichten ist nicht seine
 einzige Aufgabe; die jeweilige steckt im Subkommando.
@@ -19,8 +20,16 @@ k-playbook stop                     # beendet den Hintergrunddienst dieses Proje
 k-playbook help
 ```
 
-`bin/install` lädt das passende Release-Binary, prüft es gegen `SHA256SUMS` und legt es
-nach `~/.local/bin/k-playbook`.
+`bin/install` bestimmt den neuesten Release-Tag (`git ls-remote` über HTTPS), lädt das
+Release-Binary dieser Plattform, prüft es gegen die `SHA256SUMS` des Tags und legt es
+nach `~/.local/bin/k-playbook`; danach installiert es Kephalaion, wenn es fehlt:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
+```
+
+Aus einem Clone aufgerufen (`make -C k-playbook install`) tut es dasselbe; `VERSION` und
+`SHA256SUMS` des Clones liest es nicht.
 
 Ohne Argument öffnet das Programm die lokale Oberfläche. Der Server dahinter läuft als
 Hintergrunddienst je Projekt weiter, das Terminal ist sofort wieder frei; ein zweiter
@@ -34,9 +43,18 @@ eigene offene Arbeit und, bis zum Abbau, der Rest der Kontextausgabe. `context` 
 Verzeichnisse und die Kataloge als JSON auf, damit kein Command
 die Overlay-Regeln selbst anwenden muss; die Commands rufen es noch, bis sie einzeln auf
 das Briefing umziehen. Beide räumen bewusst nichts auf — deren Ausgabe würde die
-Antwort stören. `upgrade` zieht Programm und Projekt nach: Pull im Clone, Binary nur,
-wenn das laufende älter ist, dann `AGENTS.md`, `CLAUDE.md`, Verlinkung und
+Antwort stören. `upgrade` zieht Kephalaion, Programm und Projekt nach: Pull im Clone,
+solange es ihn gibt; das Binary nur, wenn das laufende älter ist als der neueste
+Release-Tag auf GitHub — dann direkt aus dem Release, geprüft gegen die `SHA256SUMS` des
+Tags, auch ohne Clone —; dann `AGENTS.md`, `CLAUDE.md`, Verlinkung und
 MCP-Einträge; `--check` meldet nur, was ein Lauf täte.
+
+Es gibt genau zwei Versionsquellen: die eigene Version im Binary und den neuesten
+Release-Tag. `k-playbook version` nennt die erste, `k-playbook version --all` zusätzlich
+die mitgereiste VS-Code-Erweiterung und die zweite; die Umgebungsprüfung
+(`k-playbook health`, das Briefing) warnt, wenn das Programm älter ist als das neueste
+Release. `VERSION`, `SHA256SUMS` und `bin/install` eines Clones liest und ruft das
+Programm dafür nicht mehr (Pakete `internal/release`, `internal/version`).
 
 Zum Entwickeln:
 

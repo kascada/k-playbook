@@ -18,7 +18,7 @@ func newProject(t *testing.T) string {
 	root := t.TempDir()
 	// Der Clone steht noch, solange er Regeln, Skripte und Checks trägt; die
 	// Commands und Skills kommen schon aus dem mitgelieferten Verzeichnis.
-	writeFile(t, filepath.Join(root, project.PlaybookDirName, project.VersionFileName), "v0.0.0\n")
+	writeFile(t, filepath.Join(root, project.PlaybookDirName, "VERSION"), "v0.0.0\n")
 	writeFile(t, filepath.Join(sharetest.Dir(t), "commands", "k-test.md"), "test\n")
 	writeFile(t, filepath.Join(sharetest.Dir(t), "skills", "beispiel", "SKILL.md"), "# Beispiel\n")
 	return root
@@ -169,36 +169,39 @@ func TestRelinkAfterUpdateMeldetKonflikt(t *testing.T) {
 	}
 }
 
-// Scheitert die Programmaktualisierung, nennt die Meldung den Bootstrap in der
-// kanonischen Form. Geprüft wird der ganze Satz, nicht nur ein
+// Scheitert die Programmaktualisierung, nennt die Meldung den Weg im
+// Terminal: `k-playbook upgrade`. Geprüft wird der ganze Satz, nicht nur ein
 // Wortbestandteil: die Meldung ist die Stelle, an der ein Nutzer erfährt, wie
 // er das Programm von Hand nachholt.
 //
-// Ausdrücklich mitgeprüft wird, was **nicht** dastehen darf: ein Zielprojekt
-// hat kein eigenes install-Target, `make install` liefe dort ins Leere.
-func TestInstallationsfehlerNenntKanonischenBootstrap(t *testing.T) {
+// Ausdrücklich mitgeprüft wird, was **nicht** mehr dastehen darf: der
+// Bootstrap des Clones. Das Programm kommt aus dem Release, nicht aus dem
+// Clone.
+func TestInstallationsfehlerNenntUpgrade(t *testing.T) {
 	message := installFailureMessage(errors.New("kein Netz"))
 
 	for _, want := range []string{
 		"kein Netz",
 		"läuft mit dem bisherigen Programm weiter",
-		"make -C " + project.PlaybookDirName + " install",
-		project.PlaybookDirName + "/bin/install",
+		"Nachholen im Terminal: " + project.UpgradeCommand + ", danach k-playbook aufrufen.",
 	} {
 		if !strings.Contains(message, want) {
 			t.Errorf("in der Meldung fehlt %q: %s", want, message)
 		}
 	}
-	if strings.Contains(strings.ReplaceAll(message, "make -C "+project.PlaybookDirName+" install", ""), "make install") {
-		t.Errorf("die Meldung nennt ein install-Target, das ein Zielprojekt nicht hat: %s", message)
+	for _, gone := range []string{"make", project.BootstrapCommandNoMake} {
+		if strings.Contains(message, gone) {
+			t.Errorf("die Meldung nennt noch %q: %s", gone, message)
+		}
 	}
 }
 
-// Die Oberfläche zeigt denselben Bootstrap wie die Antwort des Servers. Beide
+// Die Oberfläche zeigt denselben Weg wie die Antwort des Servers. Beide
 // Texte stehen an verschiedenen Stellen — Go-Meldung und service.js, wo der
 // Update-Knopf der Statusseite und von /setup bedient wird —, und genau
-// deshalb wird der Gleichlauf geprüft statt vorausgesetzt.
-func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
+// deshalb wird der Gleichlauf geprüft statt vorausgesetzt. Dazu liest die
+// Seite das Feld latest der Antwort, nicht mehr clone.
+func TestOberflaecheNenntDenselbenWeg(t *testing.T) {
 	source, err := staticFiles.ReadFile("static/service.js")
 	if err != nil {
 		t.Fatalf("service.js lesen: %v", err)
@@ -206,81 +209,35 @@ func TestOberflaecheNenntDenselbenBootstrap(t *testing.T) {
 	script := string(source)
 
 	for _, want := range []string{
-		"make -C " + project.PlaybookDirName + " install",
-		project.PlaybookDirName + "/bin/install",
+		"Nachholen im Terminal: " + project.UpgradeCommand + ".",
+		project.UpgradeCommand + " und danach k-playbook aufrufen.",
+		"program.latest",
+		"älter als das neueste Release",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("in service.js fehlt %q", want)
 		}
 	}
-}
-
-// Ob nach dem Pull installiert und neu gestartet wird, entscheidet nicht der
-// Wechsel der VERSION allein, sondern der semantische Vergleich mit dem
-// laufenden Programm: nur „älter" löst aus.
-func TestRestartAfterPull(t *testing.T) {
-	tests := []struct {
-		name    string
-		running string
-		result  project.UpdateResult
-		want    bool
-	}{
-		{
-			name:    "Zielprojekt: Clone zieht an, Programm bleibt zurück",
-			running: "v0.3.0",
-			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
-			want:    true,
-		},
-		{
-			// Lexikalisch stünde v0.10.0 vor v0.9.4.
-			name:    "Minor-Sprung über 9 hinaus",
-			running: "v0.9.4",
-			result:  project.UpdateResult{VersionChanged: true, Version: "v0.10.0"},
-			want:    true,
-		},
-		{
-			// Der Entwicklungsfall: `make dev-install` hat das Programm des
-			// neuen Standes schon eingespielt, der Clone holt ihn erst jetzt nach.
-			name:    "Entwicklungsrepo: Programm trägt die neue Version bereits",
-			running: "v0.4.0",
-			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
-		},
-		{
-			// Neuer als der Clone: nie herabstufen.
-			name:    "Programm neuer als der neue Stand",
-			running: "v0.5.0",
-			result:  project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
-		},
-		{
-			// Ohne Versionswechsel verhält sich ein Update wie immer.
-			name:    "kein Versionswechsel, Programm älter",
-			running: "v0.3.0",
-			result:  project.UpdateResult{Version: "v0.4.0"},
-		},
-		{
-			name:    "Installation ohne VERSION",
-			running: "v0.4.0",
-			result:  project.UpdateResult{VersionChanged: true},
-		},
-		{
-			name:   "Programm ohne gestempelte Version",
-			result: project.UpdateResult{VersionChanged: true, Version: "v0.4.0"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := restartAfterPull(test.running, test.result); got != test.want {
-				t.Errorf("restartAfterPull = %v, erwartet %v", got, test.want)
-			}
-		})
+	for _, gone := range []string{
+		"make -C " + project.PlaybookDirName + " install",
+		project.BootstrapCommandNoMake,
+		"program.clone",
+		"älter als die Installation",
+		"zum Clone passende Programm",
+	} {
+		if strings.Contains(script, gone) {
+			t.Errorf("service.js nennt noch %q", gone)
+		}
 	}
 }
 
-// Nach einem Clone-Update hängt der Dock/Finder-Hinweis an der geschriebenen
+// Nach „Aktualisieren“ hängt der Dock/Finder-Hinweis an der geschriebenen
 // Form: nur wo der bloße Name steht, wird er genannt.
 func TestDescribeMCPRepairNenntDiePortableForm(t *testing.T) {
-	absolute := describeMCPRepair(project.UpdateResult{MCPRepaired: []string{".mcp.json"}})
+	if nothing := describeMCPRepair(project.MCPRepairReport{}); nothing != "" {
+		t.Errorf("ohne Reparatur eine Meldung: %q", nothing)
+	}
+	absolute := describeMCPRepair(project.MCPRepairReport{Repaired: []string{".mcp.json"}})
 	if !strings.Contains(absolute, ".mcp.json") {
 		t.Errorf("Meldung nennt die Datei nicht: %q", absolute)
 	}
@@ -288,9 +245,9 @@ func TestDescribeMCPRepairNenntDiePortableForm(t *testing.T) {
 		t.Errorf("Meldung ohne portable Form nennt den Hinweis: %q", absolute)
 	}
 
-	portable := describeMCPRepair(project.UpdateResult{
-		MCPRepaired:         []string{".mcp.json", "opencode.json"},
-		MCPRepairedPortable: []string{".mcp.json"},
+	portable := describeMCPRepair(project.MCPRepairReport{
+		Repaired: []string{".mcp.json", "opencode.json"},
+		Portable: []string{".mcp.json"},
 	})
 	for _, want := range []string{"bloße Name " + project.InstalledCommandName, "In .mcp.json steht", "Dock oder Finder", "von Hand"} {
 		if !strings.Contains(portable, want) {

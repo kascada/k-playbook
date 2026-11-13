@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/version"
 	"github.com/kascada/k-playbook/installer/internal/webui"
 )
 
@@ -58,32 +60,37 @@ func careForHost() {
 }
 
 // noteOutdatedProgram meldet in einer Zeile, dass dieses Programm älter ist
-// als die VERSION des Clones.
+// als das neueste Release.
 //
 // Nur ein Hinweis: beim Start wird nichts heruntergeladen. Die Oberfläche
 // bietet dieselbe Aktualisierung als Knopf an, und erst der Klick installiert.
-// Ohne die Zeile bliebe der Zustand „Clone neu, Programm alt" im Terminal
-// unsichtbar — genau der Zustand, in dem ein Nutzer nach einem Update-Klick
-// und einem erneuten `k-playbook` wieder das alte Programm vor sich hatte.
+// Ohne die Zeile bliebe der Zustand „neueres Release, Programm alt" im
+// Terminal unsichtbar.
+//
+// Gefragt wird der neueste Release-Tag (program.CheckStatus) — ein Netzaufruf
+// mit kurzer Frist, und nur, wenn dieses Programm eine Version trägt. Ist der
+// Tag unbekannt, bleibt die Zeile aus.
 func noteOutdatedProgram(out io.Writer, running string) {
 	environment := project.Detect()
 	if !environment.Installed {
 		return
 	}
-	if line := outdatedProgramNotice(running, project.InstalledVersion(environment.PlaybookDir)); line != "" {
+	status := program.CheckStatus(context.Background(), running)
+	if line := outdatedProgramNotice(status.Running, status.Latest); line != "" {
 		fmt.Fprintln(out, line)
 	}
 }
 
 // outdatedProgramNotice ist die Zeile selbst, leer, wenn nichts zu melden ist.
-// Nur „älter" meldet: gleich, neuer und unbekannt sind kein Anlass.
-func outdatedProgramNotice(running string, clone string) string {
-	if program.Compare(running, clone) != program.Older {
+// Nur „älter" meldet: gleich, neuer und unbekannt sind kein Anlass. Der Weg im
+// Terminal ist `k-playbook upgrade`.
+func outdatedProgramNotice(running string, latest string) string {
+	if version.Compare(running, latest) != version.Older {
 		return ""
 	}
-	return fmt.Sprintf("Hinweis: Dieses Programm (%s) ist älter als die Installation (%s). "+
+	return fmt.Sprintf("Hinweis: Dieses Programm (%s) ist älter als das neueste Release (%s). "+
 		"Die Oberfläche bietet „Programm aktualisieren“ an; im Terminal: %s.",
-		running, clone, project.BootstrapCommand)
+		running, latest, project.UpgradeCommand)
 }
 
 // cleanUpFormerHostInstall entfernt Daten des abgelösten Wrapper-Modells.
@@ -134,8 +141,10 @@ func protectProjectInstallation() {
 	}
 }
 
-// repairMCPRegistration zieht die MCP-Registrierung des Projekts nach — der
-// zweite selbsttätige Weg neben dem Clone-Update, und der weitere von beiden.
+// repairMCPRegistration zieht die MCP-Registrierung des Projekts nach — ein
+// selbsttätiger Weg neben „Aktualisieren“ in der Oberfläche und dem
+// Projektschritt von `k-playbook upgrade`, im selben Umfang wie dieser und
+// weiter als jenes.
 //
 // Er ist der Auffangweg für alles, was nicht über die Oberfläche aktualisiert
 // wurde: ein `git pull` von Hand oder `make -C k-playbook installer-update`

@@ -1,8 +1,6 @@
 package webui
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,6 +17,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
+	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
@@ -83,7 +82,14 @@ func TestMain(m *testing.M) {
 	cleanupDefaults := defaultstest.Isolate()
 	// Kein Test fragt das echte kephalaion dieses Rechners (Task 138).
 	cleanupBinary := kephtest.IsolateBinary()
+	// Und keiner das echte GitHub nach dem neuesten Release-Tag oder einem
+	// Release-Binary (Task 149). Die Tests hier setzen eigene Versionen und
+	// starten gebaute Programme als Dienst; wer die Quelle braucht, stellt mit
+	// releasetest.Serve eine Ersatzquelle hin. Ein gestarteter Dienst erbt die
+	// Umgebung — abgeschaltet oder die Ersatzquelle.
+	cleanupRelease := releasetest.Isolate()
 	code := m.Run()
+	cleanupRelease()
 	cleanupBinary()
 	cleanupDefaults()
 	_ = os.Chdir(packageDir)
@@ -132,40 +138,34 @@ func buildProgram(t *testing.T, version string) string {
 }
 
 // restartFixture ist ein laufender „alter" Dienst — dieser Testprozess mit
-// eigener Registrierung — in einem Projekt, dessen Clone einen Stub-Bootstrap
-// trägt.
+// eigener Registrierung — in einem Projekt ohne Clone, vor einer Ersatzquelle
+// für das Release.
 type restartFixture struct {
 	projectDir string
 	target     string
 	state      *serverState
 	file       string
 	wasStopped func() bool
+	source     *releasetest.Source
 }
 
-// newRestartFixture baut das Projekt: VERSION clone, SHA256SUMS mit der Summe
-// von asset für diese Plattform und bin/install als Stub, der asset ans Ziel
-// kopiert und mit exitCode endet. Am Ziel liegt vorher targetScript.
-func newRestartFixture(t *testing.T, running string, clone string, asset string, exitCode int, targetScript string) *restartFixture {
+// newRestartFixture baut das Projekt — bewusst ohne Clone: Programmprüfung und
+// Installation hängen nicht an ihm — und die Ersatzquelle: latest ist der
+// neueste Release-Tag, asset das Release-Binary dieser Plattform samt passender
+// SHA256SUMS. Mit assetMissing fehlt das Asset (der Tag steht, die CI baut
+// noch): die Installation scheitert. Am Ziel liegt vorher targetScript.
+func newRestartFixture(t *testing.T, running string, latest string, asset string, assetMissing bool, targetScript string) *restartFixture {
 	t.Helper()
 
 	target := isolateHome(t)
 	writeExecutable(t, target, targetScript)
 
 	projectDir := t.TempDir()
-	playbook := filepath.Join(projectDir, project.PlaybookDirName)
 	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
-	writeFile(t, filepath.Join(playbook, project.VersionFileName), clone+"\n")
-	writeFile(t, filepath.Join(playbook, program.SumsFileName), fileSum(t, asset)+"  "+program.AssetName()+"\n")
-	// Der Stub ersetzt wie bin/install atomar über mktemp und mv: ein `cp`
-	// über die laufende Programmdatei scheitert mit „Text file busy".
-	writeExecutable(t, filepath.Join(playbook, "bin", "install"), fmt.Sprintf(
-		"#!/bin/sh\n"+
-			"echo \"Stub-Bootstrap für %s\"\n"+
-			"tmp=\"$(mktemp \"$HOME/.local/bin/.k-playbook.XXXXXX\")\"\n"+
-			"cp %q \"$tmp\" || exit 9\n"+
-			"chmod 0755 \"$tmp\"\n"+
-			"mv -f \"$tmp\" \"$HOME/.local/bin/k-playbook\" || exit 9\n"+
-			"exit %d\n", clone, asset, exitCode))
+	source := serveRelease(t, latest, asset)
+	if assetMissing {
+		source.RemoveAsset(latest, program.AssetName())
+	}
 	t.Cleanup(func() { makeWritable(projectDir) })
 	chdir(t, projectDir)
 
@@ -192,17 +192,21 @@ func newRestartFixture(t *testing.T, running string, clone string, asset string,
 		state:      &serverState{version: running, registration: registration, shutdown: shutdown},
 		file:       registration.Path(),
 		wasStopped: wasStopped,
+		source:     source,
 	}
 }
 
-func fileSum(t *testing.T, path string) string {
+// serveRelease stellt eine Ersatzquelle hin, deren neuester Tag tag ist und
+// die die Datei asset als Release-Binary dieser Plattform ausliefert.
+func serveRelease(t *testing.T, tag string, asset string) *releasetest.Source {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	content, err := os.ReadFile(asset)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
+	source := releasetest.Serve(t)
+	source.AddRelease(tag, content)
+	return source
 }
 
 // stopRegistered beendet den Dienst aus der Laufzeitdatei, sofern es nicht
@@ -227,19 +231,21 @@ func (f *restartFixture) registered(t *testing.T) guiproc.Record {
 	return record
 }
 
-// Der ganze Ablauf: älteres Programm, Stub-Bootstrap legt ein getrennt
-// gebautes Programm mit neuer Version ab, der neue Dienst übernimmt die
+// Der ganze Ablauf, ohne Clone: älteres Programm, die Installation lädt ein
+// getrennt gebautes Programm mit neuer Version aus dem Release des neuesten
+// Tags und prüft es gegen dessen SHA256SUMS, der neue Dienst übernimmt die
 // Laufzeitdatei, meldet die neue Version und hat die Startpflege erledigt; der
 // alte ist nicht mehr registriert und beendet sich.
 func TestProgrammaktualisierungStartetNeu(t *testing.T) {
 	asset := buildProgram(t, "v0.9.91")
-	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, 0, versionScript("v0.9.90"))
+	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, false, versionScript("v0.9.90"))
 
 	code, response := postUpdate(t, f.state, programHandler, "/api/update/program")
 	if code != http.StatusOK || !response.Restarted {
 		t.Fatalf("Status %d, Antwort %+v", code, response)
 	}
-	if response.Version != "v0.9.91" || !strings.Contains(response.InstallOutput, "Stub-Bootstrap") {
+	if response.Version != "v0.9.91" || !strings.Contains(response.InstallOutput, "Geprüft gegen SHA256SUMS von v0.9.91") ||
+		!strings.Contains(response.InstallOutput, f.source.URL()+"/download/v0.9.91/"+program.AssetName()) {
 		t.Errorf("Antwort = %+v", response)
 	}
 
@@ -282,18 +288,23 @@ func TestProgrammaktualisierungStartetNeu(t *testing.T) {
 func TestNeuerDienstStartetNichtAlterLaeuftWeiter(t *testing.T) {
 	asset := filepath.Join(t.TempDir(), "asset")
 	writeExecutable(t, asset, versionScript("v0.9.91"))
-	// Am Ziel liegt schon ein Programm mit der VERSION des Clones: kein
+	// Am Ziel liegt schon ein Programm mit der Version des neuesten Tags: kein
 	// Download, nur der Neustart — und der scheitert, denn als Server taugt
 	// das Skript nicht.
-	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, 0, versionScript("v0.9.91"))
+	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, false, versionScript("v0.9.91"))
 
 	code, response := postUpdate(t, f.state, programHandler, "/api/update/program")
 	if code != http.StatusInternalServerError || response.Restarted || !response.InstallFailed {
 		t.Fatalf("Status %d, Antwort %+v", code, response)
 	}
-	for _, want := range []string{"nicht gestartet", "läuft mit dem bisherigen Programm weiter", project.BootstrapCommand} {
+	for _, want := range []string{"nicht gestartet", "läuft mit dem bisherigen Programm weiter", project.UpgradeCommand} {
 		if !strings.Contains(response.Message, want) {
 			t.Errorf("Meldung ohne %q: %s", want, response.Message)
+		}
+	}
+	for _, request := range f.source.Requests() {
+		if strings.HasPrefix(request, "/download/") {
+			t.Errorf("trotz passender Datei am Ziel wurde geladen: %s", request)
 		}
 	}
 	if record := f.registered(t); record.PID != os.Getpid() {
@@ -307,24 +318,28 @@ func TestNeuerDienstStartetNichtAlterLaeuftWeiter(t *testing.T) {
 	}
 }
 
-// Scheitert die Installation, läuft der Dienst weiter; die Antwort trägt
-// Fehler, Ausgabe und Befehl. Freigegeben wurde nichts.
+// Scheitert die Installation — hier fehlt das Asset noch, der Tag steht schon —,
+// läuft der Dienst weiter; die Antwort trägt Fehler und Befehl. Freigegeben
+// und ersetzt wurde nichts.
 func TestInstallationScheitertDienstLaeuftWeiter(t *testing.T) {
 	asset := filepath.Join(t.TempDir(), "asset")
 	writeExecutable(t, asset, versionScript("v0.9.91"))
-	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, 1, versionScript("v0.9.90"))
+	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, true, versionScript("v0.9.90"))
 
 	code, response := postUpdate(t, f.state, programHandler, "/api/update/program")
 	if code != http.StatusInternalServerError || !response.InstallFailed || response.Restarted {
 		t.Fatalf("Status %d, Antwort %+v", code, response)
 	}
-	for _, want := range []string{"Exit-Code 1", project.BootstrapCommand, project.BootstrapCommandNoMake} {
+	for _, want := range []string{"das Release v0.9.91 ist noch nicht fertig", "Nachholen im Terminal: " + project.UpgradeCommand} {
 		if !strings.Contains(response.Message, want) {
 			t.Errorf("Meldung ohne %q: %s", want, response.Message)
 		}
 	}
-	if !strings.Contains(response.InstallOutput, "Stub-Bootstrap") {
-		t.Errorf("Ausgabe fehlt: %q", response.InstallOutput)
+	if strings.Contains(response.Message, project.BootstrapCommand) {
+		t.Errorf("die Meldung nennt noch den Bootstrap des Clones: %s", response.Message)
+	}
+	if got := program.ReadVersion(f.target); got != "v0.9.90" {
+		t.Errorf("am Ziel liegt %q, die Datei wurde ersetzt", got)
 	}
 	if record := f.registered(t); record.PID != os.Getpid() || f.state.registration.Released() {
 		t.Errorf("Registrierung angetastet: %+v", record)
@@ -343,7 +358,7 @@ func TestInstallationScheitertDienstLaeuftWeiter(t *testing.T) {
 // ist genau einer registriert.
 func TestGleichzeitigerStartInDerLueckeGewinnt(t *testing.T) {
 	asset := buildProgram(t, "v0.9.91")
-	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, 0, versionScript("v0.9.90"))
+	f := newRestartFixture(t, "v0.9.90", "v0.9.91", asset, false, versionScript("v0.9.90"))
 
 	var competitor *guiproc.Child
 	afterRelease = func() {
@@ -376,53 +391,72 @@ func TestGleichzeitigerStartInDerLueckeGewinnt(t *testing.T) {
 	}
 }
 
-// Der Weg über „Update verfügbar": der Pull bewegt die VERSION, das laufende
-// Programm ist älter — dann installiert und startet derselbe Ablauf neu.
-func TestUpdateMitVersionswechselInstalliertUndStartetNeu(t *testing.T) {
+// Der Weg über „Update verfügbar": Ist das laufende Programm älter als der
+// neueste Release-Tag, installiert und startet derselbe Ablauf neu. Knopf und
+// Neustart hängen am Tag, nicht am Pull: Es geht nach einem Pull, der die
+// VERSION im Clone gar nicht bewegt, und ebenso nach einem gescheiterten Pull.
+func TestUpdateInstalliertUndStartetNeuBeiAelteremProgramm(t *testing.T) {
 	asset := buildProgram(t, "v0.9.91")
-	target := isolateHome(t)
-	writeExecutable(t, target, versionScript("v0.9.90"))
 
-	projectDir, upstream := gitProject(t, "v0.9.90")
-	// Das Ausführungsbit kommt von der Datei: git übernimmt es beim add.
-	writeExecutable(t, filepath.Join(upstream, "bin", "install"), "#!/bin/sh\n"+
-		"echo \"Stub-Bootstrap\"\n"+
-		"tmp=\"$(mktemp \"$HOME/.local/bin/.k-playbook.XXXXXX\")\"\n"+
-		"cp "+asset+" \"$tmp\" || exit 9\n"+
-		"chmod 0755 \"$tmp\"\n"+
-		"mv -f \"$tmp\" \"$HOME/.local/bin/k-playbook\" || exit 9\n")
-	gitCmd(t, upstream, "add", "-A")
-	gitCmd(t, upstream, "commit", "-m", "Stub-Bootstrap")
-	gitCmd(t, upstream, "push")
-	pushChange(t, upstream, program.SumsFileName, fileSum(t, asset)+"  "+program.AssetName()+"\n")
-	pushChange(t, upstream, project.VersionFileName, "v0.9.91\n")
-	chdir(t, projectDir)
+	for _, fall := range []struct {
+		name       string
+		breakPull  bool
+		pullFailed string
+	}{
+		{name: "nach gelungenem Pull"},
+		{name: "nach gescheitertem Pull", breakPull: true, pullFailed: "git pull --ff-only fehlgeschlagen"},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			target := isolateHome(t)
+			writeExecutable(t, target, versionScript("v0.9.90"))
 
-	key, err := guiproc.Key()
-	if err != nil {
-		t.Fatal(err)
-	}
-	registration, err := guiproc.Register(guiproc.Record{
-		Key: key, Addr: "127.0.0.1:1", PID: os.Getpid(), Version: "v0.9.90",
-		StartTime: guiproc.OwnStartTime().Unix(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = registration.Remove() })
-	t.Cleanup(func() { stopRegistered(t, registration.Path()) })
+			projectDir, upstream := gitProject(t, "v0.9.91")
+			pushChange(t, upstream, filepath.Join("commands", "k-neu.md"), "neu\n")
+			if fall.breakPull {
+				gitCmd(t, filepath.Join(projectDir, project.PlaybookDirName), "remote", "set-url", "origin", filepath.Join(t.TempDir(), "gibt-es-nicht.git"))
+			}
+			serveRelease(t, "v0.9.91", asset)
+			chdir(t, projectDir)
 
-	shutdown, wasStopped := shutdownProbe()
-	state := &serverState{version: "v0.9.90", registration: registration, shutdown: shutdown}
-	code, response := postUpdate(t, state, pullHandler, "/api/update")
-	if code != http.StatusOK || !response.Restarted || response.Version != "v0.9.91" {
-		t.Fatalf("Status %d, Antwort %+v", code, response)
-	}
-	record, ok, err := guiproc.Read(registration.Path())
-	if err != nil || !ok || record.Version != "v0.9.91" || record.URL() != response.URL {
-		t.Fatalf("Laufzeitdatei = %+v (%v, %v)", record, ok, err)
-	}
-	if !wasStopped() {
-		t.Error("der alte Dienst beendet sich nicht")
+			key, err := guiproc.Key()
+			if err != nil {
+				t.Fatal(err)
+			}
+			registration, err := guiproc.Register(guiproc.Record{
+				Key: key, Addr: "127.0.0.1:1", PID: os.Getpid(), Version: "v0.9.90",
+				StartTime: guiproc.OwnStartTime().Unix(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = registration.Remove() })
+			t.Cleanup(func() { stopRegistered(t, registration.Path()) })
+
+			shutdown, wasStopped := shutdownProbe()
+			state := &serverState{version: "v0.9.90", registration: registration, shutdown: shutdown}
+			code, response := postUpdate(t, state, pullHandler, "/api/update")
+			// Auch nach einem gescheiterten Pull 200: die Seite muss der neuen
+			// Adresse folgen.
+			if code != http.StatusOK || !response.Restarted || response.Version != "v0.9.91" {
+				t.Fatalf("Status %d, Antwort %+v", code, response)
+			}
+			if fall.pullFailed != "" && !strings.Contains(response.Message, fall.pullFailed) {
+				t.Errorf("der gescheiterte Pull wird nicht gemeldet: %s", response.Message)
+			}
+			_, pullErr := os.Stat(filepath.Join(projectDir, project.PlaybookDirName, "commands", "k-neu.md"))
+			if (pullErr == nil) == fall.breakPull {
+				t.Errorf("Pull angekommen = %v, erwartet %v", pullErr == nil, !fall.breakPull)
+			}
+			record, ok, err := guiproc.Read(registration.Path())
+			if err != nil || !ok || record.Version != "v0.9.91" || record.URL() != response.URL {
+				t.Fatalf("Laufzeitdatei = %+v (%v, %v)", record, ok, err)
+			}
+			if got := program.ReadVersion(target); got != "v0.9.91" {
+				t.Errorf("am Ziel liegt %q", got)
+			}
+			if !wasStopped() {
+				t.Error("der alte Dienst beendet sich nicht")
+			}
+		})
 	}
 }

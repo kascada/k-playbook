@@ -46,6 +46,9 @@ const (
 	AreaGitHub         = "github"
 	AreaShare          = "share"
 	AreaAnchor         = "anchor"
+	// AreaProgram: das Programm selbst — ob es älter ist als das neueste
+	// Release (project/health_release.go).
+	AreaProgram = "program"
 )
 
 // Problem ist ein Eintrag des Reports.

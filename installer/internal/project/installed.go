@@ -4,21 +4,42 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/kascada/k-playbook/installer/internal/release"
 )
 
 // InstalledCommandName ist der Name, unter dem k-playbook einmal je Host oder
 // DevContainer installiert und danach aufgerufen wird.
 const InstalledCommandName = "k-playbook"
 
-// BootstrapCommand ist die kanonische Form des Bootstraps: der Aufruf, mit dem
-// ein Zielprojekt das zu seinem Clone passende Binary installiert.
-// BootstrapCommandNoMake ist derselbe Weg ohne make.
+// UpgradeCommand aktualisiert Kephalaion und das Programm und zieht das
+// Projekt nach. Wo das der Ausweg ist — ein älteres Programm, eine
+// gescheiterte Aktualisierung über die Oberfläche —, nennen die Meldungen ihn.
+const UpgradeCommand = InstalledCommandName + " upgrade"
+
+// FirstInstallCommand ist die Erstinstallation: bin/install aus dem Repo,
+// eigenständig über curl | bash aufrufbar. Es bestimmt den neuesten
+// Release-Tag, prüft das Binary gegen die SHA256SUMS des Tags, installiert es
+// nach ~/.local/bin/k-playbook und danach Kephalaion, wenn es fehlt.
+//
+// Die Meldungen nennen es dort, wo `k-playbook upgrade` nicht hilft: wenn
+// upgrade selbst gescheitert ist oder der PATH nicht auf das Installationsziel
+// zeigt.
+const FirstInstallCommand = release.FirstInstallCommand
+
+// BootstrapCommand ist der Aufruf von bin/install aus dem Clone eines
+// Zielprojekts; BootstrapCommandNoMake derselbe Weg ohne make. Aus dem Clone
+// aufgerufen verhält sich bin/install wie über FirstInstallCommand: Es liest
+// weder VERSION noch SHA256SUMS neben sich und installiert den neuesten
+// Release-Tag.
 //
 // Beide stehen hier und nicht als Literal in den Meldungen, damit Oberfläche
 // und Dokumentation nicht auseinanderlaufen. Wichtig ist die Form: ein
 // Zielprojekt hat **kein eigenes** install-Target — sein Makefile ist das des
 // Clones, und der Aufruf geht deshalb immer über den Clone. Ein bloßes
-// `make install` liefe dort ins Leere.
+// `make install` liefe dort ins Leere. Gebraucht werden sie noch in der
+// Meldung zum fehlenden Clone; das Programm selbst ruft bin/install nicht
+// mehr auf.
 const (
 	BootstrapCommand       = "make -C " + PlaybookDirName + " install"
 	BootstrapCommandNoMake = PlaybookDirName + "/bin/install"
@@ -28,12 +49,8 @@ const (
 // Meldungen eingesetzt wird.
 const BootstrapHint = BootstrapCommand + " (ohne make: " + BootstrapCommandNoMake + ")"
 
-// KephalaionInstallCommand installiert Kephalaion, wenn es fehlt. bin/install
-// ruft es am Ende auf, `k-playbook upgrade` in einem eigenen Schritt.
-const KephalaionInstallCommand = PlaybookDirName + "/bin/install-kephalaion"
-
 // installedBinDirName und installedBinSubDir bilden das Verzeichnis, in das
-// bin/install schreibt: ~/.local/bin. Die Aufteilung steht hier und nicht als
+// installiert wird: ~/.local/bin. Die Aufteilung steht hier und nicht als
 // zusammengesetzter Pfad, damit filepath.Join den Trenner der Plattform setzt.
 const (
 	installedBinDirName = ".local"

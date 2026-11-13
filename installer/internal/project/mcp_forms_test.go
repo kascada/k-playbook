@@ -309,7 +309,8 @@ func TestRepairMCPOhneInstalliertesBinary(t *testing.T) {
 }
 
 // Die portable Form in beiden Dateien: der Zustand dieses Quell-Repos ab
-// Etappe 3. Beide selbsttätigen Wege — Clone-Update und Start — müssen daran
+// Etappe 3. Beide Umfänge der selbsttätigen Wege — der enge von
+// „Aktualisieren“ in der Oberfläche und der des Starts — müssen daran
 // vorbeigehen, sonst schriebe die eigene Automatik bei jedem Lauf einen
 // absoluten Home-Pfad in getrackte Dateien und der Release-Preflight scheiterte
 // an ihr.

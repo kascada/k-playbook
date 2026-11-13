@@ -14,53 +14,103 @@ import (
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
-	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release"
 )
 
 // KephalaionResult ist der Ausgang von InstallKephalaion.
 type KephalaionResult struct {
-	// Path ist der Ort von kephalaion im PATH: vorhanden oder gerade
-	// installiert.
+	// Path ist der Ort von kephalaion: vorhanden oder gerade installiert.
 	Path string `json:"path,omitempty"`
-	// Installed: bin/install-kephalaion ist gelaufen.
+	// Installed: das install.sh von Kephalaion ist gelaufen.
 	Installed bool `json:"installed,omitempty"`
-	// Output ist die Ausgabe von bin/install-kephalaion, stdout und stderr
-	// zusammen.
+	// Output ist die Ausgabe des install.sh, stdout und stderr zusammen.
 	Output string `json:"output,omitempty"`
 }
 
-// InstallKephalaion sorgt dafür, dass kephalaion im PATH liegt. Ist es da,
-// geschieht nichts — auch keine Aktualisierung, die macht kephalaion upgrade.
-// Sonst läuft bin/install-kephalaion des Clones aus dem Hauptverzeichnis, mit
-// demselben Zeitlimit wie der Bootstrap.
+// InstallKephalaion sorgt dafür, dass kephalaion auf diesem Rechner liegt. Ist
+// es da (kephalaion.FindBinary), geschieht nichts — kein Abruf und auch keine
+// Aktualisierung, die macht kephalaion upgrade.
 //
-// Erfolg heißt nicht Exit 0, sondern: danach liegt kephalaion im PATH. Das
-// install.sh von Kephalaion installiert nach ~/.local/bin; fehlt das im PATH,
-// ist das Binary zwar da, aber für k-playbook so gut wie nicht.
-func InstallKephalaion(projectDir string) (KephalaionResult, error) {
+// Sonst lädt es das install.sh aus dem neuesten Kephalaion-Release
+// (release.KephalaionInstallURL) und führt es aus, mit demselben Zeitlimit wie
+// die Installation des Programms. Einen Clone braucht es dafür nicht: Das
+// Skript bin/install-kephalaion des Clones ruft dieses Programm nicht mehr auf.
+// Asset-Namen, Plattformen und Prüfsumme bleiben Sache von Kephalaion. Erst
+// ganz laden, dann ausführen: Bricht der Download ab, läuft kein halbes
+// Skript, und ein Fehler beim Laden ist von einem Fehler der Installation zu
+// unterscheiden.
+//
+// Nur das Binary. node init, service install und Token gehören nicht hierher:
+// Im DevContainer kommt die config read-only vom Host, und der Node ist der
+// des Hosts.
+//
+// Erfolg heißt nicht Exit 0, sondern: danach findet FindBinary kephalaion. Das
+// install.sh von Kephalaion installiert nach ~/.local/bin.
+//
+// Die Adresse ist wie die Release-Quelle austauschbar (release.EnvSource), auch
+// für gebaute Unterprozesse; kein Test lädt oder startet das echte install.sh.
+func InstallKephalaion(ctx context.Context) (KephalaionResult, error) {
 	result := KephalaionResult{}
 	if path, ok := kephalaion.FindBinary(); ok {
 		result.Path = path
 		return result, nil
 	}
 
-	script := filepath.Join(project.PlaybookDir(projectDir), "bin", "install-kephalaion")
-	if _, err := os.Stat(script); err != nil {
-		return result, fmt.Errorf("die Installation kennt %s noch nicht", project.KephalaionInstallCommand)
+	ctx, cancel := context.WithTimeout(ctx, InstallTimeout)
+	defer cancel()
+
+	work, err := os.MkdirTemp("", "k-playbook-kephalaion-")
+	if err != nil {
+		return result, fmt.Errorf("Arbeitsverzeichnis für das install.sh von Kephalaion nicht anlegbar: %w", err)
+	}
+	defer os.RemoveAll(work)
+
+	script := filepath.Join(work, "install.sh")
+	if err := release.Fetch(ctx, release.CurrentSource().KephalaionInstall, script); err != nil {
+		return result, fmt.Errorf("das install.sh von Kephalaion ließ sich nicht laden: %w", err)
 	}
 
 	result.Installed = true
-	output, _, err := runScript(projectDir, script, project.KephalaionInstallCommand)
+	output, err := runKephalaionInstall(ctx, script)
 	result.Output = output
 	if err != nil {
 		return result, err
 	}
 	path, ok := kephalaion.FindBinary()
 	if !ok {
-		return result, errors.New("kephalaion liegt nach der Installation nicht im PATH")
+		return result, errors.New("kephalaion liegt nach der Installation weder im PATH noch unter ~/.local/bin oder /usr/local/bin")
 	}
 	result.Path = path
 	return result, nil
+}
+
+// kephalaionInstallLabel ist das install.sh, wie die Meldungen es nennen.
+const kephalaionInstallLabel = "das install.sh von Kephalaion"
+
+// runKephalaionInstall führt das geladene install.sh mit sh aus — so, wie
+// kephalaion.InstallCommand es einem Nutzer sagt (curl … | sh). Ohne stdin:
+// Das Skript fragt nichts.
+func runKephalaionInstall(ctx context.Context, script string) (string, error) {
+	cmd := exec.CommandContext(ctx, "sh", script)
+	cmd.Dir = filepath.Dir(script)
+	cmd.Env = withoutServeMarker(os.Environ())
+	// Ohne WaitDelay hielte ein Enkelprozess — curl — die Pipe nach dem
+	// Abbruch offen, und CombinedOutput kehrte erst mit ihm zurück.
+	cmd.WaitDelay = 5 * time.Second
+	output, err := cmd.CombinedOutput()
+	text := strings.TrimSpace(string(output))
+
+	if ctx.Err() == context.DeadlineExceeded {
+		return text, fmt.Errorf("%s hat nach %s nicht geendet", kephalaionInstallLabel, InstallTimeout)
+	}
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return text, fmt.Errorf("%s endete mit Exit-Code %d", kephalaionInstallLabel, exitErr.ExitCode())
+		}
+		return text, fmt.Errorf("%s nicht ausführbar: %v", kephalaionInstallLabel, err)
+	}
+	return text, nil
 }
 
 // Fristen für die Aufrufe von kephalaion upgrade. Variablen, damit Tests den
@@ -68,7 +118,7 @@ func InstallKephalaion(projectDir string) (KephalaionResult, error) {
 var (
 	// KephalaionAutoTimeout begrenzt `kephalaion upgrade --auto`: Frage an
 	// GitHub, Download, Probe (30 s), Frage an die Hubs (je 5 s), Neustart
-	// mit Prüfung (10 s) — dieselben 3 Minuten wie BootstrapTimeout.
+	// mit Prüfung (10 s) — dieselben 3 Minuten wie InstallTimeout.
 	KephalaionAutoTimeout = 3 * time.Minute
 	// KephalaionCheckTimeout begrenzt `kephalaion upgrade --check`: eine
 	// Frage an GitHub.

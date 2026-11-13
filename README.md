@@ -58,6 +58,13 @@ Without `make`, the same bootstrap runs directly:
 k-playbook/bin/install
 ```
 
+The program itself does not depend on the clone. `bin/install` is self-contained and also
+installs the binary on a machine without a clone:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
+```
+
 The target directory must be named `k-playbook`, because commands and skills address it
 that way. Without a target argument the name follows from the repository name; do not
 pass a different one. Only when cloning from a fork or mirror under a diverging name,
@@ -67,13 +74,14 @@ append `k-playbook` as the second argument.
 and installs it to `~/.local/bin/k-playbook`. On the host and inside a devcontainer it
 runs in its own environment and therefore installs the matching binary in each.
 
-**The installation needs network access.** The binaries are not in the repository but
-attached as assets to the release named by `VERSION` in the root directory.
-`bin/install` downloads the matching asset and verifies it against the shipped
-`SHA256SUMS`.
+**The installation needs network access and `git`.** The binaries are not in the repository
+but attached as assets to the releases. `bin/install` determines the newest release tag
+(`git ls-remote` over HTTPS, anonymously), downloads the asset of that tag and verifies it
+against the `SHA256SUMS` committed at the tag. Called from a clone it does exactly the same:
+it reads neither `VERSION` nor `SHA256SUMS` beside it and installs the newest release.
 
-**Kephalaion comes along.** If no `kephalaion` is on the `PATH`, `bin/install` then runs
-`bin/install-kephalaion`, which installs it through the `install.sh` of the latest
+**Kephalaion comes along.** If no `kephalaion` is on the `PATH`, `bin/install` then
+installs it through the `install.sh` of the latest
 Kephalaion release into `~/.local/bin/kephalaion`. Only the binary: setting up the node,
 the service and the token stays with Kephalaion (`kephalaion node init`, see its README);
 inside a devcontainer the node is usually the host's. An existing `kephalaion` is left
@@ -209,37 +217,44 @@ make -C k-playbook installer-update
 
 `k-playbook/` contains nothing project-owned and is fully replaceable because of that.
 
-**If `VERSION` changed along the way, the new state comes with a different binary.** If the
-running program is older than that version, the interface installs it on the spot: one
-click runs the clone's bootstrap, which verifies the asset against `SHA256SUMS` and
-replaces `~/.local/bin/k-playbook`, and the service then restarts itself from the new
-program — the open page follows to the new address. Nothing is downloaded on startup or
-during a check, only on that click. If the running program is equally old or newer, as in a
-development repository after `make dev-install`, nothing is installed.
+**The program updates itself from the release, not from the clone.** There are exactly two
+version sources: the program's own version, stamped into the binary, and the newest release
+tag on GitHub. `k-playbook version` prints the first, `k-playbook version --all` adds the
+second, and the health check (the briefing, `k-playbook health`) warns when the program is
+older than the newest release. If it is, the interface offers `Programm aktualisieren`: one
+click downloads the release binary of the newest tag directly from GitHub, verifies it
+against the `SHA256SUMS` of that tag, replaces `~/.local/bin/k-playbook`, and the service
+then restarts itself from the new program — the open page follows to the new address.
+Nothing is downloaded on startup or during a check, only on that click. If the running
+program is equally old or newer, as a build with `make dev-install VERSION=…` above the
+newest tag, nothing is installed. The pull above no longer decides about any of this; it
+only serves the content that still lives in the clone.
 
-By hand it stays the same call as for the initial installation, due once in every
-environment — on the host as well as in the devcontainer:
+By hand it is one call, due once in every environment — on the host as well as in the
+devcontainer:
 
 ```bash
-make -C k-playbook install
+k-playbook upgrade
 ```
 
-Without `make`: `k-playbook/bin/install`. A target project has no `install` target of its
-own; the call always goes through the clone. It is the way to go if the installation fails
-or if `k-playbook` in the `PATH` resolves to a different file than
-`~/.local/bin/k-playbook`; in that case the interface shows a note with both paths instead
-of the button, because a program installed there would not be the one the next call starts.
-If only commands, instructions or recipes are new, `VERSION` does not change and the service keeps
-running.
+It is also the way to go if the installation from the interface fails. If
+`k-playbook upgrade` itself cannot install, or if `k-playbook` in the `PATH` resolves to a
+different file than `~/.local/bin/k-playbook`, the way is the first installation again
+(`curl … | bash`, see [Installation](#installation)); in the second case the interface shows
+a note with both paths instead of the button, because a program installed there would not be
+the one the next call starts. If only commands, instructions or recipes are new, the service
+keeps running.
 
 In the terminal, `k-playbook upgrade` does both in one go — first Kephalaion (installed when
 missing from the `PATH`, otherwise updated through `kephalaion upgrade --auto` where
 Kephalaion considers that safe, with its node restarted; a hub, a global installation or an
-older `kephalaion` without `--auto` are only reported), then the pull, the binary when
-the running program is older, then
+older `kephalaion` without `--auto` are only reported), then the pull in the clone as long
+as there is one, the release binary when the running program is older than the newest
+release tag (also without a clone and after a failed pull), then
 moving hub and collection out of an old `k-playbook-local/K-PLAYBOOK.local.yaml` into the
 block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`,
-`AGENTS.md`, `CLAUDE.md`, linking and MCP entries, and last the `README.md` of the
+`AGENTS.md`, `CLAUDE.md`, linking and MCP entries (a stale entry is replaced, a missing one
+added when the file is not tracked by Git — no longer tied to the pull), and last the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
 as a hint) —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
@@ -274,7 +289,10 @@ The build uses the same flags CI uses for the release assets — `-trimpath`,
 that both paths produce bit-identical binaries. The versioned `SHA256SUMS` rests on
 exactly that.
 
-A release runs in two steps, so that `VERSION` never points at a tag without downloads:
+A release runs in two steps, so that `VERSION` on `main` never points at a tag without
+downloads. Installed programs and `bin/install` look at the newest tag, though, and the tag
+exists from the first step on: until CI has uploaded the assets, the health check already
+warns and an installation reports that the release is not finished yet.
 
 ```bash
 make release VERSION=v0.2.0          # builds, commits VERSION and SHA256SUMS, pushes the tag

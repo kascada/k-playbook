@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release"
+	"github.com/kascada/k-playbook/installer/internal/version"
 )
 
 // k-playbook upgrade — der eine Nachzug für Kephalaion, Programm und Projekt,
@@ -26,8 +29,10 @@ import (
 // umgekehrt: neue k-playbook-Releases setzen neue Kephalaion-Fähigkeiten
 // voraus, Projektschritt und /k-upgrade brauchen den Node, und ein Neustart
 // des Nodes ist so am Anfang erledigt und von Kephalaion selbst geprüft. Fehlt
-// kephalaion, installiert es bin/install-kephalaion des Clones (ohne Clone nur
-// eine Meldung). Liegt es da, ruft der Schritt `kephalaion upgrade --auto
+// kephalaion, lädt der Schritt das install.sh des neuesten Kephalaion-Releases
+// und führt es aus (program.InstallKephalaion) — ohne Clone, das Skript
+// bin/install-kephalaion ruft dieses Programm nicht mehr auf. Liegt es da, ruft
+// der Schritt `kephalaion upgrade --auto
 // --json` auf und meldet allein nach dessen Antwort; ob ein Upgrade gefahrlos
 // ist (Hub, globale Installation, dev build, zu alter Hub, DevContainer),
 // entscheidet Kephalaion. Kennt das Binary --auto nicht (Exit 2), meldet der
@@ -36,19 +41,28 @@ import (
 // läuft im aufrufenden Prozess, vor dem Pull; das neue Programm nach einem
 // Binärwechsel fasst Kephalaion nicht noch einmal an.
 //
-// (1) das Programm — `git pull` im Clone, danach das Binary über den
-// Bootstrap des Clones, aber nur, wenn das laufende Programm älter ist als der
-// Clone (Regel aus restartAfterPull in webui/update.go: nie „ungleich", sonst
-// stufte das Entwicklungsrepo sein neueres Programm herab).
+// (1) das Programm — zuerst `git pull` im Clone, solange es ihn gibt: Er dient
+// nur noch den Inhalten, die am Clone hängen, und entscheidet nicht mehr über
+// Version und Installation. Danach der Vergleich der eigenen Version mit dem
+// neuesten Release-Tag auf GitHub (program.CheckStatus) und — nur bei „älter"
+// — das Release-Binary dieses Tags, geprüft gegen die SHA256SUMS des Tags
+// (program.Install über release.Install). Nie „ungleich", sonst stufte ein
+// Build über dem neuesten Tag sich herab. Vergleich und Installation laufen,
+// ob es den Clone gibt oder nicht und ob der Pull gelingt oder nicht; ein
+// fehlender Clone und ein gescheiterter Pull werden gemeldet. Ohne eigene
+// Version wird der Tag nicht abgerufen; ist er unbekannt (ohne Netz, ohne git,
+// Zeitüberschreitung), sagt die Meldung das, und das Projekt wird trotzdem
+// nachgezogen.
 //
 // (2) das Projekt — zuerst der Umzug der Anbindung aus der alten
 // k-playbook-local/K-PLAYBOOK.local.yaml in den Block kephalaion: von
 // K-PLAYBOOK.yaml (project.MigrateKephalaionBinding, Task 138), dann
 // ApplyAssistantSetup, also
 // Einordnen von CLAUDE.md/AGENTS.md, Anstoß ersetzen und Zusatzblöcke
-// entfernen, Verlinkung; die MCP-Einträge repariert der Pull schon
-// (UpdateResult.MCPRepaired), ein eigenes RepairMCP läuft nur, wenn der Pull
-// entfiel. Am Ende der Hinweis auf den Neustart der Sitzung, wenn das Binary
+// entfernen, Verlinkung; danach immer die MCP-Einträge
+// (project.RepairMCPReport im Umfang des Starts,
+// MCPWriteOutdatedAndUnversioned) — die Reparatur hängt nicht mehr am Pull.
+// Am Ende der Hinweis auf den Neustart der Sitzung, wenn das Binary
 // gewechselt hat — der MCP-Server der Sitzung behält das alte Programm — und
 // ein eigener, wenn Kephalaion aktualisiert oder sein Node neu gestartet
 // wurde.
@@ -56,21 +70,24 @@ import (
 // Hat Schritt (1) das Binary ersetzt, führt dieser — noch alte — Prozess
 // Schritt (2) nicht selbst aus: er hätte alte Vorlagen und alte Erkennung.
 // Er startet dafür das neu installierte Programm mit `upgrade --project-only`
-// (reexecProjectStep) und gibt ihm mit `--repair-mcp` mit, ob der Pull entfiel:
-// das neue Programm weiß sonst nicht, ob die MCP-Einträge schon repariert
-// sind. Die Oberfläche braucht das nicht, weil sie neu startet; upgrade hat
-// keinen Neustart.
+// (reexecProjectStep). Die Oberfläche braucht das nicht, weil sie neu startet;
+// upgrade hat keinen Neustart. Den Schalter `--repair-mcp` nimmt
+// `--project-only` weiter an, er entscheidet aber nichts mehr: Ein Binary von
+// vor Task 149 gab damit mit, dass sein Pull entfiel, und startet das neu
+// installierte Programm noch so.
 //
 // `--check` schreibt nichts: es meldet den Kephalaion-Stand (nur
-// `upgrade --check --json`, nie --auto), den Programm-Stand (CheckUpdate plus
-// Vergleich mit der laufenden Version) und baut die Projektprüfung aus den
-// Check-Funktionen — es meldet, was ein Lauf täte.
+// `upgrade --check --json`, nie --auto), den Stand des Clones gegenüber seinem
+// Remote (CheckUpdate), den Programm-Stand gegenüber dem neuesten Release-Tag
+// — der Tag ist auch hier bekannt — und baut die Projektprüfung aus den
+// Check-Funktionen — es meldet, was ein Lauf täte. Bei den MCP-Einträgen sagt
+// es weniger, als ein Lauf täte: gemeldet werden nur veraltete Einträge, nicht
+// die fehlenden, die ein Lauf in einer nicht von git erfassten Datei ergänzt.
 //
-// Hinweis auf /k-upgrade: Hat ein Lauf eine neue Version geholt — der Pull hat
-// die VERSION der Installation bewegt oder das Binary wurde ersetzt —, sagt
-// die letzte Zeile, dass /k-upgrade in einer Sitzung die Umstellungen
-// nachzieht, die eine Beurteilung brauchen. `--check` sagt in einer eigenen
-// Vorschauzeile, dass ein Lauf Neues holt. Beide entfallen, wenn
+// Hinweis auf /k-upgrade: Hat ein Lauf das Binary ersetzt, sagt die letzte
+// Zeile, dass /k-upgrade in einer Sitzung die Umstellungen nachzieht, die eine
+// Beurteilung brauchen. `--check` sagt in einer eigenen Vorschauzeile, dass
+// ein Lauf Neues holt. Beide entfallen, wenn
 // K_PLAYBOOK_VIA_COMMAND=1 gesetzt ist: so ruft /k-upgrade selbst das
 // Programm auf (Hülle und Ersatzaufruf in der Shell), und dort stünde der
 // Hinweis mitten im Command. Eine Variable statt eines Schalters, weil ein
@@ -78,15 +95,19 @@ import (
 // der Hülle scheitern ließe; die Variable übergeht es. Der Hinweis kommt nur
 // vom aufrufenden Prozess, nie von `--project-only`.
 
-// upgradeSchemaVersion ist die Fassung der JSON-Antwort.
-const upgradeSchemaVersion = "1"
+// upgradeSchemaVersion ist die Fassung der JSON-Antwort. Fassung 2 (Task 149):
+// program.status trägt latest statt clone (dazu latestError),
+// program.versionChanged und program.mcpRepaired entfallen, project trägt
+// mcpRepairedPortable und mcpMessage.
+const upgradeSchemaVersion = "2"
 
 // viaCommandEnv ist die Umgebungsvariable, die Hülle und Ersatzaufruf von
 // /k-upgrade auf 1 setzen.
 const viaCommandEnv = "K_PLAYBOOK_VIA_COMMAND"
 
 // Austauschbar, damit die Abfolge ohne Netz, Clone und echtes Binary prüfbar
-// ist: der Pull, der Bootstrap und der Aufruf des neu installierten Programms.
+// ist: der Pull, die Installation des Release-Binaries und der Aufruf des neu
+// installierten Programms.
 var (
 	upgradeUpdate  = project.Update
 	upgradeInstall = program.Install
@@ -111,8 +132,10 @@ type upgradeOptions struct {
 	// projectOnly: nur Schritt (2) — der Aufruf, mit dem ein alter Prozess das
 	// neu installierte Programm für das Projekt arbeiten lässt.
 	projectOnly bool
-	// repairMCP: Schritt (2) soll die MCP-Einträge reparieren, weil der Pull
-	// im alten Prozess entfiel; nur zusammen mit projectOnly.
+	// repairMCP: der Schalter --repair-mcp, nur zusammen mit projectOnly. Er
+	// wird angenommen und entscheidet nichts mehr — Schritt (2) repariert die
+	// MCP-Einträge immer. Ein Binary von vor Task 149 startet das neu
+	// installierte Programm noch mit ihm.
 	repairMCP bool
 }
 
@@ -142,31 +165,26 @@ func (r *upgradeReport) say(format string, args ...any) {
 
 // upgradeProgramReport ist Schritt (1).
 type upgradeProgramReport struct {
-	// Status vergleicht das laufende Programm mit dem Clone — nach dem Pull.
+	// Status vergleicht das laufende Programm mit dem neuesten Release-Tag.
 	Status *program.Status `json:"status,omitempty"`
-	// Update ist der Remote-Stand (nur --check).
+	// Update ist der Remote-Stand des Clones (nur --check).
 	Update *project.UpdateStatus `json:"update,omitempty"`
 	// Pulled: der Pull im Clone ist gelaufen.
 	Pulled     bool   `json:"pulled,omitempty"`
 	PullOutput string `json:"pullOutput,omitempty"`
-	// VersionChanged: der Pull hat die VERSION der Installation bewegt.
-	VersionChanged bool `json:"versionChanged,omitempty"`
 	// RemoteSwitched: der Upstream trug die SSH-Adresse des offiziellen Repos
 	// und zeigt jetzt auf diese HTTPS-Adresse.
 	RemoteSwitched string `json:"remoteSwitched,omitempty"`
-	// Installed: bin/install hat das Binary ersetzt.
+	// Installed: das Release-Binary des neuesten Tags hat das Binary ersetzt.
 	Installed     bool   `json:"installed,omitempty"`
 	InstallOutput string `json:"installOutput,omitempty"`
-	// MCPRepaired nennt die MCP-Dateien, deren veralteter Eintrag der Pull
-	// korrigiert hat.
-	MCPRepaired []string `json:"mcpRepaired,omitempty"`
 	// Error nennt, was in diesem Schritt scheiterte; die weiteren Schritte
 	// laufen trotzdem.
 	Error string `json:"error,omitempty"`
 
-	// fetchesNew (nur --check): die Installation ist hinter dem Remote, oder
-	// das laufende Programm ist älter als die Installation und installierbar
-	// — ein Lauf holt Neues.
+	// fetchesNew (nur --check): das laufende Programm ist älter als der
+	// neueste Release-Tag und installierbar, oder der Clone liegt hinter
+	// seinem Remote — ein Lauf holt Neues.
 	fetchesNew bool
 }
 
@@ -175,7 +193,8 @@ type upgradeKephalaionReport struct {
 	// Present: kephalaion liegt im PATH — vorher oder nach der Installation.
 	Present bool   `json:"present"`
 	Path    string `json:"path,omitempty"`
-	// Installed: bin/install-kephalaion ist gelaufen (nicht bei --check).
+	// Installed: das install.sh von Kephalaion ist gelaufen (nicht bei
+	// --check).
 	Installed bool   `json:"installed,omitempty"`
 	Output    string `json:"output,omitempty"`
 	// Auto ist die Antwort von `kephalaion upgrade --auto --json`.
@@ -209,9 +228,12 @@ type upgradeProjectReport struct {
 	Links project.LinkChanges `json:"links"`
 	// LinksCreated: die Verlinkung stand vorher gar nicht und steht jetzt.
 	LinksCreated bool `json:"linksCreated,omitempty"`
-	// MCPRepaired nennt die MCP-Dateien, die dieser Schritt geschrieben hat —
-	// nur, wenn der Pull entfiel.
-	MCPRepaired []string `json:"mcpRepaired,omitempty"`
+	// MCPRepaired nennt die MCP-Dateien, die dieser Schritt geschrieben hat;
+	// MCPRepairedPortable die davon, in denen jetzt der bloße Kommandoname
+	// steht. MCPMessage sagt, was an der Reparatur nicht gelang.
+	MCPRepaired         []string `json:"mcpRepaired,omitempty"`
+	MCPRepairedPortable []string `json:"mcpRepairedPortable,omitempty"`
+	MCPMessage          string   `json:"mcpMessage,omitempty"`
 	// Pending nennt bei --check, was ein Lauf an AGENTS.md, CLAUDE.md,
 	// Verlinkung und MCP-Einträgen täte.
 	Pending []string `json:"pending,omitempty"`
@@ -277,7 +299,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	}
 
 	if options.projectOnly {
-		result := upgradeProject(environment.ProjectDir, options.repairMCP)
+		result := upgradeProject(environment.ProjectDir)
 		report.Project = &result
 		report.Messages = append(report.Messages, result.messages()...)
 		emit(result.messages())
@@ -285,7 +307,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	}
 
 	if options.check {
-		kephalaionReport, lines := checkUpgradeKephalaion(environment)
+		kephalaionReport, lines := checkUpgradeKephalaion()
 		report.Kephalaion = &kephalaionReport
 		report.Messages = append(report.Messages, lines...)
 		emit(lines)
@@ -311,7 +333,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	// Kephalaion zuerst: k-playbook hängt von Kephalaion ab, nicht umgekehrt,
 	// und Programm- wie Projektschritt brauchen den Node. Ein Neustart des
 	// Nodes ist so am Anfang erledigt und von --auto selbst geprüft.
-	kephalaionReport, lines := upgradeKephalaion(environment)
+	kephalaionReport, lines := upgradeKephalaion()
 	report.Kephalaion = &kephalaionReport
 	report.Messages = append(report.Messages, lines...)
 	emit(lines)
@@ -323,10 +345,9 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 
 	if programReport.Installed && target != "" {
 		// Das neue Programm zieht das Projekt nach — mit seinen Vorlagen und
-		// seiner Erkennung, nicht mit denen dieses Prozesses. Ob der Pull
-		// entfiel, weiß nur dieser Prozess; die MCP-Reparatur reist als
-		// Schalter mit, mit derselben Regel wie ohne Binärwechsel.
-		result, lines, err := upgradeReexec(target, environment.ProjectDir, !programReport.Pulled, options.asJSON, out)
+		// seiner Erkennung, nicht mit denen dieses Prozesses. Die MCP-Einträge
+		// repariert es dabei selbst, ob der Pull lief oder nicht.
+		result, lines, err := upgradeReexec(target, environment.ProjectDir, options.asJSON, out)
 		report.Project = result
 		if err != nil {
 			lines = append(lines, "Projekt: das neue Programm konnte das Projekt nicht nachziehen — "+err.Error()+
@@ -335,7 +356,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		}
 		report.Messages = append(report.Messages, lines...)
 	} else {
-		result := upgradeProject(environment.ProjectDir, !programReport.Pulled)
+		result := upgradeProject(environment.ProjectDir)
 		report.Project = &result
 		report.Messages = append(report.Messages, result.messages()...)
 		emit(result.messages())
@@ -353,7 +374,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		report.Messages = append(report.Messages, line)
 		emit([]string{line})
 	}
-	if (programReport.VersionChanged || programReport.Installed) && !upgradeViaCommand() {
+	if programReport.Installed && !upgradeViaCommand() {
 		session := "in einer Sitzung"
 		if report.RestartRequired {
 			session = "in einer neuen Sitzung"
@@ -365,12 +386,14 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	return report
 }
 
-// upgradeProgram ist Schritt (1): Pull im Clone, dann — nur bei „älter" — das
-// Binary. Das dritte Ergebnis ist das Installationsziel, wenn das Binary
-// gewechselt hat; damit läuft Schritt (2) im neuen Programm.
+// upgradeProgram ist Schritt (1): erst der Pull im Clone, dann — nur bei
+// „älter" als der neueste Release-Tag — das Binary. Das dritte Ergebnis ist das
+// Installationsziel, wenn das Binary gewechselt hat; damit läuft Schritt (2) im
+// neuen Programm.
 //
-// Ohne Clone oder ohne Netz gibt es eine klare Meldung und keinen Abbruch:
-// das Projekt wird trotzdem nachgezogen, mit dem laufenden Programm. Scheitert
+// Der Pull dient nur noch den Inhalten des Clones. Ohne Clone oder nach einem
+// gescheiterten Pull gibt es eine Meldung und keinen Abbruch: Vergleich und
+// Installation laufen trotzdem, und das Projekt wird nachgezogen. Scheitert
 // Download oder Install, ist das eine eigene Meldung mit dem Weg im Terminal.
 func upgradeProgram(environment project.Environment) (upgradeProgramReport, []string, string) {
 	report := upgradeProgramReport{}
@@ -379,7 +402,7 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 
 	switch {
 	case !environment.PlaybookPresent:
-		lines = append(lines, "Programm: die Installation "+project.PlaybookDirName+"/ fehlt; es gibt nichts zu aktualisieren. Einrichten: "+project.BootstrapHint+".")
+		lines = append(lines, "Programm: die Installation "+project.PlaybookDirName+"/ fehlt; der Pull entfällt. Einrichten: "+project.BootstrapHint+".")
 	case !isDir(filepath.Join(environment.PlaybookDir, ".git")):
 		lines = append(lines, "Programm: die Installation ist kein Git-Repository; der Pull entfällt.")
 	default:
@@ -391,54 +414,52 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 		}
 		if err != nil {
 			report.Error = err.Error()
-			lines = append(lines, "Programm: Pull im Clone fehlgeschlagen — "+err.Error()+"; ohne Netz oder bei lokalen Änderungen im Clone ist das zu erwarten. Das Projekt wird mit dem laufenden Programm nachgezogen.")
+			lines = append(lines, "Programm: Pull im Clone fehlgeschlagen — "+err.Error()+"; ohne Netz oder bei lokalen Änderungen im Clone ist das zu erwarten. Verglichen und installiert wird trotzdem.")
 			if result.Output != "" {
 				lines = append(lines, indent(result.Output))
 			}
 		} else {
 			report.Pulled = true
-			report.VersionChanged = result.VersionChanged
-			report.MCPRepaired = result.MCPRepaired
-			if result.VersionChanged {
-				lines = append(lines, "Programm: Installation aktualisiert, VERSION jetzt "+displayVersion(result.Version)+".")
-			} else {
-				lines = append(lines, "Programm: Installation auf dem neuesten Stand"+describeVersionSuffix(result.Version)+".")
-			}
-			lines = append(lines, describeMCPRepairLines(result)...)
+			lines = append(lines, "Programm: Clone "+project.PlaybookDirName+"/ per Pull auf dem Stand seines Remotes.")
 		}
 	}
 
-	if !environment.PlaybookPresent {
-		return report, lines, ""
-	}
-
-	status := program.CheckStatus(running, environment.PlaybookDir)
+	status := program.CheckStatus(context.Background(), running)
 	report.Status = status
+	lines = append(lines, releaseSourceLines()...)
 	switch {
-	case running == "":
+	case !version.Valid(running):
 		lines = append(lines, "Programm: dieses Programm trägt keine Version (ohne Build-Flags gebaut); installiert wird nicht.")
+	case status.Latest == "":
+		lines = append(lines, "Programm-Stand: der neueste Release-Tag ist unbekannt — "+status.LatestError+
+			". Verglichen und installiert wird nicht; das Projekt wird mit dem laufenden Programm nachgezogen.")
 	case !status.Outdated:
-		lines = append(lines, fmt.Sprintf("Programm-Stand: nichts zu tun — laufend %s, Installation %s (%s).",
-			displayVersion(status.Running), displayVersion(status.Clone), status.Order))
+		lines = append(lines, fmt.Sprintf("Programm-Stand: nichts zu tun — laufend %s, neuestes Release %s (%s).",
+			displayVersion(status.Running), displayVersion(status.Latest), status.Order))
 	case !status.Installable:
 		report.Error = status.Hint
 		lines = append(lines, "Programm: "+status.Hint)
 	default:
-		result, err := upgradeInstall(environment.ProjectDir)
+		result, err := upgradeInstall(context.Background(), status.Latest)
 		report.InstallOutput = result.Output
 		if err != nil {
 			report.Error = err.Error()
+			// Der Ausweg ist hier nicht `k-playbook upgrade` — das ist eben
+			// gescheitert —, sondern die Erstinstallation.
 			lines = append(lines, "Programm nicht aktualisiert — Download/Install nicht möglich: "+strings.TrimSuffix(err.Error(), ".")+
-				". Das Projekt wird mit dem laufenden Programm nachgezogen. Nachholen im Terminal: "+project.BootstrapHint+".")
+				". Das Projekt wird mit dem laufenden Programm nachgezogen. Nachholen im Terminal: "+project.FirstInstallCommand)
 			if result.Output != "" {
 				lines = append(lines, indent(result.Output))
 			}
 			break
 		}
-		if result.Bootstrapped {
+		if result.Installed {
 			report.Installed = true
 			lines = append(lines, fmt.Sprintf("Programm: %s installiert nach %s (vorher lief %s).",
 				displayVersion(result.Expected), result.Target, displayVersion(running)))
+			if result.Output != "" {
+				lines = append(lines, indent(result.Output))
+			}
 			return report, lines, result.Target
 		}
 		lines = append(lines, fmt.Sprintf("Programm: am Installationsziel %s liegt schon %s; dieses Programm (%s) lief von woanders. Der nächste Aufruf nimmt das installierte.",
@@ -447,70 +468,82 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 	return report, lines, ""
 }
 
+// releaseSourceLines nennt eine ersetzte oder abgeschaltete Release-Quelle
+// (K_PLAYBOOK_RELEASE_SOURCE). Die Variable ist die Testnaht des Pakets
+// release und wirkt auch im ausgelieferten Programm; wer sie gesetzt hat,
+// liest hier, dass nicht GitHub gefragt wurde. Im Normalfall keine Zeile.
+func releaseSourceLines() []string {
+	if note := release.CurrentSource().Note(); note != "" {
+		return []string{"Programm: " + note + "."}
+	}
+	return nil
+}
+
 // checkUpgradeProgram meldet den Programm-Stand ohne zu schreiben: der
-// Remote-Stand des Clones und der Vergleich mit der laufenden Version.
+// Remote-Stand des Clones und der Vergleich der laufenden Version mit dem
+// neuesten Release-Tag. Der Vergleich läuft auch ohne Clone.
 func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport, []string) {
 	report := upgradeProgramReport{}
 	lines := []string{}
 	if !environment.PlaybookPresent {
-		lines = append(lines, "Programm: die Installation "+project.PlaybookDirName+"/ fehlt; ein Lauf könnte nichts aktualisieren.")
-		return report, lines
-	}
-
-	update, err := upgradeCheckUpdate(environment.ProjectDir)
-	switch {
-	case err != nil:
-		report.Error = err.Error()
-		lines = append(lines, "Installation: Prüfung fehlgeschlagen — "+err.Error())
-	case update.Available:
-		report.Update = &update
-		report.fetchesNew = true
-		lines = append(lines, fmt.Sprintf("Installation: hinter dem Remote (%s → %s auf %s); ein Lauf holte den neuen Stand.",
-			shortHash(update.Local), shortHash(update.Remote), update.Branch))
-	case update.Message != "":
-		report.Update = &update
-		lines = append(lines, "Installation: "+update.Message)
-	default:
-		report.Update = &update
-		lines = append(lines, "Installation: auf dem Stand des Remotes ("+shortHash(update.Local)+").")
+		lines = append(lines, "Programm: die Installation "+project.PlaybookDirName+"/ fehlt; ein Lauf zöge keinen Clone nach.")
+	} else {
+		update, err := upgradeCheckUpdate(environment.ProjectDir)
+		switch {
+		case err != nil:
+			report.Error = err.Error()
+			lines = append(lines, "Installation: Prüfung fehlgeschlagen — "+err.Error())
+		case update.Available:
+			report.Update = &update
+			report.fetchesNew = true
+			lines = append(lines, fmt.Sprintf("Installation: hinter dem Remote (%s → %s auf %s); ein Lauf holte den neuen Stand.",
+				shortHash(update.Local), shortHash(update.Remote), update.Branch))
+		case update.Message != "":
+			report.Update = &update
+			lines = append(lines, "Installation: "+update.Message)
+		default:
+			report.Update = &update
+			lines = append(lines, "Installation: auf dem Stand des Remotes ("+shortHash(update.Local)+").")
+		}
 	}
 
 	running := guiproc.OwnVersion()
-	status := program.CheckStatus(running, environment.PlaybookDir)
+	status := program.CheckStatus(context.Background(), running)
 	report.Status = status
+	lines = append(lines, releaseSourceLines()...)
 	switch {
-	case running == "":
+	case !version.Valid(running):
 		lines = append(lines, "Programm-Stand: dieses Programm trägt keine Version (ohne Build-Flags gebaut); ein Lauf installierte nicht.")
+	case status.Latest == "":
+		lines = append(lines, "Programm-Stand: der neueste Release-Tag ist unbekannt — "+status.LatestError+
+			"; ein Lauf vergliche und installierte nicht.")
 	case !status.Outdated:
-		lines = append(lines, fmt.Sprintf("Programm-Stand: nichts zu tun — laufend %s, Installation %s (%s).",
-			displayVersion(status.Running), displayVersion(status.Clone), status.Order))
+		lines = append(lines, fmt.Sprintf("Programm-Stand: nichts zu tun — laufend %s, neuestes Release %s (%s).",
+			displayVersion(status.Running), displayVersion(status.Latest), status.Order))
 	case !status.Installable:
-		lines = append(lines, "Programm-Stand: älter als die Installation, aber "+status.Hint)
+		lines = append(lines, "Programm-Stand: älter als das neueste Release ("+displayVersion(status.Latest)+"), aber "+status.Hint)
 	default:
 		report.fetchesNew = true
-		lines = append(lines, fmt.Sprintf("Programm-Stand: %s ist älter als die Installation (%s); ein Lauf installierte das Programm nach %s, danach wäre die Sitzung neu zu starten.",
-			displayVersion(status.Running), displayVersion(status.Clone), status.Target))
+		lines = append(lines, fmt.Sprintf("Programm-Stand: %s ist älter als das neueste Release (%s); ein Lauf installierte das Programm nach %s, danach wäre die Sitzung neu zu starten.",
+			displayVersion(status.Running), displayVersion(status.Latest), status.Target))
 	}
 	return report, lines
 }
 
 // upgradeKephalaion ist der Schritt Kephalaion, drei Wege:
 //
-//  1. kephalaion fehlt: bin/install-kephalaion des Clones; danach kein
-//     --auto. Ohne Clone nur die Meldung mit der Installation von Hand.
+//  1. kephalaion fehlt: das install.sh des neuesten Kephalaion-Releases
+//     (program.InstallKephalaion); danach kein --auto.
 //  2. kephalaion da: `kephalaion upgrade --auto --json`; je outcome eine
 //     Meldung. Was gefahrlos ist, entscheidet Kephalaion, nicht k-playbook.
 //  3. kephalaion kennt --auto nicht (Exit 2): `upgrade --check --json` und
 //     die Meldung, ob ein neueres Release da ist.
 //
-// Weg 2 und 3 brauchen den Clone nicht. Kein Weg hält den Lauf auf.
-func upgradeKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
+// Kein Weg braucht den Clone, und keiner hält den Lauf auf.
+func upgradeKephalaion() (upgradeKephalaionReport, []string) {
 	path, ok := upgradeFindKephalaion()
 	if !ok {
-		if !environment.PlaybookPresent {
-			return upgradeKephalaionReport{}, []string{missingKephalaionWithoutClone()}
-		}
-		return installKephalaion(environment)
+		return installKephalaion()
 	}
 
 	report := upgradeKephalaionReport{Present: true, Path: path}
@@ -532,17 +565,19 @@ func upgradeKephalaion(environment project.Environment) (upgradeKephalaionReport
 	return report, describeKephalaionAuto(auto)
 }
 
-// installKephalaion ist Weg 1: bin/install-kephalaion des Clones.
-func installKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
+// installKephalaion ist Weg 1: das install.sh des neuesten
+// Kephalaion-Releases. Scheitert es, nennt die Meldung die Installation von
+// Hand (kephalaion.InstallCommand) — dasselbe Skript ohne k-playbook.
+func installKephalaion() (upgradeKephalaionReport, []string) {
 	report := upgradeKephalaionReport{}
-	result, err := upgradeInstallKephalaion(environment.ProjectDir)
+	result, err := upgradeInstallKephalaion(context.Background())
 	report.Path, report.Installed, report.Output = result.Path, result.Installed, result.Output
 	report.Present = result.Path != ""
 	switch {
 	case err != nil:
 		report.Error = err.Error()
 		lines := []string{"Kephalaion: nicht installiert — " + strings.TrimSuffix(err.Error(), ".") +
-			". Nachholen im Terminal: " + project.KephalaionInstallCommand + " (ohne Clone: " + kephalaion.InstallCommand + ")."}
+			". Nachholen im Terminal: " + kephalaion.InstallCommand}
 		if result.Output != "" {
 			lines = append(lines, indent(result.Output))
 		}
@@ -558,16 +593,13 @@ func installKephalaion(environment project.Environment) (upgradeKephalaionReport
 }
 
 // checkUpgradeKephalaion meldet, was ein Lauf versuchen würde, ohne etwas zu
-// ändern: fehlt kephalaion, die Installation; sonst der Report von
-// `upgrade --check --json`. --auto ruft es nie auf.
-func checkUpgradeKephalaion(environment project.Environment) (upgradeKephalaionReport, []string) {
+// ändern: fehlt kephalaion, die Installation — auch ohne Clone; sonst der
+// Report von `upgrade --check --json`. --auto ruft es nie auf.
+func checkUpgradeKephalaion() (upgradeKephalaionReport, []string) {
 	path, ok := upgradeFindKephalaion()
 	if !ok {
-		if !environment.PlaybookPresent {
-			return upgradeKephalaionReport{}, []string{missingKephalaionWithoutClone()}
-		}
-		return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH; ein Lauf installiert es über " +
-			project.KephalaionInstallCommand + "."}
+		return upgradeKephalaionReport{}, []string{"Kephalaion: fehlt im PATH; ein Lauf installiert es über das install.sh des neuesten Kephalaion-Releases (von Hand: " +
+			kephalaion.InstallCommand + ")."}
 	}
 	report := upgradeKephalaionReport{Present: true, Path: path}
 	check, lines := checkKephalaionRelease(path, &report)
@@ -697,15 +729,16 @@ func describeKephalaionCheckFailed(check program.KephalaionCheck) []string {
 	return []string{"Kephalaion: Prüfung auf ein neueres Release gescheitert — " + strings.TrimSuffix(reason, ".") + ". " + kephalaionNextStep}
 }
 
-func missingKephalaionWithoutClone() string {
-	return "Kephalaion: fehlt im PATH, und ohne die Installation " +
-		project.PlaybookDirName + "/ installiert dieser Lauf es nicht. Von Hand: " + kephalaion.InstallCommand + "."
-}
-
 // upgradeProject ist Schritt (2): derselbe Ablauf wie „Einrichten" in der
-// Oberfläche. repairMCP läuft nur, wenn der Pull entfiel — sonst hat der die
-// veralteten Einträge schon korrigiert, und die Meldung stünde doppelt.
-func upgradeProject(projectDir string, repairMCP bool) upgradeProjectReport {
+// Oberfläche, danach immer die MCP-Einträge.
+//
+// Die MCP-Reparatur hängt nicht am Pull und läuft auch unter --project-only:
+// immer im Umfang des Starts (MCPWriteOutdatedAndUnversioned). Das ist
+// gewollt mehr als früher nach einem gelungenen Pull, der nur veraltete
+// Einträge ersetzte: Ein Lauf ergänzt auch einen fehlenden Eintrag bzw. eine
+// fehlende Datei, wenn die Zieldatei nicht von git erfasst ist — der Stand,
+// der ohne Pull ohnehin gilt.
+func upgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
 	// Zuerst die Anbindung: Ohne Block kephalaion: ist Kephalaion nicht
 	// bereit, und die Schritte danach (READMEs unter keph:/docs/) brauchen
@@ -732,15 +765,10 @@ func upgradeProject(projectDir string, repairMCP bool) upgradeProjectReport {
 		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed() ||
 		(report.Kephalaion != nil && report.Kephalaion.Written)
 
-	if repairMCP {
-		writes, err := project.RepairMCP(projectDir, project.MCPWriteOutdatedAndUnversioned)
-		report.MCPRepaired = project.MCPWritePaths(writes)
-		if len(writes) > 0 {
-			report.Changed = true
-		}
-		if err != nil {
-			report.Error = strings.TrimSpace(report.Error + " MCP-Registrierung nicht vollständig nachgezogen: " + err.Error())
-		}
+	repair := project.RepairMCPReport(projectDir, project.MCPWriteOutdatedAndUnversioned)
+	report.MCPRepaired, report.MCPRepairedPortable, report.MCPMessage = repair.Repaired, repair.Portable, repair.Message
+	if len(repair.Repaired) > 0 {
+		report.Changed = true
 	}
 	return report
 }
@@ -788,6 +816,13 @@ func (r upgradeProjectReport) messages() []string {
 	}
 	if len(r.MCPRepaired) > 0 {
 		lines = append(lines, "Projekt: MCP-Registrierung nachgezogen: "+strings.Join(r.MCPRepaired, ", ")+". Der Assistent liest den Eintrag erst nach einem Neustart.")
+	}
+	if len(r.MCPRepairedPortable) > 0 {
+		lines = append(lines, "Projekt: in "+strings.Join(r.MCPRepairedPortable, ", ")+" steht der bloße Name "+project.InstalledCommandName+
+			", weil die Datei von git erfasst ist; ein aus Dock oder Finder gestarteter Client braucht dort den absoluten Pfad.")
+	}
+	if r.MCPMessage != "" {
+		lines = append(lines, "Projekt: "+r.MCPMessage)
 	}
 	if r.Error != "" {
 		lines = append(lines, "Projekt: nicht vollständig nachgezogen — "+r.Error)
@@ -868,15 +903,12 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 }
 
 // reexecProjectStep lässt das neu installierte Programm Schritt (2) ausführen.
-// repairMCP gibt ihm mit, dass der Pull entfiel und die MCP-Einträge noch zu
-// reparieren sind. Im Klartextmodus schreibt es direkt nach out; im JSON-Modus
-// kommt seine Antwort zurück, so wie sie kam — ein neueres Programm darf mehr
-// Felder kennen als dieses.
-func reexecProjectStep(target string, projectDir string, repairMCP bool, asJSON bool, out io.Writer) (any, []string, error) {
+// Im Klartextmodus schreibt es direkt nach out; im JSON-Modus kommt seine
+// Antwort zurück, so wie sie kam — ein neueres Programm darf mehr Felder
+// kennen als dieses. --repair-mcp reist nicht mehr mit: Das neue Programm ist
+// neuer als dieses und repariert die MCP-Einträge im Projektschritt immer.
+func reexecProjectStep(target string, projectDir string, asJSON bool, out io.Writer) (any, []string, error) {
 	args := []string{"upgrade", "--project-only"}
-	if repairMCP {
-		args = append(args, "--repair-mcp")
-	}
 	if asJSON {
 		args = append(args, "--json")
 	}
@@ -918,21 +950,6 @@ func withoutEnv(environ []string, name string) []string {
 	return result
 }
 
-func describeMCPRepairLines(result project.UpdateResult) []string {
-	lines := []string{}
-	if len(result.MCPRepaired) > 0 {
-		lines = append(lines, "Programm: MCP-Registrierung auf das installierte "+project.InstalledCommandName+" korrigiert: "+strings.Join(result.MCPRepaired, ", ")+".")
-	}
-	if len(result.MCPRepairedPortable) > 0 {
-		lines = append(lines, "Programm: in "+strings.Join(result.MCPRepairedPortable, ", ")+" steht der bloße Name "+project.InstalledCommandName+
-			", weil die Datei von git erfasst ist; ein aus Dock oder Finder gestarteter Client braucht dort den absoluten Pfad.")
-	}
-	if result.Message != "" {
-		lines = append(lines, "Programm: "+result.Message)
-	}
-	return lines
-}
-
 func describeLinkCounts(changes project.LinkChanges) string {
 	parts := []string{}
 	for _, part := range []struct {
@@ -948,13 +965,6 @@ func describeLinkCounts(changes project.LinkChanges) string {
 		}
 	}
 	return strings.Join(parts, ", ")
-}
-
-func describeVersionSuffix(version string) string {
-	if version == "" {
-		return ""
-	}
-	return " (VERSION " + version + ")"
 }
 
 func displayVersion(version string) string {
@@ -989,9 +999,9 @@ Aufruf:
 Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
 
   0. Kephalaion: zuerst, weil k-playbook von Kephalaion abhängt und die
-     Schritte danach den Node brauchen. Liegt kein kephalaion im PATH,
-     installiert es k-playbook/bin/install-kephalaion über das install.sh
-     des neuesten Kephalaion-Releases (ohne Clone: nur eine Meldung). Liegt
+     Schritte danach den Node brauchen. Liegt kein kephalaion im PATH, lädt
+     der Schritt das install.sh des neuesten Kephalaion-Releases und führt
+     es aus — auch ohne Clone. Liegt
      es da, ruft der Schritt kephalaion upgrade --auto --json auf:
      Kephalaion aktualisiert sich selbst und startet seinen Node neu, wenn
      es das für gefahrlos hält; einen Hub, eine globale Installation, einen
@@ -1000,39 +1010,46 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      nicht, meldet der Schritt nach kephalaion upgrade --check --json, ob ein
      neueres Release da ist. Scheitert der Schritt, eine Meldung, und die
      Schritte danach laufen trotzdem.
-  1. Programm: git pull --ff-only im Clone k-playbook/, danach das Binary über
-     k-playbook/bin/install — aber nur, wenn das laufende Programm älter ist
-     als die VERSION des Clones; gleich oder neuer bleibt stehen. Ohne Clone
-     oder ohne Netz eine Meldung, kein Abbruch; scheitert Download oder
-     Install, eine eigene Meldung, und Schritt 2 läuft mit dem laufenden
-     Programm. Hat das Binary gewechselt, führt das neu installierte
-     Programm Schritt 2 aus. Trägt der Clone die SSH-Adresse des
-     öffentlichen Repos (git@github.com:kascada/k-playbook), stellt der Lauf
-     sie vor dem Pull auf https://github.com/kascada/k-playbook.git um; ein
-     Alias-Host aus ~/.ssh/config bleibt stehen.
+  1. Programm: zuerst git pull --ff-only im Clone k-playbook/, solange es
+     ihn gibt — er dient nur noch den Inhalten des Clones. Danach der
+     Vergleich der eigenen Version mit dem neuesten Release-Tag auf GitHub
+     (git ls-remote über HTTPS, anonym) und, nur wenn das laufende Programm
+     älter ist, das Release-Binary dieses Tags: direkt von GitHub geladen,
+     gegen die SHA256SUMS des Tags geprüft und nach ~/.local/bin/k-playbook
+     gelegt; gleich oder neuer bleibt stehen. Vergleich und Installation
+     laufen auch ohne Clone und nach einem gescheiterten Pull; beides wird
+     gemeldet. Ist der neueste Tag unbekannt (ohne Netz, ohne git,
+     Zeitüberschreitung) oder trägt das Programm keine Version, eine Meldung,
+     kein Abbruch; scheitert Download oder Install, eine eigene Meldung, und
+     Schritt 2 läuft mit dem laufenden Programm. Hat das Binary gewechselt,
+     führt das neu installierte Programm Schritt 2 aus. Trägt der Clone die
+     SSH-Adresse des öffentlichen Repos (git@github.com:kascada/k-playbook),
+     stellt der Lauf sie vor dem Pull auf
+     https://github.com/kascada/k-playbook.git um; ein Alias-Host aus
+     ~/.ssh/config bleibt stehen.
   2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen, einen veralteten
      Anstoß auf k-playbook briefing bringen, die abgelösten Session-Memory-
      und Befunde-Blöcke entfernen), CLAUDE.md als Include-Datei, die
-     Verlinkung der Commands und Skills; die MCP-Einträge korrigiert der
-     Pull, ohne Pull dieser Schritt. Projekt-Prosa in AGENTS.md und
-     k-playbook-local/ bleiben unangetastet.
+     Verlinkung der Commands und Skills, danach immer die MCP-Einträge: ein
+     veralteter wird ersetzt, ein fehlender ergänzt, wenn die Zieldatei nicht
+     von git erfasst ist. Projekt-Prosa in AGENTS.md und k-playbook-local/
+     bleiben unangetastet.
 
 Am Ende der Hinweis, die Sitzung neu zu starten: wenn das Binary gewechselt
 hat — der MCP-Server der Sitzung behält das alte Programm —, und wenn
 Kephalaion aktualisiert oder sein Node neu gestartet wurde; das kann auch
-andere offene Sitzungen an diesem Node treffen. Hat der Lauf eine neue
-Version geholt (VERSION der Installation bewegt oder Binary ersetzt), sagt
-die letzte Zeile, dass /k-upgrade in einer Sitzung die Umstellungen
-nachzieht, die eine Beurteilung brauchen.
+andere offene Sitzungen an diesem Node treffen. Hat der Lauf das Binary
+ersetzt, sagt die letzte Zeile, dass /k-upgrade in einer Sitzung die
+Umstellungen nachzieht, die eine Beurteilung brauchen.
 
 --check schreibt nichts: es meldet nach kephalaion upgrade --check --json, ob
 ein neueres Kephalaion da ist (--auto ruft es nie auf), den Stand des Clones
 gegenüber dem Remote (bei der SSH-Adresse des öffentlichen Repos über HTTPS
-gefragt), den Stand des laufenden Programms gegenüber dem Clone und, was ein
-Lauf am Projekt täte. Holte ein Lauf Neues, sagt eine letzte Zeile, dass
-danach /k-upgrade die Umstellungen nachzieht. --json gibt den Bericht als
-JSON aus (schemaVersion, check, kephalaion, program, project,
-restartRequired, messages).
+gefragt), den Stand des laufenden Programms gegenüber dem neuesten
+Release-Tag und, was ein Lauf am Projekt täte. Holte ein Lauf Neues, sagt
+eine letzte Zeile, dass danach /k-upgrade die Umstellungen nachzieht. --json
+gibt den Bericht als JSON aus (schemaVersion, check, kephalaion, program,
+project, restartRequired, messages).
 
 Mit K_PLAYBOOK_VIA_COMMAND=1 — so rufen Hülle und Ersatzaufruf von
 /k-upgrade das Programm auf — entfallen beide Hinweise auf /k-upgrade.

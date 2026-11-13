@@ -7,6 +7,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
@@ -31,7 +32,12 @@ func TestMain(m *testing.M) {
 	cleanupDefaults := isolateDefaults()
 	// Kein Test fragt das echte kephalaion dieses Rechners (Task 138).
 	cleanupBinary := kephtest.IsolateBinary()
+	// Und keiner das echte GitHub nach dem neuesten Release-Tag (Task 149):
+	// Sobald ein Test eine eigene Version setzt, erreicht jedes health.Check
+	// die Release-Quelle.
+	cleanupRelease := releasetest.Isolate()
 	code := m.Run()
+	cleanupRelease()
 	cleanupBinary()
 	cleanupDefaults()
 	cleanupGitHub()

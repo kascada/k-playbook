@@ -1,8 +1,12 @@
 name: Release
 
 # Baut die vier Plattform-Binaries zu einem Tag und hängt sie als Assets an das
-# Release. Der Clone trägt sie nicht mehr; `bin/install` lädt genau das eine,
-# das zur Plattform der jeweiligen Umgebung passt. Dazu kommt
+# Release. Der Clone trägt sie nicht mehr; `bin/install` und das Programm
+# selbst (`k-playbook upgrade`, Update-Knopf) laden genau das eine, das zur
+# Plattform der jeweiligen Umgebung passt — aus dem Release des neuesten Tags,
+# geprüft gegen das SHA256SUMS dieses Tags. Der Tag steht, bevor dieser Lauf
+# die Assets hochgeladen hat; bis dahin melden beide, dass das Release noch
+# nicht fertig ist. Dazu kommt
 # k-playbook-defaults.tar.gz mit dem Inhalt von defaults/ für Kephalaion.
 #
 # Geprüft wird gegen das committete SHA256SUMS: die erwarteten Summen kommen
@@ -111,10 +115,9 @@ jobs:
       - name: Vorgaben packen
         run: .github/scripts/pack-defaults.sh dist/k-playbook-defaults.tar.gz
 
-      # Die Notes tragen den Bootstrap vorweg, nicht nur die Doku: er ist der
-      # eine Handgriff, den auch ein Bestandsprojekt nach einem Clone-Update mit
-      # gewechselter VERSION noch braucht, und die Release-Seite ist die Stelle,
-      # die beim Versionswechsel tatsächlich gelesen wird. `--notes` wird von
+      # Die Notes tragen Installation und Aktualisierung vorweg, nicht nur die
+      # Doku: die Release-Seite ist die Stelle, die beim Versionswechsel
+      # tatsächlich gelesen wird. `--notes` wird von
       # `--generate-notes` nicht ersetzt: die generierte Liste hängt dahinter.
       #
       # Nur im Erstellungszweig. Der Upload-Zweig ist der Wiederholungslauf zu
@@ -130,26 +133,38 @@ jobs:
           intro="$(cat <<'EOF'
           ## Installieren und aktualisieren
 
-          `k-playbook` wird einmal je Host und einmal je DevContainer installiert. Nach dem
-          Clone und nach jedem Clone-Update, bei dem `VERSION` wechselt, gehört der
-          Bootstrap dazu — der Update-Pfad lädt von sich aus kein Binary:
+          `k-playbook` wird einmal je Host und einmal je DevContainer installiert:
 
           ```bash
+          curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
+          # aus dem Clone im Projekt:
           make -C k-playbook install
           # ohne make:
           k-playbook/bin/install
           ```
 
-          Ein Zielprojekt hat kein eigenes `install`-Target; der Aufruf geht immer über den
-          Clone. `~/.local/bin` muss im PATH liegen, sonst bricht der Bootstrap ab, bevor er
-          etwas lädt.
+          Alle drei tun dasselbe: Sie installieren das Binary des neuesten Releases, geprüft
+          gegen die `SHA256SUMS` des Tags, und danach Kephalaion, wenn es fehlt. `VERSION` und
+          `SHA256SUMS` eines Clones lesen sie nicht. Gebraucht werden `git`, `curl` oder `wget`
+          und `sha256sum` oder `shasum`; `~/.local/bin` muss im PATH liegen, sonst bricht die
+          Installation ab, bevor sie etwas lädt.
 
-          **Reihenfolge in einem Bestandsprojekt:** zuerst den Clone aktualisieren
-          (Update-Knopf der Oberfläche oder `make -C k-playbook installer-update`), erst
-          danach den Bootstrap. Vorher liegt `k-playbook/bin/install` noch gar nicht im
-          Projekt. Zwischen beiden Schritten zeigen Commands, der Anstoßblock in `AGENTS.md`
-          und die MCP-Registrierung noch auf den abgelösten Wrapper, und es gibt kein
-          funktionierendes Kommando. Nach dem Bootstrap zieht der nächste Aufruf von
+          Ein installiertes Programm aktualisiert sich aus dem Release, nicht aus dem Clone:
+          `k-playbook upgrade` im Terminal oder „Programm aktualisieren“ in der Oberfläche. Die
+          Umgebungsprüfung (Briefing, `k-playbook health`) warnt, wenn das Programm älter ist
+          als das neueste Release, und `k-playbook version --all` nennt beide Versionen. Ein
+          Clone-Update allein lädt kein Binary.
+
+          Ältere Programme rufen dafür noch `k-playbook/bin/install` des Clones auf und prüfen
+          das Ergebnis gegen dessen `VERSION` und `SHA256SUMS`: dort zuerst den Clone
+          aktualisieren (Update-Knopf der Oberfläche oder `make -C k-playbook installer-update`),
+          dann `k-playbook upgrade`.
+
+          **Reihenfolge in einem Bestandsprojekt des abgelösten Wrapper-Modells:** zuerst den
+          Clone aktualisieren, erst danach installieren. Vorher liegt `k-playbook/bin/install`
+          noch gar nicht im Projekt. Zwischen beiden Schritten zeigen Commands, der Anstoßblock
+          in `AGENTS.md` und die MCP-Registrierung noch auf den abgelösten Wrapper, und es gibt
+          kein funktionierendes Kommando. Nach der Installation zieht der nächste Aufruf von
           `k-playbook` beides von selbst nach.
           EOF
           )"

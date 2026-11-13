@@ -1,12 +1,8 @@
-// Package program kümmert sich um die Programmdatei selbst: ob das laufende
-// Programm zum Clone passt, ob `k-playbook` im PATH auf das Installationsziel
-// zeigt, welche Version eine installierte Datei trägt, und wie das passende
-// Release-Programm über den Bootstrap des Clones nachinstalliert wird.
-//
-// Heruntergeladen wird hier nichts. Der Download ist Sache von
-// k-playbook/bin/install, das die Datei gegen SHA256SUMS prüft und atomar
-// ersetzt; dieses Paket ruft es nur auf und prüft danach die Datei.
-package program
+// Package version vergleicht Versionen der Form, die das Programm trägt und
+// die ein Release-Tag nennt: semantisch nach SemVer. Ein Blattpaket ohne
+// Abhängigkeiten, damit die Umgebungsprüfung in project, der Programm-Stand
+// in program und die Release-Quelle in release denselben Vergleich nutzen.
+package version
 
 import (
 	"strconv"
@@ -25,8 +21,8 @@ const (
 	Older
 	// Equal: beide sind gleich.
 	Equal
-	// Newer: die erste Version ist neuer — der Normalfall im Entwicklungsrepo
-	// nach `make dev-install`, wenn der Clone noch dem letzten Release folgt.
+	// Newer: die erste Version ist neuer — etwa im Entwicklungsrepo nach
+	// `make dev-install VERSION=…` mit einer Version über dem letzten Release.
 	Newer
 )
 
@@ -48,12 +44,12 @@ func (o Order) String() string {
 // „v0.9.4", obwohl es lexikalisch davor steht, und genau solche Sprünge
 // kommen bei jedem Minor-Release vor.
 //
-// Warum nicht schlicht „ungleich": im Entwicklungsrepo ist das laufende
-// Programm regelmäßig neuer als der Clone. Ein Vergleich auf Ungleichheit
+// Warum nicht schlicht „ungleich": im Entwicklungsrepo kann das laufende
+// Programm neuer sein als das neueste Release. Ein Vergleich auf Ungleichheit
 // meldete dort bei jedem Start ein Update und installierte auf Knopfdruck ein
 // älteres Programm über das neuere. Deshalb zählt allein „älter".
 //
-// Gelesen wird die Form, die VERSION und die gestempelte Version tragen:
+// Gelesen wird die Form, die ein Release-Tag und die gestempelte Version tragen:
 // optionales „v", drei Zahlen, optional ein Vorabkennzeichen hinter „-".
 // Build-Metadaten hinter „+" zählen nach SemVer nicht. Was sich so nicht lesen
 // lässt — leer, „dev", eine Commit-Kennung —, ergibt Unknown.
@@ -70,6 +66,13 @@ func Compare(version string, reference string) Order {
 		return Newer
 	}
 	return Equal
+}
+
+// Valid sagt, ob sich text als Version lesen lässt — die Frage, die Compare
+// mit Unknown beantwortet, für eine einzelne Angabe.
+func Valid(text string) bool {
+	_, ok := parse(text)
+	return ok
 }
 
 type semver struct {
