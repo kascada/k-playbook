@@ -90,22 +90,15 @@ There is no list for this in the configuration.
 k-playbook context
 ```
 
-It outputs the resolved working state as JSON: directories, instruction files in read order, remediation policy, guidelines, and the three catalogs, with shipped and project-owned content already merged, an origin for each entry, and disabled entries marked.
+It outputs the resolved working state as JSON: directories, remediation policy, guidelines, and the three catalogs, with shipped and project-owned content already merged, an origin for each entry, and disabled entries marked.
 
 The interface presents the same information in readable form in the `Resolved context` section.
 
-## What is `k-playbook.md`?
+## Where do the instructions for a session live?
 
-The instruction file: what an assistant should read before working. It exists twice:
+In the briefing. `AGENTS.md` in the project root contains only a brief prompt that names `k-playbook briefing`, the one call at the start of a session. The briefing carries the instructions that always apply as one text: the shipped parts, updated with every release, and after them the project-owned parts from the project collection under `keph:/k-playbook/instructions/always/`. Instructions for a particular job are read on demand through a reference (`k-playbook:/instructions/on-demand/<topic>.md`); their project-owned side lies under `keph:/k-playbook/instructions/on-demand/`.
 
-| File | Applies to | On update |
-|---|---|---|
-| `k-playbook/k-playbook.md` | every project that uses k-playbook | is replaced |
-| `k-playbook-local/k-playbook.md` | this project only | remains |
-
-They are read in this order. The project-owned layer is where content that applies only here belongs: project structure and special characteristics, conventions, recurring flows. General k-playbook rules do not belong there: they are in the shipped layer and are updated with every update.
-
-It is deliberately not named `AGENTS.md`: assistants read that name themselves, and it is reserved for the project root. It contains only a brief prompt that names `k-playbook briefing`, the one call at the start of a session.
+Content that applies only to one project — structure and special characteristics, conventions, recurring flows — belongs there or into the project documentation under `keph:/docs/`. The former instruction file `k-playbook.md`, once shipped and once project-owned, is gone: nothing reads it any more, and the context output has no field `instructions` (task 148).
 
 ## Can I add my own slash commands?
 

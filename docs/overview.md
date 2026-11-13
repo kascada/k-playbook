@@ -76,8 +76,8 @@ project-owned under `k-playbook-local/` — and what actually applies is the uni
 with the project-owned entry winning for the same name.
 
 Nothing works this out for itself. `k-playbook context` resolves it once per
-session and hands out the same answer to every command: the directories, the
-instruction files in read order, and the catalogs with `dist`, `local` and
+session and hands out the same answer to every command: the directories
+and the catalogs with `dist`, `local` and
 `override` already merged. The core model behind it is in
 [`manual.md`](./manual.md#core-model), the contract in
 [`k-playbook-format.md`](./k-playbook-format.md).

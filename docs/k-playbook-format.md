@@ -65,8 +65,6 @@ locations derive from the project root, the directory that holds
 | project todos | `todos/` in the project collection; a `k-playbook-local/data/todos.json` from before is taken over by `k-playbook todo migrate` |
 | version sources | `keph:/k-playbook/inventory.md` — in the project collection since task 144, settings in the frontmatter; a `k-playbook-local/version-sources.yaml` is no longer read, `/k-upgrade` 3.6 moves it |
 | private content | no place created by k-playbook any more (task 147); a `k-playbook-local/priv/` from before stays untouched |
-| instructions, shipped | `k-playbook/k-playbook.md` |
-| instructions, project-owned | `k-playbook-local/k-playbook.md` |
 
 A key whose value is always the same would only be a source of errors.
 Commands therefore no longer guess or read paths: they derive them.
@@ -343,7 +341,6 @@ configuration and the filesystem:
 |---|---|
 | `schemaVersion` | the validated configuration version |
 | `now` | invocation time: `date` as `YYYY-MM-DD`, `timestamp` as RFC 3339 |
-| `instructions` | instruction files in reading order |
 | `project` | project root, `repoRoot`, `vcs`, configuration location |
 | `playbook`, `local` | the two resolved directories |
 | `remediation` | the policy, including a default when the block is missing |
@@ -398,9 +395,10 @@ links too (`context.links`). If the context output cannot be built, that is a st
 transition: each later step takes one field out and gives it its own place in the
 briefing -- the authority is the table "Context field → future place" in
 [knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
---, and when it is empty, `k-playbook context` and `k_playbook_context` go. Today
-`k-playbook.md`, the `AGENTS.md` block, `k-playbook context` and `catalogs` are
-unchanged; the switch comes step by step. Contract: [mcp.md](mcp.md#briefing-contract).
+--, and when it is empty, `k-playbook context` and `k_playbook_context` go. The first
+field has gone that way: `instructions`, the list of the `k-playbook.md` files, no longer
+exists (task 148), because the reading order is `documents.always`. Today the `AGENTS.md`
+block, `k-playbook context` and `catalogs` are unchanged; the switch comes step by step. Contract: [mcp.md](mcp.md#briefing-contract).
 
 `links` is normally absent, intentionally: the invocation brings assistant
 linking in line with the catalog, as described below, and a message that says
@@ -454,20 +452,21 @@ The search starts at the working directory and proceeds upward. Without
 
 ## Instructions
 
-What an assistant must read before working is in `k-playbook.md`, once at each
-level:
+What an assistant must read before working comes with the briefing: the text of
+`k-playbook:/instructions/always/`, assembled from two levels.
 
-| File | Applies to | On update |
+| Where | Applies to | On update |
 |---|---|---|
-| `k-playbook/k-playbook.md` | every project using k-playbook | is replaced |
-| `k-playbook-local/k-playbook.md` | this project only | remains |
+| `<hub>:k-playbook/defaults/instructions/` | every project using k-playbook | the hub fetches the new release |
+| `keph:/k-playbook/instructions/` in the project collection | this project only | remains |
 
-They are read in this order; the project-owned level can supplement or override
-the shipped one. Under `instructions`, `context` lists only files that actually
-exist: a nonexistent path is worse than no path.
-
-The file is deliberately not called `AGENTS.md`: assistants read that name
-automatically, and it is reserved for the project root.
+The shipped parts come first, the project-owned ones after them; a project-owned
+document of the same name replaces the shipped one, an empty one disables it (see
+"Merge shipped and project-owned content"). The former instruction file
+`k-playbook.md` — once shipped at the top of the installation, once in
+`k-playbook-local/` — is gone (task 148): the program reads neither, the shipped
+file is no longer part of the repository, and the context output has no field
+`instructions`.
 
 `AGENTS.md` receives only a **prompt**: a short block naming the one call of a
 session, `k-playbook briefing`, with the MCP tool `k_playbook_briefing` as its

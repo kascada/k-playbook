@@ -246,7 +246,6 @@ func (c *BriefingContext) UnmarshalJSON(data []byte) error {
 // dass jedes andere Feld der Kontextausgabe im Abschnitt steht.
 var briefingCoveredContextFields = []string{
 	"catalogs.reviews", // documents.reviews
-	"guidelines",       // documents.guidelines — dort überlagert, hier nur lokal
 }
 
 // briefingContextForDir ist die Quelle des Abschnitts: ContextForDir, dieselbe

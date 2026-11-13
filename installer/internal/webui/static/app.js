@@ -1053,7 +1053,6 @@ function renderContext(data) {
   // Pfade werden gegen das Projektverzeichnis gekürzt: der gemeinsame Anfang
   // steht bereits oben und würde jede Zeile nur verlängern.
   const root = context.project.dir;
-  addPathGroup("Instruktionen", context.instructions || [], root);
 
   const catalogs = context.catalogs || {};
   const kinds = Object.keys(CATALOG_LABELS).filter((kind) => kind in catalogs);

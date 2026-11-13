@@ -681,8 +681,10 @@ func TestDocRefMitgelieferterStand(t *testing.T) {
 	}
 }
 
-// reviews und guidelines sind Sorten wie instructions: Einzeldateien,
-// lokal vor mitgeliefert, leer lokal schaltet ab. Nur instructions/always/
+// reviews ist eine Sorte wie instructions: Einzeldateien, lokal vor
+// mitgeliefert, leer lokal schaltet ab. guidelines hat seit Task 148 keine
+// lokale Ebene mehr: Eine gleichnamige lokale Datei ersetzt nicht, eine leere
+// schaltet nicht ab, eine nur lokale gibt es nicht. Nur instructions/always/
 // wird zusammengebaut.
 func TestDocRefSortenReviewsGuidelines(t *testing.T) {
 	layers, _, _ := docTree(t, map[string]string{
@@ -703,12 +705,11 @@ func TestDocRefSortenReviewsGuidelines(t *testing.T) {
 	})
 
 	for ref, want := range map[string]DocPart{
-		"k-playbook:/guidelines/stil.md":        {Name: "stil.md", Origin: DocOriginOverride},
-		"k-playbook:/reviews/review-eigen.md":   {Name: "review-eigen.md", Origin: DocOriginLocal},
-		"k-playbook:/reviews/review-code.md":    {Name: "review-code.md", Origin: DocOriginDist},
-		"k-playbook:/reviews/review-tech.md":    {Name: "review-tech.md", Origin: DocOriginOverride, Disabled: true},
-		"k-playbook:/guidelines/betrieb.md":     {Name: "betrieb.md", Origin: DocOriginOverride, Disabled: true},
-		"k-playbook:/guidelines/oberflaeche.md": {Name: "oberflaeche.md", Origin: DocOriginLocal},
+		"k-playbook:/guidelines/stil.md":      {Name: "stil.md", Origin: DocOriginDist},
+		"k-playbook:/reviews/review-eigen.md": {Name: "review-eigen.md", Origin: DocOriginLocal},
+		"k-playbook:/reviews/review-code.md":  {Name: "review-code.md", Origin: DocOriginDist},
+		"k-playbook:/reviews/review-tech.md":  {Name: "review-tech.md", Origin: DocOriginOverride, Disabled: true},
+		"k-playbook:/guidelines/betrieb.md":   {Name: "betrieb.md", Origin: DocOriginDist},
 	} {
 		result := mustResolveDoc(t, layers, ref)
 		if result.Directory || len(result.Parts) != 1 || !reflect.DeepEqual(result.Parts[0], want) {
@@ -718,8 +719,28 @@ func TestDocRefSortenReviewsGuidelines(t *testing.T) {
 			t.Errorf("%s: disabled %v, content %q", ref, result.Disabled, result.Content)
 		}
 	}
-	if got := mustResolveDoc(t, layers, "k-playbook:/guidelines/stil.md").Content; got != "# Stil\n\nlokal\n" {
-		t.Errorf("Überlagerung liefert nicht die lokale Fassung: %q", got)
+	// Die lokale Fassung einer Guideline gewinnt nicht, die leere lokale
+	// schaltet nicht ab, die nur lokale ist unbekannt.
+	if got := mustResolveDoc(t, layers, "k-playbook:/guidelines/stil.md").Content; got != "# Stil\n\nmitgeliefert\n" {
+		t.Errorf("guidelines liefert nicht die mitgelieferte Fassung: %q", got)
+	}
+	if err := expectDocError(t, layers, "k-playbook:/guidelines/oberflaeche.md", DocCodeNotFound); !strings.Contains(err.Error(), "eine lokale Fassung gibt es hier nicht") {
+		t.Errorf("nur lokale Guideline: %v", err)
+	}
+	// Dasselbe über das Verzeichnis, wie das Briefing es listet.
+	entries, _, err := overlayDocDir(layers, "guidelines", nil)
+	if err != nil {
+		t.Fatalf("overlayDocDir: %v", err)
+	}
+	names := []string{}
+	for _, entry := range entries {
+		if entry.Origin != DocOriginDist || entry.Disabled {
+			t.Errorf("guidelines/%s: Herkunft %s, abgeschaltet %v", entry.Name, entry.Origin, entry.Disabled)
+		}
+		names = append(names, entry.Name)
+	}
+	if !reflect.DeepEqual(names, []string{"betrieb.md", "stil.md"}) {
+		t.Errorf("guidelines im Verzeichnis: %v", names)
 	}
 	if got := mustResolveDoc(t, layers, "k-playbook:/reviews/review-code.md").Content; !strings.HasPrefix(got, "---\nname: review-code\n") {
 		t.Errorf("Einzeldatei ohne Frontmatter: %q", got)
@@ -1008,25 +1029,27 @@ func TestProjectDocLayersOhneInstallation(t *testing.T) {
 }
 
 // includeTree sind Ebenen mit Bausteinen für Include-Tests: Einzeldateien
-// unter guidelines/ und on-demand/, ein zusammengebautes Verzeichnis.
+// unter reviews/ und on-demand/, ein zusammengebautes Verzeichnis. reviews/
+// steht hier für eine Sorte mit lokaler Ebene; guidelines/ hat seit Task 148
+// keine mehr.
 func includeTree(t *testing.T, local map[string]string) DocLayers {
 	t.Helper()
 	layers, _, _ := docTree(t, map[string]string{
-		"guidelines/haupt.md":             "---\ntitle: Haupt\n---\n\n# Haupt\n\ninclude: k-playbook:/guidelines/baustein.md\n\nEnde.\n",
-		"guidelines/baustein.md":          "---\ntitle: Baustein\n---\n\n## Baustein\n\nText.\n",
-		"guidelines/relativ.md":           "# Relativ\n\ninclude: teile/stueck.md\n",
-		"guidelines/teile/stueck.md":      "Stück.\n",
-		"guidelines/hoch.md":              "include: teile/../baustein.md\n",
-		"guidelines/verschachtelt.md":     "# V\n\ninclude: haupt.md\n",
-		"guidelines/codeblock.md":         "# Code\n\n```markdown\ninclude: k-playbook:/guidelines/baustein.md\n```\n\n~~~\ninclude: baustein.md\n~~~\n\ninclude: baustein.md\n",
-		"guidelines/zyklus-a.md":          "A\n\ninclude: zyklus-b.md\n",
-		"guidelines/zyklus-b.md":          "B\n\ninclude: zyklus-a.md\n",
-		"guidelines/tot.md":               "# Tot\n\ninclude: fehlt.md\n",
-		"guidelines/zwei-argumente.md":    "include: a.md b.md\n",
-		"guidelines/nicht-sorte.md":       "include: k-playbook:/checks/check_x.sh\n",
-		"guidelines/verzeichnis.md":       "include: k-playbook:/instructions/on-demand/\n",
-		"guidelines/always.md":            "# Always\n\ninclude: k-playbook:/instructions/always/\n",
-		"instructions/always/010-a.md":    "## A\n\ninclude: k-playbook:/guidelines/baustein.md\n",
+		"reviews/haupt.md":                "---\ntitle: Haupt\n---\n\n# Haupt\n\ninclude: k-playbook:/reviews/baustein.md\n\nEnde.\n",
+		"reviews/baustein.md":             "---\ntitle: Baustein\n---\n\n## Baustein\n\nText.\n",
+		"reviews/relativ.md":              "# Relativ\n\ninclude: teile/stueck.md\n",
+		"reviews/teile/stueck.md":         "Stück.\n",
+		"reviews/hoch.md":                 "include: teile/../baustein.md\n",
+		"reviews/verschachtelt.md":        "# V\n\ninclude: haupt.md\n",
+		"reviews/codeblock.md":            "# Code\n\n```markdown\ninclude: k-playbook:/reviews/baustein.md\n```\n\n~~~\ninclude: baustein.md\n~~~\n\ninclude: baustein.md\n",
+		"reviews/zyklus-a.md":             "A\n\ninclude: zyklus-b.md\n",
+		"reviews/zyklus-b.md":             "B\n\ninclude: zyklus-a.md\n",
+		"reviews/tot.md":                  "# Tot\n\ninclude: fehlt.md\n",
+		"reviews/zwei-argumente.md":       "include: a.md b.md\n",
+		"reviews/nicht-sorte.md":          "include: k-playbook:/checks/check_x.sh\n",
+		"reviews/verzeichnis.md":          "include: k-playbook:/instructions/on-demand/\n",
+		"reviews/always.md":               "# Always\n\ninclude: k-playbook:/instructions/always/\n",
+		"instructions/always/010-a.md":    "## A\n\ninclude: k-playbook:/reviews/baustein.md\n",
 		"instructions/always/020-b.md":    "## B\n",
 		"instructions/on-demand/thema.md": "## Thema\n",
 		"checks/check_x.sh":               "#!/bin/sh\n",
@@ -1047,11 +1070,11 @@ func TestDocRefIncludeSetztRumpfEin(t *testing.T) {
 
 	// Das Hauptdokument behält sein Frontmatter; eingesetzt wird der Rumpf
 	// des Ziels ohne dessen Frontmatter.
-	doc := mustResolveDoc(t, layers, "k-playbook:/guidelines/haupt.md")
+	doc := mustResolveDoc(t, layers, "k-playbook:/reviews/haupt.md")
 	if doc.Content != "---\ntitle: Haupt\n---\n\n# Haupt\n\n## Baustein\n\nText.\n\nEnde.\n" {
 		t.Errorf("Inhalt: %q", doc.Content)
 	}
-	if !reflect.DeepEqual(doc.Includes, []DocInclude{{Ref: "k-playbook:/guidelines/baustein.md", Origin: DocOriginDist, Depth: 1}}) {
+	if !reflect.DeepEqual(doc.Includes, []DocInclude{{Ref: "k-playbook:/reviews/baustein.md", Origin: DocOriginDist, Depth: 1}}) {
 		t.Errorf("includes: %+v", doc.Includes)
 	}
 	if len(doc.Parts) != 1 || doc.Parts[0].Name != "haupt.md" {
@@ -1060,17 +1083,17 @@ func TestDocRefIncludeSetztRumpfEin(t *testing.T) {
 
 	// Relativ gegen das Verzeichnis des einbindenden Dokuments, auch aus dem
 	// Unterverzeichnis heraus nicht mit „..“.
-	rel := mustResolveDoc(t, layers, "k-playbook:/guidelines/relativ.md")
+	rel := mustResolveDoc(t, layers, "k-playbook:/reviews/relativ.md")
 	if rel.Content != "# Relativ\n\nStück.\n" {
 		t.Errorf("relativ: %q", rel.Content)
 	}
-	if !reflect.DeepEqual(includeRefs(rel.Includes), []string{"k-playbook:/guidelines/teile/stueck.md"}) {
+	if !reflect.DeepEqual(includeRefs(rel.Includes), []string{"k-playbook:/reviews/teile/stueck.md"}) {
 		t.Errorf("includes relativ: %+v", rel.Includes)
 	}
 
 	// Verschachtelt: Tiefe 2, Frontmatter des eingebundenen Hauptdokuments
 	// verschwindet, weil nur der Rumpf eingesetzt wird.
-	nested := mustResolveDoc(t, layers, "k-playbook:/guidelines/verschachtelt.md")
+	nested := mustResolveDoc(t, layers, "k-playbook:/reviews/verschachtelt.md")
 	if nested.Content != "# V\n\n# Haupt\n\n## Baustein\n\nText.\n\nEnde.\n" {
 		t.Errorf("verschachtelt: %q", nested.Content)
 	}
@@ -1079,8 +1102,8 @@ func TestDocRefIncludeSetztRumpfEin(t *testing.T) {
 	}
 
 	// In Code-Blöcken bleibt die Zeile stehen, beide Zaunarten.
-	code := mustResolveDoc(t, layers, "k-playbook:/guidelines/codeblock.md")
-	if code.Content != "# Code\n\n```markdown\ninclude: k-playbook:/guidelines/baustein.md\n```\n\n~~~\ninclude: baustein.md\n~~~\n\n## Baustein\n\nText.\n" {
+	code := mustResolveDoc(t, layers, "k-playbook:/reviews/codeblock.md")
+	if code.Content != "# Code\n\n```markdown\ninclude: k-playbook:/reviews/baustein.md\n```\n\n~~~\ninclude: baustein.md\n~~~\n\n## Baustein\n\nText.\n" {
 		t.Errorf("codeblock: %q", code.Content)
 	}
 	if len(code.Includes) != 1 {
@@ -1088,44 +1111,44 @@ func TestDocRefIncludeSetztRumpfEin(t *testing.T) {
 	}
 
 	// Ohne Include-Zeile ist includes leer, nie nil.
-	if plain := mustResolveDoc(t, layers, "k-playbook:/guidelines/baustein.md"); plain.Includes == nil || len(plain.Includes) != 0 {
+	if plain := mustResolveDoc(t, layers, "k-playbook:/reviews/baustein.md"); plain.Includes == nil || len(plain.Includes) != 0 {
 		t.Errorf("includes ohne Include: %#v", plain.Includes)
 	}
 }
 
 func TestDocRefIncludeRohtextUndAbgeschaltet(t *testing.T) {
 	layers := includeTree(t, map[string]string{
-		"guidelines/baustein.md": "# Abgeschaltet: kein Baustein.\n",
+		"reviews/baustein.md": "# Abgeschaltet: kein Baustein.\n",
 	})
 
 	// Raw: die Zeile bleibt, includes ist leer.
-	raw, err := ResolveDocRefWith(context.Background(), layers, "k-playbook:/guidelines/haupt.md", DocReadOptions{Raw: true})
+	raw, err := ResolveDocRefWith(context.Background(), layers, "k-playbook:/reviews/haupt.md", DocReadOptions{Raw: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(raw.Content, "\ninclude: k-playbook:/guidelines/baustein.md\n") || len(raw.Includes) != 0 || raw.Includes == nil {
+	if !strings.Contains(raw.Content, "\ninclude: k-playbook:/reviews/baustein.md\n") || len(raw.Includes) != 0 || raw.Includes == nil {
 		t.Errorf("raw: %+v", raw)
 	}
 	// Ein abgeschaltetes Ziel setzt nichts ein, kein Fehler; die Zeile fällt
 	// weg, und includes nennt das Ziel als abgeschaltet.
-	doc := mustResolveDoc(t, layers, "k-playbook:/guidelines/haupt.md")
+	doc := mustResolveDoc(t, layers, "k-playbook:/reviews/haupt.md")
 	if doc.Content != "---\ntitle: Haupt\n---\n\n# Haupt\n\n\nEnde.\n" {
 		t.Errorf("abgeschaltetes Ziel: %q", doc.Content)
 	}
-	if !reflect.DeepEqual(doc.Includes, []DocInclude{{Ref: "k-playbook:/guidelines/baustein.md", Origin: DocOriginOverride, Depth: 1, Disabled: true}}) {
+	if !reflect.DeepEqual(doc.Includes, []DocInclude{{Ref: "k-playbook:/reviews/baustein.md", Origin: DocOriginOverride, Depth: 1, Disabled: true}}) {
 		t.Errorf("includes: %+v", doc.Includes)
 	}
 	// Eine lokale Fassung des Bausteins gewinnt — dieselbe Überlagerung wie
 	// beim Verweis selbst.
-	layers = includeTree(t, map[string]string{"guidelines/baustein.md": "## Lokal\n\nText.\n"})
-	doc = mustResolveDoc(t, layers, "k-playbook:/guidelines/haupt.md")
+	layers = includeTree(t, map[string]string{"reviews/baustein.md": "## Lokal\n\nText.\n"})
+	doc = mustResolveDoc(t, layers, "k-playbook:/reviews/haupt.md")
 	if !strings.Contains(doc.Content, "## Lokal\n") || doc.Includes[0].Origin != DocOriginOverride {
 		t.Errorf("lokaler Baustein: %+v", doc)
 	}
 	// Auch das einbindende Dokument lokal: relativ zählt im selben Präfix,
 	// die Auflösung des Ziels ist die normale.
-	layers = includeTree(t, map[string]string{"guidelines/eigen.md": "# Eigen\n\ninclude: baustein.md\n"})
-	if doc = mustResolveDoc(t, layers, "k-playbook:/guidelines/eigen.md"); doc.Content != "# Eigen\n\n## Baustein\n\nText.\n" {
+	layers = includeTree(t, map[string]string{"reviews/eigen.md": "# Eigen\n\ninclude: baustein.md\n"})
+	if doc = mustResolveDoc(t, layers, "k-playbook:/reviews/eigen.md"); doc.Content != "# Eigen\n\n## Baustein\n\nText.\n" {
 		t.Errorf("lokales Dokument mit Include: %q", doc.Content)
 	}
 }
@@ -1133,33 +1156,33 @@ func TestDocRefIncludeRohtextUndAbgeschaltet(t *testing.T) {
 func TestDocRefIncludeFehlerTragenDieKette(t *testing.T) {
 	layers := includeTree(t, nil)
 
-	err := expectDocError(t, layers, "k-playbook:/guidelines/zyklus-a.md", DocCodeIncludeCycle)
-	if !strings.Contains(err.Error(), "Include-Kette: k-playbook:/guidelines/zyklus-a.md → k-playbook:/guidelines/zyklus-b.md → k-playbook:/guidelines/zyklus-a.md") {
+	err := expectDocError(t, layers, "k-playbook:/reviews/zyklus-a.md", DocCodeIncludeCycle)
+	if !strings.Contains(err.Error(), "Include-Kette: k-playbook:/reviews/zyklus-a.md → k-playbook:/reviews/zyklus-b.md → k-playbook:/reviews/zyklus-a.md") {
 		t.Errorf("Zyklus ohne Kette: %v", err)
 	}
 	// Die Kette steht genau einmal in der Meldung.
 	if strings.Count(err.Error(), "Include-Kette") != 1 {
 		t.Errorf("Kette mehrfach: %v", err)
 	}
-	err = expectDocError(t, layers, "k-playbook:/guidelines/tot.md", DocCodeNotFound)
-	if !strings.Contains(err.Error(), "k-playbook:/guidelines/fehlt.md ist unbekannt") ||
-		!strings.Contains(err.Error(), "Include-Kette: k-playbook:/guidelines/tot.md → k-playbook:/guidelines/fehlt.md") {
+	err = expectDocError(t, layers, "k-playbook:/reviews/tot.md", DocCodeNotFound)
+	if !strings.Contains(err.Error(), "k-playbook:/reviews/fehlt.md ist unbekannt") ||
+		!strings.Contains(err.Error(), "Include-Kette: k-playbook:/reviews/tot.md → k-playbook:/reviews/fehlt.md") {
 		t.Errorf("totes Ziel: %v", err)
 	}
-	err = expectDocError(t, layers, "k-playbook:/guidelines/zwei-argumente.md", DocCodeInvalidInput)
+	err = expectDocError(t, layers, "k-playbook:/reviews/zwei-argumente.md", DocCodeInvalidInput)
 	if !strings.Contains(err.Error(), "genau ein Argument") || !strings.Contains(err.Error(), "Include-Kette") {
 		t.Errorf("zwei Argumente: %v", err)
 	}
-	err = expectDocError(t, layers, "k-playbook:/guidelines/nicht-sorte.md", DocCodeUnsupported)
-	if !strings.Contains(err.Error(), "k-playbook:/guidelines/nicht-sorte.md → k-playbook:/checks/check_x.sh") {
+	err = expectDocError(t, layers, "k-playbook:/reviews/nicht-sorte.md", DocCodeUnsupported)
+	if !strings.Contains(err.Error(), "k-playbook:/reviews/nicht-sorte.md → k-playbook:/checks/check_x.sh") {
 		t.Errorf("Ziel außerhalb der Sorten: %v", err)
 	}
-	err = expectDocError(t, layers, "k-playbook:/guidelines/verzeichnis.md", DocCodeInvalidInput)
+	err = expectDocError(t, layers, "k-playbook:/reviews/verzeichnis.md", DocCodeInvalidInput)
 	if !strings.Contains(err.Error(), "Dateiname fehlt") {
 		t.Errorf("Verzeichnis ohne Zusammenbau als Ziel: %v", err)
 	}
 	// Aus der Sorte führt kein relativer Pfad heraus: „..“ ist ungültig.
-	err = expectDocError(t, layers, "k-playbook:/guidelines/hoch.md", DocCodeInvalidInput)
+	err = expectDocError(t, layers, "k-playbook:/reviews/hoch.md", DocCodeInvalidInput)
 	if !strings.Contains(err.Error(), `".." ist im Pfad nicht erlaubt`) || !strings.Contains(err.Error(), "Include-Kette") {
 		t.Errorf("..: %v", err)
 	}
@@ -1171,20 +1194,20 @@ func TestDocRefIncludeFehlerTragenDieKette(t *testing.T) {
 		if i < 11 {
 			content += fmt.Sprintf("\ninclude: zu-tief-%02d.md\n", i+1)
 		}
-		chain[fmt.Sprintf("guidelines/zu-tief-%02d.md", i)] = content
+		chain[fmt.Sprintf("reviews/zu-tief-%02d.md", i)] = content
 	}
 	layers, _, _ = docTree(t, chain, nil)
-	err = expectDocError(t, layers, "k-playbook:/guidelines/zu-tief-00.md", DocCodeIncludeTooDeep)
-	if !strings.Contains(err.Error(), "k-playbook:/guidelines/zu-tief-10.md → k-playbook:/guidelines/zu-tief-11.md") {
+	err = expectDocError(t, layers, "k-playbook:/reviews/zu-tief-00.md", DocCodeIncludeTooDeep)
+	if !strings.Contains(err.Error(), "k-playbook:/reviews/zu-tief-10.md → k-playbook:/reviews/zu-tief-11.md") {
 		t.Errorf("zu tief: %v", err)
 	}
 	// Von 01 aus reicht die Kette nur bis Tiefe 10: kein Fehler.
-	deep := mustResolveDoc(t, layers, "k-playbook:/guidelines/zu-tief-01.md")
+	deep := mustResolveDoc(t, layers, "k-playbook:/reviews/zu-tief-01.md")
 	if len(deep.Includes) != 10 || deep.Includes[9].Depth != 10 || !strings.HasSuffix(deep.Content, "Stufe 11\n") {
 		t.Errorf("Tiefe 10 erlaubt: %d Includes, Inhalt %q", len(deep.Includes), deep.Content)
 	}
 	// Mit Raw gibt es keinen Fehler: nichts wird eingesetzt.
-	if _, err := ResolveDocRefWith(context.Background(), includeTree(t, nil), "k-playbook:/guidelines/zyklus-a.md", DocReadOptions{Raw: true}); err != nil {
+	if _, err := ResolveDocRefWith(context.Background(), includeTree(t, nil), "k-playbook:/reviews/zyklus-a.md", DocReadOptions{Raw: true}); err != nil {
 		t.Errorf("raw mit Zyklus: %v", err)
 	}
 }
@@ -1210,7 +1233,7 @@ func TestDocRefIncludeImZusammengebautenVerzeichnis(t *testing.T) {
 		!strings.Contains(dir.Problems[0], "nicht aufgenommen") {
 		t.Errorf("problems: %v", dir.Problems)
 	}
-	if !reflect.DeepEqual(includeRefs(dir.Includes), []string{"k-playbook:/guidelines/baustein.md", "k-playbook:/instructions/on-demand/thema.md"}) ||
+	if !reflect.DeepEqual(includeRefs(dir.Includes), []string{"k-playbook:/reviews/baustein.md", "k-playbook:/instructions/on-demand/thema.md"}) ||
 		dir.Includes[0].Depth != 1 {
 		t.Errorf("includes: %+v", dir.Includes)
 	}
@@ -1227,7 +1250,7 @@ func TestDocRefIncludeImZusammengebautenVerzeichnis(t *testing.T) {
 	// Ein Verzeichnis als Include-Ziel einer Datei: sein Text wird
 	// eingesetzt, sein Problem gemeldet, es erscheint ohne Herkunft in
 	// includes, seine eigenen Includes dahinter.
-	file := mustResolveDoc(t, layers, "k-playbook:/guidelines/always.md")
+	file := mustResolveDoc(t, layers, "k-playbook:/reviews/always.md")
 	if file.Content != "# Always\n\n## A\n\n## Baustein\n\nText.\n\n## B\n\n## Eigen\n\n## Thema\n" {
 		t.Errorf("Verzeichnis als Ziel: %q", file.Content)
 	}
@@ -1236,7 +1259,7 @@ func TestDocRefIncludeImZusammengebautenVerzeichnis(t *testing.T) {
 	}
 	if !reflect.DeepEqual(file.Includes, []DocInclude{
 		{Ref: "k-playbook:/instructions/always/", Depth: 1},
-		{Ref: "k-playbook:/guidelines/baustein.md", Origin: DocOriginDist, Depth: 2},
+		{Ref: "k-playbook:/reviews/baustein.md", Origin: DocOriginDist, Depth: 2},
 		{Ref: "k-playbook:/instructions/on-demand/thema.md", Origin: DocOriginDist, Depth: 2},
 	}) {
 		t.Errorf("includes: %+v", file.Includes)
@@ -1255,7 +1278,7 @@ func TestDocRefIncludeProjekt(t *testing.T) {
 	layers := includeTree(t, nil)
 	root := t.TempDir()
 	writeDocTree(t, root, map[string]string{
-		"docs/haupt.md":        "# Projekt\n\ninclude: teile/stueck.md\n\ninclude: k-playbook:/guidelines/baustein.md\n",
+		"docs/haupt.md":        "# Projekt\n\ninclude: teile/stueck.md\n\ninclude: k-playbook:/reviews/baustein.md\n",
 		"docs/teile/stueck.md": "Projektstück.\n",
 		"docs/leer.md":         "",
 		"docs/leer-ziel.md":    "# L\n\ninclude: leer.md\n",
@@ -1269,7 +1292,7 @@ func TestDocRefIncludeProjekt(t *testing.T) {
 	}
 	if !reflect.DeepEqual(doc.Includes, []DocInclude{
 		{Ref: "project:/docs/teile/stueck.md", Origin: DocOriginProject, Depth: 1},
-		{Ref: "k-playbook:/guidelines/baustein.md", Origin: DocOriginDist, Depth: 1},
+		{Ref: "k-playbook:/reviews/baustein.md", Origin: DocOriginDist, Depth: 1},
 	}) {
 		t.Errorf("includes: %+v", doc.Includes)
 	}
@@ -1283,9 +1306,9 @@ func TestDocRefIncludeProjekt(t *testing.T) {
 		t.Errorf("Kette: %v", err)
 	}
 	// Aus k-playbook: heraus ein project:-Ziel.
-	layers2 := includeTree(t, map[string]string{"guidelines/projekt.md": "# P\n\ninclude: project:/docs/teile/stueck.md\n"})
+	layers2 := includeTree(t, map[string]string{"reviews/projekt.md": "# P\n\ninclude: project:/docs/teile/stueck.md\n"})
 	layers2.Project = layers.Project
-	if p := mustResolveDoc(t, layers2, "k-playbook:/guidelines/projekt.md"); p.Content != "# P\n\nProjektstück.\n" || p.Includes[0].Origin != DocOriginProject {
+	if p := mustResolveDoc(t, layers2, "k-playbook:/reviews/projekt.md"); p.Content != "# P\n\nProjektstück.\n" || p.Includes[0].Origin != DocOriginProject {
 		t.Errorf("project: als Ziel: %+v", p)
 	}
 }
@@ -1293,11 +1316,11 @@ func TestDocRefIncludeProjekt(t *testing.T) {
 // keph: als einbindendes Dokument und als Ziel, ~ relativ.
 func TestDocRefIncludeKeph(t *testing.T) {
 	store := &fakeKephStore{docs: map[string]string{
-		"user/kamran/tasks/100-a.md":   "---\ntitle: A\n---\n\n# A\n\ninclude: notizen.md\n\ninclude: k-playbook:/guidelines/baustein.md\n",
+		"user/kamran/tasks/100-a.md":   "---\ntitle: A\n---\n\n# A\n\ninclude: notizen.md\n\ninclude: k-playbook:/reviews/baustein.md\n",
 		"user/kamran/tasks/notizen.md": "Notiz.\n\ninclude: keph:/user/~/tasks/100-a.md\n",
 		"manual/x.md":                  "X\n",
 	}}
-	layers := includeTree(t, map[string]string{"guidelines/keph.md": "# K\n\ninclude: keph:/manual/x.md\n"})
+	layers := includeTree(t, map[string]string{"reviews/keph.md": "# K\n\ninclude: keph:/manual/x.md\n"})
 	layers.Keph = func() (KephDocs, error) { return KephDocs{Store: store, User: "kamran"}, nil }
 
 	// notizen.md bindet über ~ das Hauptdokument wieder ein: Zyklus, erkannt
@@ -1314,13 +1337,13 @@ func TestDocRefIncludeKeph(t *testing.T) {
 	if doc.Includes[0].Ref != "keph:/user/kamran/tasks/notizen.md" || doc.Includes[0].Origin != DocOriginKeph {
 		t.Errorf("includes: %+v", doc.Includes)
 	}
-	if k := mustResolveDoc(t, layers, "k-playbook:/guidelines/keph.md"); k.Content != "# K\n\nX\n" {
+	if k := mustResolveDoc(t, layers, "k-playbook:/reviews/keph.md"); k.Content != "# K\n\nX\n" {
 		t.Errorf("keph: als Ziel: %q", k.Content)
 	}
 	// Ohne Zugang scheitert das Include mit kephalaion_unavailable und Kette.
 	layers.Keph = nil
-	err = expectDocError(t, layers, "k-playbook:/guidelines/keph.md", DocCodeKephalaionUnavailable)
-	if !strings.Contains(err.Error(), "k-playbook:/guidelines/keph.md → keph:/manual/x.md") {
+	err = expectDocError(t, layers, "k-playbook:/reviews/keph.md", DocCodeKephalaionUnavailable)
+	if !strings.Contains(err.Error(), "k-playbook:/reviews/keph.md → keph:/manual/x.md") {
 		t.Errorf("Kette: %v", err)
 	}
 }

@@ -785,9 +785,10 @@ unberührt; ein Projekt ohne das Verzeichnis bleibt nach Start der Oberfläche, 
 
 `project/local.go` trägt deshalb nur noch den Namen und den Pfad (`LocalDirName`,
 `LocalDir()`), für die Leser von Altbestand: die Gesundheitsprüfung, den Umzug in
-`k-playbook upgrade` und `/k-upgrade`, die Instruktionsdatei `k-playbook.md` und die lokale
-Ebene von `guidelines/` (beide bis zu ihrer Ablösung), die Liste der bisherigen Review-Läufe
-und die Vorprüfung beim Branchwechsel. Mit Task 147 entfallen sind:
+`k-playbook upgrade` und `/k-upgrade`, die lokale
+Ebene von `guidelines/` (bis zu ihrer Ablösung), die Liste der bisherigen Review-Läufe
+und die Vorprüfung beim Branchwechsel. Die Instruktionsdatei `k-playbook.md` liest seit
+Task 148 nichts mehr. Mit Task 147 entfallen sind:
 
 - Die Liste der Einträge in `project/local.go` samt ihren Funktionen zum Prüfen und
   Anlegen, dazu die Vorlagen der READMEs und der projekteigenen `k-playbook.md`. Zuletzt
@@ -1242,19 +1243,25 @@ brauchen die Hüllen auf der Platte), `guidelines/` und `testdata/` bleiben vore
 
 ## Instruktionen
 
-Zwei Ebenen, in `project/context.go` und `project/instructions.go`:
+Zwei Ebenen, aufgelöst in `project/docref.go`; `project/instructions.go` pflegt nur den
+Anstoß in `AGENTS.md`:
 
-| Datei | Gilt für | Beim Update |
+| Ort | Gilt für | Beim Update |
 |---|---|---|
-| `k-playbook/k-playbook.md` | jedes Projekt, das k-playbook nutzt | wird ersetzt |
-| `k-playbook-local/k-playbook.md` | nur dieses Projekt | bleibt |
 | `<hub>:k-playbook/defaults/instructions/` | jedes Projekt, das k-playbook nutzt | der Hub holt den neuen Release |
 | `keph:/k-playbook/instructions/` (Collection des Projekts, seit Task 143) | nur dieses Projekt | bleibt |
 
+Die frühere Instruktionsdatei `k-playbook.md` — mitgeliefert oben in der Installation,
+projekteigen in `k-playbook-local/` — gibt es nicht mehr (Task 148): `instructionFiles()`
+und das Feld `instructions` der Kontextausgabe sind entfernt, die mitgelieferte Datei ist
+aus dem Quell-Repo gelöscht (oben und unter `defaults/`), und kein Command lässt „die
+Dateien aus `instructions`" lesen. `TestBuildContextNenntKeineInstructions` hält fest, dass
+die Kontextausgabe eine liegengebliebene Datei nicht nennt.
+
 Die Sorte `instructions` — das Verzeichnis `instructions/` mit `always/` und `on-demand/` —
-ist neu und noch nicht eingebaut (Task 087): weder `instructionFiles()` noch die
-Kontextausgabe noch `AGENTS.md` nennen sie, und sie hängt nicht in `catalogKinds()`.
-Gelesen wird sie nur über Verweise, `k-playbook read` bzw. `k_playbook_doc_read`, aufgelöst in
+hängt nicht in `catalogKinds()`; die Kontextausgabe nennt sie nicht, das Briefing liefert
+sie (`documents.always`, `documents.onDemand`).
+Gelesen wird sie über Verweise, `k-playbook read` bzw. `k_playbook_doc_read`, aufgelöst in
 `project/docref.go` nach der Regel der Kataloge: gleicher Name gewinnt lokal, leer lokal
 schaltet ab (`isEmptyContent()`, dieselbe Prüfung wie `isEmptyFile()`). Ein Verweis auf
 `always/` baut die Teile mit Ziffer vorn zu einem Text zusammen, numerisch sortiert über beide
@@ -1266,15 +1273,9 @@ Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `alw
 `k-playbook:`: `commands`, deren Text in `defaults/commands/` liegt, während die Hülle für den
 Assistenten aus dem Binary kommt (Task 092), die Include-Sorten `includes` und `testdata`
 (Task 093) und `reviews`, `guidelines`. Aus der Installation `k-playbook/` liest
-keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg. Wie `always/` zu `k-playbook.md`
-steht, entscheidet Task 086. Regeln und Zugriffswege:
+keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg.
+Regeln und Zugriffswege:
 [`../../docs/verweisschema.md`](../../docs/verweisschema.md).
-
-`instructionFiles()` sammelt sie in dieser Reihenfolge und nimmt nur auf, was existiert —
-ein Pfad ins Leere wäre schlechter als keiner.
-
-Die Datei heißt bewusst **nicht** `AGENTS.md`. Diesen Namen lesen die Assistenten von
-sich aus, und er ist dem Hauptverzeichnis vorbehalten.
 
 `ApplyRootInstructions()` legt `AGENTS.md` an, falls sie fehlt, und hängt sonst einen
 kurzen Anstoß an: den einen Aufruf einer Sitzung, `k-playbook briefing`, eingerückt als
@@ -3333,7 +3334,7 @@ per `display` zu überstimmen. `TestStylesheetHonorsHiddenAttribute` prüft, das
 ## Aufgelöster Kontext in der Oberfläche
 
 Der unterste Block der Setup-Seite zeigt, was `BuildContext()` liefert — dasselbe, was
-das Unterkommando `context` ausgibt: Pfade, Instruktionsdateien, die effektiven Kataloge
+das Unterkommando `context` ausgibt: Pfade, die effektiven Kataloge
 und die Guidelines, dazu `kephalaion` aus dem Zwischenspeicher der Statusseite;
 `versionSources` steht nicht darin, die Quellenkonfiguration zeigt der Inventarbereich.
 

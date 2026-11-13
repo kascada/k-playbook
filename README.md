@@ -36,8 +36,8 @@
   under `share/scripts/`; `install-security-tools.sh` installs them, and every job writes
   SARIF into the run directory. What was checked and what was not is stated with a
   reason on the entry.
-- **Its own MCP server.** `k-playbook mcp` gives the assistant the resolved paths,
-  instructions and catalogs, plus the tools for review runs. It is registered for
+- **Its own MCP server.** `k-playbook mcp` gives the assistant the resolved paths
+  and catalogs, plus the tools for review runs. It is registered for
   Claude Code and OpenCode.
 
 ## Installation
@@ -122,11 +122,10 @@ project/
 ├── k-playbook/           the installation, fully replaceable
 │   ├── reviews/ checks/
 │   ├── bin/
-│   ├── k-playbook.md     shipped instruction layer
 │   └── installer/ docs/
 └── k-playbook-local/     being phased out: never created any more, only read
-    ├── guidelines/       where it still exists, until its content has moved
-    └── k-playbook.md     to the project collection
+    └── guidelines/       where it still exists, until its content has moved
+                          to the project collection
 ```
 
 Tasks, todos, the project documentation and the source configuration of the version

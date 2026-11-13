@@ -174,24 +174,38 @@ func TestDefaultsSourceLesefehlerIstNichtErreichbar(t *testing.T) {
 
 // Über die Auflösung: lokal vor mitgeliefert wie bei der Platte, Fehlendes
 // ist not_found, eine nicht bereite Collection kephalaion_unavailable — auch
-// wenn die lokale Ebene den Eintrag hat.
+// wenn die lokale Ebene den Eintrag hat. Geprüft an commands/, dessen lokale
+// Ebene auf der Platte liegt (.k-playbook/commands/). guidelines/ hat keine
+// lokale Ebene (Task 148): Eine Datei unter k-playbook-local/guidelines/
+// gewinnt nicht.
 func TestDefaultsSourceHinterVerweisen(t *testing.T) {
 	root := t.TempDir()
-	writeDocTree(t, filepath.Join(root, "k-playbook-local"), map[string]string{"guidelines/b.md": "# B lokal\n\nText.\n"})
-	store := defaultsStore(map[string]string{"guidelines/a.md": "# A\n", "guidelines/b.md": "# B\n"})
+	writeDocTree(t, filepath.Join(root, ProjectDirName), map[string]string{"commands/b.md": "# B lokal\n\nText.\n"})
+	writeDocTree(t, filepath.Join(root, "k-playbook-local"), map[string]string{
+		"guidelines/g.md":     "# G lokal\n\nText.\n",
+		"guidelines/eigen.md": "# Eigen\n\nText.\n",
+	})
+	store := defaultsStore(map[string]string{"commands/a.md": "# A\n", "commands/b.md": "# B\n", "guidelines/g.md": "# G\n"})
 	calls := 0
 	layers := DocLayers{Dist: NewKephDefaultsSource(openStore(store, &calls)), Local: NewProjectLocalDocSource(root)}
 
-	a, err := ResolveDocRef(layers, "k-playbook:/guidelines/a.md")
+	a, err := ResolveDocRef(layers, "k-playbook:/commands/a.md")
 	if err != nil || a.Content != "# A\n" || a.Parts[0].Origin != DocOriginDist {
 		t.Errorf("a: %+v, %v", a, err)
 	}
-	b, err := ResolveDocRef(layers, "k-playbook:/guidelines/b.md")
+	b, err := ResolveDocRef(layers, "k-playbook:/commands/b.md")
 	if err != nil || b.Content != "# B lokal\n\nText.\n" || b.Parts[0].Origin != DocOriginOverride {
 		t.Errorf("b: %+v, %v", b, err)
 	}
-	if _, err := ResolveDocRef(layers, "k-playbook:/guidelines/c.md"); DocRefErrorCode(err) != DocCodeNotFound {
+	if _, err := ResolveDocRef(layers, "k-playbook:/commands/c.md"); DocRefErrorCode(err) != DocCodeNotFound {
 		t.Errorf("c: %v, erwartet not_found", err)
+	}
+	g, err := ResolveDocRef(layers, "k-playbook:/guidelines/g.md")
+	if err != nil || g.Content != "# G\n" || g.Parts[0].Origin != DocOriginDist {
+		t.Errorf("g: %+v, %v", g, err)
+	}
+	if _, err := ResolveDocRef(layers, "k-playbook:/guidelines/eigen.md"); DocRefErrorCode(err) != DocCodeNotFound {
+		t.Errorf("nur lokale Guideline: %v, erwartet not_found", err)
 	}
 
 	down := DocLayers{
@@ -200,7 +214,7 @@ func TestDefaultsSourceHinterVerweisen(t *testing.T) {
 		}),
 		Local: NewProjectLocalDocSource(root),
 	}
-	if _, err := ResolveDocRef(down, "k-playbook:/guidelines/b.md"); DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
+	if _, err := ResolveDocRef(down, "k-playbook:/commands/b.md"); DocRefErrorCode(err) != DocCodeKephalaionUnavailable {
 		t.Errorf("lokaler Eintrag ohne mitgelieferte Ebene: %v, erwartet kephalaion_unavailable", err)
 	}
 }

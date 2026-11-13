@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -33,15 +32,11 @@ type Context struct {
 	// in Dateien schreiben, die bleiben — Review-Logs, Ergebnisverzeichnisse.
 	// Ein Assistent, dem sein Wirt kein Datum nennt, müsste sonst raten, und
 	// ein geratenes Datum in einem Protokoll ist schlechter als keines.
-	Now ContextNow `json:"now"`
-	// Instructions sind die Dateien, die vor der Arbeit zu lesen sind, in
-	// dieser Reihenfolge: erst was für alle k-playbook-Projekte gilt, dann was
-	// dieses Projekt ergänzt.
-	Instructions []string       `json:"instructions"`
-	Project      ContextProject `json:"project"`
-	Playbook     ContextDir     `json:"playbook"`
-	Local        ContextDir     `json:"local"`
-	Remediation  Remediation    `json:"remediation"`
+	Now         ContextNow     `json:"now"`
+	Project     ContextProject `json:"project"`
+	Playbook    ContextDir     `json:"playbook"`
+	Local       ContextDir     `json:"local"`
+	Remediation Remediation    `json:"remediation"`
 	// Docs ist der Block docs: — was die Docs-Erzeuger beim Code-Scan
 	// zusätzlich auslassen (exclude) und welche Einträge verworfen wurden
 	// (problems). Commands lesen die Liste von hier, nie aus der Datei.
@@ -75,8 +70,7 @@ type Context struct {
 	// mitgelieferte Ebene liegt in <hub>:k-playbook unter defaults/ und ist
 	// ohne Kephalaion nicht lesbar. Die lokale Ebene steht dann nicht allein
 	// da — der Katalog bleibt leer. Leer, wenn die Kataloge gelesen wurden.
-	CatalogsProblem string   `json:"catalogsProblem,omitempty"`
-	Guidelines      []string `json:"guidelines"`
+	CatalogsProblem string `json:"catalogsProblem,omitempty"`
 	// VersionSources ist der Zustand der Quellenkonfiguration des
 	// Versionsinventars, des Dokuments keph:/k-playbook/inventory.md. Sie
 	// steht hier, weil Commands Konfiguration ausschließlich aus dieser
@@ -111,24 +105,6 @@ type Context struct {
 	// von ContextForDir, nicht von BuildContext — die Oberfläche und die
 	// Review-Auswahl über MCP tragen die Kosten nicht. Siehe contextGitHub.
 	GitHub *ContextGitHub `json:"github,omitempty"`
-}
-
-// InstructionsFileName ist die Instruktionsdatei je Ebene. Sie heißt bewusst
-// nicht AGENTS.md: diesen Namen lesen die Assistenten von sich aus, und er ist
-// dem Hauptverzeichnis vorbehalten.
-const InstructionsFileName = "k-playbook.md"
-
-// instructionFiles sammelt die vorhandenen Instruktionsdateien in Lesereihenfolge.
-// Was fehlt, fällt weg — ein Pfad ins Leere wäre schlechter als keiner.
-func instructionFiles(playbookDir string, localDir string) []string {
-	files := []string{}
-	for _, dir := range []string{playbookDir, localDir} {
-		path := filepath.Join(dir, InstructionsFileName)
-		if fileExists(path) {
-			files = append(files, path)
-		}
-	}
-	return files
 }
 
 type ContextProject struct {
@@ -245,14 +221,14 @@ func catalogKindNamed(name string) catalogKind {
 	panic("unbekannte Katalogsorte " + name)
 }
 
-// guidelinesKind ist die Sorte guidelines/: für ResolveDocRef und das
-// Briefing eine Überlagerungssorte wie reviews — mitgeliefert in
-// k-playbook/guidelines/, lokal in k-playbook-local/guidelines/, gleicher Name
-// ersetzt, leer schaltet ab. Bewusst nicht in catalogKinds(): das Feld
-// Guidelines der Kontextausgabe liest bis zur Umstellung der Kontextausgabe
-// weiter nur lokal. Das ist die eine benannte Stelle, an der eine Sorte noch
-// zweifach aufgelöst wird (Task 086, docs/k-playbook-format.md).
-var guidelinesKind = catalogKind{name: "guidelines", dirName: "guidelines", suffix: ".md"}
+// guidelinesKind ist die Sorte guidelines/ für ResolveDocRef und das
+// Briefing: nur mitgeliefert, aus <hub>:k-playbook unter
+// defaults/guidelines/. Eine lokale Ebene hat sie seit Task 148 nicht mehr
+// (docDistOnlyKinds) — k-playbook-local/guidelines/ liest nichts, projekteigene
+// Guidelines liegen unter keph:/docs/guidelines/ (Todo #40). Bewusst nicht in
+// catalogKinds(): Die Kontextausgabe nennt keine Guidelines, das Briefing
+// liefert sie unter documents.guidelines.
+var guidelinesKind = catalogKind{name: "guidelines", dirName: docGuidelinesRoot, suffix: ".md"}
 
 // BuildContext stellt den Arbeitsstand zusammen.
 func BuildContext(projectDir string) (Context, error) {
@@ -319,7 +295,6 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 	context := Context{
 		SchemaVersion: config.SchemaVersion,
 		Now:           buildNow(),
-		Instructions:  instructionFiles(playbookDir, localDir),
 		Project: ContextProject{
 			Dir:       projectDir,
 			RepoRoot:  RepoRootDir(projectDir, config),
@@ -336,7 +311,6 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 		Git:         gitSettings,
 		BaseTools:   DetectBaseTools(projectDir),
 		Catalogs:    map[string][]CatalogEntry{},
-		Guidelines:  listFiles(filepath.Join(localDir, "guidelines")),
 	}
 
 	layers := DocLayers{Dist: shared.Dist, Local: shared.Local}
@@ -740,25 +714,6 @@ func isEmptyContent(data []byte) bool {
 		return false
 	}
 	return true
-}
-
-// listFiles liefert die Dateien eines Verzeichnisses ohne README und Dotfiles.
-func listFiles(dir string) []string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return []string{}
-	}
-
-	files := []string{}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || strings.HasPrefix(name, ".") || name == "README.md" {
-			continue
-		}
-		files = append(files, filepath.Join(dir, name))
-	}
-	sort.Strings(files)
-	return files
 }
 
 // ContextLinks ist die Selbstheilung der Registrierung, wie sie in der

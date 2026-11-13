@@ -26,15 +26,14 @@ import (
 // Projekts ab seiner Wurzel, keph: ein Dokument der Projekt-Collection über
 // den Node; beide haben eine Ebene, ohne Überlagerung und Zusammenbau.
 // k-playbook: löst die Sorten in docRefKinds auf; dahinter stehen zwei Ebenen
-// (bei docs/ nur die mitgelieferte, docDistOnlyKinds)
+// (bei docs/ und guidelines/ nur die mitgelieferte, docDistOnlyKinds)
 // — die mitgelieferte und die lokale —, die über eine austauschbare Quelle
 // gelesen werden: die mitgelieferte aus der öffentlichen Collection
 // <hub>:k-playbook unter defaults/ (defaultsdocs.go), die lokale für
 // instructions/, includes/ und reviews/ aus der Collection des Projekts unter
-// k-playbook/ (projectlayer.go), für commands/ aus .k-playbook/commands/ und
-// für guidelines/ von der Platte. Wer aufruft,
-// sieht davon nichts; er bekommt den Inhalt mit lokal und mitgeliefert schon
-// gegeneinander aufgelöst.
+// k-playbook/ (projectlayer.go) und für commands/ aus .k-playbook/commands/.
+// Wer aufruft, sieht davon nichts; er bekommt den Inhalt mit lokal und
+// mitgeliefert schon gegeneinander aufgelöst.
 //
 // Die Überlagerungsregel ist eine für alle: overlayDocDir legt die beiden
 // Ebenen eines Verzeichnisses übereinander — gleicher Name gewinnt lokal, ein
@@ -42,9 +41,9 @@ import (
 // Kontextausgabe (resolveCatalog) als auch die Verweise hier und das Briefing
 // gehen darüber. Dieselbe Sorte kommt so über jeden Weg gleich heraus.
 // instructions und guidelines sind trotzdem keine Sorten in catalogKinds():
-// instructions erscheint nicht unter catalogs, und das Feld guidelines der
-// Kontextausgabe liest bis zu deren Umstellung weiter nur lokal — die eine
-// benannte Ausnahme (Task 086).
+// Sie erscheinen nicht unter catalogs, das Briefing liefert sie. guidelines/
+// hat seit Task 148 keine lokale Ebene mehr: k-playbook-local/guidelines/
+// liest nichts, das Feld guidelines der Kontextausgabe ist entfernt.
 
 // Die Präfixe des Schemas.
 const (
@@ -79,7 +78,11 @@ const docTestdataRoot = "testdata"
 // checks und skills fehlen bewusst: Skripte laufen, Skills liegen beim
 // Assistenten; beides liest niemand über einen Verweis. Commands liegen beim
 // Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
-var docReaderKinds = []string{docInstructionsRoot, "reviews", "guidelines", docCommandsRoot}
+var docReaderKinds = []string{docInstructionsRoot, "reviews", docGuidelinesRoot, docCommandsRoot}
+
+// docGuidelinesRoot ist die Sorte guidelines/: Leitlinien, nur mitgeliefert
+// (docDistOnlyKinds).
+const docGuidelinesRoot = "guidelines"
 
 // docDocsRoot ist die Sorte docs/: die Vorlagen der README.md unter
 // keph:/docs/ der Projekt-Collection (Task 137) — k-playbook:/docs/<pfad>/README.md
@@ -94,10 +97,12 @@ const docDocsRoot = "docs"
 // Briefing erscheinen.
 var docRefKinds = append(append([]string{}, docReaderKinds...), docIncludesRoot, docTestdataRoot, docDocsRoot)
 
-// docDistOnlyKinds sind die Sorten ohne lokale Ebene: ResolveDocRef liest
-// sie nur aus der mitgelieferten, eine Datei unter k-playbook-local/ gewinnt
-// dort nicht und schaltet nichts ab.
-var docDistOnlyKinds = []string{docDocsRoot}
+// docDistOnlyKinds sind die Sorten ohne lokale Ebene: ResolveDocRef und
+// overlayDocDir lesen sie nur aus der mitgelieferten, eine Datei unter
+// k-playbook-local/ gewinnt dort nicht und schaltet nichts ab. guidelines/
+// gehört seit Task 148 dazu: Projekteigene Guidelines liegen unter
+// keph:/docs/guidelines/ und sind keine Ebene hinter k-playbook: (Todo #40).
+var docDistOnlyKinds = []string{docDocsRoot, docGuidelinesRoot}
 
 // docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
 // zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
@@ -317,11 +322,12 @@ func memoKephDocs(open func() (KephDocs, error)) func() (KephDocs, error) {
 // ersten Zugriff; Task 143). Die Sorte commands/ liest aus
 // .k-playbook/commands/, demselben Ort, aus dem die Verlinkung projekteigene
 // Commands nimmt (ProjectAssetDir), samt der Bausteine unter
-// commands/_shared/; eine Datei dort ersetzt Hülle und Text zugleich. Die
-// übrigen Sorten (guidelines/, testdata/) lesen bis zu ihrem Umbau weiter aus
-// k-playbook-local/. Die früheren Orte k-playbook-local/commands/ (seit Task
-// 129) und k-playbook-local/instructions/, includes/, reviews/ (seit Task
-// 143) liest nichts mehr.
+// commands/_shared/; eine Datei dort ersetzt Hülle und Text zugleich.
+// testdata/ liest bis zu seinem Umbau weiter aus k-playbook-local/. Die
+// früheren Orte k-playbook-local/commands/ (seit Task 129),
+// k-playbook-local/instructions/, includes/, reviews/ (seit Task 143) und
+// k-playbook-local/guidelines/ (seit Task 148, die Sorte hat keine lokale
+// Ebene mehr) liest nichts mehr.
 func NewProjectLocalDocSource(projectDir string) DocSource {
 	return newProjectLocalDocSource(projectDir, NewProjectLayerSource(projectDir))
 }
@@ -346,7 +352,8 @@ type projectLocalDocSource struct {
 // pick wählt nach dem ersten Segment: instructions/, includes/ und reviews/
 // aus der Collection, commands/ aus .k-playbook/, alles andere aus
 // k-playbook-local/. Der Pfad bleibt derselbe, weil jeder Ort denselben
-// Aufbau hat.
+// Aufbau hat. Eine Sorte ohne lokale Ebene (docDistOnlyKinds, etwa
+// guidelines/) hat hier keinen Ort: Wer trotzdem fragt, findet nichts.
 func (s projectLocalDocSource) pick(p string) DocSource {
 	first, _, _ := strings.Cut(p, "/")
 	switch {
@@ -354,8 +361,22 @@ func (s projectLocalDocSource) pick(p string) DocSource {
 		return s.project
 	case isProjectLayerKind(first):
 		return s.collection
+	case isDistOnlyDocRef(first):
+		return noDocSource{}
 	}
 	return s.local
+}
+
+// noDocSource ist eine Ebene ohne Inhalt: jedes Verzeichnis und jede Datei
+// fehlt.
+type noDocSource struct{}
+
+func (noDocSource) List(dir string) ([]DocSourceEntry, error) {
+	return nil, &fs.PathError{Op: "readdir", Path: dir, Err: fs.ErrNotExist}
+}
+
+func (noDocSource) Read(file string) ([]byte, error) {
+	return nil, &fs.PathError{Op: "open", Path: file, Err: fs.ErrNotExist}
 }
 
 func (s projectLocalDocSource) List(dir string) ([]DocSourceEntry, error) {
@@ -933,11 +954,18 @@ type docDirEntry struct {
 // lokaler schaltet ihn ab, Unterverzeichnisse, README.md und Dotfiles zählen
 // nie. keep filtert die Namen weiter — etwa auf das Muster einer Sorte —; nil
 // nimmt alle. Das zweite Ergebnis meldet, ob es das Verzeichnis in mindestens
-// einer Ebene gibt. Die Einträge sind nach Namen sortiert.
+// einer Ebene gibt. Die Einträge sind nach Namen sortiert. Ein Verzeichnis
+// einer Sorte aus docDistOnlyKinds hat keine lokale Ebene: Dort wird die
+// lokale Quelle nicht gefragt, jeder Eintrag ist mitgeliefert.
 func overlayDocDir(layers DocLayers, dir string, keep func(name string) bool) ([]docDirEntry, bool, error) {
-	local, localFound, err := listDocLayer(layers.Local, dir)
-	if err != nil {
-		return nil, false, err
+	var local []string
+	localFound := false
+	if !isDistOnlyDocRef(dir) {
+		var err error
+		local, localFound, err = listDocLayer(layers.Local, dir)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 	dist, distFound, err := listDocLayer(layers.Dist, dir)
 	if err != nil {

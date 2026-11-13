@@ -151,19 +151,20 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 		t.Errorf("reviews:\n%+v\nerwartet\n%+v", briefing.Documents.Reviews, wantReviews)
 	}
 
-	// Guidelines sind überlagert: mitgeliefert und lokal, README nie.
+	// Guidelines kommen nur mitgeliefert, README nie: Die Datei stil.md unter
+	// k-playbook-local/guidelines/ zählt nicht (Task 148).
 	wantGuidelines := []BriefingEntry{
 		{Ref: "k-playbook:/guidelines/betrieb.md", Title: "Betrieb: Ablageorte", Origin: DocOriginDist},
-		{Ref: "k-playbook:/guidelines/stil.md", Title: "Stil", Origin: DocOriginLocal},
 	}
 	if !reflect.DeepEqual(briefing.Documents.Guidelines, wantGuidelines) {
 		t.Errorf("guidelines:\n%+v\nerwartet\n%+v", briefing.Documents.Guidelines, wantGuidelines)
 	}
 
 	// Der frühere Ort k-playbook-local/instructions/ und reviews/ wirkt nicht
-	// mehr (Task 143): 300-alt.md kommt nicht hinzu, die leeren Dateien dort
+	// mehr (Task 143), ebenso k-playbook-local/guidelines/ (Task 148):
+	// 300-alt.md und stil.md kommen nicht hinzu, die leeren Dateien dort
 	// schalten muster.md und review-code.md nicht ab.
-	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "300-alt.md") {
+	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "300-alt.md") || strings.Contains(string(data), "stil.md") {
 		t.Errorf("documents nennt eine Datei vom alten Ort: %s %v", data, err)
 	}
 
@@ -431,7 +432,9 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 		t.Errorf("context.project:\n%s\nerwartet\n%s", got, want)
 	}
 
-	// Die drei heute abgedeckten Felder: ausgelassen hier, geliefert dort.
+	// Das abgedeckte Feld catalogs.reviews: ausgelassen hier, geliefert dort.
+	// guidelines gibt es in der Kontextausgabe nicht mehr (Task 148), die
+	// Leitlinien stehen nur unter documents.guidelines.
 	if _, ok := rest.Field("guidelines"); ok || len(briefing.Documents.Guidelines) == 0 {
 		t.Errorf("guidelines: im Rest %v, documents.guidelines %d", ok, len(briefing.Documents.Guidelines))
 	}

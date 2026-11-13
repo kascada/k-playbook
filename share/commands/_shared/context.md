@@ -25,8 +25,7 @@ stop and report it. Do not guess paths and do not create anything.
 
 The resolved state does not change while you work, and it is the same for every command.
 If you already ran this command in this session and its output is still in the
-conversation, reuse that output — do not run it again, and do not re-read the files from
-`instructions`. Chained commands share one load.
+conversation, reuse that output — do not run it again. Chained commands share one load.
 
 Run it again only when one of these applies:
 
@@ -48,7 +47,6 @@ fields from two loads.
 | Field | Use |
 |---|---|
 | `now.date`, `now.timestamp` | The moment of this call, in the machine's time zone. `now.date` is `YYYY-MM-DD`, `now.timestamp` is RFC 3339. |
-| `instructions` | Files to read first, in that order: the shipped level, then this project's. |
 | `project.dir` | The main directory — where `K-PLAYBOOK.yaml` sits. |
 | `project.repoRoot`, `project.vcs` | The code repository for Git operations, and whether it is under version control. |
 | `project.languages` | The languages this project needs tools for. Always filled — a missing entry falls back to the default, so there is nothing to interpret. |
@@ -155,9 +153,6 @@ run, and the producing command creates its own directory without asking.
 
 ## Rules
 
-- **Read every file in `instructions` before doing work.** They carry what applies to
-  this project; the rest of the command builds on them. Once per session is enough — if
-  you already read them, work from what you have.
 - **Do not read `K-PLAYBOOK.yaml` yourself.** Its content reaches you through this
   output. Reading it directly means reading a second, possibly different answer.
 - **Take today's date from `now.date`.** Never guess it, and do not call `date` yourself.

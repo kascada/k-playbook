@@ -99,14 +99,10 @@ No command determines what applies itself. The tool does that:
 k-playbook context
 ```
 
-The JSON output names the resolved directories, instruction files in read order, remediation policy, guidelines, and the catalogs `reviews` and `checks`, with shipped and project-owned reviews already merged; `checks` lists only the shipped checks (task 134):
+The JSON output names the resolved directories, remediation policy, guidelines, and the catalogs `reviews` and `checks`, with shipped and project-owned reviews already merged; `checks` lists only the shipped checks (task 134):
 
 ```json
 {
-  "instructions": [
-    "/project/k-playbook/k-playbook.md",
-    "/project/k-playbook-local/k-playbook.md"
-  ],
   "catalogs": {
     "reviews": [
       { "name": "review-code.md",  "key": "code",  "origin": "dist" },
@@ -121,7 +117,7 @@ The JSON output names the resolved directories, instruction files in read order,
 
 `origin` is `dist`, `local`, or `override`. `disabled` appears where the project-owned file is empty; that is how to disable a shipped entry. For `checks`, `origin` is always `dist` and nothing is disabled: checks have no project-owned side.
 
-The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it, and the files from `instructions` are read only once. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of reviews, checks, or guidelines has changed, or work has moved to another project.
+The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of reviews, checks, or guidelines has changed, or work has moved to another project.
 
 `/k-review`, `/k-enforcement`, and `k-check` work on this set and display it before working. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
 

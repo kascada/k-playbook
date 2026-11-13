@@ -87,7 +87,9 @@ func TestBriefingKlartext(t *testing.T) {
 			"  k-playbook:/instructions/on-demand/thema.md  [dist]  Thema — D\n",
 		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n" +
 			"  k-playbook:/reviews/review-eigen.md  [local keph:/k-playbook/reviews/review-eigen.md]  Eigenes Review\n",
-		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\n  k-playbook:/guidelines/stil.md  [local]  Stil\n",
+		// Nur mitgeliefert: k-playbook-local/guidelines/stil.md zählt nicht
+		// (Task 148), die nächste Zeile ist schon der nächste Abschnitt.
+		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\nEigene Arbeit: ",
 		"Eigene Arbeit: Kephalaion nicht nutzbar — ",
 		"Projektdoku: keph:/docs/\n",
 		"\n" + briefingContextSeparator + "\n",
@@ -156,7 +158,7 @@ func TestBriefingJSON(t *testing.T) {
 	if briefing.SchemaVersion != project.BriefingSchemaVersion {
 		t.Errorf("schemaVersion %q", briefing.SchemaVersion)
 	}
-	if len(briefing.Documents.Always.Parts) != 3 || len(briefing.Documents.Reviews) != 2 || len(briefing.Documents.Guidelines) != 2 {
+	if len(briefing.Documents.Always.Parts) != 3 || len(briefing.Documents.Reviews) != 2 || len(briefing.Documents.Guidelines) != 1 {
 		t.Errorf("Listen: %+v", briefing.Documents)
 	}
 	if !strings.HasPrefix(briefing.Documents.Always.Content, "## A\n\n## B lokal\n") {

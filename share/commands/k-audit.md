@@ -2,7 +2,7 @@
 description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage) — Führt einen vollständigen Audit-Sweep über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
 argument-hint: [YYYY-MM-DD|latest|new]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_review_status, mcp__k-playbook__k_playbook_review_create, mcp__k-playbook__k_playbook_review_scan, mcp__k-playbook__k_playbook_review_merge, mcp__k-playbook__k_playbook_review_write_ai_entry]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_review_status, mcp__k-playbook__k_playbook_review_create, mcp__k-playbook__k_playbook_review_scan, mcp__k-playbook__k_playbook_review_merge, mcp__k-playbook__k_playbook_review_write_ai_entry, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-audit
@@ -19,11 +19,10 @@ Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 `/k-audit` ist der Chat-Einstieg für den vollständigen Scan-und-Bewertungs-Sweep. Der Command hält keinen
 eigenen Zustand: Jeder Aufruf liest den Ist-Zustand über die MCP-Werkzeuge aus dem

@@ -2,18 +2,17 @@
 description: "Durchsucht alte AI-Verläufe. Claude: volle Chat-JSONL-Suche. OpenCode: Log-/Session-Suche in opencode.log. Unterstützt Provider claude|opencode|all, Suchbegriff und optionalen Zeitraum."
 argument-hint: "[claude|opencode|all] <Suchbegriff> [heute | gestern | YYYY-MM-DD | YYYY-MM-DD..YYYY-MM-DD] [-all]"
 # model: github-copilot/gpt-5.5
-allowed-tools: [Bash, Read, Glob]
+allowed-tools: [Bash, Read, Glob, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-verlauf
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 
 Durchsucht alte AI-Verläufe nach einem Begriff.
@@ -108,8 +107,8 @@ else
 fi
 ```
 
-Hat der Rückfall gegriffen, sag das einmal und nenne `baseTools.installCommand` aus der
-Context-Ausgabe. Installiere nichts selbst. Steht `rg` dort als fehlend, obwohl der
+Hat der Rückfall gegriffen, sag das einmal und nenne `context.baseTools.installCommand` aus dem
+Briefing. Installiere nichts selbst. Steht `rg` dort als fehlend, obwohl der
 `rg`-Zweig lief, war es eine Shell-Funktion — `command -v` erkennt auch sie, der Befund
 misst nur den `PATH`.
 
@@ -174,7 +173,7 @@ fi
 ```
 
 Für den Rückfall gilt dasselbe wie in Schritt 5: einmal sagen, dass er gegriffen hat,
-`baseTools.installCommand` nennen und nichts selbst installieren.
+`context.baseTools.installCommand` nennen und nichts selbst installieren.
 
 Wenn `DATE_FILTER` gesetzt ist, filtere zusätzlich über den Prefix `timestamp=YYYY-MM-DD...`.
 

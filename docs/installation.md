@@ -227,14 +227,7 @@ The same process runs during **updates**. A project that has only an actual `CLA
 
 **What Claude Code must support.** `@` imports in `CLAUDE.md` have existed since Claude Code **0.2.107** (CHANGELOG entry "CLAUDE.md files can now import other files"); an older version silently loads nothing from the stub. Import depth is limited: according to the documentation, Claude Code follows imports up to **four levels** deep ("Imported files can recursively import other files, with a maximum depth of four hops", code.claude.com, page "How Claude remembers your project", as of 2026-09-05). The stub consumes one level, so an `AGENTS.md` that itself imports with `@` has one level less than the former symlink.
 
-Anything else an assistant should read is not in `AGENTS.md`, but in `k-playbook.md`, once per layer:
-
-| File | Applies to | On update |
-|---|---|---|
-| `k-playbook/k-playbook.md` | every project that uses k-playbook | is replaced |
-| `k-playbook-local/k-playbook.md` | this project only | remains |
-
-They are read in this order; the project-owned layer supplements or overrides the shipped one.
+Anything else an assistant should read is not in `AGENTS.md`: it comes with `k-playbook briefing`, the one call `AGENTS.md` names. The briefing carries the instructions that always apply, the shipped parts first and the project-owned parts from the project collection (`keph:/k-playbook/instructions/always/`) after them. A file `k-playbook.md` is no longer read on either layer (task 148); what a project wants every session to know belongs into its collection.
 
 Linking is project-local. Nothing is written to `~/.config/opencode/` or `~/.claude/`. This allows one machine to have several projects with different k-playbook versions without them overwriting each other.
 
@@ -287,7 +280,7 @@ Mermaid diagrams are rendered if the machine has network access: the library is 
 
 ## Inspect what applies
 
-At the bottom is the **Resolved context** section. When expanded, it shows what a command sees: resolved paths, instruction files in read order, effective catalogs for reviews and checks with their origin, shipped, project-owned, or replaced — checks are always shipped, they have no project-owned side since task 134 — plus guidelines. Disabled entries are included so their existence remains visible.
+At the bottom is the **Resolved context** section. When expanded, it shows what a command sees: resolved paths, effective catalogs for reviews and checks with their origin, shipped, project-owned, or replaced — checks are always shipped, they have no project-owned side since task 134 — plus guidelines. Disabled entries are included so their existence remains visible.
 
 It provides the same information as `k-playbook context`, only presented readably.
 

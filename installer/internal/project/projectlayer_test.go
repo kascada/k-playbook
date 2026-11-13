@@ -2,6 +2,8 @@ package project
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -272,9 +274,10 @@ func TestProjectLayerHubLesbarProjektNicht(t *testing.T) {
 }
 
 // Nur instructions/, includes/ und reviews/ kommen aus der Collection;
-// commands/ bleibt in .k-playbook/commands/, guidelines/ in
-// k-playbook-local/. Der frühere Ort k-playbook-local/instructions/,
-// includes/ und reviews/ wird nicht mehr gelesen.
+// commands/ bleibt in .k-playbook/commands/. Der frühere Ort
+// k-playbook-local/instructions/, includes/ und reviews/ wird nicht mehr
+// gelesen, ebenso k-playbook-local/guidelines/ (Task 148): guidelines/ hat
+// keine lokale Ebene, weder auf der Platte noch in der Collection.
 func TestProjectLocalDocSourceWaehltDenOrt(t *testing.T) {
 	root := t.TempDir()
 	writeDocTree(t, root, map[string]string{
@@ -298,7 +301,7 @@ func TestProjectLocalDocSourceWaehltDenOrt(t *testing.T) {
 
 	for file, want := range map[string]string{
 		"commands/k-eigen.md":           "Command.\n",
-		"guidelines/stil.md":            "Stil.\n",
+		"guidelines/stil.md":            "",
 		"reviews/review-neu.md":         "Neu.\n",
 		"includes/neu.md":               "Neu.\n",
 		"reviews/review-alt.md":         "",
@@ -322,5 +325,8 @@ func TestProjectLocalDocSourceWaehltDenOrt(t *testing.T) {
 		if got := locator.Locate(file); got != want {
 			t.Errorf("Locate(%s) = %q, erwartet %q", file, got, want)
 		}
+	}
+	if entries, err := source.List("guidelines"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("List(guidelines): %v, %v; erwartet fs.ErrNotExist", entries, err)
 	}
 }

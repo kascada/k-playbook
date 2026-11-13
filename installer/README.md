@@ -31,7 +31,7 @@ Wrapper-Installation weg.
 `briefing` ist der Einstieg jeder Sitzung — der Aufruf, den `AGENTS.md` nennt: der Text
 der immer geltenden Anweisungen, die Reviews und Leitlinien als Verweise, die
 eigene offene Arbeit und, bis zum Abbau, der Rest der Kontextausgabe. `context` löst
-Verzeichnisse, Instruktionsdateien und die Kataloge als JSON auf, damit kein Command
+Verzeichnisse und die Kataloge als JSON auf, damit kein Command
 die Overlay-Regeln selbst anwenden muss; die Commands rufen es noch, bis sie einzeln auf
 das Briefing umziehen. Beide räumen bewusst nichts auf — deren Ausgabe würde die
 Antwort stören. `upgrade` zieht Programm und Projekt nach: Pull im Clone, Binary nur,

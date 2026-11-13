@@ -7,11 +7,10 @@ description: Use when analysing unfamiliar code, chasing a root cause, or verify
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Skills stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 
 **Kurzfassung.** Sorgt dafür, dass Erkenntnisse aus Analyse und Fehlersuche **während**
@@ -41,7 +40,7 @@ gilt, wenn Kephalaion nicht erreichbar ist.
 **Diese Anweisung wird gelesen und befolgt, nicht hier wiederholt.** Weicht der Skill von
 ihr ab, gilt die Anweisung.
 
-Wenn der Context-Aufruf fehlschlägt, ist das Verzeichnis kein k-playbook-Projekt; kurz
+Wenn das Briefing fehlschlägt, ist das Verzeichnis kein k-playbook-Projekt; kurz
 darauf hinweisen und ohne Befund-Erfassung weiterarbeiten.
 
 ## Arbeitsweise

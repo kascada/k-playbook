@@ -2,18 +2,17 @@
 description: Listet, ergänzt, ändert, hakt ab und löscht die Todos des Projekts. Ohne Argument listen; done/delete/edit/reopen steuern einen Eintrag, alles andere ist ein neuer Eintrag.
 argument-hint: [text | done <id|stichwort> | delete <id|stichwort> | edit <id> <text> | reopen <id>]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Bash, mcp__k-playbook__k_playbook_todo_list, mcp__k-playbook__k_playbook_todo_add, mcp__k-playbook__k_playbook_todo_update, mcp__k-playbook__k_playbook_todo_delete]
+allowed-tools: [Bash, mcp__k-playbook__k_playbook_todo_list, mcp__k-playbook__k_playbook_todo_add, mcp__k-playbook__k_playbook_todo_update, mcp__k-playbook__k_playbook_todo_delete, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-todo
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 Die Todos liegen als Dokumente unter `todos/` in der Projekt-Collection, die
 erledigten unter `todos/done/`. Ihr Format gehört Go. **Sie werden in diesem
@@ -27,7 +26,7 @@ In dieser Reihenfolge, der erste verfügbare gewinnt:
 
 1. **MCP-Werkzeuge.** Bietet der Client `k_playbook_todo_list`,
    `k_playbook_todo_add`, `k_playbook_todo_update` und `k_playbook_todo_delete`
-   an, werden sie benutzt. `projectDir` ist `project.dir` aus dem Kontext.
+   an, werden sie benutzt. `projectDir` ist `context.project.dir` aus dem Briefing.
 2. **Subkommando.** Bietet er sie nicht an, wird `k-playbook todo …` über Bash
    aufgerufen. Das ist der Normalfall und keine Notlösung: der MCP-Server wird
    pro Projekt registriert und kann fehlen, das Binary ist mit der Installation

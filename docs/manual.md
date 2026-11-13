@@ -94,7 +94,7 @@ k-playbook context
 ```
 
 The command outputs the resolved working state as JSON: directories,
-instruction files in reading order, remediation policy, guidelines, and the
+remediation policy, guidelines, and the
 three catalogs, already merged, including each entry's origin and marked
 disabled entries.
 
@@ -114,14 +114,17 @@ different project.
 
 ### Instructions at two levels
 
-| File | Applies to | On update |
+| Where | Applies to | On update |
 |---|---|---|
-| `k-playbook/k-playbook.md` | every project using k-playbook | is replaced |
-| `k-playbook-local/k-playbook.md` | this project only | remains |
+| `<hub>:k-playbook/defaults/instructions/` | every project using k-playbook | the hub fetches the new release |
+| `keph:/k-playbook/instructions/` in the project collection | this project only | remains |
 
-They are read in this order; the project-owned level supplements or overrides
-the shipped one. `AGENTS.md` in the project root receives only a short prompt
-that names `k-playbook briefing`; existing content remains untouched.
+Both levels reach a session through the briefing and through references
+(`k-playbook:/instructions/…`); a project-owned document of the same name
+replaces the shipped one, an empty one disables it. A file `k-playbook.md` is no
+longer read on either level (task 148). `AGENTS.md` in the project root receives
+only a short prompt that names `k-playbook briefing`; existing content remains
+untouched.
 
 ## Installation
 

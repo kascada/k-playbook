@@ -1,6 +1,7 @@
 package project
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -352,7 +353,6 @@ func TestBuildContextLiestEvidenceVertragAlsInlineListen(t *testing.T) {
 
 func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(LocalDir(root), "guidelines", "stil.md"), "# Vorgabe\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -371,8 +371,60 @@ func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 	if context.Remediation.Mode != DefaultRemediationMode {
 		t.Errorf("Remediation.Mode = %q", context.Remediation.Mode)
 	}
-	if len(context.Guidelines) != 1 {
-		t.Errorf("Guidelines = %v, erwartet eine Datei", context.Guidelines)
+}
+
+// Das Feld guidelines gibt es nicht mehr (Task 148): Dateien unter
+// k-playbook-local/guidelines/ nennt die Kontextausgabe nicht, auch wenn sie
+// daliegen.
+func TestBuildContextNenntKeineGuidelines(t *testing.T) {
+	root := newContextProject(t)
+	write(t, filepath.Join(LocalDir(root), "guidelines", "stil.md"), "# Vorgabe\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	data, err := json.Marshal(context)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if _, ok := fields["guidelines"]; ok {
+		t.Errorf("die Kontextausgabe trägt guidelines: %s", fields["guidelines"])
+	}
+	if strings.Contains(string(data), "stil.md") {
+		t.Errorf("die Kontextausgabe nennt die lokale Guideline:\n%s", data)
+	}
+}
+
+// Das Feld instructions gibt es nicht mehr (Task 148): Eine k-playbook.md in
+// der Installation oder in k-playbook-local/ nennt die Kontextausgabe nicht,
+// auch wenn die Datei daliegt.
+func TestBuildContextNenntKeineInstructions(t *testing.T) {
+	root := newContextProject(t)
+	write(t, filepath.Join(PlaybookDir(root), "k-playbook.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(LocalDir(root), "k-playbook.md"), "# projekteigen\n")
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	data, err := json.Marshal(context)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if _, ok := fields["instructions"]; ok {
+		t.Errorf("die Kontextausgabe trägt instructions: %s", fields["instructions"])
+	}
+	if strings.Contains(string(data), "k-playbook.md") {
+		t.Errorf("die Kontextausgabe nennt k-playbook.md:\n%s", data)
 	}
 }
 

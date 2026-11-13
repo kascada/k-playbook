@@ -2,18 +2,17 @@
 description: Run unit tests, diagnose failures, and report the root cause before asking whether to fix them.
 argument-hint: [path-or-command]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-test-check
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 
 Run unit tests, find the root cause of each failure, explain it briefly, then ask before making any changes.

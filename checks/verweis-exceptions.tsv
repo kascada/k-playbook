@@ -32,4 +32,4 @@ defaults/commands/k-upgrade.md	808	pfad	Ortsangabe: wo Hub und Collection heute 
 defaults/instructions/always/010-verweise.md	26	pfad	Ortsangabe in einem Verbot (nie selbst aus k-playbook/ lesen); die Datei bleibt nach Task 108 unverändert.
 defaults/instructions/always/030-briefing.md	30	pfad	Ortsangabe in einem Verbot (Katalogverzeichnisse nicht selbst lesen).
 defaults/guidelines/betrieb.md	20	pfad	Ortsangabe: Beispiel der kurzen Schreibweise in Text für Menschen.
-share/commands/k-audit.md	398	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.
+share/commands/k-audit.md	397	pfad	zurückgestellt: das Modul ist ein Verweis, liegt aber unter share/commands/ und ist über k-playbook:/commands/ nicht lesbar; die Form klärt der Umbau von /k-audit.

@@ -2,7 +2,7 @@
 description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage) — Führt ein einzelnes Review-Rezept aus; ohne Argument Auswahl aus aktivierten Review-Rezepten, mit Handoff im Report-Modus als review-input.json und review-triage.md.
 argument-hint: [review-name]
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-review
@@ -19,11 +19,10 @@ Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 
 Führe ein gezieltes Review gegen das aktuelle Projekt aus, anhand eines Review-Rezepts

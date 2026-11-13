@@ -1,18 +1,17 @@
 ---
 description: Schließt eine Arbeitssitzung ab - legt die Befunde der Sitzung vor, trägt Fehlendes nach, lässt den Nutzer entscheiden, was aus ihnen werden soll, und prüft, ob die Doku nachzuziehen ist. Nimmt kein Argument.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write]
+allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-danke
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 
 Das Sitzungsende ist eine Tatsache über den Nutzer, nicht über das System — deshalb sagt
@@ -35,8 +34,8 @@ Command.
 - **Verbindlich ist `k-playbook:/instructions/on-demand/befunde.md`.** Lies sie mit
   `k_playbook_doc_read`, bevor du einen Befund liest oder schreibst. Sie enthält Ablage, Kopf,
   Rumpf und das Widerlegen; dieser Command wiederholt sie nicht.
-- `COLLECTION = kephalaion.address` aus der Context-Ausgabe.
-- Steht `kephalaion.ok` nicht auf `true`, sind die Befunde weder zu lesen noch zu schreiben.
+- `COLLECTION = context.kephalaion.address` aus dem Briefing.
+- Steht `context.kephalaion.ok` nicht auf `true`, sind die Befunde weder zu lesen noch zu schreiben.
   Sag das ausdrücklich, führe nur Schritt 6 aus und gib in Schritt 7 die Befunde, die
   festzuhalten wären, vollständig im Text wieder.
 

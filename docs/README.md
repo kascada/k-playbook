@@ -90,7 +90,7 @@ questions and the ordered work list.
 - `read docs` / `Markdown view` / `Mermaid` -> [`installation.md`](./installation.md#read-documentation), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#doku-in-der-oberfläche)
 - `overlay` / `replace rule` / `disable` -> [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content), [`faq.md`](./faq.md)
 - `context` / `resolved working state` -> [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`commands.md`](./commands.md#the-resolved-working-state)
-- `k-playbook.md` / `instructions` / `prompt` -> [`k-playbook-format.md`](./k-playbook-format.md#instructions), [`faq.md`](./faq.md)
+- `instructions` / `prompt` / `AGENTS.md` block -> [`k-playbook-format.md`](./k-playbook-format.md#instructions), [`faq.md`](./faq.md)
 - `legacy artifacts` / `old global linking` -> [`installation.md`](./installation.md#3-link-assistants)
 - `command missing` / `dead symlink` / `update links` -> [`installation.md`](./installation.md#update), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#selbstheilung-auf-dem-lesepfad)
 - `overview` / `what is it for` / `three kinds of work` / `big picture` -> [`overview.md`](./overview.md)

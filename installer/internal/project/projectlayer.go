@@ -27,8 +27,9 @@ const ProjectLayerDirName = "k-playbook"
 
 // projectLayerKinds sind die Sorten, deren projekteigene Ebene in der
 // Collection liegt. commands/ bleibt in .k-playbook/commands/ (die Assistenten
-// brauchen die Hüllen auf der Platte), guidelines/ und testdata/ bleiben bis
-// zu ihrem Umbau in k-playbook-local/.
+// brauchen die Hüllen auf der Platte), testdata/ bleibt bis zu seinem Umbau
+// in k-playbook-local/; guidelines/ hat keine projekteigene Ebene mehr (Task
+// 148, docDistOnlyKinds).
 var projectLayerKinds = []string{docInstructionsRoot, docIncludesRoot, "reviews"}
 
 // OpenProjectLayerStore öffnet den Zugang zur Collection des Projekts für die

@@ -2,18 +2,17 @@
 description: Create or update a project-specific VS Code workspace title and dark color theme in `.vscode/settings.json` based on the project path.
 argument-hint: [project-name]
 # model: github-copilot/gpt-5.4-mini
-allowed-tools: [Read, Write, Bash, Glob]
+allowed-tools: [Read, Write, Bash, Glob, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-vscode-project-color
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 
 Create or update a project-specific VS Code workspace configuration for easier window recognition.

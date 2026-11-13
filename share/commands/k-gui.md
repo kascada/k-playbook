@@ -1,23 +1,22 @@
 ---
 description: Start the local k-playbook GUI.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Bash, Read]
+allowed-tools: [Bash, Read, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-gui
 
 ## Erster Schritt
 
-Wende `.claude/commands/_shared/context.md` an. Liegt die Ausgabe in dieser
-Sitzung schon vor, verwende sie; sonst rufe `k-playbook context` auf und lies die
-Dateien aus `instructions`.
-Alle Pfade und Kataloge dieses Commands stammen aus dieser Ausgabe; die
-`K-PLAYBOOK.yaml` wird nicht selbst gelesen.
+Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
+`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
+immer geltenden Anweisungen (`documents.always.content`).
 
 Die Ersteinrichtung eines Projekts läuft nicht über diesen Command, sondern über
 `k-playbook` in der Shell. Erst deren dritter Schritt verlinkt die
 Commands beim Assistenten — wer `/k-gui` aufrufen kann, hat also bereits eine
-Installation. Ein fehlgeschlagener Context-Aufruf ist deshalb hier wie überall ein
+Installation. Ein fehlgeschlagenes Briefing ist deshalb hier wie überall ein
 Abbruchgrund.
 
 
@@ -32,7 +31,7 @@ Dieser Command nutzt bewusst nicht `make`.
 ## Schritt 1 — Oberfläche starten
 
 `k-playbook` ist einmal je Host oder DevContainer installiert — dasselbe Kommando,
-das der erste Schritt schon für `context` aufgerufen hat. Es ist nichts zu suchen und
+das der erste Schritt schon für das Briefing aufgerufen hat. Es ist nichts zu suchen und
 nichts zu raten; starte es ohne Argument im aktuellen Projekt:
 
 ```bash
