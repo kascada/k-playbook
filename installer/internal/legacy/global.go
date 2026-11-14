@@ -70,9 +70,14 @@ func RemoveGlobalLinks() ([]Removal, error) {
 	return removeGlobalLinks(home)
 }
 
-// RemoveFormerHostInstall räumt die alte Wrapper-Spiegelung und ihren
-// Standard-Cache weg. Ein direkt installiertes Binary bleibt erhalten; nur ein
-// Symlink auf die alte Spiegelung fällt weg.
+// RemoveFormerHostInstall räumt die alte Wrapper-Spiegelung und die Binaries
+// ihres Standard-Caches weg. Ein direkt installiertes Binary bleibt erhalten;
+// nur ein Symlink auf die alte Spiegelung fällt weg.
+//
+// Vom Cache geht nur ~/.cache/k-playbook/bin: Dorthin legte der Wrapper seine
+// Binaries (bin/<version>/k-playbook-<os>-<arch>), und sonst nichts. Daneben
+// liegt heute der Cache des neuesten Release (release.CacheFileName); er
+// bleibt liegen.
 func RemoveFormerHostInstall() ([]Removal, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -83,7 +88,7 @@ func RemoveFormerHostInstall() ([]Removal, error) {
 
 func removeFormerHostInstall(home string) ([]Removal, error) {
 	installation := filepath.Join(home, ".local", "share", "k-playbook", "installation")
-	cache := filepath.Join(home, ".cache", "k-playbook")
+	cache := filepath.Join(home, ".cache", "k-playbook", "bin")
 	launcher := filepath.Join(home, ".local", "bin", "k-playbook")
 	removals := []Removal{}
 	problems := []string{}

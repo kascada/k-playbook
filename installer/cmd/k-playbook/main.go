@@ -200,7 +200,7 @@ const versionAllHint = "Hinweis: k-playbook version --all nennt zusätzlich die 
 // ein Terminal ist: Wer die Ausgabe liest oder umleitet (ReadVersion, ein
 // Skript), bekommt genau die eine Zeile.
 //
-// Ist der neueste Tag unbekannt (ohne Netz, ohne git, Zeitüberschreitung),
+// Ist der neueste Tag unbekannt (ohne Netz, ohne veröffentlichtes Release, Zeitüberschreitung),
 // steht dort „unbekannt“ mit dem Grund; der Exit-Code ändert sich dadurch
 // nicht. Eine über K_PLAYBOOK_RELEASE_SOURCE ersetzte Quelle wird genannt.
 func runVersion(out io.Writer, args []string) error {

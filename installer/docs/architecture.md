@@ -1555,20 +1555,21 @@ gezielten Wartungswegen geschrieben.
 ### Version und Installation aus dem Release
 
 Es gibt genau zwei Versionsquellen: die eigene Version im Binary (`buildinfo.Version`) und
-den neuesten Release-Tag auf GitHub. Jeder Vergleich und jede Installation des Programms
+den Tag des neuesten veröffentlichten Release auf GitHub. Jeder Vergleich und jede Installation des Programms
 geht von diesen beiden aus (Task 149). Der Clone `<projekt>/k-playbook/` spielt dabei keine
 Rolle mehr: Kein Vergleich und keine Installation liest seine `VERSION`, seine
 `SHA256SUMS` oder ruft sein `bin/install` auf. Der Pull im Clone bleibt vorerst für die
 Inhalte, die noch an ihm hängen; über Version und Installation entscheidet er nicht.
 
 Die zweite Quelle kennt das Blattpaket `internal/release` — gelesen wird über HTTPS und
-anonym, weil das Repo öffentlich ist und kein Nutzer einen Schlüssel brauchen soll; das ist
-eine bewusste Ausnahme von der Regel, Netzbefehle von git über `k-playbook github run` zu
-führen:
+anonym, weil das Repo öffentlich ist und kein Nutzer einen Schlüssel brauchen soll, und
+ohne die GitHub-API (anonym 60 Anfragen je Stunde); das ist eine bewusste Ausnahme von der
+Regel, Netzbefehle über `k-playbook github run` zu führen:
 
 | Funktion | Quelle | Was |
 |---|---|---|
-| `LatestTag()` | `git ls-remote --tags --refs https://github.com/kascada/k-playbook.git 'v*'` | der höchste Tag der Form `vX.Y.Z` (ohne Zusatz), verglichen nach `version.Compare()`; Frist `TagTimeout` (3 s) |
+| `LatestTag()` | `HEAD https://github.com/kascada/k-playbook/releases/latest`, ohne der Weiterleitung zu folgen | der Tag aus dem Ziel `…/releases/tag/<tag>`: das neueste veröffentlichte Release (Entwürfe und Vorabversionen zeigt die Adresse nicht); ein Tag mit Zusatz ist ein Fehler, kein Rückgriff; Frist `TagTimeout` (3 s); fragt immer und schreibt das Ergebnis in den Cache |
+| `CachedLatestTag()` | der Cache, sonst wie `LatestTag()` | ein frischer Eintrag ohne Netzaufruf (unten) |
 | `Checksums()` | `https://raw.githubusercontent.com/kascada/k-playbook/<tag>/SHA256SUMS` | die committete Prüfsummendatei des Tags |
 | `Install()` | `https://github.com/kascada/k-playbook/releases/download/<tag>/<asset>` | das Release-Binary dieser Plattform |
 
@@ -1579,8 +1580,29 @@ anlegen, PATH prüfen (`DirInPath()`), Prüfsumme des Tags lesen — alles vor d
 dann Download in eine temporäre Datei neben dem Ziel, Prüfsumme, `chmod 0755`, Umbenennen
 auf das Ziel. Atomar; ein Symlink am Ziel wird selbst ersetzt, nicht sein bisheriges Ziel;
 ein plattformfremdes Binary am Ziel wird an den Magic-Bytes erkannt und genannt
-(`Installed.ForeignNote()`). Fehlt das Asset (404), sagt `AssetMissingError`, dass das
-Release noch nicht fertig ist, und nichts wird ersetzt.
+(`Installed.ForeignNote()`). Fehlt das Asset (404) — ein von Hand angelegtes oder gerade neu
+bestücktes Release —, sagt `AssetMissingError`, dass das Release noch nicht fertig ist, und
+nichts wird ersetzt.
+
+**Der Cache des neuesten Release** (Task 151, `release/cache.go`) liegt in
+`$XDG_CACHE_HOME/k-playbook/latest-release.json`, sonst `$HOME/.cache/k-playbook/…` — auf
+Linux und macOS gleich, deshalb nicht `os.UserCacheDir` (macOS: `~/Library/Caches`). Der
+Tag hängt am Rechner, nicht am Projekt; `.k-playbook/` wird eingecheckt. Der Eintrag trägt
+Tag oder Fehlergrund, die Quelle (`GitHub` bzw. die Basis-URL aus
+`K_PLAYBOOK_RELEASE_SOURCE`) und den Zeitpunkt. Ein Erfolg gilt `CacheSuccessTTL` (6 h), ein
+Fehlschlag `CacheFailureTTL` (30 min) — sonst kostete ein hängendes Netz jedes Briefing die
+volle Frist. Eine fehlende, kaputte oder fremde Datei und ein Eintrag einer anderen Quelle
+gelten als „kein Eintrag“; geschrieben wird atomar (Datei daneben, dann umbenennen), ein
+Fehler beim Schreiben wird nicht gemeldet. Bei abgeschalteter Quelle (`off`) wird der Cache
+weder gelesen noch geschrieben, und bricht der Aufrufer selbst ab, bleibt er unberührt.
+
+Den Cache nehmen die reinen Hinweise: die Quelle `program` der Umgebungsprüfung (Briefing,
+`k_playbook_health`, `k-playbook health`), der Hinweis beim Start der Oberfläche und
+`GET /api/update` beim Laden der Seite. Frisch fragen alle Wege, die installieren oder
+ausdrücklich prüfen: `k-playbook upgrade` samt `--check`, `version --all`,
+`POST /api/update`, `POST /api/update/program` und `GET /api/update?fresh=1` (der Knopf
+„Update prüfen“). `program.CheckStatus()` bekommt das als Parameter (`program.Fresh`,
+`program.Cached`).
 
 `version.Compare()` und `Order` liegen im Blattpaket `internal/version`, damit `project`
 (Umgebungsprüfung), `program` und `release` denselben Vergleich nutzen. Nur „älter“ löst
@@ -1591,7 +1613,8 @@ Wer vergleicht:
 
 - `program.CheckStatus()` — die gemeinsame Auskunft für `k-playbook upgrade`, den
   Update-Knopf und den Start der Oberfläche: `running`, `latest`, `latestError`, `order`,
-  `outdated`, dazu der PATH-Befund. Ohne eigene Version ruft sie den Tag nicht ab.
+  `outdated`, dazu der PATH-Befund. Ohne eigene Version ruft sie den Tag nicht ab; ob sie
+  frisch fragt oder den Cache nimmt, sagt der Aufrufer.
 - `healthProgram()` in `project/health_release.go` — die Quelle `program` der
   Umgebungsprüfung: Warnung „Das Programm (vA) ist älter als das neueste Release (vB)“,
   Abhilfe `k-playbook upgrade`; ohne Netz, ohne eigene Version und bei gleicher bzw. neuerer
@@ -1603,33 +1626,35 @@ Wer vergleicht:
 
 Drei Folgen, die man kennen muss:
 
-- **Der Tag steht vor den Assets.** `make release` pusht den Tag, die CI baut danach. In
-  dem Fenster dazwischen warnt die Umgebungsprüfung schon, und `upgrade` wie `bin/install`
-  melden, dass das Release noch nicht fertig ist; `k-playbook upgrade` hilft dann nicht.
-  Scheitert die CI, bleiben Warnung und Fehlschlag, bis der Tag entfernt ist oder ein
-  Nachfolger erschienen ist. Hingenommen (Task 149); ob der Release-Ablauf oder die Quelle
-  des neuesten Tags angepasst wird, ist offen.
-- **Die Umgebungsprüfung ruft das Netz.** Sie läuft beim Briefing, bei `k_playbook_health`,
-  `k-playbook health` und beim Laden der Statusseite. Einen Cache gibt es nicht. Gemessen am
-  2026-11-13 (Median über 15 Läufe, `k-playbook briefing`, beide Builds mit derselben
-  Version): 401 ms ohne, 816 ms mit dem Abruf — rund 0,4 s je Briefing; ist GitHub nicht
-  erreichbar, endet er sofort (447 ms), hängt die Verbindung, nach der Frist (3,4 s).
-  Läuft die Frist ab, endet git samt seinem Kindprozess `git-remote-https` — sonst hielte
-  der die Ausgabe eine weitere Sekunde offen (gemessen: 4,5 s statt 3,4 s). Eine Schwelle
-  für die Laufzeit ist nicht festgelegt.
+- **Kein Fenster zwischen Tag und Assets.** `make release` pusht den Tag, die CI baut
+  danach. Als neuestes gilt aber das neueste veröffentlichte Release, und die CI
+  veröffentlicht es erst mit allen Assets (`.github/workflows/release.yml`: `gh release
+  create` legt mit Dateien selbst erst einen Entwurf an; der Upload-Zweig macht ein
+  vorhandenes Release vor dem Hochladen zum Entwurf). Bis dahin sehen Umgebungsprüfung,
+  `upgrade` und `bin/install` das vorige Release; scheitert die CI, bleibt es dabei.
+- **Die Umgebungsprüfung ruft das Netz nur selten.** Sie läuft beim Briefing, bei
+  `k_playbook_health`, `k-playbook health` und beim Laden der Statusseite und liest den
+  Cache. Gemessen am 2026-11-14 (Median über 15 Läufe, `k-playbook briefing` mit
+  gestempelter Version, Ersatzquelle auf 127.0.0.1, temporäres `XDG_CACHE_HOME`): 513 ms mit
+  frischem Eintrag (keine Anfrage), 580 ms mit abgelaufenem (eine Anfrage an die lokale
+  Ersatzquelle — gegen GitHub kommt die Netzlaufzeit dazu, Task 149 maß rund 0,4 s), 556 ms
+  bei hängender Verbindung mit frischem Fehlschlag-Eintrag (keine Anfrage); ohne Eintrag
+  wartet ein Briefing bei hängender Verbindung die Frist ab (3,5 s), danach eine halbe
+  Stunde nicht mehr. Eine Schwelle für die Laufzeit ist nicht festgelegt.
 - **Ohne eigene Version kein Netzaufruf.** Ein Ad-hoc-`go build` ohne Build-Flags fragt
   nichts ab, weder in der Umgebungsprüfung noch in `CheckStatus()`.
 
 Für Tests ist die Quelle austauschbar, auch für gebaute Unterprozesse, über die
 Umgebungsvariable `K_PLAYBOOK_RELEASE_SOURCE` (`release.EnvSource`): leer ist GitHub, `off`
-schaltet jeden Abruf ab, sonst eine Basis-URL mit `<basis>/k-playbook.git`,
-`<basis>/raw/<tag>/SHA256SUMS`, `<basis>/download/<tag>/<asset>` und
+schaltet jeden Abruf ab, sonst eine Basis-URL mit `<basis>/releases/latest` (Weiterleitung
+auf `<basis>/releases/tag/<tag>`), `<basis>/raw/<tag>/SHA256SUMS`, `<basis>/download/<tag>/<asset>` und
 `<basis>/kephalaion/install.sh`. `releasetest.Isolate()` schaltet sie in `TestMain` jedes
 Testpakets ab, das Programm-Stand, Installation oder Umgebungsprüfung erreicht
 (`cmd/k-playbook`, `internal/webui`, `internal/mcpserver`, `internal/project`,
 `internal/program`); `releasetest.Serve()` stellt eine Ersatzquelle hin, die mit dem echten
-git (einfaches HTTP-Protokoll) und dem echten HTTP-Client gefragt wird. Kein Test berührt
-das echte Netz. Die Variable wirkt auch im ausgelieferten Programm; `version --all` und
+HTTP-Client und von `bin/install` mit curl oder wget gefragt wird. Beide setzen dazu
+`XDG_CACHE_HOME` auf ein temporäres Verzeichnis, auch für gebaute Unterprozesse. Kein Test
+berührt das echte Netz oder das echte `~/.cache`. Die Variable wirkt auch im ausgelieferten Programm; `version --all` und
 `upgrade` nennen deshalb eine ersetzte oder abgeschaltete Quelle. `bin/install` liest
 dieselbe Variable mit derselben Bedeutung.
 
@@ -1726,13 +1751,13 @@ schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein
 
 `bin/install` ist die Erstinstallation und eigenständig: über
 `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`
-aufrufbar, bestimmt es Tag und Prüfsumme wie das Paket `release` (neuester Tag über
-`git ls-remote`, `SHA256SUMS` des Tags über HTTPS) und installiert das Release-Binary direkt
-nach `~/.local/bin/k-playbook`, danach Kephalaion. Aus einem Clone aufgerufen
-(`make -C k-playbook install`, `k-playbook/bin/install`) verhält es sich gleich: Es liest
-weder `VERSION` noch `SHA256SUMS` neben sich und installiert den neuesten Tag. Dafür braucht
-es `git`; ohne bricht es mit einer Meldung ab, die `git` als Voraussetzung nennt, bevor
-etwas angelegt oder geladen ist. Der ganze Ablauf steht in `main` und wird erst in der
+aufrufbar, bestimmt es Tag und Prüfsumme wie das Paket `release` (neuestes Release über die
+Weiterleitung von `releases/latest` mit curl oder wget, `SHA256SUMS` des Tags über HTTPS)
+und installiert das Release-Binary direkt nach `~/.local/bin/k-playbook`, danach
+Kephalaion. Aus einem Clone aufgerufen (`make -C k-playbook install`,
+`k-playbook/bin/install`) verhält es sich gleich: Es liest weder `VERSION` noch `SHA256SUMS`
+neben sich und installiert das neueste Release. `git` braucht es nicht; den Cache des
+neuesten Release schreibt es nicht. Der ganze Ablauf steht in `main` und wird erst in der
 letzten Zeile gerufen: Unter `curl | bash` liest bash das Skript von stdin, und so führt ein
 abgebrochener Download nichts aus, und kein Kindprozess frisst den Rest des Skripts.
 
@@ -1790,8 +1815,10 @@ bauen vorher unbedingt für die eigene Plattform, dort kann nie ein fremdes Bina
 ### Übergang aufräumen
 
 Der erste Start des neuen Binaries — und ebenso `bin/install` — entfernt die alte
-Spiegelung unter `~/.local/share/k-playbook/installation/` sowie den früheren
-Standard-Cache unter `~/.cache/k-playbook/`. Ein direkter Eintrag
+Spiegelung unter `~/.local/share/k-playbook/installation/` sowie die Binaries des früheren
+Standard-Caches unter `~/.cache/k-playbook/bin/` — dorthin, nach `bin/<version>/`, legte der
+Wrapper seine Downloads, und sonst nichts. Der Cache des neuesten Release
+(`latest-release.json`) daneben bleibt liegen. Ein direkter Eintrag
 `~/.local/bin/k-playbook` bleibt erhalten; nur ein Symlink auf die alte Spiegelung wird
 entfernt.
 
@@ -4100,7 +4127,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/kephalaion/save` | prüft erneut und schreibt nur bei `ok` `hub` und `collection` zeilenweise in den Block `kephalaion:` von `K-PLAYBOOK.yaml`, nie einen Account; Antwort mit Hinweis auf das Committen; 409 mit Zustand bei nicht bestandenem Test oder einer Form, die sich nicht sicher ändern lässt; verwirft den Zwischenspeicher |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
-| `GET` | `/api/update` | per `git ls-remote` prüfen, ob der Clone zurückliegt, und zusätzlich, ob das laufende Programm älter ist als der neueste Release-Tag (`program` mit `running`, `latest`, `latestError`, samt PATH-Befund; auch ohne Clone); rein lesend, lädt nie etwas |
+| `GET` | `/api/update` | per `git ls-remote` prüfen, ob der Clone zurückliegt, und zusätzlich, ob das laufende Programm älter ist als der neueste Release-Tag (`program` mit `running`, `latest`, `latestError`, samt PATH-Befund; auch ohne Clone); den Tag aus dem Cache, mit `fresh=1` frisch gefragt; rein lesend, lädt nie etwas |
 | `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er oder fehlt der Clone, trägt die Antwort Meldung und Ausgabe mit 409 — aber erst, nachdem veraltete MCP-Einträge korrigiert und das Programm geprüft sind; ist das laufende Programm älter als der neueste Tag, folgen Installation und Neustart wie bei `/api/update/program` (dann 200, damit die Seite der neuen Adresse folgt) |
 | `POST` | `/api/update/program` | das Release-Programm des neuesten Tags installieren (`program.Install()`, geprüft gegen die `SHA256SUMS` des Tags, ohne Clone) und den Dienst daraus neu starten; 409 bei laufendem Ablauf, nicht älterem Programm, unbekanntem Tag oder falschem PATH, 428 mit Rückfrage bei laufender Arbeit (`?confirm=1` bestätigt), 500 mit Fehler und Ausgabe, wenn der Dienst weiterläuft |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |

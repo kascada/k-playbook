@@ -288,3 +288,65 @@ func mcpState(t *testing.T, root string, path string) project.MCPStatus {
 	t.Fatalf("kein MCP-Status für %s", path)
 	return project.MCPStatus{}
 }
+
+// `upgrade --check` fragt immer frisch, auch bei frischem Eintrag im Cache —
+// sichtbar an der Ersatzquelle —, und schreibt das Ergebnis in den Cache.
+func TestUpgradeCheckFragtTrotzFrischemCache(t *testing.T) {
+	upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
+	setOwnVersion(t, "v0.17.0")
+	source := releasetest.Serve(t)
+	source.AddTag("v0.17.0")
+
+	// Ein frischer Eintrag dieser Quelle: v0.17.0.
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.17.0" {
+		t.Fatalf("CachedLatestTag = %q, %v", tag, err)
+	}
+	asked := len(source.Requests())
+	source.AddTag("v0.18.0")
+
+	stdout := runUpgradeText(t, "--check")
+	if len(source.Requests()) != asked+1 {
+		t.Errorf("upgrade --check hat nicht frisch gefragt: %v", source.Requests())
+	}
+	if !strings.Contains(stdout, "neueste Release (v0.18.0)") {
+		t.Errorf("upgrade --check sieht das neue Release nicht:\n%s", stdout)
+	}
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.18.0" || len(source.Requests()) != asked+1 {
+		t.Errorf("der Cache trägt nicht das frische Ergebnis: %q, %v, Anfragen %v", tag, err, source.Requests())
+	}
+}
+
+// `upgrade` ohne --check fragt ebenso frisch, auch bei frischem Eintrag im
+// Cache, installiert das neue Release — hier über die Testnaht, nichts landet
+// in ~/.local/bin — und schreibt das Ergebnis in den Cache.
+func TestUpgradeFragtTrotzFrischemCache(t *testing.T) {
+	root := upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
+	setOwnVersion(t, "v0.17.0")
+	tags := stubInstall(t, filepath.Join(root, "k-playbook-neu"))
+	source := releasetest.Serve(t)
+	source.AddTag("v0.17.0")
+
+	// Ein frischer Eintrag dieser Quelle: v0.17.0 — aus dem Cache wäre das
+	// laufende Programm aktuell.
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.17.0" {
+		t.Fatalf("CachedLatestTag = %q, %v", tag, err)
+	}
+	asked := len(source.Requests())
+	source.AddTag("v0.18.0")
+
+	report := runUpgradeJSON(t)
+	if len(source.Requests()) != asked+1 {
+		t.Errorf("upgrade hat nicht frisch gefragt: %v", source.Requests())
+	}
+	if status := report.Program.Status; status == nil || status.Latest != "v0.18.0" || !status.Outdated {
+		t.Errorf("program.status = %+v", status)
+	}
+	if len(*tags) != 1 || (*tags)[0] != "v0.18.0" {
+		t.Errorf("Installation mit Tags %v, erwartet v0.18.0", *tags)
+	}
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.18.0" || len(source.Requests()) != asked+1 {
+		t.Errorf("der Cache trägt nicht das frische Ergebnis: %q, %v, Anfragen %v", tag, err, source.Requests())
+	}
+}

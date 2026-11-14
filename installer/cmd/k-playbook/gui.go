@@ -67,15 +67,16 @@ func careForHost() {
 // Ohne die Zeile bliebe der Zustand „neueres Release, Programm alt" im
 // Terminal unsichtbar.
 //
-// Gefragt wird der neueste Release-Tag (program.CheckStatus) — ein Netzaufruf
-// mit kurzer Frist, und nur, wenn dieses Programm eine Version trägt. Ist der
-// Tag unbekannt, bleibt die Zeile aus.
+// Gefragt wird der neueste Release-Tag (program.CheckStatus) aus dem Cache —
+// ein Netzaufruf mit kurzer Frist nur, wenn der Eintrag nicht frisch ist, und
+// nur, wenn dieses Programm eine Version trägt. Ist der Tag unbekannt, bleibt
+// die Zeile aus.
 func noteOutdatedProgram(out io.Writer, running string) {
 	environment := project.Detect()
 	if !environment.Installed {
 		return
 	}
-	status := program.CheckStatus(context.Background(), running)
+	status := program.CheckStatus(context.Background(), running, program.Cached)
 	if line := outdatedProgramNotice(status.Running, status.Latest); line != "" {
 		fmt.Fprintln(out, line)
 	}

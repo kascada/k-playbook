@@ -232,12 +232,12 @@ func TestCheckStatus(t *testing.T) {
 		source.AddTag("v0.9.4")
 		source.AddTag("v0.9.5-rc.1")
 
-		older := CheckStatus(context.Background(), "v0.9.3")
+		older := CheckStatus(context.Background(), "v0.9.3", Fresh)
 		if !older.Outdated || older.Latest != "v0.9.4" || older.Order != "älter" || !older.Installable || older.Target != target || older.Hint != "" {
 			t.Errorf("älter: %+v", older)
 		}
 		for running, order := range map[string]string{"v0.9.4": "gleich", "v0.10.0": "neuer"} {
-			status := CheckStatus(context.Background(), running)
+			status := CheckStatus(context.Background(), running, Fresh)
 			if status.Outdated || status.Latest != "v0.9.4" || status.Order != order || status.LatestError != "" {
 				t.Errorf("%s: %+v", running, status)
 			}
@@ -249,7 +249,7 @@ func TestCheckStatus(t *testing.T) {
 		source := releasetest.Serve(t)
 		source.AddTag("v0.9.4")
 
-		status := CheckStatus(context.Background(), "v0.9.3")
+		status := CheckStatus(context.Background(), "v0.9.3", Fresh)
 		if !status.Outdated || status.Installable || !strings.Contains(status.Hint, project.FirstInstallCommand) {
 			t.Errorf("Status = %+v", status)
 		}
@@ -259,7 +259,7 @@ func TestCheckStatus(t *testing.T) {
 		source := releasetest.Serve(t)
 		source.AddTag("v0.9.4")
 		for _, running := range []string{"", "dev"} {
-			status := CheckStatus(context.Background(), running)
+			status := CheckStatus(context.Background(), running, Fresh)
 			if status.Outdated || status.Latest != "" || status.LatestError != "" || status.Order != "unbekannt" {
 				t.Errorf("laufend %q: %+v", running, status)
 			}
@@ -271,7 +271,7 @@ func TestCheckStatus(t *testing.T) {
 
 	t.Run("Tag unbekannt", func(t *testing.T) {
 		releasetest.Off(t)
-		status := CheckStatus(context.Background(), "v0.9.3")
+		status := CheckStatus(context.Background(), "v0.9.3", Fresh)
 		if status.Outdated || status.Latest != "" || status.Order != "unbekannt" || !strings.Contains(status.LatestError, "abgeschaltet") {
 			t.Errorf("abgeschaltet: %+v", status)
 		}
@@ -279,11 +279,40 @@ func TestCheckStatus(t *testing.T) {
 		// Die Quelle antwortet, nennt aber keinen Release-Tag.
 		source := releasetest.Serve(t)
 		source.AddTag("v0.9.5-rc.1")
-		status = CheckStatus(context.Background(), "v0.9.3")
+		status = CheckStatus(context.Background(), "v0.9.3", Fresh)
 		if status.Outdated || status.Latest != "" || status.LatestError == "" {
 			t.Errorf("ohne Release-Tag: %+v", status)
 		}
 	})
+}
+
+// Fresh fragt immer und schreibt den Cache; Cached nimmt einen frischen
+// Eintrag ohne Anfrage — sichtbar an der Ersatzquelle.
+func TestCheckStatusFrischOderAusDemCache(t *testing.T) {
+	isolate(t)
+	source := releasetest.Serve(t)
+	source.AddTag("v0.9.4")
+
+	if status := CheckStatus(context.Background(), "v0.9.4", Fresh); status.Latest != "v0.9.4" || len(source.Requests()) != 1 {
+		t.Fatalf("Fresh: %+v, Anfragen %v", status, source.Requests())
+	}
+	if _, err := os.Stat(filepath.Join(release.CacheDir(), release.CacheFileName)); err != nil {
+		t.Fatalf("Fresh hat den Cache nicht geschrieben: %v", err)
+	}
+
+	// Ein neues Release erscheint. Cached sieht noch den Eintrag, ohne zu
+	// fragen; Fresh fragt und sieht es.
+	source.AddTag("v0.9.5")
+	if status := CheckStatus(context.Background(), "v0.9.4", Cached); status.Latest != "v0.9.4" || status.Outdated || len(source.Requests()) != 1 {
+		t.Errorf("Cached: %+v, Anfragen %v", status, source.Requests())
+	}
+	if status := CheckStatus(context.Background(), "v0.9.4", Fresh); status.Latest != "v0.9.5" || !status.Outdated || len(source.Requests()) != 2 {
+		t.Errorf("Fresh: %+v, Anfragen %v", status, source.Requests())
+	}
+	// Der neue Eintrag gilt jetzt auch für Cached.
+	if status := CheckStatus(context.Background(), "v0.9.4", Cached); status.Latest != "v0.9.5" || len(source.Requests()) != 2 {
+		t.Errorf("Cached nach Fresh: %+v, Anfragen %v", status, source.Requests())
+	}
 }
 
 func TestReadVersion(t *testing.T) {

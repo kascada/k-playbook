@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -20,135 +19,156 @@ import (
 // TestMain schaltet die Quelle ab: Ein Test, der sie nicht ausdrücklich
 // ersetzt, fragt nichts — nie das echte GitHub. (releasetest.Isolate tut
 // dasselbe für andere Pakete; hier wäre der Import ein Zyklus.)
+//
+// Dazu zeigt XDG_CACHE_HOME auf ein temporäres Verzeichnis: Kein Test liest
+// oder schreibt den Cache im echten ~/.cache.
 func TestMain(m *testing.M) {
 	os.Setenv(EnvSource, SourceOff)
-	os.Exit(m.Run())
-}
-
-// fakeGit ersetzt ls-remote: die Ausgabe steht fest, und gezählt wird, wie oft
-// gefragt wurde. Kein Test dieses Pakets startet git oder berührt ein Netz.
-func fakeGit(t *testing.T, output string, err error) *atomic.Int32 {
-	t.Helper()
-	var calls atomic.Int32
-	before := RunGit
-	RunGit = func(ctx context.Context, args ...string) ([]byte, error) {
-		calls.Add(1)
-		want := []string{"ls-remote", "--tags", "--refs", CurrentSource().Repo, "v*"}
-		if strings.Join(args, " ") != strings.Join(want, " ") {
-			t.Errorf("git-Aufruf = %q, erwartet %q", args, want)
-		}
-		return []byte(output), err
+	cache, err := os.MkdirTemp("", "k-playbook-cache-*")
+	if err != nil {
+		panic(err)
 	}
-	t.Cleanup(func() { RunGit = before })
-	return &calls
+	os.Setenv("XDG_CACHE_HOME", cache)
+	code := m.Run()
+	os.RemoveAll(cache)
+	os.Exit(code)
 }
 
-// source stellt eine Ersatzquelle für Prüfsummen und Assets hin und setzt
-// EnvSource darauf.
+// source stellt eine Ersatzquelle hin und setzt EnvSource darauf.
 func source(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 	t.Setenv(EnvSource, server.URL)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	return server
 }
 
-func refs(tags ...string) string {
-	var b strings.Builder
-	for i, tag := range tags {
-		fmt.Fprintf(&b, "%040x\trefs/tags/%s\n", i+1, tag)
-	}
-	return b.String()
+// latest ist eine Ersatzquelle, die /releases/latest mit status beantwortet und
+// dabei auf location weiterleitet (leer: kein Location-Kopf). Gezählt wird,
+// wie oft gefragt wurde, und es gilt: nur HEAD auf /releases/latest.
+func latest(t *testing.T, status int, location string) *atomic.Int32 {
+	t.Helper()
+	var calls atomic.Int32
+	source(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path != "/releases/latest" || r.Method != http.MethodHead {
+			t.Errorf("Anfrage %s %s, erwartet HEAD /releases/latest", r.Method, r.URL.Path)
+		}
+		if location != "" {
+			w.Header().Set("Location", location)
+		}
+		w.WriteHeader(status)
+	})
+	return &calls
 }
 
-// Der neueste Tag ist der höchste der Form vX.Y.Z — semantisch, nicht
-// lexikalisch: v0.10.0 steht über v0.9.4.
-func TestLatestTagNimmtDenHoechsten(t *testing.T) {
-	t.Setenv(EnvSource, "")
-	fakeGit(t, refs("v0.9.4", "v0.10.0", "v0.9.12", "v0.2.0"), nil)
+// Der Tag ist das Ziel der Weiterleitung von /releases/latest — gefolgt wird
+// ihr nicht: Die Seite des Release fragt niemand.
+func TestLatestTagLiestDieWeiterleitung(t *testing.T) {
+	var calls atomic.Int32
+	server := source(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path == "/releases/latest" {
+			http.Redirect(w, r, "/releases/tag/v0.10.0", http.StatusFound)
+			return
+		}
+		t.Errorf("der Weiterleitung wurde gefolgt: %s", r.URL.Path)
+	})
 
 	tag, err := LatestTag(context.Background())
-	if err != nil {
-		t.Fatalf("Fehler: %v", err)
+	if err != nil || tag != "v0.10.0" {
+		t.Fatalf("LatestTag = %q, %v", tag, err)
 	}
-	if tag != "v0.10.0" {
-		t.Errorf("neuester Tag = %q, erwartet v0.10.0", tag)
+	if calls.Load() != 1 {
+		t.Errorf("%d Anfragen, erwartet eine", calls.Load())
+	}
+
+	// Ein absolutes Ziel, wie GitHub es schickt.
+	latest(t, http.StatusFound, server.URL+"/releases/tag/v0.16.38")
+	// latest ersetzt EnvSource durch einen neuen Server; dessen Adresse ist
+	// eine andere — das Ziel unter der alten gilt nicht als Release.
+	if _, err := LatestTag(context.Background()); err == nil {
+		t.Error("ein Ziel unter einer fremden Adresse galt als Release")
+	}
+	var calls2 atomic.Int32
+	server2 := source(t, func(w http.ResponseWriter, r *http.Request) {
+		calls2.Add(1)
+		w.Header().Set("Location", "http://"+r.Host+"/releases/tag/v0.16.38")
+		w.WriteHeader(http.StatusFound)
+	})
+	tag, err = LatestTag(context.Background())
+	if err != nil || tag != "v0.16.38" {
+		t.Fatalf("absolutes Ziel unter %s: %q, %v", server2.URL, tag, err)
 	}
 }
 
-// Tags mit Zusatz sind keine Releases: ein Vorabkennzeichen, Build-Metadaten,
-// ein Name ohne v oder mit weniger als drei Zahlen zählen nicht — auch dann
-// nicht, wenn sie höher wären.
-func TestLatestTagUebergehtTagsMitZusatz(t *testing.T) {
-	t.Setenv(EnvSource, "")
-	fakeGit(t, refs("v0.9.4", "v0.10.0-rc.1", "v1.0.0-beta", "v0.9.5+build", "0.9.9", "v2.0", "vorlage", "v0.9.4.1"), nil)
-
-	tag, err := LatestTag(context.Background())
-	if err != nil {
-		t.Fatalf("Fehler: %v", err)
-	}
-	if tag != "v0.9.4" {
-		t.Errorf("neuester Tag = %q, erwartet v0.9.4", tag)
-	}
-
-	// Nur Tags mit Zusatz: es gibt kein Release.
-	fakeGit(t, refs("v0.10.0-rc.1", "vorlage"), nil)
-	if _, err := LatestTag(context.Background()); !errors.Is(err, ErrNoTag) {
-		t.Errorf("Fehler = %v, erwartet ErrNoTag", err)
+// Ein Tag mit Zusatz ist kein Release, auch wenn GitHub ihn als neuestes
+// nennt: der Tag ist dann unbekannt, ein TagError — kein Rückgriff auf ein
+// anderes Release.
+func TestLatestTagMitZusatzIstUnbekannt(t *testing.T) {
+	for _, tag := range []string{"v0.10.0-rc.1", "v1.0.0-beta", "v0.9.5+build", "0.9.9", "v2.0", "vorlage", "v0.9.4.1"} {
+		latest(t, http.StatusFound, "/releases/tag/"+tag)
+		got, err := LatestTag(context.Background())
+		var tagErr *TagError
+		if got != "" || !errors.As(err, &tagErr) || !strings.Contains(tagErr.Reason, "keinen der Form vX.Y.Z") {
+			t.Errorf("%s: Tag %q, Fehler %v", tag, got, err)
+		}
 	}
 }
 
-// Ohne Netz, ohne git und bei Zeitüberschreitung ist der Tag unbekannt: ein
-// TagError mit Grund, nie ein leerer Tag ohne Fehler.
-func TestLatestTagOhneNetzIstUnbekannt(t *testing.T) {
-	t.Setenv(EnvSource, "")
+// Ohne Weiterleitung, mit 404 (kein veröffentlichtes Release), mit einem Ziel,
+// das kein Release ist, und ohne Netz ist der Tag unbekannt: ein TagError mit
+// Grund, nie ein leerer Tag ohne Fehler.
+func TestLatestTagOhneWeiterleitungIstUnbekannt(t *testing.T) {
+	for _, fall := range []struct {
+		name     string
+		status   int
+		location string
+		want     string
+	}{
+		{"keine Weiterleitung", http.StatusOK, "", "statt mit einer Weiterleitung"},
+		{"404", http.StatusNotFound, "", "kein veröffentlichtes Release"},
+		{"Serverfehler", http.StatusBadGateway, "", "502"},
+		{"Weiterleitung ohne Ziel", http.StatusFound, "", "nennt aber kein Ziel"},
+		{"Ziel ist die Liste", http.StatusFound, "/releases", "leitet nicht auf ein Release weiter"},
+		{"Ziel mit Unterpfad", http.StatusFound, "/releases/tag/v0.10.0/mehr", "leitet nicht auf ein Release weiter"},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			latest(t, fall.status, fall.location)
+			tag, err := LatestTag(context.Background())
+			var tagErr *TagError
+			if tag != "" || !errors.As(err, &tagErr) || !strings.Contains(tagErr.Reason, fall.want) {
+				t.Errorf("Tag %q, Fehler %v; erwartet %q im Grund", tag, err, fall.want)
+			}
+		})
+	}
 
-	fakeGit(t, "", errors.New("exit status 128: fatal: unable to access 'https://github.com/kascada/k-playbook.git/': Could not resolve host: github.com"))
-	tag, err := LatestTag(context.Background())
-	var tagErr *TagError
-	if tag != "" || !errors.As(err, &tagErr) {
-		t.Fatalf("ohne Netz: Tag %q, Fehler %v", tag, err)
-	}
-	if !strings.Contains(tagErr.Reason, "Could not resolve host") {
-		t.Errorf("der Grund nennt die Meldung von git nicht: %q", tagErr.Reason)
-	}
-
-	fakeGit(t, "", &exec.Error{Name: "git", Err: exec.ErrNotFound})
-	_, err = LatestTag(context.Background())
-	if !errors.As(err, &tagErr) || !strings.Contains(tagErr.Reason, "git fehlt im PATH") {
-		t.Errorf("ohne git: %v", err)
-	}
-
-	before := TagTimeout
-	TagTimeout = 20 * time.Millisecond
-	t.Cleanup(func() { TagTimeout = before })
-	beforeGit := RunGit
-	RunGit = func(ctx context.Context, args ...string) ([]byte, error) {
-		<-ctx.Done()
-		return nil, ctx.Err()
-	}
-	t.Cleanup(func() { RunGit = beforeGit })
-	_, err = LatestTag(context.Background())
-	if !errors.As(err, &tagErr) || !strings.Contains(tagErr.Reason, "nicht geantwortet") {
-		t.Errorf("Zeitüberschreitung: %v", err)
-	}
+	t.Run("ohne Netz", func(t *testing.T) {
+		// Ein Port, auf dem niemand lauscht.
+		listener := httptest.NewServer(http.NotFoundHandler())
+		address := listener.URL
+		listener.Close()
+		t.Setenv(EnvSource, address)
+		tag, err := LatestTag(context.Background())
+		var tagErr *TagError
+		if tag != "" || !errors.As(err, &tagErr) || !strings.Contains(tagErr.Reason, "ließ sich nicht erfragen") {
+			t.Errorf("Tag %q, Fehler %v", tag, err)
+		}
+	})
 }
 
-// Läuft die Frist ab, endet git samt seinem Kindprozess: Für HTTPS startet
-// git einen Helfer, der die Ausgabe offen hält. Hier ein Ersatz-git, das einen
-// Kindprozess mit geerbter Ausgabe startet und selbst hängt. Träfe das Signal
-// nur git, kehrte LatestTag erst nach WaitDelay (1 s) zurück.
-func TestLatestTagFristBeendetAuchDenKindprozess(t *testing.T) {
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh fehlt")
-	}
-	dir := t.TempDir()
-	// Der Kindprozess erbt stdout und stderr und hält sie 30 Sekunden offen.
-	if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\nsleep 30 &\nsleep 30\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv(EnvSource, "http://127.0.0.1:9")
+// Läuft die Frist ab, kehrt LatestTag mit ihr zurück, nicht erst, wenn die
+// Quelle antwortet.
+func TestLatestTagFristAbgelaufen(t *testing.T) {
+	release := make(chan struct{})
+	source(t, func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	})
+	t.Cleanup(func() { close(release) })
 	before := TagTimeout
 	TagTimeout = 150 * time.Millisecond
 	t.Cleanup(func() { TagTimeout = before })
@@ -161,14 +181,14 @@ func TestLatestTagFristBeendetAuchDenKindprozess(t *testing.T) {
 		t.Fatalf("Fehler = %v", err)
 	}
 	if elapsed > 700*time.Millisecond {
-		t.Errorf("LatestTag kehrte erst nach %s zurück — der Kindprozess hielt die Ausgabe offen", elapsed)
+		t.Errorf("LatestTag kehrte erst nach %s zurück", elapsed)
 	}
 }
 
-// Abgeschaltet heißt: kein Aufruf von git, keine Anfrage — nur ErrDisabled.
+// Abgeschaltet heißt: keine Anfrage — nur ErrDisabled.
 func TestAbgeschalteteQuelleFragtNichts(t *testing.T) {
+	calls := latest(t, http.StatusFound, "/releases/tag/v0.9.4")
 	t.Setenv(EnvSource, SourceOff)
-	calls := fakeGit(t, refs("v0.9.4"), nil)
 
 	if _, err := LatestTag(context.Background()); !errors.Is(err, ErrDisabled) {
 		t.Errorf("LatestTag: %v", err)
@@ -181,7 +201,7 @@ func TestAbgeschalteteQuelleFragtNichts(t *testing.T) {
 		t.Errorf("Install: %v", err)
 	}
 	if calls.Load() != 0 {
-		t.Errorf("git wurde %d-mal aufgerufen", calls.Load())
+		t.Errorf("die Quelle wurde %d-mal gefragt", calls.Load())
 	}
 	if _, err := os.Stat(filepath.Dir(target)); err == nil {
 		t.Error("das Zielverzeichnis wurde angelegt")
@@ -196,7 +216,9 @@ func TestAbgeschalteteQuelleFragtNichts(t *testing.T) {
 func TestCurrentSource(t *testing.T) {
 	t.Setenv(EnvSource, "")
 	github := CurrentSource()
-	if github.Repo != RepoURL || github.Replaced || github.Off || github.Note() != "" {
+	if github.Latest != "https://github.com/kascada/k-playbook/releases/latest" ||
+		github.TagPrefix != "https://github.com/kascada/k-playbook/releases/tag/" ||
+		github.Replaced || github.Off || github.Note() != "" {
 		t.Errorf("ohne Variable: %+v, Note %q", github, github.Note())
 	}
 	if got := github.SumsURL("v0.9.4"); got != "https://raw.githubusercontent.com/kascada/k-playbook/v0.9.4/SHA256SUMS" {
@@ -208,7 +230,7 @@ func TestCurrentSource(t *testing.T) {
 
 	t.Setenv(EnvSource, "http://127.0.0.1:9/")
 	replaced := CurrentSource()
-	if replaced.Repo != "http://127.0.0.1:9/k-playbook.git" || replaced.Raw != "http://127.0.0.1:9/raw" ||
+	if replaced.Latest != "http://127.0.0.1:9/releases/latest" || replaced.TagPrefix != "http://127.0.0.1:9/releases/tag/" || replaced.Raw != "http://127.0.0.1:9/raw" ||
 		replaced.Download != "http://127.0.0.1:9/download" || !replaced.Replaced {
 		t.Errorf("ersetzt: %+v", replaced)
 	}

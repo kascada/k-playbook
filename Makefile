@@ -230,14 +230,12 @@ vscode-vsix: ## Baut die VSIX der VS-Code-Erweiterung neu (braucht Node)
 # installieren erst, wenn VERSION im Clone wechselt, und prüfen danach gegen
 # VERSION und SHA256SUMS des Clones.
 #
-# Neuere Programme und bin/install selbst schützt die Reihenfolge nicht mehr:
-# Sie lesen nicht VERSION, sondern den neuesten Tag (git ls-remote), und der
-# steht schon nach dem ersten Schritt. In dem Fenster, bis CI die Assets
-# hochgeladen hat, warnt die Umgebungsprüfung bereits, und k-playbook upgrade
-# wie bin/install melden, dass das Release noch nicht fertig ist; ersetzt wird
-# dann nichts. Scheitert CI, bleibt das so, bis der Tag entfernt ist oder ein
-# Nachfolger erschienen ist. Einen Versions-Fallback gibt es dafür nicht:
-# geladen wird das Asset des neuesten Tags oder gar keins.
+# Neuere Programme und bin/install brauchen die Reihenfolge nicht: Sie lesen
+# nicht VERSION, sondern das neueste veröffentlichte Release (die
+# Weiterleitung von releases/latest), und CI veröffentlicht es erst, wenn alle
+# Assets hochgeladen sind (.github/workflows/release.yml). Bis dahin sehen sie
+# das vorige Release; ein Fenster zwischen Tag und Assets gibt es für sie
+# nicht. Scheitert CI, bleibt das vorige Release das neueste.
 #
 # Gefragt wird in installer/, nicht hier: `go env GOVERSION` beantwortet die
 # Frage modulabhängig. Im Wurzelverzeichnis gibt es keine go.mod, dort nennt es

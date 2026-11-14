@@ -19,7 +19,7 @@ type Status struct {
 	Running string `json:"running"`
 	Latest  string `json:"latest"`
 	// LatestError sagt, warum der neueste Tag unbekannt ist: ohne Netz, ohne
-	// git, Zeitüberschreitung. Leer, wenn er bekannt ist oder gar nicht
+	// veröffentlichtes Release, Zeitüberschreitung. Leer, wenn er bekannt ist oder gar nicht
 	// gefragt wurde.
 	LatestError string `json:"latestError,omitempty"`
 	// Order ist das Ergebnis des Vergleichs: älter, gleich, neuer, unbekannt.
@@ -35,8 +35,23 @@ type Status struct {
 	Hint        string `json:"hint,omitempty"`
 }
 
+// Lookup sagt, wie CheckStatus den neuesten Release-Tag erfragt.
+type Lookup int
+
+const (
+	// Fresh fragt sofort (release.LatestTag) und schreibt das Ergebnis in
+	// den Cache — für alles, was installiert oder ausdrücklich prüft:
+	// `k-playbook upgrade` samt `--check`, POST /api/update und
+	// /api/update/program, GET /api/update mit fresh=1.
+	Fresh Lookup = iota
+	// Cached nimmt einen frischen Eintrag aus dem Cache und fragt nur sonst
+	// (release.CachedLatestTag) — für die reinen Hinweise: den Start der
+	// Oberfläche und GET /api/update beim Laden der Seite.
+	Cached
+)
+
 // CheckStatus vergleicht die Version des laufenden Programms mit dem neuesten
-// Release-Tag.
+// Release-Tag, erfragt nach lookup.
 //
 // Ohne eigene Version wird nichts abgerufen, kein Netzaufruf: Ein Programm
 // ohne Version löst weder Warnung noch Installation aus, und ein Ad-hoc-Build
@@ -46,12 +61,16 @@ type Status struct {
 // Nur „älter" meldet. Gleich ist der Normalfall; neuer ist ein Build über dem
 // neuesten Tag (`make dev-install VERSION=…`) und gilt als aktuell. Den PATH
 // prüft sie nur, wenn es etwas anzubieten gäbe.
-func CheckStatus(ctx context.Context, running string) *Status {
+func CheckStatus(ctx context.Context, running string, lookup Lookup) *Status {
 	status := &Status{Running: running, Order: version.Unknown.String()}
 	if !version.Valid(running) {
 		return status
 	}
-	latest, err := release.LatestTag(ctx)
+	ask := release.LatestTag
+	if lookup == Cached {
+		ask = release.CachedLatestTag
+	}
+	latest, err := ask(ctx)
 	if err != nil {
 		status.LatestError = strings.TrimSuffix(err.Error(), ".")
 		return status

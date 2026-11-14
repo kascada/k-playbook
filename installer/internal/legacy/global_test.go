@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/release"
 )
 
 // newHome baut ein Home-Verzeichnis mit einer alten Basisinstallation daneben.
@@ -118,7 +120,9 @@ func TestEntferntAlteHostInstallationUndCache(t *testing.T) {
 	home := filepath.Join(root, "home")
 	installation := filepath.Join(home, ".local", "share", "k-playbook", "installation")
 	launcher := filepath.Join(home, ".local", "bin", "k-playbook")
-	cache := filepath.Join(home, ".cache", "k-playbook")
+	cache := filepath.Join(home, ".cache", "k-playbook", "bin")
+	// Der Cache des neuesten Release liegt daneben und bleibt.
+	latest := filepath.Join(home, ".cache", "k-playbook", release.CacheFileName)
 
 	write := func(path string) {
 		t.Helper()
@@ -130,7 +134,8 @@ func TestEntferntAlteHostInstallationUndCache(t *testing.T) {
 		}
 	}
 	write(filepath.Join(installation, "bin", "k-playbook"))
-	write(filepath.Join(cache, "bin", "v0.1.2", "k-playbook-linux-amd64"))
+	write(filepath.Join(cache, "v0.1.2", "k-playbook-linux-amd64"))
+	write(latest)
 	symlink(t, filepath.Join(installation, "bin", "k-playbook"), launcher)
 
 	// Die Tool-venvs wohnen unter demselben Dach wie die alte Spiegelung. Sie
@@ -153,6 +158,9 @@ func TestEntferntAlteHostInstallationUndCache(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(venv, "bin", "semgrep")); err != nil {
 		t.Errorf("Tool-venv wurde mitentfernt: %v", err)
+	}
+	if content, err := os.ReadFile(latest); err != nil || string(content) != "alt\n" {
+		t.Errorf("der Cache des neuesten Release wurde mitentfernt: %q, %v", content, err)
 	}
 }
 

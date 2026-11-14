@@ -14,15 +14,17 @@ set -euo pipefail
 # und installiert den neuesten Tag, nicht den Stand des Clones.
 #
 # Tag und Prüfsumme bestimmt es wie das Programm selbst (installer/internal/
-# release): der Tag ist der höchste der Form vX.Y.Z aus
-# `git ls-remote --tags --refs`, über HTTPS und anonym; die erwartete Summe
-# kommt aus der committeten SHA256SUMS des Tags (raw.githubusercontent.com),
-# das Binary aus den Assets des Releases. Summe über den Git-Stand, Binary
-# über das Release: ein ausgetauschtes Asset fällt auf. Dafür braucht das
-# Skript git — neben curl oder wget und sha256sum oder shasum.
+# release): der Tag ist der des neuesten veröffentlichten Release, gelesen aus
+# der Weiterleitung von <repo>/releases/latest auf <repo>/releases/tag/<tag>,
+# ohne ihr zu folgen — über HTTPS, anonym, ohne die GitHub-API. Die erwartete
+# Summe kommt aus der committeten SHA256SUMS des Tags
+# (raw.githubusercontent.com), das Binary aus den Assets des Releases. Summe
+# über den Git-Stand, Binary über das Release: ein ausgetauschtes Asset fällt
+# auf. Gebraucht werden curl oder wget und sha256sum oder shasum; git nicht.
 #
-# Der Tag steht, bevor die CI die Assets gebaut hat. In diesem Fenster fehlt
-# das Asset; das Skript sagt dann, dass das Release noch nicht fertig ist, und
+# Die CI veröffentlicht ein Release erst mit allen Assets; ein Tag, dessen
+# Assets noch gebaut werden, ist unter releases/latest nicht zu sehen. Fehlt
+# ein Asset trotzdem, sagt das Skript, dass das Release nicht fertig ist, und
 # ersetzt nichts.
 #
 # Der ganze Ablauf steht in main und wird erst in der letzten Zeile gerufen:
@@ -30,7 +32,8 @@ set -euo pipefail
 # gelesen, bevor etwas läuft — ein abgebrochener Download führt nichts aus —,
 # und kein Kindprozess kann den Rest des Skripts von stdin wegfressen.
 
-repo_url="https://github.com/kascada/k-playbook.git"
+latest_url="https://github.com/kascada/k-playbook/releases/latest"
+tag_prefix="https://github.com/kascada/k-playbook/releases/tag/"
 raw_base_url="https://raw.githubusercontent.com/kascada/k-playbook"
 release_base_url="https://github.com/kascada/k-playbook/releases/download"
 install_script_url="https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install"
@@ -39,7 +42,8 @@ kephalaion_install_url="https://github.com/kephalaion/kephalaion/releases/latest
 # K_PLAYBOOK_RELEASE_SOURCE ersetzt die Quelle oder schaltet sie ab — dieselbe
 # Variable mit derselben Bedeutung wie im Programm (release.EnvSource), die
 # Naht für Tests: leer ist GitHub, "off" heißt kein Abruf, sonst eine
-# Basis-URL mit <basis>/k-playbook.git, <basis>/raw/<tag>/SHA256SUMS,
+# Basis-URL mit <basis>/releases/latest (Weiterleitung auf
+# <basis>/releases/tag/<tag>), <basis>/raw/<tag>/SHA256SUMS,
 # <basis>/download/<tag>/<asset> und <basis>/kephalaion/install.sh.
 source_note=""
 case "${K_PLAYBOOK_RELEASE_SOURCE:-}" in
@@ -47,7 +51,8 @@ case "${K_PLAYBOOK_RELEASE_SOURCE:-}" in
   off) source_note="off" ;;
   *)
     source_base="${K_PLAYBOOK_RELEASE_SOURCE%/}"
-    repo_url="${source_base}/k-playbook.git"
+    latest_url="${source_base}/releases/latest"
+    tag_prefix="${source_base}/releases/tag/"
     raw_base_url="${source_base}/raw"
     release_base_url="${source_base}/download"
     kephalaion_install_url="${source_base}/kephalaion/install.sh"
@@ -68,15 +73,15 @@ Verwendung: ${install_command}
    aus einem Clone: make -C k-playbook install
          ohne make: k-playbook/bin/install
 
-Bestimmt den neuesten Release-Tag von k-playbook (git ls-remote über HTTPS),
-lädt das Release-Binary dieser Plattform, prüft es gegen die SHA256SUMS des
+Bestimmt das neueste Release von k-playbook (die Weiterleitung von
+releases/latest auf GitHub), lädt das Release-Binary dieser Plattform, prüft es gegen die SHA256SUMS des
 Tags und installiert es nach ~/.local/bin/k-playbook. Fehlt Kephalaion auf
 diesem Rechner, installiert es danach über das install.sh des neuesten
 Kephalaion-Releases.
 
 Aus einem Clone aufgerufen verhält es sich gleich: VERSION und SHA256SUMS des
-Clones liest es nicht. Gebraucht werden git, curl oder wget und sha256sum
-oder shasum.
+Clones liest es nicht. Gebraucht werden curl oder wget und sha256sum oder
+shasum.
 EOF
 }
 
@@ -190,22 +195,42 @@ foreign_platform_kind() {
   esac
 }
 
-# latest_tag nennt den höchsten Tag der Form vX.Y.Z. Ein Tag mit Zusatz
-# (v1.0.0-rc.1) ist kein Release. Verglichen wird numerisch je Stelle, nicht
-# als Zeichenkette — sonst stünde v0.9.4 über v0.10.0.
+# latest_tag nennt den Tag des neuesten veröffentlichten Release: das Ziel der
+# Weiterleitung von releases/latest, ohne ihr zu folgen. Ein Tag mit Zusatz
+# (v1.0.0-rc.1) ist kein Release, auch wenn er als neuestes markiert wäre.
 #
-# Leer und Rückgabe 1, wenn git die Tags nicht lesen konnte; leer und
-# Rückgabe 0, wenn das Repo keinen solchen Tag nennt.
+# Rückgabe 1 mit dem Grund auf stderr, wenn sich kein solcher Tag bestimmen
+# ließ — ohne Netz, ohne veröffentlichtes Release, ohne Weiterleitung.
 latest_tag() {
-  local refs
-  # Nie nach Zugangsdaten fragen: das Repo ist öffentlich, und ein Prompt
-  # hinge unter curl | bash an einem stdin, das das Skript selbst ist.
-  refs="$(GIT_TERMINAL_PROMPT=0 git ls-remote --tags --refs "${repo_url}" 'v*' </dev/null)" || return 1
-  printf '%s\n' "${refs}" |
-    awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/) print substr($2, 2) }' |
-    sort -t. -k1,1n -k2,2n -k3,3n |
-    tail -n 1 |
-    awk 'NF { print "v" $0 }'
+  local answer code target tag
+  if ! answer="$(redirect_of "${latest_url}")" || [[ -z "${answer}" ]]; then
+    printf 'Keine Antwort von %s.\n' "${latest_url}" >&2
+    return 1
+  fi
+  code="${answer%% *}"
+  target=""
+  [[ "${answer}" != *" "* ]] || target="${answer#* }"
+  case "${code}" in
+    301|302|303|307|308) ;;
+    404)
+      printf '%s antwortet mit 404: es gibt kein veröffentlichtes Release.\n' "${latest_url}" >&2
+      return 1
+      ;;
+    *)
+      printf '%s antwortet mit %s statt mit einer Weiterleitung auf das neueste Release.\n' "${latest_url}" "${code}" >&2
+      return 1
+      ;;
+  esac
+  tag="${target#"${tag_prefix}"}"
+  if [[ -z "${target}" || "${tag}" == "${target}" || -z "${tag}" || "${tag}" == */* ]]; then
+    printf '%s leitet nicht auf ein Release weiter, sondern auf %s.\n' "${latest_url}" "${target:-nichts}" >&2
+    return 1
+  fi
+  if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'Das neueste Release trägt den Tag %s, keinen der Form vX.Y.Z.\n' "${tag}" >&2
+    return 1
+  fi
+  printf '%s\n' "${tag}"
 }
 
 # install_kephalaion installiert Kephalaion, wenn es im PATH fehlt — über das
@@ -277,18 +302,6 @@ main() {
 
   binary="k-playbook-${os}-${arch}"
 
-  # git ist Voraussetzung: Der neueste Release-Tag wird über git ls-remote
-  # gelesen. Geprüft wird vor allem anderen, damit ein Abbruch nichts angelegt,
-  # nichts geladen und nichts ersetzt hat.
-  command -v git >/dev/null 2>&1 ||
-    fail "git fehlt im PATH." \
-      "" \
-      "k-playbook wird aus dem neuesten Release installiert, und den neuesten" \
-      "Release-Tag liest diese Installation über git ls-remote. git ist deshalb" \
-      "Voraussetzung. Installiere git und rufe die Installation erneut auf:" \
-      "" \
-      "  ${install_command}"
-
   if command -v sha256sum >/dev/null 2>&1; then
     sha256_of() { sha256sum "$1" | awk '{ print $1 }'; }
   elif command -v shasum >/dev/null 2>&1; then
@@ -298,12 +311,30 @@ main() {
   fi
 
   # Alle Downloads ohne stdin: Unter curl | bash ist stdin das Skript selbst.
+  #
+  # redirect_of fragt eine Adresse mit HEAD, folgt keiner Weiterleitung und
+  # nennt "<status> <ziel>" — das Ziel absolut, leer ohne Weiterleitung.
   if command -v curl >/dev/null 2>&1; then
     download() { curl -fL --retry 2 --connect-timeout 15 --output "$1" "$2" </dev/null; }
     download_quiet() { curl -fsSL --retry 2 --connect-timeout 15 --output "$1" "$2" </dev/null; }
+    redirect_of() {
+      curl -sS -I -o /dev/null -w '%{http_code} %{redirect_url}' --connect-timeout 15 --max-time 30 "$1" </dev/null
+    }
   elif command -v wget >/dev/null 2>&1; then
     download() { wget --output-document="$1" "$2" </dev/null; }
     download_quiet() { wget -q --output-document="$1" "$2" </dev/null; }
+    # wget endet bei einer nicht gefolgten Weiterleitung mit 8; gelesen werden
+    # deshalb nur die Kopfzeilen. Ein relatives Ziel bekommt Schema und Host
+    # der gefragten Adresse.
+    redirect_of() {
+      local headers origin
+      headers="$(wget -q -S --spider --max-redirect=0 --timeout=15 --tries=1 "$1" 2>&1 </dev/null)" || true
+      origin="$(printf '%s' "$1" | sed -E 's#^([A-Za-z]+://[^/]+).*#\1#')"
+      printf '%s\n' "${headers}" | awk -v origin="${origin}" '
+        $1 ~ /^HTTP\// { code = $2 }
+        tolower($1) == "location:" { location = $2; if (location ~ /^\//) location = origin location }
+        END { if (code == "") exit 1; printf "%s %s", code, location }'
+    }
   else
     fail "Weder curl noch wget verfügbar; Release-Binary kann nicht geladen werden."
   fi
@@ -329,9 +360,8 @@ main() {
   foreign="$(foreign_platform_kind "${target}")"
 
   version="$(latest_tag)" ||
-    fail "Der neueste Release-Tag ließ sich nicht lesen (git ls-remote ${repo_url})." \
+    fail "Das neueste Release ließ sich nicht bestimmen (${latest_url})." \
       "Ohne Netz ist das zu erwarten; installiert wurde nichts."
-  [[ -n "${version}" ]] || fail "Das Repo nennt keinen Release-Tag der Form vX.Y.Z: ${repo_url}"
   printf 'Neuestes Release: %s\n' "${version}"
 
   sums="$(mktemp)"
@@ -348,8 +378,8 @@ main() {
   printf 'Lade %s ...\n' "${url}"
   download "${temporary}" "${url}" ||
     fail "Das Release-Binary ließ sich nicht laden: ${url}" \
-      "Fehlt das Asset (404), ist das Release ${version} noch nicht fertig: Der Tag" \
-      "steht, bevor die Assets gebaut sind. Später erneut aufrufen. Ersetzt wurde nichts."
+      "Fehlt das Asset (404), ist das Release ${version} noch nicht fertig bestückt." \
+      "Später erneut aufrufen. Ersetzt wurde nichts."
 
   actual="$(sha256_of "${temporary}")"
   if [[ "${actual}" != "${expected}" ]]; then
@@ -367,10 +397,13 @@ Ersetzt wurde nichts."
   mv -f "${temporary}" "${target}"
   temporary=""
 
-  # Der alte Wrapper legte seine Spiegelung und Downloads außerhalb von bin/ ab.
-  # Security-Tool-venvs liegen ebenfalls unter ~/.local/share/k-playbook und
-  # bleiben deshalb ausdrücklich außerhalb dieser Bereinigung.
-  rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook"
+  # Der alte Wrapper legte seine Spiegelung und Downloads außerhalb von bin/ ab:
+  # die Spiegelung unter ~/.local/share/k-playbook/installation, die Binaries
+  # unter ~/.cache/k-playbook/bin/<version>/. Security-Tool-venvs liegen
+  # ebenfalls unter ~/.local/share/k-playbook und der Cache des neuesten
+  # Release unter ~/.cache/k-playbook/latest-release.json; beide bleiben
+  # ausdrücklich außerhalb dieser Bereinigung.
+  rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook/bin"
 
   printf 'Installiert: %s (%s, sha256 %s)\n' "${target}" "${version}" "${actual}"
 

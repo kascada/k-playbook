@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -234,5 +235,61 @@ func TestVersionWeistImTerminalAufAllHin(t *testing.T) {
 	var out bytes.Buffer
 	if err := runVersion(&out, nil); err == nil || out.Len() != 0 || hint.Len() != 0 {
 		t.Errorf("ohne Version: Fehler %v, stdout %q, Hinweis %q", err, out.String(), hint.String())
+	}
+}
+
+// Der Hinweis beim Start der Oberfläche liest den Cache: Ein frischer Eintrag
+// kostet keine Anfrage, auch wenn die Quelle inzwischen ein neueres Release
+// nennt.
+func TestStartHinweisLiestDenCache(t *testing.T) {
+	root := t.TempDir()
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n")
+	before, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(before) })
+	source := releasetest.Serve(t)
+	source.AddTag("v0.9.4")
+	if _, err := release.LatestTag(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	asked := len(source.Requests())
+	source.AddTag("v0.10.0")
+
+	var out bytes.Buffer
+	noteOutdatedProgram(&out, "v0.9.4")
+	if out.Len() != 0 {
+		t.Errorf("aus dem Cache ist v0.9.4 das neueste, trotzdem: %q", out.String())
+	}
+	if len(source.Requests()) != asked {
+		t.Errorf("trotz frischem Eintrag gefragt: %v", source.Requests()[asked:])
+	}
+}
+
+// `version --all` fragt immer frisch, auch bei frischem Eintrag, und schreibt
+// das Ergebnis in den Cache.
+func TestVersionAllFragtTrotzFrischemCache(t *testing.T) {
+	before := buildinfo.Version
+	t.Cleanup(func() { buildinfo.Version = before })
+	buildinfo.Version = "v0.9.4"
+	versionTerminal(t, false)
+	source := releasetest.Serve(t)
+	source.AddTag("v0.9.4")
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.9.4" {
+		t.Fatalf("CachedLatestTag = %q, %v", tag, err)
+	}
+	asked := len(source.Requests())
+	source.AddTag("v0.10.0")
+
+	var out bytes.Buffer
+	if err := runVersion(&out, []string{"--all"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Neuestes Release: v0.10.0") || len(source.Requests()) != asked+1 {
+		t.Errorf("Ausgabe %q, Anfragen %v", out.String(), source.Requests())
+	}
+	if tag, _ := release.CachedLatestTag(context.Background()); tag != "v0.10.0" || len(source.Requests()) != asked+1 {
+		t.Errorf("der Cache trägt %q, Anfragen %v", tag, source.Requests())
 	}
 }

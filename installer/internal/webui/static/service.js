@@ -45,9 +45,14 @@ if (serviceElements.update) {
 
 // Der Knopf bleibt während der Prüfung verborgen: sichtbar wird er erst, wenn
 // es wirklich etwas zu tun gibt.
-async function checkUpdate() {
+//
+// Beim Laden der Seite nimmt der Server den neuesten Release-Tag aus seinem
+// Cache (bis zu einigen Stunden alt); fresh fragt GitHub sofort — für das
+// ausdrückliche Prüfen über den Knopf.
+async function checkUpdate(fresh = false) {
   try {
-    const response = await fetch("/api/update", { cache: "no-store" });
+    const url = fresh ? "/api/update?fresh=1" : "/api/update";
+    const response = await fetch(url, { cache: "no-store" });
     const data = await response.json();
     renderUpdate(data);
     showUpdateMessage(updateNotice(data));
@@ -76,7 +81,7 @@ async function onUpdateClick() {
     return;
   }
   if (updateMode !== "pull") {
-    await checkUpdate();
+    await checkUpdate(true);
     return;
   }
 

@@ -74,10 +74,11 @@ append `k-playbook` as the second argument.
 and installs it to `~/.local/bin/k-playbook`. On the host and inside a devcontainer it
 runs in its own environment and therefore installs the matching binary in each.
 
-**The installation needs network access and `git`.** The binaries are not in the repository
-but attached as assets to the releases. `bin/install` determines the newest release tag
-(`git ls-remote` over HTTPS, anonymously), downloads the asset of that tag and verifies it
-against the `SHA256SUMS` committed at the tag. Called from a clone it does exactly the same:
+**The installation needs network access, but not `git`.** The binaries are not in the
+repository but attached as assets to the releases. `bin/install` determines the newest
+published release (the redirect of `releases/latest` on GitHub, over HTTPS, anonymously,
+with `curl` or `wget`), downloads the asset of its tag and verifies it against the
+`SHA256SUMS` committed at the tag. Called from a clone it does exactly the same:
 it reads neither `VERSION` nor `SHA256SUMS` beside it and installs the newest release.
 
 **Kephalaion comes along.** If no `kephalaion` is on the `PATH`, `bin/install` then
@@ -223,10 +224,12 @@ make -C k-playbook installer-update
 `k-playbook/` contains nothing project-owned and is fully replaceable because of that.
 
 **The program updates itself from the release, not from the clone.** There are exactly two
-version sources: the program's own version, stamped into the binary, and the newest release
-tag on GitHub. `k-playbook version` prints the first, `k-playbook version --all` adds the
-second, and the health check (the briefing, `k-playbook health`) warns when the program is
-older than the newest release. If it is, the interface offers `Programm aktualisieren`: one
+version sources: the program's own version, stamped into the binary, and the newest
+published release on GitHub. `k-playbook version` prints the first, `k-playbook version
+--all` adds the second, and the health check (the briefing, `k-playbook health`) warns when
+the program is older than the newest release. The health check reads the newest release
+from a cache under `~/.cache/k-playbook/` and asks GitHub at most every few hours;
+`k-playbook upgrade` and `version --all` always ask right away. If it is, the interface offers `Programm aktualisieren`: one
 click downloads the release binary of the newest tag directly from GitHub, verifies it
 against the `SHA256SUMS` of that tag, replaces `~/.local/bin/k-playbook`, and the service
 then restarts itself from the new program — the open page follows to the new address.
@@ -295,9 +298,9 @@ that both paths produce bit-identical binaries. The versioned `SHA256SUMS` rests
 exactly that.
 
 A release runs in two steps, so that `VERSION` on `main` never points at a tag without
-downloads. Installed programs and `bin/install` look at the newest tag, though, and the tag
-exists from the first step on: until CI has uploaded the assets, the health check already
-warns and an installation reports that the release is not finished yet.
+downloads. Installed programs and `bin/install` look at the newest published release, and
+CI publishes a release only once all its assets are uploaded: until then they still see the
+previous one.
 
 ```bash
 make release VERSION=v0.2.0          # builds, commits VERSION and SHA256SUMS, pushes the tag

@@ -29,7 +29,7 @@ func installScript(t *testing.T) string {
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("bin/install fehlt: %v", err)
 	}
-	for _, tool := range []string{"bash", "git", "curl"} {
+	for _, tool := range []string{"bash", "curl"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("%s fehlt", tool)
 		}
@@ -129,8 +129,8 @@ func (r *installRun) installed(t *testing.T) string {
 	return string(content)
 }
 
-// releases stellt die Ersatzquelle hin: v0.10.0 ist der höchste Tag der Form
-// vX.Y.Z und trägt das Asset dieser Plattform.
+// releases stellt die Ersatzquelle hin: v0.10.0 ist das neueste Release (der
+// höchste Tag der Form vX.Y.Z) und trägt das Asset dieser Plattform.
 func releases(t *testing.T) *releasetest.Source {
 	t.Helper()
 	source := releasetest.Serve(t)
@@ -154,6 +154,19 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 		if err := os.WriteFile(r.target, []byte("vorher\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		// Die Binaries des alten Wrappers gehen, der Cache des neuesten
+		// Release daneben bleibt.
+		cache := filepath.Join(r.home, ".cache", "k-playbook")
+		wrapperBinary := filepath.Join(cache, "bin", "v0.1.2", "k-playbook-linux-amd64")
+		latest := filepath.Join(cache, release.CacheFileName)
+		for _, path := range []string{wrapperBinary, latest} {
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("alt\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
 
 		code, output := r.run(t, script)
 		if code != 0 {
@@ -161,6 +174,12 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 		}
 		if got := r.installed(t); got != "neu v0.10.0\n" {
 			t.Errorf("am Ziel liegt %q:\n%s", got, output)
+		}
+		if _, err := os.Stat(filepath.Join(cache, "bin")); !os.IsNotExist(err) {
+			t.Errorf("die Binaries des alten Wrappers blieben liegen: %v", err)
+		}
+		if content, err := os.ReadFile(latest); err != nil || string(content) != "alt\n" {
+			t.Errorf("der Cache des neuesten Release wurde gelöscht: %q, %v", content, err)
 		}
 		for _, want := range []string{"Neuestes Release: v0.10.0", "Installiert: " + r.target + " (v0.10.0, sha256 ", "Kephalaion vorhanden: ", "Release-Quelle ersetzt über " + release.EnvSource} {
 			if !strings.Contains(output, want) {
@@ -211,50 +230,61 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 	})
 }
 
-// Ohne git bricht bin/install mit einer klaren Meldung ab, die git als
-// Voraussetzung nennt: Exit-Code ungleich 0, nichts gefragt, nichts ersetzt.
+// Ohne git installiert bin/install: Das neueste Release kommt aus der
+// Weiterleitung von releases/latest, mit curl oder — ohne curl — mit wget.
 func TestBinInstallOhneGit(t *testing.T) {
 	script := installScript(t)
-	source := releases(t)
-	r := newInstallRun(t, true)
-	if err := os.WriteFile(r.target, []byte("vorher\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// Ein PATH ohne git: nur die Werkzeuge, die das Skript sonst braucht.
-	for _, tool := range []string{"bash", "sh", "uname", "awk", "sort", "tail", "head", "od", "tr", "mktemp", "rm", "mv", "chmod", "mkdir", "cat", "curl", "sha256sum"} {
-		found, err := exec.LookPath(tool)
-		if err != nil {
-			t.Skipf("%s fehlt", tool)
-		}
-		if err := os.Symlink(found, filepath.Join(r.bin, tool)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	r.path = filepath.Join(r.home, ".local", "bin") + string(os.PathListSeparator) + r.bin
+	base := []string{"bash", "sh", "uname", "awk", "sed", "sort", "tail", "head", "od", "tr", "mktemp", "rm", "mv", "chmod", "mkdir", "cat", "sha256sum"}
+	for _, fall := range []struct {
+		name  string
+		fetch string
+	}{
+		{"mit curl", "curl"},
+		{"mit wget", "wget"},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			source := releases(t)
+			r := newInstallRun(t, true)
+			if err := os.WriteFile(r.target, []byte("vorher\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			// Ein PATH ohne git und mit genau einem Werkzeug zum Laden.
+			for _, tool := range append(append([]string(nil), base...), fall.fetch) {
+				found, err := exec.LookPath(tool)
+				if err != nil {
+					t.Skipf("%s fehlt", tool)
+				}
+				if err := os.Symlink(found, filepath.Join(r.bin, tool)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			r.path = filepath.Join(r.home, ".local", "bin") + string(os.PathListSeparator) + r.bin
 
-	cmd := exec.Command(filepath.Join(r.bin, "bash"), script)
-	cmd.Dir = r.dir
-	cmd.Env = []string{"HOME=" + r.home, "PATH=" + r.path, release.EnvSource + "=" + os.Getenv(release.EnvSource)}
-	output, err := cmd.CombinedOutput()
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) || exitErr.ExitCode() == 0 {
-		t.Fatalf("ohne git kein Fehlschlag (%v):\n%s", err, output)
-	}
-	for _, want := range []string{"git fehlt im PATH", "Voraussetzung"} {
-		if !strings.Contains(string(output), want) {
-			t.Errorf("%q fehlt in:\n%s", want, output)
-		}
-	}
-	if got := r.installed(t); got != "vorher\n" {
-		t.Errorf("am Ziel liegt %q, die Datei wurde ersetzt", got)
-	}
-	if requests := source.Requests(); len(requests) != 0 {
-		t.Errorf("ohne git wurde die Quelle gefragt: %v", requests)
+			code, output := r.run(t, script)
+			if code != 0 {
+				t.Fatalf("Exit-Code %d:\n%s", code, output)
+			}
+			if got := r.installed(t); got != "neu v0.10.0\n" {
+				t.Errorf("am Ziel liegt %q:\n%s", got, output)
+			}
+			if !strings.Contains(output, "Neuestes Release: v0.10.0") {
+				t.Errorf("Ausgabe:\n%s", output)
+			}
+			if requests := source.Requests(); len(requests) == 0 || requests[0] != "/releases/latest" {
+				t.Errorf("Anfragen: %v", requests)
+			}
+			for _, request := range source.Requests() {
+				if strings.HasPrefix(request, "/releases/tag/") {
+					t.Errorf("der Weiterleitung wurde gefolgt: %v", source.Requests())
+				}
+			}
+		})
 	}
 }
 
 // Scheitert die Installation, endet bin/install ungleich 0 und ersetzt nichts:
-// das Asset fehlt noch (der Tag steht, die CI baut), die Prüfsumme weicht ab,
+// es gibt kein veröffentlichtes Release, das neueste trägt einen Tag mit
+// Zusatz, das Asset fehlt, die Prüfsumme weicht ab,
 // der Eintrag fehlt in SHA256SUMS, die Quelle ist abgeschaltet, das
 // Zielverzeichnis steht nicht im PATH.
 func TestBinInstallScheitertOhneZuErsetzen(t *testing.T) {
@@ -265,6 +295,21 @@ func TestBinInstallScheitertOhneZuErsetzen(t *testing.T) {
 		prepare func(t *testing.T, source *releasetest.Source, r *installRun)
 		want    string
 	}{
+		{
+			name: "kein veröffentlichtes Release",
+			prepare: func(t *testing.T, _ *releasetest.Source, _ *installRun) {
+				// Eine Ersatzquelle ohne Release: /releases/latest antwortet mit 404.
+				releasetest.Serve(t)
+			},
+			want: "kein veröffentlichtes Release",
+		},
+		{
+			name: "neuestes Release mit Zusatz",
+			prepare: func(_ *testing.T, source *releasetest.Source, _ *installRun) {
+				source.SetLatest("v0.11.0-rc.1")
+			},
+			want: "keinen der Form vX.Y.Z",
+		},
 		{
 			name: "Asset fehlt",
 			prepare: func(_ *testing.T, source *releasetest.Source, _ *installRun) {

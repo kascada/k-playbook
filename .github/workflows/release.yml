@@ -3,10 +3,11 @@ name: Release
 # Baut die vier Plattform-Binaries zu einem Tag und hängt sie als Assets an das
 # Release. Der Clone trägt sie nicht mehr; `bin/install` und das Programm
 # selbst (`k-playbook upgrade`, Update-Knopf) laden genau das eine, das zur
-# Plattform der jeweiligen Umgebung passt — aus dem Release des neuesten Tags,
-# geprüft gegen das SHA256SUMS dieses Tags. Der Tag steht, bevor dieser Lauf
-# die Assets hochgeladen hat; bis dahin melden beide, dass das Release noch
-# nicht fertig ist. Dazu kommt
+# Plattform der jeweiligen Umgebung passt — aus dem neuesten veröffentlichten
+# Release (der Weiterleitung von releases/latest), geprüft gegen das SHA256SUMS
+# seines Tags. Deshalb ist ein Release erst sichtbar, wenn alle Assets daran
+# hängen: ein Tag allein und ein Entwurf erscheinen unter releases/latest
+# nicht. Dazu kommt
 # k-playbook-defaults.tar.gz mit dem Inhalt von defaults/ für Kephalaion.
 #
 # Geprüft wird gegen das committete SHA256SUMS: die erwarteten Summen kommen
@@ -123,11 +124,40 @@ jobs:
       # Nur im Erstellungszweig. Der Upload-Zweig ist der Wiederholungslauf zu
       # einem Tag, dessen Release die Notes bereits trägt; ihn dort neu zu
       # schreiben überschriebe eine womöglich von Hand ergänzte Fassung.
+      #
+      # Veröffentlicht ist ein Release erst mit allen Assets — bin/install und
+      # das Programm nehmen das neueste veröffentlichte Release:
+      #
+      #   - Erstellungszweig: `gh release create` mit Dateien legt das Release
+      #     selbst als Entwurf an, lädt hoch und veröffentlicht erst danach;
+      #     scheitert der Upload, löscht es den Entwurf (gh, pkg/cmd/release/
+      #     create, draftWhileUploading).
+      #   - Upload-Zweig: Hier kann ein veröffentlichtes Release ohne alle
+      #     Assets stehen — von Hand angelegt, oder während `--clobber`, das
+      #     ein vorhandenes Asset erst löscht und dann neu hochlädt. Deshalb
+      #     wird es vorher zum Entwurf und erst nach dem Upload wieder
+      #     veröffentlicht. Solange zeigt releases/latest auf das vorige
+      #     Release.
+      #
+      # „Latest“ bekommt das Release nur, wenn sein Tag der höchste der Form
+      # vX.Y.Z ist: Ohne Angabe markierte GitHub jedes neu veröffentlichte
+      # Release so, auch den Wiederholungslauf zu einem älteren Tag.
       - name: Assets veröffentlichen
         run: |
           set -eu
+          highest="$(git ls-remote --tags --refs origin 'v*' |
+            awk '{ sub("^refs/tags/", "", $2); if ($2 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/) print substr($2, 2) }' |
+            sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)"
+          test -n "$highest" || { echo "Die Tags des Repos ließen sich nicht lesen." >&2; exit 1; }
+          if [ "v$highest" = "$TAG" ]; then
+            latest="--latest"
+          else
+            latest="--latest=false"
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft
             gh release upload "$TAG" dist/k-playbook-* --clobber
+            gh release edit "$TAG" --draft=false "$latest"
             exit 0
           fi
           intro="$(cat <<'EOF'
@@ -145,8 +175,8 @@ jobs:
 
           Alle drei tun dasselbe: Sie installieren das Binary des neuesten Releases, geprüft
           gegen die `SHA256SUMS` des Tags, und danach Kephalaion, wenn es fehlt. `VERSION` und
-          `SHA256SUMS` eines Clones lesen sie nicht. Gebraucht werden `git`, `curl` oder `wget`
-          und `sha256sum` oder `shasum`; `~/.local/bin` muss im PATH liegen, sonst bricht die
+          `SHA256SUMS` eines Clones lesen sie nicht. Gebraucht werden `curl` oder `wget` und
+          `sha256sum` oder `shasum`; `~/.local/bin` muss im PATH liegen, sonst bricht die
           Installation ab, bevor sie etwas lädt.
 
           Ein installiertes Programm aktualisiert sich aus dem Release, nicht aus dem Clone:
@@ -169,6 +199,7 @@ jobs:
           EOF
           )"
           gh release create "$TAG" dist/k-playbook-* \
+            "$latest" \
             --title "$TAG" \
             --notes "$intro" \
             --generate-notes

@@ -50,8 +50,8 @@ import (
 // Build über dem neuesten Tag sich herab. Vergleich und Installation laufen,
 // ob es den Clone gibt oder nicht und ob der Pull gelingt oder nicht; ein
 // fehlender Clone und ein gescheiterter Pull werden gemeldet. Ohne eigene
-// Version wird der Tag nicht abgerufen; ist er unbekannt (ohne Netz, ohne git,
-// Zeitüberschreitung), sagt die Meldung das, und das Projekt wird trotzdem
+// Version wird der Tag nicht abgerufen; ist er unbekannt (ohne Netz, ohne
+// veröffentlichtes Release, Zeitüberschreitung), sagt die Meldung das, und das Projekt wird trotzdem
 // nachgezogen.
 //
 // (2) das Projekt — zuerst der Umzug der Anbindung aus der alten
@@ -424,7 +424,7 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 		}
 	}
 
-	status := program.CheckStatus(context.Background(), running)
+	status := program.CheckStatus(context.Background(), running, program.Fresh)
 	report.Status = status
 	lines = append(lines, releaseSourceLines()...)
 	switch {
@@ -508,7 +508,7 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 	}
 
 	running := guiproc.OwnVersion()
-	status := program.CheckStatus(context.Background(), running)
+	status := program.CheckStatus(context.Background(), running, program.Fresh)
 	report.Status = status
 	lines = append(lines, releaseSourceLines()...)
 	switch {
@@ -1012,14 +1012,15 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      Schritte danach laufen trotzdem.
   1. Programm: zuerst git pull --ff-only im Clone k-playbook/, solange es
      ihn gibt — er dient nur noch den Inhalten des Clones. Danach der
-     Vergleich der eigenen Version mit dem neuesten Release-Tag auf GitHub
-     (git ls-remote über HTTPS, anonym) und, nur wenn das laufende Programm
+     Vergleich der eigenen Version mit dem neuesten Release auf GitHub (die
+     Weiterleitung von releases/latest, über HTTPS und anonym, immer frisch
+     gefragt) und, nur wenn das laufende Programm
      älter ist, das Release-Binary dieses Tags: direkt von GitHub geladen,
      gegen die SHA256SUMS des Tags geprüft und nach ~/.local/bin/k-playbook
      gelegt; gleich oder neuer bleibt stehen. Vergleich und Installation
      laufen auch ohne Clone und nach einem gescheiterten Pull; beides wird
-     gemeldet. Ist der neueste Tag unbekannt (ohne Netz, ohne git,
-     Zeitüberschreitung) oder trägt das Programm keine Version, eine Meldung,
+     gemeldet. Ist der neueste Tag unbekannt (ohne Netz, ohne
+     veröffentlichtes Release, Zeitüberschreitung) oder trägt das Programm keine Version, eine Meldung,
      kein Abbruch; scheitert Download oder Install, eine eigene Meldung, und
      Schritt 2 läuft mit dem laufenden Programm. Hat das Binary gewechselt,
      führt das neu installierte Programm Schritt 2 aus. Trägt der Clone die

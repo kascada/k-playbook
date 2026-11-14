@@ -96,7 +96,7 @@ func (state *serverState) applyProgramHandler(w http.ResponseWriter, r *http.Req
 	}
 	defer state.updateMu.Unlock()
 
-	status := checkProgram(r.Context(), state.version)
+	status := checkProgram(r.Context(), state.version, program.Fresh)
 	response := updateResponse{Program: status}
 	switch {
 	case status.Latest == "" && status.LatestError != "":

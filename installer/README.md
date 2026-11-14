@@ -20,7 +20,8 @@ k-playbook stop                     # beendet den Hintergrunddienst dieses Proje
 k-playbook help
 ```
 
-`bin/install` bestimmt den neuesten Release-Tag (`git ls-remote` über HTTPS), lädt das
+`bin/install` bestimmt das neueste veröffentlichte Release (die Weiterleitung von
+`releases/latest`, über HTTPS, ohne `git`), lädt das
 Release-Binary dieser Plattform, prüft es gegen die `SHA256SUMS` des Tags und legt es
 nach `~/.local/bin/k-playbook`; danach installiert es Kephalaion, wenn es fehlt:
 

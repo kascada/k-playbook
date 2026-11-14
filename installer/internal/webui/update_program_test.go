@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/release"
 	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 )
 
@@ -536,5 +538,92 @@ func TestProgrammaktualisierungNurBeiAelteremProgramm(t *testing.T) {
 	code, response := postUpdate(t, &serverState{version: "v0.9.4"}, programHandler, "/api/update/program")
 	if code != http.StatusConflict || !strings.Contains(response.Message, "nicht älter") {
 		t.Errorf("Status %d, Meldung %q", code, response.Message)
+	}
+}
+
+// GET /api/update ist ein Hinweis beim Laden der Seite und nimmt den neuesten
+// Tag aus dem Cache; mit fresh=1 — dem Knopf „Update prüfen“ — und auf
+// POST /api/update fragt der Dienst frisch und schreibt den Cache. Sichtbar an
+// der Ersatzquelle. Kein Programm im PATH: installiert wird nichts.
+func TestUpdatePruefungLiestDenCacheUndFragtAufWunschFrisch(t *testing.T) {
+	isolateHome(t)
+	projectDir, _ := gitProject(t, "v0.9.4")
+	chdir(t, projectDir)
+	source := releasetest.Serve(t)
+	source.AddTag("v0.9.4")
+	state := &serverState{version: "v0.9.4"}
+
+	// Der erste GET findet keinen Eintrag und fragt.
+	if response := getUpdate(t, state); response.Program.Latest != "v0.9.4" || len(source.Requests()) != 1 {
+		t.Fatalf("erster GET: %+v, Anfragen %v", response.Program, source.Requests())
+	}
+
+	source.AddTag("v0.9.5")
+	if response := getUpdate(t, state); response.Program.Latest != "v0.9.4" || response.Program.Outdated || len(source.Requests()) != 1 {
+		t.Errorf("GET mit frischem Eintrag: %+v, Anfragen %v", response.Program, source.Requests())
+	}
+
+	recorder := httptest.NewRecorder()
+	state.updateCheckHandler(recorder, httptest.NewRequest(http.MethodGet, "/api/update?fresh=1", nil))
+	var fresh updateResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &fresh); err != nil || fresh.Program == nil {
+		t.Fatalf("Antwort: %v\n%s", err, recorder.Body.String())
+	}
+	if fresh.Program.Latest != "v0.9.5" || !fresh.Program.Outdated || len(source.Requests()) != 2 {
+		t.Errorf("GET mit fresh=1: %+v, Anfragen %v", fresh.Program, source.Requests())
+	}
+	// Das frische Ergebnis steht im Cache: der nächste GET sieht es ohne Anfrage.
+	if response := getUpdate(t, state); response.Program.Latest != "v0.9.5" || len(source.Requests()) != 2 {
+		t.Errorf("GET nach fresh=1: %+v, Anfragen %v", response.Program, source.Requests())
+	}
+
+	source.AddTag("v0.9.6")
+	_, post := postUpdate(t, state, pullHandler, "/api/update")
+	if post.Program == nil || post.Program.Latest != "v0.9.6" || post.Restarted {
+		t.Errorf("POST /api/update: %+v", post)
+	}
+	if requests := source.Requests(); len(requests) != 3 {
+		t.Errorf("POST /api/update hat nicht frisch gefragt: %v", requests)
+	}
+}
+
+// POST /api/update/program fragt frisch, auch bei frischem Eintrag im Cache,
+// und schreibt das Ergebnis in den Cache. Aus dem Cache wäre das laufende
+// Programm aktuell (409); frisch gefragt ist es älter, und weil ein Command
+// läuft, endet der Aufruf ohne Bestätigung mit der Rückfrage (428) — geladen
+// und installiert wird nichts.
+func TestProgrammaktualisierungFragtTrotzFrischemCache(t *testing.T) {
+	target := isolateHome(t)
+	writeExecutable(t, target, versionScript("v0.9.4"))
+	projectDir := t.TempDir()
+	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
+	chdir(t, projectDir)
+	source := releasetest.Serve(t)
+	source.AddTag("v0.9.4")
+
+	// Ein frischer Eintrag dieser Quelle: v0.9.4.
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.9.4" {
+		t.Fatalf("CachedLatestTag = %q, %v", tag, err)
+	}
+	asked := len(source.Requests())
+	source.AddRelease("v0.9.5", []byte(versionScript("v0.9.5")))
+
+	state := &serverState{version: "v0.9.4"}
+	state.noteCommandRunning("ses_1", "msg_1")
+	code, response := postUpdate(t, state, programHandler, "/api/update/program")
+	if code != http.StatusPreconditionRequired || !response.Busy {
+		t.Fatalf("Status %d, Antwort %+v", code, response)
+	}
+	if response.Program == nil || response.Program.Latest != "v0.9.5" || !response.Program.Outdated {
+		t.Errorf("Program = %+v", response.Program)
+	}
+	if requests := source.Requests(); len(requests) != asked+1 {
+		t.Errorf("POST /api/update/program hat nicht frisch gefragt: %v", requests)
+	}
+	if got := program.ReadVersion(target); got != "v0.9.4" {
+		t.Errorf("am Ziel liegt %q, ohne Bestätigung wurde installiert", got)
+	}
+	if tag, err := release.CachedLatestTag(context.Background()); err != nil || tag != "v0.9.5" || len(source.Requests()) != asked+1 {
+		t.Errorf("der Cache trägt nicht das frische Ergebnis: %q, %v, Anfragen %v", tag, err, source.Requests())
 	}
 }

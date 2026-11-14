@@ -143,12 +143,13 @@ release tag, downloads the release asset of that tag for the current platform,
 verifies it against the `SHA256SUMS` committed at the tag,
 and installs it to `~/.local/bin/k-playbook`. If `kephalaion` is missing from the
 `PATH`, it then installs it as well, through the `install.sh` of the latest
-Kephalaion release. This one bootstrap needs network access and `git`, and `~/.local/bin`
-must be on `PATH`. It also runs without a clone
+Kephalaion release. This one bootstrap needs network access and `curl` or `wget` (no
+`git`), and `~/.local/bin` must be on `PATH`. It also runs without a clone
 (`curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`)
 and does the same from one: `VERSION` and `SHA256SUMS` of the clone are not read.
 Afterwards the program updates itself from the release: the health check warns
-when it is older than the newest release tag, and `k-playbook upgrade` or the
+when it is older than the newest published release (read from a cache under
+`~/.cache/k-playbook/`, at most a few hours old), and `k-playbook upgrade` or the
 update button of the interface install that release. The last command starts the
 interface, which guides three steps: create configuration, register the MCP
 server, and link assistants. Each write happens only after confirmation.

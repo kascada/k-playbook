@@ -57,12 +57,28 @@ type programStatus = program.Status
 // Release-Tag — die gemeinsame Prüfung für GET /api/update, POST /api/update
 // und POST /api/update/program. Nur „älter" meldet; Begründung bei
 // program.CheckStatus. Ohne eigene Version fragt sie nichts ab.
-func checkProgram(ctx context.Context, running string) *programStatus {
-	return program.CheckStatus(ctx, running)
+//
+// lookup sagt, ob der Cache gilt: Die POST-Wege installieren und fragen
+// frisch, GET /api/update ist ein Hinweis beim Laden der Seite und nimmt den
+// Cache — außer mit fresh=1, dem ausdrücklichen Prüfen (Knopf „Update
+// prüfen“).
+func checkProgram(ctx context.Context, running string, lookup program.Lookup) *programStatus {
+	return program.CheckStatus(ctx, running, lookup)
+}
+
+// updateCheckLookup: GET /api/update nimmt den Cache, mit fresh=1 fragt es
+// frisch.
+func updateCheckLookup(r *http.Request) program.Lookup {
+	if r.URL.Query().Get("fresh") == "1" {
+		return program.Fresh
+	}
+	return program.Cached
 }
 
 // updateCheckHandler prüft den Remote-Stand des Clones und das laufende
-// Programm. Rein lesend: heruntergeladen wird hier nie etwas.
+// Programm. Rein lesend: heruntergeladen wird hier nie etwas. Den neuesten
+// Release-Tag nimmt er aus dem Cache, mit fresh=1 fragt er frisch
+// (updateCheckLookup).
 //
 // Beides steht nebeneinander in der Antwort. Trifft beides zu, hat das ältere
 // Programm Vorrang in der Oberfläche: Der Knopf installiert dann das neueste
@@ -73,7 +89,7 @@ func (state *serverState) updateCheckHandler(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusOK, updateResponse{})
 		return
 	}
-	programState := checkProgram(r.Context(), state.version)
+	programState := checkProgram(r.Context(), state.version, updateCheckLookup(r))
 
 	status, err := project.CheckUpdate(environment.ProjectDir)
 	if err != nil {
@@ -167,7 +183,7 @@ func (state *serverState) applyUpdateHandler(w http.ResponseWriter, r *http.Requ
 			response.Remote = shortCommit(update.Remote)
 		}
 	}
-	response.Program = checkProgram(r.Context(), state.version)
+	response.Program = checkProgram(r.Context(), state.version, program.Fresh)
 
 	if !response.Program.Outdated {
 		writeJSON(w, status, response)

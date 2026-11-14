@@ -10,7 +10,10 @@
 //
 // Beides wirkt über die Umgebungsvariable release.EnvSource und erreicht damit
 // auch gebaute Unterprozesse — einen gestarteten Dienst, ein neu installiertes
-// Programm —, für die eine Paketvariable nicht gälte.
+// Programm —, für die eine Paketvariable nicht gälte. Ebenso setzen beide
+// XDG_CACHE_HOME auf ein temporäres Verzeichnis: Kein Test liest oder
+// schreibt den Cache des neuesten Release (release.CacheDir) im echten
+// ~/.cache, auch nicht über eine Ersatzquelle.
 package releasetest
 
 import (
@@ -20,28 +23,56 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/release"
+	"github.com/kascada/k-playbook/installer/internal/version"
 )
 
 // Isolate schaltet die Release-Quelle für diesen Prozess und seine
 // Unterprozesse ab und gibt die Aufräumfunktion zurück. Gedacht für TestMain:
 // Danach endet jede Frage nach dem neuesten Tag mit release.ErrDisabled, ohne
-// git und ohne Netz.
+// Netz.
+//
+// Dazu zeigt XDG_CACHE_HOME auf ein eigenes temporäres Verzeichnis, das die
+// Aufräumfunktion wieder löscht.
 func Isolate() (cleanup func()) {
-	before, had := os.LookupEnv(release.EnvSource)
-	os.Setenv(release.EnvSource, release.SourceOff)
+	restoreSource := setenv(release.EnvSource, release.SourceOff)
+	cache, err := os.MkdirTemp("", "k-playbook-cache-*")
+	if err != nil {
+		panic("releasetest: temporäres Cache-Verzeichnis nicht anlegbar: " + err.Error())
+	}
+	restoreCache := setenv("XDG_CACHE_HOME", cache)
+	return func() {
+		restoreCache()
+		os.RemoveAll(cache)
+		restoreSource()
+	}
+}
+
+// setenv setzt eine Variable und gibt zurück, was den alten Zustand
+// wiederherstellt.
+func setenv(name string, value string) (restore func()) {
+	before, had := os.LookupEnv(name)
+	os.Setenv(name, value)
 	return func() {
 		if had {
-			os.Setenv(release.EnvSource, before)
+			os.Setenv(name, before)
 			return
 		}
-		os.Unsetenv(release.EnvSource)
+		os.Unsetenv(name)
 	}
+}
+
+// Cache setzt XDG_CACHE_HOME für einen Test auf ein temporäres Verzeichnis und
+// nennt das Verzeichnis des Caches darunter (release.CacheDir). Serve ruft es
+// selbst; ein Test ruft es, wenn er den Cache ohne Ersatzquelle braucht.
+func Cache(t *testing.T) string {
+	t.Helper()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	return release.CacheDir()
 }
 
 // Off schaltet die Quelle für einen Test ab — für Tests, die prüfen, dass
@@ -52,17 +83,24 @@ func Off(t *testing.T) {
 	t.Setenv(release.EnvSource, release.SourceOff)
 }
 
-// Source ist eine Ersatzquelle: ein lokaler HTTP-Server, der die Tags so
-// ausliefert, wie git sie über das einfache HTTP-Protokoll liest
-// (<basis>/k-playbook.git/info/refs), dazu SHA256SUMS je Tag, die Assets und —
-// wenn gesetzt — ein Ersatz für das install.sh von Kephalaion.
-// Gefragt wird sie mit dem echten git und dem echten HTTP-Client — ersetzt
-// sind nur die Adressen.
+// Source ist eine Ersatzquelle: ein lokaler HTTP-Server, der das neueste
+// Release so nennt wie GitHub — <basis>/releases/latest leitet auf
+// <basis>/releases/tag/<tag> weiter —, dazu SHA256SUMS je Tag, die Assets und
+// — wenn gesetzt — ein Ersatz für das install.sh von Kephalaion.
+// Gefragt wird sie mit dem echten HTTP-Client und von bin/install mit curl
+// oder wget — ersetzt sind nur die Adressen.
+//
+// Jeder genannte Tag gilt als veröffentlichtes Release. Das neueste ist der
+// höchste der Form vX.Y.Z, wie GitHub Vorabversionen übergeht; SetLatest
+// nennt ein anderes. Ohne einen solchen Tag antwortet /releases/latest mit
+// 404.
 type Source struct {
 	server *httptest.Server
 
-	mu     sync.Mutex
-	tags   []string
+	mu   sync.Mutex
+	tags []string
+	// latest ersetzt das neueste Release, wenn gesetzt.
+	latest string
 	sums   map[string]string            // Tag -> Inhalt von SHA256SUMS
 	assets map[string]map[string][]byte // Tag -> Asset -> Inhalt
 	// kephalaion ist der Ersatz für das install.sh von Kephalaion; nil heißt:
@@ -79,9 +117,11 @@ func Serve(t *testing.T) *Source {
 	source.server = httptest.NewServer(http.HandlerFunc(source.handle))
 	t.Cleanup(source.server.Close)
 	t.Setenv(release.EnvSource, source.server.URL)
-	// git liest die Proxy-Variablen der Umgebung auch für 127.0.0.1; der
-	// HTTP-Client von Go tut das nicht. Ohne die Ausnahme fragte git auf einem
-	// Rechner mit Proxy diesen statt der Ersatzquelle.
+	Cache(t)
+	// curl und wget (bin/install) lesen die Proxy-Variablen der Umgebung auch
+	// für 127.0.0.1; der HTTP-Client von Go tut das nicht. Ohne die Ausnahme
+	// fragte bin/install auf einem Rechner mit Proxy diesen statt der
+	// Ersatzquelle.
 	t.Setenv("NO_PROXY", "127.0.0.1,localhost")
 	t.Setenv("no_proxy", "127.0.0.1,localhost")
 	return source
@@ -90,8 +130,8 @@ func Serve(t *testing.T) *Source {
 // URL ist die Basis-URL der Ersatzquelle, der Wert von release.EnvSource.
 func (s *Source) URL() string { return s.server.URL }
 
-// AddTag nennt einen Tag, ohne Prüfsummen und ohne Assets — das Fenster, in
-// dem der Tag steht und die CI noch baut.
+// AddTag nennt ein veröffentlichtes Release, ohne Prüfsummen und ohne Assets —
+// ein Release, das (noch) nicht fertig bestückt ist.
 func (s *Source) AddTag(tag string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -101,6 +141,36 @@ func (s *Source) AddTag(tag string) {
 		}
 	}
 	s.tags = append(s.tags, tag)
+}
+
+// SetLatest nennt tag als neuestes Release, wie GitHub es über „Latest“
+// markiert — auch einen Tag mit Zusatz. Leer gilt wieder der höchste Tag der
+// Form vX.Y.Z.
+func (s *Source) SetLatest(tag string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.latest = tag
+}
+
+// Latest ist das Release, auf das /releases/latest gerade weiterleitet, leer
+// ohne eines.
+func (s *Source) Latest() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.latestLocked()
+}
+
+func (s *Source) latestLocked() string {
+	if s.latest != "" {
+		return s.latest
+	}
+	latest := ""
+	for _, tag := range s.tags {
+		if release.IsReleaseTag(tag) && (latest == "" || version.Compare(tag, latest) == version.Newer) {
+			latest = tag
+		}
+	}
+	return latest
 }
 
 // AddRelease nennt einen Tag samt dem Asset dieser Plattform und der passenden
@@ -161,16 +231,13 @@ func (s *Source) handle(w http.ResponseWriter, r *http.Request) {
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	switch {
-	case path == "k-playbook.git/info/refs":
-		// Das einfache HTTP-Protokoll: je Zeile „<hash>\t<ref>“. Ohne den
-		// Content-Type des smarten Protokolls liest git die Antwort so.
-		tags := append([]string(nil), s.tags...)
-		sort.Strings(tags)
-		w.Header().Set("Content-Type", "text/plain")
-		for i, tag := range tags {
-			fmt.Fprintf(w, "%040x\trefs/tags/%s\n", i+1, tag)
+	case path == "releases/latest":
+		// Wie GitHub: eine Weiterleitung mit absolutem Ziel.
+		if latest := s.latestLocked(); latest != "" {
+			w.Header().Set("Location", s.server.URL+"/releases/tag/"+latest)
+			w.WriteHeader(http.StatusFound)
+			return
 		}
-		return
 	case path == "kephalaion/install.sh":
 		if s.kephalaion != nil {
 			fmt.Fprint(w, *s.kephalaion)

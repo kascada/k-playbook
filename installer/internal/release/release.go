@@ -4,14 +4,19 @@
 // neuesten Kephalaion-Releases.
 //
 // Es gibt genau zwei Versionsquellen — die eigene Version im Binary
-// (buildinfo.Version) und den neuesten Tag auf GitHub —, und dieses Paket ist
-// die zweite. Gelesen wird über HTTPS und anonym: das Repo ist öffentlich,
-// kein Nutzer braucht einen Schlüssel. Das ist eine bewusste Ausnahme von der
-// Regel, Netzbefehle von git über `k-playbook github run` zu führen.
+// (buildinfo.Version) und das neueste Release auf GitHub —, und dieses Paket
+// ist die zweite. Gelesen wird über HTTPS und anonym: das Repo ist öffentlich,
+// kein Nutzer braucht einen Schlüssel, und die GitHub-API (anonym 60 Anfragen
+// je Stunde) wird nicht gebraucht. Das ist eine bewusste Ausnahme von der
+// Regel, Netzbefehle über `k-playbook github run` zu führen.
 //
-//   - Der Tag kommt aus `git ls-remote --tags --refs <repo> 'v*'`: der höchste
-//     der Form vX.Y.Z, ohne Zusatz. Er steht, sobald er gepusht ist — also
-//     schon, bevor die CI die Assets gebaut hat.
+//   - Der Tag ist der des neuesten veröffentlichten Release: GitHub leitet
+//     <repo>/releases/latest auf <repo>/releases/tag/<tag> weiter, und gelesen
+//     wird nur diese Weiterleitung, ohne ihr zu folgen. Entwürfe und
+//     Vorabversionen zeigt die Adresse nicht, und die CI veröffentlicht ein
+//     Release erst mit allen Assets (.github/workflows/release.yml). Ein Tag
+//     ohne fertiges Release ist damit unsichtbar — anders als früher mit
+//     `git ls-remote`, das den Tag nannte, sobald er gepusht war.
 //   - Die Prüfsummen kommen aus der committeten SHA256SUMS des Tags, über
 //     raw.githubusercontent.com — nicht als Release-Asset: Die erwartete Summe
 //     kommt so über den Git-Stand, das Binary über das Release, und ein
@@ -27,7 +32,6 @@ package release
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -35,13 +39,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/version"
@@ -49,12 +52,15 @@ import (
 
 // Die Orte auf GitHub.
 const (
-	// RepoURL ist das öffentliche Repo, gegen das ls-remote fragt.
-	RepoURL = "https://github.com/kascada/k-playbook.git"
+	// RepoBaseURL ist das öffentliche Repo auf GitHub.
+	RepoBaseURL = "https://github.com/kascada/k-playbook"
+	// LatestReleaseURL leitet auf <RepoBaseURL>/releases/tag/<tag> des
+	// neuesten veröffentlichten Release weiter.
+	LatestReleaseURL = RepoBaseURL + "/releases/latest"
 	// RawBaseURL trägt die committeten Dateien je Tag: <basis>/<tag>/SHA256SUMS.
 	RawBaseURL = "https://raw.githubusercontent.com/kascada/k-playbook"
 	// DownloadBaseURL trägt die Assets je Release: <basis>/<tag>/<asset>.
-	DownloadBaseURL = "https://github.com/kascada/k-playbook/releases/download"
+	DownloadBaseURL = RepoBaseURL + "/releases/download"
 	// InstallScriptURL ist bin/install auf main: die Erstinstallation.
 	InstallScriptURL = "https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install"
 	// KephalaionInstallURL ist das install.sh des neuesten Kephalaion-Releases.
@@ -81,7 +87,8 @@ const assetPrefix = "k-playbook"
 //   - leer: GitHub.
 //   - SourceOff: kein Abruf. LatestTag, Checksums und Install enden mit
 //     ErrDisabled, ohne das Netz zu berühren.
-//   - sonst eine Basis-URL: das Repo liegt unter <basis>/k-playbook.git, die
+//   - sonst eine Basis-URL: das neueste Release unter <basis>/releases/latest
+//     (eine Weiterleitung auf <basis>/releases/tag/<tag>, wie bei GitHub), die
 //     Prüfsummen unter <basis>/raw/<tag>/SHA256SUMS, die Assets unter
 //     <basis>/download/<tag>/<asset>, das install.sh von Kephalaion unter
 //     <basis>/kephalaion/install.sh.
@@ -98,9 +105,10 @@ const SourceOff = "off"
 
 // Fristen. Variablen, damit Tests den Weg über die Frist gehen können.
 var (
-	// TagTimeout begrenzt die Frage nach dem neuesten Tag. Sie läuft in der
-	// Umgebungsprüfung und damit in jedem Briefing; ohne Antwort ist der Tag
-	// unbekannt, und nichts wartet länger.
+	// TagTimeout begrenzt die Frage nach dem neuesten Tag. Sie läuft auch in
+	// der Umgebungsprüfung und damit im Briefing, wenn der Cache keinen
+	// frischen Eintrag hat; ohne Antwort ist der Tag unbekannt, und nichts
+	// wartet länger.
 	TagTimeout = 3 * time.Second
 	// ChecksumTimeout begrenzt das Laden von SHA256SUMS — eine kleine Datei.
 	ChecksumTimeout = 30 * time.Second
@@ -109,13 +117,13 @@ var (
 // ErrDisabled: die Release-Quelle ist über EnvSource abgeschaltet.
 var ErrDisabled = errors.New("die Release-Abfrage ist abgeschaltet (" + EnvSource + "=" + SourceOff + ")")
 
-// ErrNoTag: das Repo nennt keinen Tag der Form vX.Y.Z.
-var ErrNoTag = errors.New("das Repo nennt keinen Release-Tag der Form vX.Y.Z")
-
 // Source sind die Orte, von denen gelesen wird.
 type Source struct {
-	// Repo ist die Adresse für ls-remote.
-	Repo string
+	// Base ist das Repo auf GitHub oder die Basis-URL der Ersatzquelle.
+	Base string
+	// Latest leitet auf <TagPrefix><tag> des neuesten Release weiter.
+	Latest    string
+	TagPrefix string
 	// Raw und Download sind die Basis-URLs für Prüfsummen und Assets.
 	Raw      string
 	Download string
@@ -132,13 +140,22 @@ func CurrentSource() Source {
 	value := strings.TrimSpace(os.Getenv(EnvSource))
 	switch value {
 	case "":
-		return Source{Repo: RepoURL, Raw: RawBaseURL, Download: DownloadBaseURL, KephalaionInstall: KephalaionInstallURL}
+		return Source{
+			Base:              RepoBaseURL,
+			Latest:            LatestReleaseURL,
+			TagPrefix:         RepoBaseURL + "/releases/tag/",
+			Raw:               RawBaseURL,
+			Download:          DownloadBaseURL,
+			KephalaionInstall: KephalaionInstallURL,
+		}
 	case SourceOff:
 		return Source{Off: true, Replaced: true}
 	}
 	base := strings.TrimRight(value, "/")
 	return Source{
-		Repo:              base + "/k-playbook.git",
+		Base:              base,
+		Latest:            base + "/releases/latest",
+		TagPrefix:         base + "/releases/tag/",
 		Raw:               base + "/raw",
 		Download:          base + "/download",
 		KephalaionInstall: base + "/kephalaion/install.sh",
@@ -153,7 +170,7 @@ func (s Source) Note() string {
 	case s.Off:
 		return "Release-Quelle abgeschaltet über " + EnvSource + "=" + SourceOff
 	case s.Replaced:
-		return "Release-Quelle ersetzt über " + EnvSource + ": " + strings.TrimSuffix(s.Repo, "/k-playbook.git")
+		return "Release-Quelle ersetzt über " + EnvSource + ": " + s.Base
 	}
 	return ""
 }
@@ -183,39 +200,9 @@ func IsReleaseTag(tag string) bool {
 	return releaseTag.MatchString(tag) && version.Valid(tag)
 }
 
-// RunGit führt git aus und liefert stdout. Tests ersetzen die Variable, damit
-// sie weder git noch ein Netz brauchen. Der Prozess fragt nie nach Zugangs-
-// daten (GIT_TERMINAL_PROMPT=0) und läuft außerhalb jedes Repos, damit die
-// Einstellungen des Arbeitsverzeichnisses nicht mitreden.
-//
-// Läuft die Frist ab, endet die ganze Prozessgruppe: git startet für HTTPS
-// einen Kindprozess (git-remote-https), der die Ausgabe offen hält. Träfe das
-// Signal nur git selbst, kehrte der Aufruf erst nach WaitDelay zurück — das
-// Briefing wartete dann eine Sekunde länger als die Frist (gemessen in
-// Task 149: 4,5 s statt 3,5 s bei hängender Verbindung).
-var RunGit = func(ctx context.Context, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = os.TempDir()
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
-	// Das Netz für den Fall, dass ein Enkelprozess die Gruppe verlassen hat
-	// und die Pipe weiter offen hält.
-	cmd.WaitDelay = time.Second
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	output, err := cmd.Output()
-	if err != nil {
-		if text := firstLine(stderr.String()); text != "" {
-			return output, fmt.Errorf("%w: %s", err, text)
-		}
-		return output, err
-	}
-	return output, nil
-}
-
-// TagError: der neueste Tag ließ sich nicht bestimmen — ohne Netz, ohne git
-// oder bei Zeitüberschreitung. Der Tag ist dann unbekannt, nicht „keiner“.
+// TagError: der neueste Tag ließ sich nicht bestimmen — ohne Netz, bei
+// Zeitüberschreitung, ohne veröffentlichtes Release oder mit einem Tag, der
+// nicht die Form vX.Y.Z hat. Der Tag ist dann unbekannt, nicht „keiner“.
 type TagError struct {
 	// Reason ist der Grund als Halbsatz, ohne Punkt.
 	Reason string
@@ -225,9 +212,18 @@ type TagError struct {
 func (e *TagError) Error() string { return e.Reason }
 func (e *TagError) Unwrap() error { return e.cause }
 
-// LatestTag fragt das Repo nach seinen Tags und nennt den höchsten der Form
-// vX.Y.Z, verglichen nach version.Compare — nicht lexikalisch, sonst stünde
-// v0.9.4 über v0.10.0.
+// tagClient fragt <repo>/releases/latest und folgt der Weiterleitung nicht:
+// gebraucht wird nur ihr Ziel, die Seite des Release selbst nicht.
+var tagClient = &http.Client{
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+// LatestTag fragt sofort nach dem Tag des neuesten veröffentlichten Release:
+// eine Anfrage an <repo>/releases/latest, deren Weiterleitung auf
+// <repo>/releases/tag/<tag> den Tag nennt. Ein Tag mit Zusatz (v1.2.3-rc1)
+// ist kein Release, auch wenn er als neuestes markiert wäre: dann ist der Tag
+// unbekannt. Das Ergebnis, auch ein Fehlschlag, landet im Cache
+// (CachedLatestTag); bei abgeschalteter Quelle nicht.
 //
 // Ein Fehler heißt: der Tag ist unbekannt. Aufrufer, die nur warnen
 // (Umgebungsprüfung), schweigen dann; `upgrade` meldet den Grund.
@@ -236,48 +232,57 @@ func LatestTag(ctx context.Context) (string, error) {
 	if source.Off {
 		return "", ErrDisabled
 	}
+	return askAndStore(ctx, source)
+}
+
+// askLatest stellt die eine Anfrage und liest die Weiterleitung.
+func askLatest(ctx context.Context, source Source) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, TagTimeout)
 	defer cancel()
 
-	output, err := RunGit(ctx, "ls-remote", "--tags", "--refs", source.Repo, "v*")
+	request, err := http.NewRequestWithContext(ctx, http.MethodHead, source.Latest, nil)
+	if err != nil {
+		return "", &TagError{Reason: "das neueste Release ließ sich nicht erfragen (" + source.Latest + "): " + err.Error(), cause: err}
+	}
+	request.Header.Set("User-Agent", assetPrefix)
+	response, err := tagClient.Do(request)
 	switch {
 	case ctx.Err() == context.DeadlineExceeded:
-		return "", &TagError{Reason: fmt.Sprintf("GitHub hat nach %s nicht geantwortet", TagTimeout), cause: ctx.Err()}
-	case errors.Is(err, exec.ErrNotFound):
-		return "", &TagError{Reason: "git fehlt im PATH; der neueste Release-Tag wird über git ls-remote gelesen", cause: err}
+		return "", &TagError{Reason: fmt.Sprintf("%s hat nach %s nicht geantwortet", sourceName(source), TagTimeout), cause: ctx.Err()}
 	case err != nil:
-		return "", &TagError{Reason: "die Tags ließen sich nicht lesen (git ls-remote " + source.Repo + "): " + err.Error(), cause: err}
+		return "", &TagError{Reason: "das neueste Release ließ sich nicht erfragen (" + source.Latest + "): " + err.Error(), cause: err}
 	}
+	response.Body.Close()
 
-	latest := ""
-	for _, tag := range parseTags(output) {
-		if latest == "" || version.Compare(tag, latest) == version.Newer {
-			latest = tag
-		}
+	switch {
+	case response.StatusCode == http.StatusNotFound:
+		return "", &TagError{Reason: source.Latest + " antwortet mit " + response.Status + " — es gibt kein veröffentlichtes Release"}
+	case response.StatusCode < 300 || response.StatusCode > 399:
+		return "", &TagError{Reason: source.Latest + " antwortet mit " + response.Status + " statt mit einer Weiterleitung auf das neueste Release"}
 	}
-	if latest == "" {
-		return "", ErrNoTag
+	location, err := response.Location()
+	if err != nil {
+		return "", &TagError{Reason: source.Latest + " leitet weiter, nennt aber kein Ziel", cause: err}
 	}
-	return latest, nil
+	target := location.String()
+	escaped, ok := strings.CutPrefix(target, source.TagPrefix)
+	tag, unescapeErr := url.PathUnescape(escaped)
+	if !ok || unescapeErr != nil || tag == "" || strings.ContainsAny(tag, "/?#") {
+		return "", &TagError{Reason: source.Latest + " leitet nicht auf ein Release weiter, sondern auf " + target}
+	}
+	if !IsReleaseTag(tag) {
+		return "", &TagError{Reason: fmt.Sprintf("das neueste Release trägt den Tag %q, keinen der Form vX.Y.Z", tag)}
+	}
+	return tag, nil
 }
 
-// parseTags liest die Ausgabe von ls-remote — je Zeile „<hash>\trefs/tags/<name>“
-// — und behält die Tags der Form vX.Y.Z.
-func parseTags(output []byte) []string {
-	var tags []string
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	for scanner.Scan() {
-		_, ref, ok := strings.Cut(strings.TrimSpace(scanner.Text()), "\t")
-		if !ok {
-			continue
-		}
-		name, ok := strings.CutPrefix(strings.TrimSpace(ref), "refs/tags/")
-		if !ok || !IsReleaseTag(name) {
-			continue
-		}
-		tags = append(tags, name)
+// sourceName nennt die Quelle in einer Meldung: GitHub oder die Basis-URL der
+// Ersatzquelle.
+func sourceName(source Source) string {
+	if source.Replaced {
+		return source.Base
 	}
-	return tags
+	return "GitHub"
 }
 
 // Sums sind die Einträge einer SHA256SUMS: Asset-Name auf sha256 in
@@ -357,9 +362,10 @@ func get(ctx context.Context, url string) (*http.Response, error) {
 	return HTTPClient.Do(request)
 }
 
-// AssetMissingError: das Release trägt das Asset (noch) nicht. Der Tag steht,
-// bevor die CI die Assets gebaut hat; in diesem Fenster ist das Release noch
-// nicht fertig.
+// AssetMissingError: das Release trägt das Asset nicht. Ein veröffentlichtes
+// Release trägt alle Assets — die CI veröffentlicht es erst danach —; fehlt
+// eines doch, ist das Release nicht fertig (etwa von Hand angelegt oder
+// gerade neu bestückt).
 type AssetMissingError struct {
 	Tag   string
 	Asset string
@@ -645,12 +651,4 @@ func foreignPlatformKind(goos string, path string) string {
 		return "macOS"
 	}
 	return ""
-}
-
-func firstLine(text string) string {
-	text = strings.TrimSpace(text)
-	if i := strings.IndexByte(text, '\n'); i >= 0 {
-		text = text[:i]
-	}
-	return strings.TrimSpace(text)
 }
