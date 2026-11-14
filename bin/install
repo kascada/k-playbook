@@ -214,9 +214,12 @@ latest_tag() {
 # bleibt unangetastet, herabgestuft wird nie; aktualisiert wird über
 # `k-playbook upgrade`, das `kephalaion upgrade --auto` aufruft.
 #
-# Nur das Binary. node init, service install und Token gehören nicht hierher:
-# Im DevContainer kommt die config read-only vom Host, und der Node ist der des
-# Hosts.
+# node init, service install und Token ruft dieses Skript nicht auf: Im
+# DevContainer kommt die config read-only vom Host, und der Node ist der des
+# Hosts. Das install.sh von Kephalaion tut aber mehr als das Binary abzulegen:
+# Es ruft danach `kephalaion node mcp add --auto` auf und, wenn ein Editor-CLI
+# im PATH liegt, `kephalaion vscode install --code` — es meldet den Node also
+# bei den Assistenten an und installiert die Erweiterung.
 install_kephalaion() {
   local found work
   if found="$(command -v kephalaion 2>/dev/null)"; then

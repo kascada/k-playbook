@@ -40,9 +40,12 @@ type KephalaionResult struct {
 // Skript, und ein Fehler beim Laden ist von einem Fehler der Installation zu
 // unterscheiden.
 //
-// Nur das Binary. node init, service install und Token gehören nicht hierher:
-// Im DevContainer kommt die config read-only vom Host, und der Node ist der
-// des Hosts.
+// node init, service install und Token ruft diese Funktion nicht auf: Im
+// DevContainer kommt die config read-only vom Host, und der Node ist der des
+// Hosts. Das install.sh von Kephalaion tut aber mehr als das Binary abzulegen:
+// Es ruft danach `kephalaion node mcp add --auto` auf und, wenn ein Editor-CLI
+// im PATH liegt, `kephalaion vscode install --code` — es meldet den Node also
+// bei den Assistenten an und installiert die Erweiterung.
 //
 // Erfolg heißt nicht Exit 0, sondern: danach findet FindBinary kephalaion. Das
 // install.sh von Kephalaion installiert nach ~/.local/bin.

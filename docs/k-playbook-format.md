@@ -64,7 +64,7 @@ locations derive from the project root, the directory that holds
 | completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection; a `k-playbook-local/tasks/` from before is moved by `/k-upgrade` 3.3 and removed by 3.4 once empty |
 | project todos | `todos/` in the project collection; a `k-playbook-local/data/todos.json` from before is taken over by `k-playbook todo migrate` |
 | version sources | `keph:/k-playbook/inventory.md` — in the project collection since task 144, settings in the frontmatter; a `k-playbook-local/version-sources.yaml` is no longer read, `/k-upgrade` 3.6 moves it |
-| private content | no place created by k-playbook any more (task 147); a `k-playbook-local/priv/` from before stays untouched |
+| private content | no place created by k-playbook any more (task 147); `/k-upgrade` 3.4 deletes a `k-playbook-local/priv/` from before once it holds only its README and the managed `.gitignore`, and otherwise names what lies in it |
 
 A key whose value is always the same would only be a source of errors.
 Commands therefore no longer guess or read paths: they derive them.
@@ -142,10 +142,14 @@ the inventory is updated right away through this run, and the profiles are queue
 `k-playbook-local/` itself is being phased out: k-playbook no longer creates the
 directory or anything in it (task 147), and the interface has neither the
 **Project-owned structure** block nor the **Local settings** block with the
-switch for `priv/` any more. What lies there stays untouched; a managed
-`.gitignore` in `priv/` or `material/` stays and keeps working, and whether that
-content is versioned is decided by hand. `/k-upgrade` 3.4 deletes a leftover
-`results/`.
+switch for `priv/` any more. The program leaves what lies there untouched;
+`/k-upgrade` 3.4 deletes `priv/`, `material/` and the other former directories once
+they hold only their README and the managed `.gitignore`, and a leftover `results/`
+even with content. Where more lies in them, the managed `.gitignore` keeps working,
+and whether that content is versioned is decided by hand. As its last conversion,
+`/k-upgrade` 3.7 deletes `k-playbook-local/` itself without asking once only a
+`.gitignore`, a `README.md` and empty subdirectories remain (task 150); otherwise it
+names what is left in one line.
 Details are in [`installation.md`](./installation.md#k-playbook-local-is-no-longer-created).
 
 ## Finding the anchor

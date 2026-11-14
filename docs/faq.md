@@ -36,21 +36,24 @@ Without a destination argument, the name is derived from the repository name and
 
 Because `k-playbook/` is completely replaced with every update. Everything owned by the project must sit beside it, otherwise it would be gone after the next `git pull`.
 
-Therefore, `.k-playbook/K-PLAYBOOK.yaml` and `k-playbook-local/` are in the project root:
+Therefore, `.k-playbook/K-PLAYBOOK.yaml` is in the project root. `k-playbook-local/` beside it
+held project-owned files; it is being phased out and no longer created, and `/k-upgrade`
+deletes it once nothing is left in it but a `.gitignore`, a `README.md` and empty
+subdirectories (3.7, task 150):
 
 ```text
 project/
 ├── .k-playbook/
 │   └── K-PLAYBOOK.yaml    the anchor
 ├── k-playbook/            replaceable
-└── k-playbook-local/      project-owned
+└── k-playbook-local/      being phased out; deleted by /k-upgrade once empty
 ```
 
 Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The tool moves such a file into `.k-playbook/` on its first call; an older program then no longer finds the project, so every environment of the project needs the new program.
 
 ## Where are the paths for tasks, reviews, and results?
 
-Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/` and shipped checks under `k-playbook/checks/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it.
+Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/` and shipped checks under `k-playbook/checks/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it. 3.7 finally deletes `k-playbook-local/` itself once it is empty.
 
 Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 

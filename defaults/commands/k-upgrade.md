@@ -10,9 +10,11 @@ dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Brie
 den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
 nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
 `scripts/k-upgrade-umbau.sh`. Danach die Umstellungen, die eine Beurteilung brauchen und deshalb die Sitzung
-macht, nicht das Programm, zuletzt das Aufräumen der Verzeichnisse, die das Einrichten nicht
-mehr anlegt, und der alten `K-PLAYBOOK.local.yaml`, dann der Umzug der Quellenkonfiguration
-des Versionsinventars aus der alten `version-sources.yaml` nach `keph:/k-playbook/inventory.md`.
+macht, nicht das Programm, gegen Ende das Aufräumen der Verzeichnisse, die das Einrichten
+nicht mehr anlegt, und der alten `K-PLAYBOOK.local.yaml`, dann der Umzug der
+Quellenkonfiguration des Versionsinventars aus der alten `version-sources.yaml` nach
+`keph:/k-playbook/inventory.md` und zuletzt das Löschen von `k-playbook-local/` selbst, wenn
+darin nur noch `.gitignore`, `README.md` und leere Unterverzeichnisse liegen.
 Der Command nimmt kein Argument.
 
 ## Schritt 1 — Briefing
@@ -73,12 +75,14 @@ Anlass vor, steht für Schritt 3 genau eine Zeile: `Umstellungen: alles erledigt
 Für alle Umstellungen gilt:
 
 - Gelöscht, verschoben oder überschrieben wird erst nach Bestätigung. Lege je Umstellung
-  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind zwei Fälle, und
-  nur sie: `cache/`, `inbox/` und `queue/` aus 3.0 a), die 3.0 ohne Inhaltsprüfung löscht, und
-  die Verzeichnisse, die 3.4 löscht — die leeren, dazu `guidelines/` und `results/` auch mit
-  Inhalt. Beide löschen ohne Vorlage und ohne auf eine Antwort zu warten.
+  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind drei Fälle, und
+  nur sie: `cache/`, `inbox/` und `queue/` aus 3.0 a), die 3.0 ohne Inhaltsprüfung löscht, die
+  Verzeichnisse, die 3.4 löscht — die leeren, dazu `guidelines/` und `results/` auch mit
+  Inhalt —, und `k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist. Alle drei löschen
+  ohne Vorlage und ohne auf eine Antwort zu warten.
 - Bist du bei einem Eintrag unsicher, sag das in der Vorlage ausdrücklich, statt still zu
-  entscheiden; in 3.4, das nichts vorlegt, steht es in der Meldung, ohne neue Rückfrage.
+  entscheiden; in 3.4 und 3.7, die nichts vorlegen, steht es in der Meldung, ohne neue
+  Rückfrage.
 - Braucht eine Umstellung die Projekt-Collection und steht `context.kephalaion.ok` nicht auf
   `true`, wird sie übersprungen; sag das und nenne den Grund aus `context.kephalaion.message`.
 - Eine Verweissuche im Projekt geht über alle Dateien, die unter `context.project.dir` auf der
@@ -552,9 +556,10 @@ hat; je geänderte Stelle `pfad:zeile` bzw. der Verweis des Dokuments. Prüfe da
 
 ### 3.4 — Aufräumen
 
-Das Einrichten legt zwölf Verzeichnisse unter `<context.local.dir>/` nicht mehr an und zählt
-sie nicht mehr als fehlend: Der Inhalt der ersten fünf liegt in der Projekt-Collection, der von
-`commands/` und `skills/` in `<context.project.dir>/.k-playbook/commands/` und
+Das Einrichten legt die Verzeichnisse der Liste unten unter `<context.local.dir>/` nicht mehr
+an und zählt sie nicht mehr als fehlend; bis auf `instructions/`, `includes/` und `tmp/` hat es
+sie früher selbst angelegt, `priv/` noch bis Task 147. Der Inhalt der ersten fünf liegt in der
+Projekt-Collection, der von `commands/` und `skills/` in `<context.project.dir>/.k-playbook/commands/` und
 `<context.project.dir>/.k-playbook/skills/`. Projekteigene Instructions, Includes und
 Review-Rezepte liegen in der Projekt-Collection unter `keph:/k-playbook/instructions/`,
 `keph:/k-playbook/includes/` und `keph:/k-playbook/reviews/`, mit demselben Baum wie unter
@@ -572,8 +577,11 @@ sind abgeschaltet, bis sie mit dem Review-Umbau eine neue Ablage bekommen. Dazu 
 das Einrichten nie angelegt hat: Sitzungen legten es zur Zeit der Wissensablage von Hand als
 Schmierzettel an, mit der verwalteten `.gitignore` und einer README, die einen Aufräumer
 versprach, den es nie gab. Nichts liest dort, nichts räumt dort auf; Notizen und Zwischenstände
-gehören nach `priv/` (`k-playbook:/guidelines/betrieb.md`). In einem bestehenden Projekt
-liegen die Verzeichnisse noch, oft nur mit ihrer README.
+gehören nach `priv/` (`k-playbook:/guidelines/betrieb.md`). `priv/` selbst kam bis Task 147
+mit dem Einrichten, mit `README.md` und verwalteter `.gitignore`; das Programm liest dort nichts.
+Solange es liegt, ist `k-playbook-local/` für 3.7 nicht leer; gelöscht wird es aber wie die
+anderen nur, wenn es leer ist. In einem bestehenden Projekt liegen die Verzeichnisse noch, oft
+nur mit ihrer README.
 Diese Umstellung löscht jedes davon, das leer ist, `data/` mit der Ausnahme unten für die
 Übernahmereste der Todos, ohne Rückfrage; jedes andere bleibt liegen und wird nur gemeldet.
 `guidelines/` und `results/` löscht sie immer, auch mit Inhalt.
@@ -594,6 +602,7 @@ Fassung des Commands; das Programm nennt sie nicht:
 - `checks/`
 - `guidelines/`
 - `results/`
+- `priv/`
 - `tmp/`
 
 **Anlass:** Mindestens eines dieser Verzeichnisse liegt unter `<context.local.dir>/`. Braucht
@@ -608,7 +617,8 @@ Aufräumen auf den Binärwechsel wartet: Ein älteres Programm legt die Verzeich
 neue Programm nimmt Einträge aus `.k-playbook/<sorte>/`; mit einem älteren verschwände eine
 umgezogene Datei aus der Verlinkung. Für `instructions/`, `includes/` und `reviews/` ebenso:
 Ein älteres Programm liest sie noch von der Platte und nicht aus der Collection. Dann bleibt
-alles liegen, und du gehst zu Schritt 4.
+alles liegen, und du gehst zu Schritt 4. Liegt `<context.local.dir>/` noch, nennst du dabei
+auch die Wartezeile von 3.7, die aus demselben Grund wartet.
 
 **Leer** heißt: Im Verzeichnis liegt, auch in Unterverzeichnissen, nichts außer
 
@@ -735,6 +745,7 @@ Aufräumen in k-playbook-local/
   checks/      gelöscht: README.md
   guidelines/  gelöscht: README.md, stil.md — projekteigene Guidelines liegen unter keph:/docs/guidelines/
   results/     gelöscht: README.md, .gitignore, log.md, known-decisions.md, 2026-08-19/review-triage.md, code/2026-08-19/review-input.json — was nicht versioniert war, ist nicht aus Git zurückzuholen
+  priv/        gelöscht: README.md, .gitignore
   tmp/         gelöscht: README.md
 ```
 
@@ -916,6 +927,77 @@ der Frage. Bei „nein“ bleibt sie liegen; die Gesundheitsprüfung meldet sie 
 Altbestand, und der nächste Lauf von `/k-upgrade` legt dieselbe Frage wieder vor, ohne etwas
 doppelt zu übernehmen. Committet wird nicht.
 
+### 3.7 — `k-playbook-local/` selbst
+
+Das Einrichten legt `<context.local.dir>` nicht mehr an, und das Programm liest dort nichts
+mehr außer `testdata/`. Was 3.0 bis 3.6 abgeräumt haben, lässt das Verzeichnis oft leer zurück,
+nur mit seiner `.gitignore` und vielleicht einer README. Diese Umstellung löscht es dann ohne
+Rückfrage; sonst meldet sie in einer Zeile, was noch darin liegt. Sie läuft als letzte, damit
+zählt, was die anderen abgeräumt haben, und braucht die Collection nicht.
+
+**Anlass:** `<context.local.dir>` liegt, als Verzeichnis oder als Symlink.
+
+**Vorbedingung** wie in 3.4: Schritt 2 hat das Programm als aktuell gemeldet — in seiner
+Ausgabe steht die Zeile `Programm-Stand: nichts zu tun — …`. Fehlt sie, löschst du nichts und
+meldest in einer Zeile, dass das Löschen von `k-playbook-local/` auf den Binärwechsel wartet:
+Ein älteres Programm legt das Verzeichnis wieder an.
+
+**Symlink.** Ist `<context.local.dir>` selbst ein Symlink, löschst du nichts, weder den Link
+noch sein Ziel, auch wenn das Ziel leer ist. Die Zeile nennt das statt der Pfade.
+
+**Leer** heißt hier: Direkt im Verzeichnis liegen nur die Dateien `.gitignore` (Inhalt egal,
+anders als in 3.4) und `README.md`, beide wahlweise, dazu wahlweise Unterverzeichnisse, in
+denen auch in der Tiefe keine Datei liegt — ein angelegtes, nie gefülltes Verzeichnis kann aus
+Versehen entstanden sein. Alles andere macht es nicht leer: jede weitere Datei, auch eine
+`README.md` oder `.gitignore` in einem Unterverzeichnis, ein Dotfile, ein Symlink. Ein
+vorhandenes `testdata/` mit Dateien oder eine `known-decisions.md` direkt im Verzeichnis zählen
+ebenso als Inhalt: 3.7 meldet sie und löscht sie nicht.
+
+**Bestand.** Erhebe alles, was das Verzeichnis nicht leer macht, rekursiv und mit versteckten
+Dateien; einem Symlink folgst du nicht, er zählt als Inhalt. Diese Suche liefert genau diese
+Pfade, relativ zu `k-playbook-local/` (mit `./` vorn). Den Pfad setzt du in allen Befehlen in
+die doppelten Anführungszeichen ein; enthält er selbst `"`, `$`, `` ` `` oder `\`, steht davor
+ein `\`:
+
+```sh
+test -L "<context.local.dir>" && echo SYMLINK
+(cd "<context.local.dir>" && find . -mindepth 1 ! -type d \
+  ! \( -path ./.gitignore -type f \) ! \( -path ./README.md -type f \))
+```
+
+Leer ist es nur, wenn die Suche mit Exit-Status 0 endet und nichts ausgibt. Endet sie mit einem
+anderen Status — etwa weil `cd` scheitert oder `find` ein Unterverzeichnis nicht lesen kann —,
+gilt es als nicht leer, auch bei leerer Ausgabe: Du löschst nichts und meldest den Fehlschlag.
+
+**Löschen.** Ist es leer, prüfst du unmittelbar davor noch einmal mit denselben Befehlen und
+derselben Regel, Exit-Status 0 und keine Ausgabe — zwischen Erhebung und Löschen kann etwas
+hinzugekommen sein. Ist es noch leer, löschst du das Verzeichnis samt Inhalt im Dateisystem,
+ohne Vorlage und ohne Rückfrage, den Pfad wieder in Anführungszeichen:
+
+```sh
+rm -rf -- "<context.local.dir>"
+```
+
+Ist es das nicht mehr oder schlägt die zweite Suche fehl, gilt „Sonst“. Committet wird nicht:
+Eine versionierte `.gitignore` oder README steht danach als gelöscht in `git status`.
+
+**Sonst** löschst du nichts, legst nichts vor und stellst keine Frage.
+
+**Melden.** 3.7 meldet in Schritt 3 genau eine Zeile:
+
+- `k-playbook-local/ gelöscht`, wenn es gelöscht wurde;
+- `k-playbook-local/ ist noch nicht leer: <pfade>` — die Pfade aus der Suche oben, ohne `./`,
+  höchstens fünf; sind es mehr, dazu ihre Gesamtzahl, etwa
+  `k-playbook-local/ ist noch nicht leer: .env, testdata/a.md, testdata/b.md, priv/notiz.md, x.txt (7 Pfade)`;
+- `k-playbook-local/ ist ein Symlink, nichts gelöscht`;
+- `k-playbook-local/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`, wenn die Suche nicht
+  mit Exit-Status 0 endet — `<fehler>` ist ihre Fehlermeldung, gekürzt auf eine Zeile;
+- `k-playbook-local/ löschen wartet auf den Binärwechsel`, wenn die Vorbedingung fehlt.
+
+Pfade, die 3.4 im selben Lauf schon als `bleibt: …` gemeldet hat, nennt 3.7 noch einmal. Die
+Zeile „noch nicht leer“ erscheint bei jedem Lauf, solange etwas darin liegt, auch wenn es
+bewusst liegen bleibt, etwa eine rechnerlokale `.env`.
+
 ## Schritt 4 — Schluss
 
 Nenne nur die Umstellungen, die etwas getan haben, bei denen etwas liegen geblieben ist oder die
@@ -929,4 +1011,10 @@ Binärwechsel warten. Für 3.5: ob die alte `K-PLAYBOOK.local.yaml` gelöscht is
 liegt, ein genannter Account mit seinem Befehl und dass `.k-playbook/K-PLAYBOOK.yaml` committet
 werden will. Für 3.6: wie viele Einträge nach `keph:/k-playbook/inventory.md` übernommen
 wurden (mit Revision), jeder nicht übernommene Eintrag mit Grund und ob die alte
-`version-sources.yaml` gelöscht ist, liegen bleibt oder auf den Binärwechsel wartet.
+`version-sources.yaml` gelöscht ist, liegen bleibt oder auf den Binärwechsel wartet. Für 3.7
+die Zeile aus Schritt 3: `k-playbook-local/ gelöscht`, `k-playbook-local/ ist noch nicht leer:
+<pfade>` (Pfade, Grenze und Bezug wie dort), dass es ein Symlink ist und nichts gelöscht wurde,
+dass es sich nicht prüfen ließ und nichts gelöscht wurde, oder dass das Löschen auf den
+Binärwechsel wartet. Die Wartezeile steht auch dann, wenn 3.4
+wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist und `<context.local.dir>/`
+noch liegt.

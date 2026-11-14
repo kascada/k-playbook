@@ -33,7 +33,7 @@ project/
 |---|---|---|
 | `.k-playbook/K-PLAYBOOK.yaml` | the project | remains untouched |
 | `k-playbook/` | k-playbook | is fully replaced |
-| `k-playbook-local/` | the project | being phased out: k-playbook no longer creates it and reads neither `k-playbook.md` nor `guidelines/` there (task 148); what happens to leftovers is in [`k-playbook-format.md`](./k-playbook-format.md) |
+| `k-playbook-local/` | the project | being phased out: k-playbook no longer creates it and reads neither `k-playbook.md` nor `guidelines/` there (task 148); `/k-upgrade` clears leftovers and, as its last conversion, deletes the directory itself once only a `.gitignore`, a `README.md` and empty subdirectories remain (3.7, task 150); more on leftovers in [`k-playbook-format.md`](./k-playbook-format.md) |
 
 Because configuration is **beside**, rather than **in**, the installation,
 `k-playbook/` contains nothing project-owned. That is exactly why it can be

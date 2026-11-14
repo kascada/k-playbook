@@ -846,9 +846,11 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"legt zwölf Verzeichnisse unter `<context.local.dir>/` nicht mehr an",
+		"legt die Verzeichnisse der Liste unten unter `<context.local.dir>/` nicht mehr an",
+		"`priv/` noch bis Task 147",
 		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/` - `instructions/` - `includes/` - `reviews/` - `rules/` - `checks/` - `guidelines/` - `results/` - `tmp/`",
+		"- `material/` - `commands/` - `skills/` - `instructions/` - `includes/` - `reviews/` - `rules/` - `checks/` - `guidelines/` - `results/` - `priv/` - `tmp/`",
+		"priv/ gelöscht: README.md, .gitignore",
 		"**Ausnahme für `guidelines/`.** Es wird gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
 		"nennt die Meldung jede gelöschte Datei, ohne die Grenze von fünf Pfaden",
 		"guidelines/ gelöscht: README.md, stil.md",
@@ -888,7 +890,7 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 			t.Errorf("3.4 nennt %q nicht", needle)
 		}
 	}
-	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse", "zehn Verzeichnisse", "elf Verzeichnisse"} {
+	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse", "zehn Verzeichnisse", "elf Verzeichnisse", "zwölf Verzeichnisse"} {
 		if strings.Contains(section, stale) {
 			t.Errorf("3.4 zählt noch %s", stale)
 		}
@@ -911,13 +913,94 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt",
+	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks, priv) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt",
 		"ebenso k-playbook-local/results/, weil Review-Ergebnisse aus dem Code wiederholbar sind",
 		"dazu instructions, includes und reviews, die k-playbook nicht mehr liest",
 		"jede Datei in instructions, includes oder reviews mit ihrem Ziel unter keph:/k-playbook/<sorte>/ in der Projekt-Collection, das der Nutzer beim Umzug ändern kann"} {
 		if !strings.Contains(string(hull), needle) {
 			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
 		}
+	}
+}
+
+// /k-upgrade 3.7 löscht seit Task 150 k-playbook-local/ selbst ohne
+// Rückfrage, wenn darin direkt nur .gitignore (Inhalt egal) und README.md
+// liegen, dazu Unterverzeichnisse ohne jede Datei; sonst eine Zeile mit
+// höchstens fünf Pfaden. Ein Symlink wird nie gelöscht, und wie 3.4 wartet
+// 3.7 auf den Binärwechsel — auch wenn 3.4 deshalb zu Schritt 4 springt.
+// Schritt 3 nimmt 3.7 von der Bestätigung aus, Einleitung und Hülle nennen es
+// als letzten Schritt.
+func TestDefaultsKUpgradeLocalDirLoeschen(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.7 — "), strings.Index(file, "## Schritt 4 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.7 nicht vor Schritt 4 gefunden")
+	}
+	if six := strings.Index(file, "### 3.6 — "); six < 0 || six > start {
+		t.Fatal("3.7 steht nicht nach 3.6")
+	}
+	section := squashSpace(file[start:end])
+	for _, needle := range []string{
+		"**Anlass:** `<context.local.dir>` liegt, als Verzeichnis oder als Symlink.",
+		"`Programm-Stand: nichts zu tun — …`",
+		"Ist `<context.local.dir>` selbst ein Symlink, löschst du nichts, weder den Link noch sein Ziel",
+		"`.gitignore` (Inhalt egal, anders als in 3.4)",
+		"einem Symlink folgst du nicht, er zählt als Inhalt",
+		"find . -mindepth 1 ! -type d",
+		`test -L "<context.local.dir>" && echo SYMLINK`,
+		`(cd "<context.local.dir>" && find .`,
+		`rm -rf -- "<context.local.dir>"`,
+		"Leer ist es nur, wenn die Suche mit Exit-Status 0 endet und nichts ausgibt.",
+		"gilt es als nicht leer, auch bei leerer Ausgabe",
+		"derselben Regel, Exit-Status 0 und keine Ausgabe",
+		"oder schlägt die zweite Suche fehl, gilt „Sonst“",
+		"`k-playbook-local/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`",
+		"unmittelbar davor noch einmal",
+		"ohne Vorlage und ohne Rückfrage",
+		"Committet wird nicht",
+		"`k-playbook-local/ gelöscht`",
+		"`k-playbook-local/ ist noch nicht leer: <pfade>`",
+		"höchstens fünf; sind es mehr, dazu ihre Gesamtzahl",
+		"`k-playbook-local/ löschen wartet auf den Binärwechsel`",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.7 nennt %q nicht", needle)
+		}
+	}
+	// Kein Befehl der Vorlage darf den Platzhalter ungequotet einsetzen: Ein
+	// Projektpfad mit Leerzeichen zerfiele sonst in mehrere Argumente.
+	for _, bare := range []string{"test -L <context.local.dir>", "cd <context.local.dir>", "rm -rf -- <context.local.dir>"} {
+		if strings.Contains(section, bare) {
+			t.Errorf("3.7 setzt den Pfad ungequotet ein: %q", bare)
+		}
+	}
+	general := squashSpace(file[:strings.Index(file, "### 3.0 — ")])
+	for _, needle := range []string{
+		"Ausgenommen sind drei Fälle, und nur sie",
+		"und `k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist. Alle drei löschen ohne Vorlage",
+		"in 3.4 und 3.7, die nichts vorlegen, steht es in der Meldung",
+		"und zuletzt das Löschen von `k-playbook-local/` selbst",
+	} {
+		if !strings.Contains(general, needle) {
+			t.Errorf("Einleitung oder Schritt 3 nennt %q nicht", needle)
+		}
+	}
+	if four := squashSpace(file[end:]); !strings.Contains(four, "Für 3.7 die Zeile aus Schritt 3") || !strings.Contains(four, "wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist") {
+		t.Error("Schritt 4 wiederholt die Zeile von 3.7 nicht samt Sprung aus 3.4")
+	}
+	if four := squashSpace(file[strings.Index(file, "### 3.4 — "):start]); !strings.Contains(four, "nennst du dabei auch die Wartezeile von 3.7") {
+		t.Error("der Sprung aus 3.4 nennt die Wartezeile von 3.7 nicht")
+	}
+	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	description := string(hull)
+	if !strings.Contains(description, "Zuletzt löscht er k-playbook-local/ ohne Rückfrage, wenn darin nur noch .gitignore, README.md und leere Unterverzeichnisse liegen.") {
+		t.Error("die Hülle nennt 3.7 nicht")
+	}
+	if n := strings.Count(strings.ToLower(description), "zuletzt"); n != 1 {
+		t.Errorf("die Hülle nennt %d-mal „zuletzt“, erwartet einmal", n)
 	}
 }
 

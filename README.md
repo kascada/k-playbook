@@ -158,12 +158,17 @@ deletes a leftover directory, naming every file.
 `k-playbook-local/` is being phased out. k-playbook no longer creates the directory or
 anything in it — not when the interface starts, not on a button, not as a side effect of
 a tool; the **Project-owned structure** and **Local settings** blocks of the interface,
-with the button “Anlegen” and the switch for `priv/`, are gone. What still lies there
-stays untouched: a managed `.gitignore` in `priv/` or `material/` keeps working, and
-whether that content is versioned is decided by hand. `results/` is the exception:
-`/k-upgrade` deletes a leftover one without asking, even with content, naming every
-deleted file. Review results can be reproduced from the code; their content was usually
-not versioned and cannot be recovered from Git afterwards. Until the storage of review
+with the button “Anlegen” and the switch for `priv/`, are gone. The program leaves what
+still lies there untouched; `/k-upgrade` clears it. It deletes `priv/` and the other
+former directories once they hold only their README and the managed `.gitignore`; where
+more lies in them, that `.gitignore` keeps working, and whether that content is versioned
+is decided by hand. `results/` is the exception: `/k-upgrade` deletes a leftover one
+without asking, even with content, naming every deleted file. Review results can be
+reproduced from the code; their content was usually not versioned and cannot be recovered
+from Git afterwards. As its last conversion (3.7, task 150) `/k-upgrade` deletes
+`k-playbook-local/` itself without asking once nothing is left in it but a `.gitignore`,
+a `README.md` and empty subdirectories; otherwise it says in one line what still lies
+there. Until the storage of review
 results has moved, the review commands and tools are paused: `/k-review`, `/k-audit` and
 `/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error,
 and the MCP tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry`

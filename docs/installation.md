@@ -113,7 +113,7 @@ What still lies under `k-playbook-local/` in an existing project stays untouched
 program and is cleared by `/k-upgrade`:
 
 - conversion 3.4 deletes each of `docs/`, `tasks/`, `data/`, `material/`, `commands/`,
-  `skills/` and the other former directories that holds nothing but `README.md` files and
+  `skills/`, `priv/` and the other former directories that holds nothing but `README.md` files and
   the managed `.gitignore` (directly under `data/` also the renamed leftovers
   `todos.json.migriert` and `todos.json.nachzuegler-<date>[-<n>]`; a `data/todos.json` not
   yet taken over keeps it), without asking (task 117); anything else keeps the directory
@@ -125,10 +125,16 @@ program and is cleared by `/k-upgrade`:
 - conversion 3.6 moves a `k-playbook-local/version-sources.yaml`, which is no longer read;
 - conversion 3.0 clears what is left of the former knowledge directories on disk (gone
   since task 123) and offers each knowledge file for a move to `keph:/docs/manual/` or for
-  deletion.
+  deletion;
+- conversion 3.7, the last one, deletes `k-playbook-local/` itself without asking (task 150)
+  once nothing is left in it but a `.gitignore` (any content), a `README.md` and empty
+  subdirectories; otherwise it reports in one line what still lies there (at most five
+  paths, then the total) and deletes nothing. A `k-playbook-local` that is itself a symlink
+  is never deleted. Like 3.4 it waits while step 2 does not report the program as current.
 
 `priv/` and `material/` have no switch any more. A managed `.gitignore` already in place
-(`*`, `!.gitignore`, `!README.md`) stays and keeps working; whether such content is
+(`*`, `!.gitignore`, `!README.md`) keeps working as long as more lies in the directory
+(an otherwise empty one is deleted by 3.4); whether such content is
 versioned is decided by hand, with a `.gitignore` in the directory itself and
 `git rm --cached` for files already in the index.
 
@@ -321,7 +327,7 @@ k-playbook
 
 This is not an additional everyday step, but the same call with which a session starts anyway.
 
-`k-playbook/` contains no project-owned content and is therefore completely replaceable, including by `rm -rf` and a new clone. `.k-playbook/K-PLAYBOOK.yaml` and `k-playbook-local/` sit next to it in the main directory and remain untouched.
+`k-playbook/` contains no project-owned content and is therefore completely replaceable, including by `rm -rf` and a new clone. `.k-playbook/K-PLAYBOOK.yaml` and a leftover `k-playbook-local/` sit next to it in the main directory and remain untouched by it; `/k-upgrade` clears and finally deletes `k-playbook-local/` (3.4 and 3.7).
 
 At every interface startup, an existing installation is also set read-only. This is only a local protection layer against accidental writes; the update deliberately and temporarily lifts it.
 
@@ -364,7 +370,7 @@ After an upgrade of Kephalaion, and whenever its node was restarted, the output 
 
 ### A project's own conversion script
 
-`/k-upgrade` runs one script that belongs to the project: if `scripts/k-upgrade-umbau.sh` exists in the project root, the session runs it with `bash scripts/k-upgrade-umbau.sh` from the project root, right after `k-playbook upgrade` and before the conversions 3.0 to 3.4. It runs without asking, also when the binary changed and the command then stops for a restart. Its output is passed on unchanged. If it ends with an exit code other than 0, the session names the code and asks whether the conversions should run anyway. If the file is missing, nothing is said about it.
+`/k-upgrade` runs one script that belongs to the project: if `scripts/k-upgrade-umbau.sh` exists in the project root, the session runs it with `bash scripts/k-upgrade-umbau.sh` from the project root, right after `k-playbook upgrade` and before the conversions 3.0 to 3.7. It runs without asking, also when the binary changed and the command then stops for a restart. Its output is passed on unchanged. If it ends with an exit code other than 0, the session names the code and asks whether the conversions should run anyway. If the file is missing, nothing is said about it.
 
 The script is meant for what the project can clear away as a whole, entire directories for instance, so that the conversions do not have to check each entry one by one. The conversions take stock only after it has run.
 
@@ -699,10 +705,10 @@ Checklist for a project:
 - [ ] `schema_version: 3` is set.
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
 - [ ] `k-playbook/` is its own clone and contains no project-owned content.
-- [ ] `k-playbook-local/` was not created: a project that had none still has none. Where one is left from before, `/k-upgrade` clears it.
+- [ ] `k-playbook-local/` was not created: a project that had none still has none. Where one is left from before, `/k-upgrade` clears it and deletes it once only `.gitignore`, `README.md` and empty subdirectories remain.
 - [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks through `.k-playbook/share/` or to `.k-playbook/commands/` and `.k-playbook/skills/`; the interface reports them as configured.
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
-- [ ] `k-playbook version` prints the version of the installed program; it matches `VERSION` in the clone or is newer.
+- [ ] `k-playbook version` prints the version of the installed program; `k-playbook version --all` names the newest release tag, and the program matches it or is newer.
 - [ ] `k-playbook context` completes and names the expected catalogs.
 - [ ] With VS Code in the environment: `k-playbook vscode status` names the embedded
       version and finds it installed in `~/.vscode-server/extensions`.
@@ -729,6 +735,6 @@ The final item checks all preceding items at once: the command stops if configur
 
 **`cannot execute binary file`.** `~/.local/bin/k-playbook` contains the binary for another platform, typical with a host and DevContainer sharing `$HOME`. Run the bootstrap again in this environment; it detects the case and reports that the other environment also needs to run it again afterwards.
 
-**The header shows an older version than the clone.** The running program is older than `VERSION` in the clone; `k-playbook` says so on startup, and the interface offers `Update program (v0.9.3 -> v0.9.4)`. One click installs through the bootstrap and restarts the service from the new program. If there is a note with two paths instead of a button, `k-playbook` in the `PATH` resolves to a different file than `~/.local/bin/k-playbook`; resolve that first, otherwise the next call would start the old program again. `k-playbook version` prints which version a file carries.
+**The program is older than the newest release.** The running program is older than the newest release tag on GitHub; the health check warns, `k-playbook` says so on startup, and the interface offers `Programm aktualisieren (v0.9.3 → v0.9.4)`. One click installs the release binary of that tag, verified against its `SHA256SUMS`, and restarts the service from the new program; in the terminal, `k-playbook upgrade` does the same. If there is a note with two paths instead of a button, `k-playbook` in the `PATH` resolves to a different file than `~/.local/bin/k-playbook`; resolve that first, otherwise the next call would start the old program again. `k-playbook version` prints which version a file carries.
 
-**The bootstrap finds no asset.** If `VERSION` is missing in the clone, no release belongs to this version. Then `git pull` in `k-playbook/` or build it yourself; see [Build it yourself](#build-it-yourself).
+**The installation finds no asset.** The newest tag already exists, but the release workflow has not finished building its binaries yet, or it failed. Nothing is replaced, and the message says the release is not finished. Wait until the release is complete and run `k-playbook upgrade` again, or build it yourself; see [Build it yourself](#build-it-yourself).
