@@ -1,9 +1,10 @@
 .DEFAULT_GOAL := help
 
-# Das Target `install` ist der Go-freie Bootstrap. Diese Datei liegt im Clone;
-# im Zielprojekt heißt der Aufruf deshalb `make -C k-playbook install` — ein
-# Zielprojekt hat kein eigenes install-Target.
-# `make dev-install` baut nur im Entwicklungsrepo den Arbeitsstand selbst.
+# Das Target `install` ist der Go-freie Bootstrap aus diesem Checkout: Es ruft
+# bin/install, das das Binary des neuesten Releases installiert. Ein
+# Zielprojekt braucht dafür keinen Checkout — dort läuft dasselbe Skript über
+# `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`.
+# `make dev-install` baut den Arbeitsstand dieses Checkouts selbst.
 INSTALLER_BINARY := k-playbook
 # Paketpfad relativ zum installer/-Verzeichnis, in dem go build läuft.
 INSTALLER_PKG := ./cmd/k-playbook
@@ -20,7 +21,7 @@ INSTALLER_SUMS_FILE := SHA256SUMS
 INSTALLER_VERSION_FILE := VERSION
 INSTALLER_BUILD_VERSION = $(or $(VERSION),$(shell tr -d '[:space:]' < $(INSTALLER_VERSION_FILE)))
 # Bewusst mit = statt := : `go env` darf erst laufen, wenn ein Target es
-# wirklich braucht. In einem Zielprojekt ohne Go würde die sofortige Auswertung
+# wirklich braucht. Auf einem Rechner ohne Go würde die sofortige Auswertung
 # sonst schon bei `make help` eine Fehlermeldung ausgeben.
 INSTALLER_HOST_TARGET = $(shell go env GOOS)-$(shell go env GOARCH)
 
@@ -44,21 +45,17 @@ VSCE_VERSION := 4.0.0
 K_PLAYBOOK ?= k-playbook
 GITHUB_SERVICE ?= k-playbook
 
-# Dieses Repo ist zugleich sein eigenes Zielprojekt: die Installation liegt
-# darunter und ist ein eigener Clone. Sie trägt deshalb den zuletzt gepushten
-# Stand, nicht den, an dem gerade gearbeitet wird — und die Oberfläche liest
-# Skripte, Regeln und Reviews immer von dort.
+# Altbestand: Bis Task 156 war die Installation eines Projekts ein Clone dieses
+# Repos unter k-playbook/, auch im Entwicklungsrepo selbst, das zugleich sein
+# eigenes Zielprojekt ist. Das Programm liest einen solchen Clone nicht mehr;
+# der Name dient nur noch dazu, ihn zu erkennen, wenn `make` versehentlich
+# darin läuft (in_dev_installation).
 PLAYBOOK_DIR := k-playbook
-# Im Entwicklungsrepo liegt die Installation stets unter k-playbook/. Die
-# Schreibschutz-Targets dürfen deshalb nie auf . fallen und den Arbeitsstand
-# sperren, samt der Verzeichnisse des privaten Dev-Repos über derselben Wurzel
-# (.k-playbook/, priv/, k-playbook-local/; siehe priv/README.md).
-INSTALLATION_DIR := $(if $(and $(wildcard $(PLAYBOOK_DIR)/.git),$(wildcard installer)),$(PLAYBOOK_DIR),.)
 # Für Fehlermeldungen: das Ziel, das der Aufrufer genannt hat. Ohne Angabe
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
 
-.PHONY: help build dist dist-host defaults-archive install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test installer-readonly installer-writable installer-update
+.PHONY: help build dist dist-host defaults-archive install dev-install gui test vscode-test vscode-vsix release release-publish installer-build installer-run installer-test
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Targets:"
@@ -66,9 +63,9 @@ help: ## Zeigt diese Hilfe an
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "Ohne Go installieren (aus dem Hauptverzeichnis des Projekts):"
-	@echo "  make -C k-playbook install"
-	@echo "  oder ohne make: k-playbook/bin/install"
+	@echo "Ohne Go installieren (einmal je Host oder DevContainer):"
+	@echo "  curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash"
+	@echo "  aus diesem Checkout: make install"
 	@echo ""
 	@echo "Selbst bauen (braucht Go) und starten:"
 	@echo "  make dist        alle Plattformen, für ein Release"
@@ -111,10 +108,11 @@ build: dist ## Alias für dist
 defaults-archive: ## Packt defaults/ wie das Release nach ./dist/k-playbook-defaults.tar.gz
 	@.github/scripts/pack-defaults.sh "$(INSTALLER_DIST_DIR)/$(DEFAULTS_ASSET)"
 
-# Die Verwechslung, gegen die das hier absichert: `make` läuft in der
-# Installation statt im Arbeitsstand. Der Build scheitert dann an der
-# Schreibsperre — mit einer Meldung, die den richtigen Ort nennt statt eines
-# "permission denied".
+# Altbestand. Die Verwechslung, gegen die das hier absichert: `make` läuft in
+# einem liegengebliebenen Clone k-playbook/ unter dem Arbeitsstand statt im
+# Arbeitsstand selbst. Frühere Versionen haben einem solchen Clone den
+# Schreibzugriff entzogen; der Build scheitert dann daran — mit einer Meldung,
+# die den richtigen Ort nennt statt eines "permission denied".
 define in_dev_installation
 test -d "../installer" -a -d "../$(PLAYBOOK_DIR)/.git"
 endef
@@ -134,36 +132,11 @@ define require_writable
 	  else \
 	    printf 'Schreibgeschützt: %s\n' "$(CURDIR)" >&2; \
 	    printf 'Eine Installation wird nicht überschrieben. Zum Bauen freigeben:\n' >&2; \
-	    printf '  make installer-writable\n' >&2; \
+	    printf '  chmod -R u+w .\n' >&2; \
 	  fi; \
 	  exit 1; \
 	}
 endef
-
-installer-writable: ## Macht die lokale Installation temporär beschreibbar
-	@chmod -R u+w "$(INSTALLATION_DIR)"
-
-installer-readonly: ## Sperrt Schreibzugriffe auf die lokale Installation
-	@chmod -R a-w "$(INSTALLATION_DIR)"
-
-# Der Vertrag von INSTALLATION_DIR (nie schreiben) macht reset --hard sicher.
-installer-update: ## Aktualisiert die lokale Installation und sperrt sie danach
-	@set -eu; \
-	  trap 'chmod -R a-w "$(INSTALLATION_DIR)"' EXIT; \
-	  chmod -R u+w "$(INSTALLATION_DIR)"; \
-	  before="$$(git -C "$(INSTALLATION_DIR)" rev-parse HEAD)"; \
-	  git -C "$(INSTALLATION_DIR)" fetch --quiet origin; \
-	  git -C "$(INSTALLATION_DIR)" reset --hard --quiet origin/main; \
-	  git -C "$(INSTALLATION_DIR)" clean -qfd; \
-	  after="$$(git -C "$(INSTALLATION_DIR)" rev-parse HEAD)"; \
-	  if [ "$$before" = "$$after" ]; then \
-	    echo "Installation bereits aktuell ($$after)"; \
-	  else \
-	    echo "Installation aktualisiert: $$before -> $$after"; \
-	    echo "Dieser Weg aktualisiert nur den Clone. Was im Hauptverzeichnis liegt"; \
-	    echo "— MCP-Registrierung, Anstoßblock —, zieht der nächste Aufruf nach:"; \
-	    echo "  k-playbook"; \
-	  fi
 
 install: ## Installiert das passende Release-Binary ohne Go
 	"./bin/install"
@@ -184,7 +157,6 @@ gui: dev-install ## Baut, installiert und startet die GUI
 
 test: ## Führt die Tests aus
 	cd installer && go test ./...
-	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s checks/tests
 	@if command -v node >/dev/null 2>&1; then \
 	  $(MAKE) --no-print-directory vscode-test; \
 	else \

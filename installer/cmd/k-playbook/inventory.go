@@ -33,9 +33,8 @@ import (
 // kephalaion_unavailable und dem Grund aus der Anbindung ab, bevor eine Quelle
 // gelesen wird; einen Rückfall auf die Platte gibt es nicht.
 //
-// Die Installation unter playbook.dir wird nicht gebraucht: das Inventar liest
-// die deklarativen Quellen des Projekts, keinen Katalog. Geprüft wird deshalb
-// nur der Anker, wie bei merge.
+// Das Inventar liest die deklarativen Quellen des Projekts, keinen Katalog.
+// Geprüft wird deshalb nur der Anker, wie bei merge.
 func runInventory(args []string) error {
 	if len(args) > 0 {
 		return fmt.Errorf("erwartet keine Argumente: k-playbook inventory")

@@ -75,3 +75,16 @@ func firstLine(text string) string {
 	}
 	return ""
 }
+
+// GitOutput führt ein Git-Kommando in dir aus und liefert die getrimmte
+// Ausgabe.
+func GitOutput(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}

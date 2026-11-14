@@ -26,7 +26,6 @@ type contextDisplay struct {
 	ProjectDir string `json:"projectDir"`
 	RepoRoot   string `json:"repoRoot"`
 	Config     string `json:"config"`
-	Playbook   string `json:"playbook"`
 	Local      string `json:"local"`
 }
 
@@ -58,7 +57,6 @@ func contextHandler(w http.ResponseWriter, r *http.Request) {
 			ProjectDir: project.DisplayPath(built.Project.Dir),
 			RepoRoot:   project.DisplayPath(built.Project.RepoRoot),
 			Config:     project.DisplayPath(built.Project.Config),
-			Playbook:   project.DisplayPath(built.Playbook.Dir),
 			Local:      project.DisplayPath(built.Local.Dir),
 		},
 	})

@@ -46,7 +46,7 @@ type Child struct {
 
 // HostCareEnv ist die zweite Marke neben ServeEnv: der Server pflegt vor dem
 // Start den Wirt wie ein argumentloser Aufruf — MCP-Registrierung,
-// Schreibschutz, Aufräumen von Altlasten —, öffnet aber keinen Browser.
+// Aufräumen von Altlasten —, öffnet aber keinen Browser.
 //
 // Gesetzt wird sie beim Neustart nach einer Programmaktualisierung. Dort gibt
 // es keinen argumentlosen Aufruf, der die Pflege sonst übernähme, und das neue

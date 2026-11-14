@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// newContextProject baut ein Projekt mit Installation und lokalem Verzeichnis.
+// newContextProject baut ein Projekt mit mitgelieferter Ebene (test-defaults/)
+// und lokalem Verzeichnis.
 func newContextProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
 	for _, dir := range []string{
-		filepath.Join(PlaybookDir(root), "defaults", "reviews"),
-		filepath.Join(PlaybookDir(root), "checks"),
+		filepath.Join(root, testDefaultsDir, "reviews"),
 		filepath.Join(LocalDir(root), "reviews"),
 		filepath.Join(LocalDir(root), "guidelines"),
 	} {
@@ -51,8 +51,8 @@ func entryByName(entries []CatalogEntry, name string) (CatalogEntry, bool) {
 func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-code.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-tech.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-code.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-tech.md"), "# mitgeliefert\n")
 	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-code.md"), "# eigene Fassung\n\nText.\n")
 	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-eigen.md"), "# nur lokal\n\nText.\n")
 	// Der frühere Ort k-playbook-local/reviews/ wird nicht mehr gelesen
@@ -118,7 +118,7 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-code.md"), "# mitgeliefert\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-code.md"), "# mitgeliefert\n")
 	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-code.md"), "")
 
 	context, err := BuildContext(root)
@@ -141,58 +141,28 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	}
 }
 
-// checks hat keine lokale Ebene mehr (Task 134): Ein liegengebliebenes
-// k-playbook-local/checks/ ersetzt nichts, schaltet nichts ab und fügt nichts
-// hinzu; jeder Eintrag ist dist.
-func TestBuildContextChecksOhneLokaleEbene(t *testing.T) {
+// Den Katalog checks gibt es nicht mehr (Task 155): Liegengebliebene
+// Verzeichnisse k-playbook/checks/ und k-playbook-local/checks/ ergeben
+// keinen Katalog, weder in der Kontextausgabe noch im JSON.
+func TestBuildContextOhneKatalogChecks(t *testing.T) {
 	root := newContextProject(t)
 
 	write(t, filepath.Join(PlaybookDir(root), "checks", "check_secrets.sh"), "#!/bin/sh\necho x\n")
-	write(t, filepath.Join(PlaybookDir(root), "checks", "check_links.sh"), "#!/bin/sh\necho y\n")
-	write(t, filepath.Join(LocalDir(root), "checks", "check_secrets.sh"), "# Abgeschaltet: nicht nötig.\n")
-	write(t, filepath.Join(LocalDir(root), "checks", "check_links.sh"), "#!/bin/sh\necho lokal\n")
 	write(t, filepath.Join(LocalDir(root), "checks", "check_eigen.sh"), "#!/bin/sh\necho eigen\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
-
-	checks := context.Catalogs["checks"]
-	if len(checks) != 2 {
-		t.Fatalf("%d Checks, erwartet 2: %+v", len(checks), checks)
+	if _, ok := context.Catalogs["checks"]; ok {
+		t.Errorf("Katalog der entfallenen Sorte checks: %+v", context.Catalogs["checks"])
 	}
-	for _, entry := range checks {
-		if entry.Origin != "dist" || entry.Disabled {
-			t.Errorf("%s: Origin = %q, Disabled = %v, erwartet dist und nicht abgeschaltet", entry.Name, entry.Origin, entry.Disabled)
-		}
-		if want := filepath.Join(PlaybookDir(root), "checks", entry.Name); entry.Path != want {
-			t.Errorf("%s: Path = %q, erwartet %q", entry.Name, entry.Path, want)
-		}
-	}
-	if _, ok := entryByName(checks, "check_eigen.sh"); ok {
-		t.Error("check_eigen.sh aus k-playbook-local/checks/ steht im Katalog")
-	}
-}
-
-// README und Unterverzeichnisse sind nie Einträge.
-func TestBuildContextUeberspringtNichtEintraege(t *testing.T) {
-	root := newContextProject(t)
-
-	write(t, filepath.Join(PlaybookDir(root), "checks", "README.md"), "# Doku\n")
-	write(t, filepath.Join(PlaybookDir(root), "checks", "check_echt.sh"), "#!/bin/sh\n")
-	write(t, filepath.Join(PlaybookDir(root), "checks", ".versteckt.sh"), "#!/bin/sh\n")
-	if err := os.MkdirAll(filepath.Join(PlaybookDir(root), "checks", "lib"), 0o755); err != nil {
-		t.Fatalf("lib anlegen: %v", err)
-	}
-	write(t, filepath.Join(PlaybookDir(root), "checks", "lib", "common.py"), "# Hilfscode\n")
-
-	context, err := BuildContext(root)
+	raw, err := json.Marshal(context)
 	if err != nil {
-		t.Fatalf("BuildContext: %v", err)
+		t.Fatalf("json: %v", err)
 	}
-	if len(context.Catalogs["checks"]) != 1 {
-		t.Errorf("Katalog = %+v, erwartet nur check_echt.sh", context.Catalogs["checks"])
+	if strings.Contains(string(raw), `"checks"`) {
+		t.Errorf("Kontext-JSON nennt checks: %s", raw)
 	}
 }
 
@@ -200,8 +170,8 @@ func TestBuildContextUeberspringtNichtEintraege(t *testing.T) {
 func TestBuildContextBildetKeys(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-secret-scanning.md"), "# Rezept\n")
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "nicht-passend.md"), "# kein Review\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-secret-scanning.md"), "# Rezept\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "nicht-passend.md"), "# kein Review\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -223,8 +193,8 @@ func TestBuildContextBildetKeys(t *testing.T) {
 func TestBuildContextZeigtReviewModi(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-default.md"), "---\ntitle: Default\n---\n# Default\n")
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-audit-only.md\n  scope:\n    tools: [gitleaks, trufflehog]\nreview:\n  enabled: false\n---\n# Audit\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-default.md"), "---\ntitle: Default\n---\n# Default\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-audit-only.md"), "---\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-audit-only.md\n  scope:\n    tools: [gitleaks, trufflehog]\nreview:\n  enabled: false\n---\n# Audit\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -266,7 +236,7 @@ func TestBuildContextZeigtReviewModi(t *testing.T) {
 func TestBuildContextLiestAuditScopeToolsAlsYAMLListe(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-scope.md"), "---\naudit:\n  enabled: true\n  scope:\n    tools:\n      - pip-audit\n      - trivy\nreview:\n  enabled: true\n---\n# Scope\n")
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-scope.md"), "---\naudit:\n  enabled: true\n  scope:\n    tools:\n      - pip-audit\n      - trivy\nreview:\n  enabled: true\n---\n# Scope\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -296,7 +266,7 @@ func TestBuildContextLiestAuditScopeToolsAlsYAMLListe(t *testing.T) {
 func TestBuildContextLiestEvidenceVertragAlsBlocklisten(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-evidence.md"),
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-evidence.md"),
 		"---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds:\n    - tech-veraltet\n    - tech-kopplung\n  scope:\n    paths:\n      - installer/**\n      - commands/**\nreview:\n  enabled: true\n---\n# Evidence\n")
 
 	context, err := BuildContext(root)
@@ -328,7 +298,7 @@ func TestBuildContextLiestEvidenceVertragAlsBlocklisten(t *testing.T) {
 func TestBuildContextLiestEvidenceVertragAlsInlineListen(t *testing.T) {
 	root := newContextProject(t)
 
-	write(t, filepath.Join(PlaybookDir(root), "defaults", "reviews", "review-evidence-inline.md"),
+	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-evidence-inline.md"),
 		"---\naudit:\n  enabled: true\n  mode: evidence\n  ruleIds: [tech-veraltet, tech-kopplung]\n  scope:\n    paths: [\"installer/**\"]\nreview:\n  enabled: false\n---\n# Evidence\n")
 
 	context, err := BuildContext(root)
@@ -359,9 +329,6 @@ func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 		t.Fatalf("BuildContext: %v", err)
 	}
 
-	if context.Playbook.Dir != PlaybookDir(root) {
-		t.Errorf("Playbook.Dir = %q", context.Playbook.Dir)
-	}
 	if context.Local.Dir != LocalDir(root) {
 		t.Errorf("Local.Dir = %q", context.Local.Dir)
 	}
@@ -401,8 +368,8 @@ func TestBuildContextNenntKeineGuidelines(t *testing.T) {
 }
 
 // Das Feld instructions gibt es nicht mehr (Task 148): Eine k-playbook.md in
-// der Installation oder in k-playbook-local/ nennt die Kontextausgabe nicht,
-// auch wenn die Datei daliegt.
+// einem liegengebliebenen Clone k-playbook/ oder in k-playbook-local/ nennt
+// die Kontextausgabe nicht, auch wenn die Datei daliegt.
 func TestBuildContextNenntKeineInstructions(t *testing.T) {
 	root := newContextProject(t)
 	write(t, filepath.Join(PlaybookDir(root), "k-playbook.md"), "# mitgeliefert\n")
@@ -425,6 +392,44 @@ func TestBuildContextNenntKeineInstructions(t *testing.T) {
 	}
 	if strings.Contains(string(data), "k-playbook.md") {
 		t.Errorf("die Kontextausgabe nennt k-playbook.md:\n%s", data)
+	}
+}
+
+// Das Feld playbook gibt es nicht mehr (Task 157): Die Kontextausgabe nennt
+// keinen Ort einer Installation im Projekt, auch wenn ein liegengebliebener
+// Clone k-playbook/ daliegt. Die Wurzeln sind project.dir und local.dir.
+func TestBuildContextNenntKeinPlaybook(t *testing.T) {
+	root := newContextProject(t)
+	write(t, filepath.Join(PlaybookDir(root), "VERSION"), "v0.0.0\n")
+	if err := os.MkdirAll(filepath.Join(PlaybookDir(root), ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	context, err := BuildContext(root)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	data, err := json.Marshal(context)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if _, ok := fields["playbook"]; ok {
+		t.Errorf("die Kontextausgabe trägt playbook: %s", fields["playbook"])
+	}
+	for _, kept := range []string{"project", "local"} {
+		if _, ok := fields[kept]; !ok {
+			t.Errorf("die Kontextausgabe trägt %s nicht:\n%s", kept, data)
+		}
+	}
+	// Der Pfad des Clones steht nirgends, auch nicht unter anderem Namen;
+	// k-playbook-local/ beginnt gleich und ist deshalb mit Anführungszeichen
+	// abgegrenzt.
+	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(data), string(quoted)) {
+		t.Errorf("die Kontextausgabe nennt %s:\n%s", PlaybookDir(root), data)
 	}
 }
 

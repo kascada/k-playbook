@@ -65,9 +65,9 @@ func applyMCPHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mcpState(message))
 }
 
-// mcpState liest den aktuellen Zustand. Den Clone k-playbook/ verlangt er
-// nicht: Der Server liefert seine Inhalte vom Hub und aus SharedDir()
-// (Task 154).
+// mcpState liest den aktuellen Zustand. Der Server liefert seine Inhalte vom
+// Hub und aus SharedDir(); den früheren Clone k-playbook/ verlangt er seit
+// Task 154 nicht mehr.
 func mcpState(message string) mcpResponse {
 	environment := project.Detect()
 

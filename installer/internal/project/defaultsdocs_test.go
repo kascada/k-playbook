@@ -334,11 +334,9 @@ func TestBriefingOhneMitgelieferteEbeneScheitert(t *testing.T) {
 // Die Kontextausgabe scheitert ohne mitgelieferte Ebene nicht — sie trägt
 // unter kephalaion, warum —, führt aber reviews leer, statt die
 // lokale Ebene allein zu zeigen, und nennt den Grund in catalogsProblem.
-// checks liegt weiter in der Installation und bleibt.
 func TestBuildContextOhneMitgelieferteEbene(t *testing.T) {
 	root := newContextProject(t)
 	write(t, filepath.Join(LocalDir(root), "reviews", "review-eigen.md"), "# Eigene\n\nText.\n")
-	write(t, filepath.Join(PlaybookDir(root), "checks", "check_a.sh"), "#!/bin/sh\n")
 	stubDefaultsStore(t, func(string) (DefaultsStore, string, error) {
 		return nil, "vm:k-playbook", docRefErrorf(DocCodeKephalaionUnavailable, "nicht bereit")
 	})
@@ -353,7 +351,7 @@ func TestBuildContextOhneMitgelieferteEbene(t *testing.T) {
 	if !strings.Contains(built.CatalogsProblem, "nicht bereit") {
 		t.Errorf("catalogsProblem: %q", built.CatalogsProblem)
 	}
-	if len(built.Catalogs["checks"]) != 1 {
-		t.Errorf("checks: %+v", built.Catalogs["checks"])
+	if _, ok := built.Catalogs["checks"]; ok {
+		t.Errorf("Katalog checks: %+v", built.Catalogs["checks"])
 	}
 }

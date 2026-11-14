@@ -1,6 +1,6 @@
 # k-playbook
 
-`k-playbook` is a toolbox of slash commands, skills, review recipes and checks. It is cloned into a subdirectory of the target project, `<project>/k-playbook/`. The project's own artifacts live next to it. A project is self-contained that way.
+`k-playbook` is a toolbox of slash commands, skills and review recipes. It is installed as one binary per machine; a project carries only its anchor, `.k-playbook/K-PLAYBOOK.yaml`, and what it owns itself. Everything shipped comes with the binary.
 
 ## Why k-playbook
 
@@ -42,33 +42,20 @@
 
 ## Installation
 
-k-playbook is cloned into the project it accompanies. There is no central installation
-and no fixed host path; every project carries its own.
-
-```bash
-cd /path/to/project
-git clone https://github.com/kascada/k-playbook.git
-make -C k-playbook install
-k-playbook
-```
-
-Without `make`, the same bootstrap runs directly:
-
-```bash
-k-playbook/bin/install
-```
-
-The program itself does not depend on the clone. `bin/install` is self-contained and also
-installs the binary on a machine without a clone:
+The installation is the binary alone: one `k-playbook` per machine, once on the host and
+once in every devcontainer. Nothing of the tool is copied into the project.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
+cd /path/to/project
+k-playbook
 ```
 
-The target directory must be named `k-playbook`, because commands and skills address it
-that way. Without a target argument the name follows from the repository name; do not
-pass a different one. Only when cloning from a fork or mirror under a diverging name,
-append `k-playbook` as the second argument.
+Without `curl`, the same bootstrap runs with `wget`:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
+```
 
 **Go is not required.** `bin/install` downloads the release binary matching the platform
 and installs it to `~/.local/bin/k-playbook`. On the host and inside a devcontainer it
@@ -78,8 +65,7 @@ runs in its own environment and therefore installs the matching binary in each.
 repository but attached as assets to the releases. `bin/install` determines the newest
 published release (the redirect of `releases/latest` on GitHub, over HTTPS, anonymously,
 with `curl` or `wget`), downloads the asset of its tag and verifies it against the
-`SHA256SUMS` committed at the tag. Called from a clone it does exactly the same:
-it reads neither `VERSION` nor `SHA256SUMS` beside it and installs the newest release.
+`SHA256SUMS` committed at the tag.
 
 **Kephalaion comes along.** If no `kephalaion` is on the `PATH`, `bin/install` then
 installs it through the `install.sh` of the latest
@@ -90,16 +76,15 @@ alone by `bin/install`; `k-playbook upgrade` updates it (see below). If this ste
 because k-playbook itself is installed, and names the command to catch up.
 
 The last call opens the web interface in the browser. On first run it finds no
-`K-PLAYBOOK.yaml` yet and proposes where to create it: the directory above the clone. It
-also proposes where the project repository lives — either the main directory itself or a
-subdirectory next to it, for instance when the code is checked out alongside the
-playbook. Nothing is written before you confirm:
+`K-PLAYBOOK.yaml` yet and proposes where to create it: the root of the Git repository the
+call was made in, otherwise the working directory. It also proposes where the project
+repository lives — either the main directory itself or a subdirectory of it, for instance
+when the code is checked out one level below. Nothing is written before you confirm:
 
 ```text
 project/
-├── .k-playbook/
-│   └── K-PLAYBOOK.yaml the anchor; the directory holding .k-playbook/ is the main directory
-└── k-playbook/         the installation
+└── .k-playbook/
+    └── K-PLAYBOOK.yaml the anchor; the directory holding .k-playbook/ is the main directory
 ```
 
 The same interface then registers the MCP server and sets up the linking for the
@@ -128,13 +113,17 @@ project/
 │   │               │        unpacked by the binary once per machine; not versioned
 │   ├── commands/ ←─┤     project-owned commands, committed (only when used)
 │   └── skills/   ←─┘     project-owned skills, committed (only when used)
-├── k-playbook/           the installation, fully replaceable
-│   ├── reviews/ checks/
-│   ├── bin/
-│   └── installer/ docs/
 └── k-playbook-local/     being phased out: never created any more; what is left
                           there is only read to move, report or list it
 ```
+
+What k-playbook ships is not in the project. Commands, skills and scripts are unpacked by
+the binary to `~/.local/share/k-playbook/`, once per machine; the shipped texts —
+instructions, review recipes, guidelines, the texts of the commands and the handbook — lie
+in the public collection `k-playbook` on the project's Kephalaion hub and are read as
+`k-playbook:/…` references. In the former model a project carried a clone of this
+repository under `k-playbook/` instead; a clone that is still there is no longer read, and
+`/k-upgrade` deletes it.
 
 Tasks, todos, the project documentation and the source configuration of the version
 inventory (`keph:/k-playbook/inventory.md`) live in the project's Kephalaion collection.
@@ -144,7 +133,7 @@ Kephalaion itself (`kephalaion node client`). Setup no longer creates `docs/`, `
 them from an existing project once they hold nothing but their README. The former
 rule directory is gone as well (task 135); `/k-upgrade` removes it once empty or warns
 that what is left there is no longer read. The same goes for the former directory of
-project-owned checks (task 134): `k-check` runs only the shipped checks, and
+project-owned checks (task 134); checks no longer exist at all (task 155), and
 `/k-upgrade` removes the directory once empty or notes that what is left there no longer
 runs. Project-owned
 commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/` since task
@@ -166,10 +155,12 @@ more lies in them, that `.gitignore` keeps working, and whether that content is 
 is decided by hand. `results/` is the exception: `/k-upgrade` deletes a leftover one
 without asking, even with content, naming every deleted file. Review results can be
 reproduced from the code; their content was usually not versioned and cannot be recovered
-from Git afterwards. As its last conversion (3.7, task 150) `/k-upgrade` deletes
+from Git afterwards. In conversion 3.7 (task 150) `/k-upgrade` deletes
 `k-playbook-local/` itself without asking once nothing is left in it but a `.gitignore`,
 a `README.md` and empty subdirectories; otherwise it says in one line what still lies
-there. Until the storage of review
+there. As its last conversion (3.8, task 156) it deletes a leftover clone `k-playbook/` and
+then removes the `.gitignore` lines that kept `k-playbook/` and `k-playbook-local/` out of
+Git, each only once its directory is gone. Until the storage of review
 results has moved, the review commands and tools are paused: `/k-review`, `/k-audit` and
 `/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error,
 and the MCP tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry`
@@ -178,7 +169,7 @@ answer `reviews_paused` and write nothing.
 A project-owned entry of the same name fully replaces the shipped one; an empty one
 disables it. This holds for review recipes, instructions and includes in the project
 collection under `keph:/k-playbook/`, and in the same way for `commands/` and `skills/`
-in `.k-playbook/`. Checks have no project-owned layer: only the shipped ones run.
+in `.k-playbook/`.
 
 That is why `.claude/commands/` and the other two targets are **real directories with
 individual symlinks**, not directory symlinks: only that way do both sources arrive. The
@@ -212,18 +203,7 @@ untouched. As long as it stands, Claude Code sees nothing of the playbook.
 
 ## Updating
 
-After startup the interface checks whether the installation lags behind the remote and
-pulls on a single click. For the pull, `k-playbook/` is made writable and set back to
-read-only afterwards. By hand it works the same way:
-
-```bash
-cd /path/to/project
-make -C k-playbook installer-update
-```
-
-`k-playbook/` contains nothing project-owned and is fully replaceable because of that.
-
-**The program updates itself from the release, not from the clone.** There are exactly two
+**The program updates itself from the release.** There are exactly two
 version sources: the program's own version, stamped into the binary, and the newest
 published release on GitHub. `k-playbook version` prints the first, `k-playbook version
 --all` adds the second, and the health check (the briefing, `k-playbook health`) warns when
@@ -235,8 +215,8 @@ against the `SHA256SUMS` of that tag, replaces `~/.local/bin/k-playbook`, and th
 then restarts itself from the new program — the open page follows to the new address.
 Nothing is downloaded on startup or during a check, only on that click. If the running
 program is equally old or newer, as a build with `make dev-install VERSION=…` above the
-newest tag, nothing is installed. The pull above no longer decides about any of this; it
-only serves the content that still lives in the clone.
+newest tag, nothing is installed. The shipped texts need no update in the project at all:
+they come from the hub.
 
 By hand it is one call, due once in every environment — on the host as well as in the
 devcontainer:
@@ -256,13 +236,12 @@ keeps running.
 In the terminal, `k-playbook upgrade` does both in one go — first Kephalaion (installed when
 missing from the `PATH`, otherwise updated through `kephalaion upgrade --auto` where
 Kephalaion considers that safe, with its node restarted; a hub, a global installation or an
-older `kephalaion` without `--auto` are only reported), then the pull in the clone as long
-as there is one, the release binary when the running program is older than the newest
-release tag (also without a clone and after a failed pull), then
+older `kephalaion` without `--auto` are only reported), then the release binary when the
+running program is older than the newest release tag, then
 moving hub and collection out of an old `k-playbook-local/K-PLAYBOOK.local.yaml` into the
 block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`,
 `AGENTS.md`, `CLAUDE.md`, linking and MCP entries (a stale entry is replaced, a missing one
-added when the file is not tracked by Git — no longer tied to the pull), and last the `README.md` of the
+added when the file is not tracked by Git), and last the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
 as a hint) —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
@@ -274,7 +253,7 @@ order, the first run does not update Kephalaion yet; the second `/k-upgrade` doe
 The linking for the assistants catches up by itself afterwards — on the next
 `k-playbook briefing`, the call at the start of every session, or on the next look at the
 assistant block of the interface. It follows the project's catalog, not the path by which
-the installation was updated. For the new commands to arrive, the assistant has to be
+the program was updated. For the new commands to arrive, the assistant has to be
 restarted once; it reads its list at startup.
 
 ## Building it yourself
@@ -314,9 +293,9 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 
 ## Core principles
 
-- Every project carries its own installation in a subdirectory. No fixed host path, no global symlink.
-- Installation and project ownership are strictly separated: `k-playbook/` is fully replaced on every update, everything beside it is never touched.
-- Shipped reviews and checks are not edited. A project deviates from a review by overlay: a local file of the same name replaces completely, an empty one disables. Checks have no overlay; only the shipped ones run.
+- The installation is the binary alone, one per machine. A project carries its anchor and what it owns, no copy of the tool.
+- Shipped and project-owned are strictly separated: what comes with the binary — `~/.local/share/k-playbook/` and the texts from the hub — is replaced by an update, what the project owns is never touched by one.
+- Shipped reviews are not edited. A project deviates from a review by overlay: a local file of the same name replaces completely, an empty one disables.
 - Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
 - Tasks, todos, the project documentation and project-owned review recipes are documents in the project collection. `k-playbook-local/` is being phased out and is never created; review results get a new place, and until then review runs are paused.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
@@ -328,7 +307,7 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 - [`docs/README.md`](./docs/README.md) - the complete documentation index.
 - [`defaults/docs/handbook/manual.md`](./defaults/docs/handbook/manual.md) - purpose, core model and standard workflows.
 - [`defaults/docs/handbook/k-playbook-format.md`](./defaults/docs/handbook/k-playbook-format.md) - the contract: `K-PLAYBOOK.yaml`, structure, overlay.
-- [`defaults/docs/handbook/installation.md`](./defaults/docs/handbook/installation.md) - clone, setup steps, security tools.
+- [`defaults/docs/handbook/installation.md`](./defaults/docs/handbook/installation.md) - installing the binary, setup steps, updating, security tools.
 - [`defaults/docs/handbook/commands.md`](./defaults/docs/handbook/commands.md) - index of the slash commands.
 - [`defaults/docs/handbook/vscode.md`](./defaults/docs/handbook/vscode.md) - the VS Code extension: commands, settings, installation, build.
 - [`defaults/docs/handbook/migration.md`](./defaults/docs/handbook/migration.md) - state of the migration, decisions and open points.

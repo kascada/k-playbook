@@ -158,7 +158,6 @@ from the frontmatter, `/k-review` stops instead of placing a result in a substit
 
 Typical review families:
 
-- `/k-review k-check-security`
 - `/k-review secret-scanning`
 - `/k-review dependency-cve`
 - `/k-review dependabot-alerts`
@@ -220,10 +219,11 @@ have the result file, and even on the machine that created it, it is overwritten
 Inline evidence therefore remains required: group IDs, location, and message belong in the task
 itself, not only in a reference.
 
-## Scanner Tools vs. k-check
+## Scanner Tools
 
 Security scanners such as `gitleaks`, `trufflehog`, `pip-audit`, `trivy`, `syft`, `grype`,
-`semgrep`, `gosec`, `ruff`, and `njsscan` are **not** modeled as checks under `checks/*.sh`.
+`semgrep`, `gosec`, `ruff`, and `njsscan` run through reviews, not as quick standalone
+heuristics.
 
 Reason:
 
@@ -250,41 +250,13 @@ These tools therefore run through report-mode reviews:
 | `njsscan` | `/k-review sast` | `sast` |
 | GitHub Dependabot Alerts | `/k-review dependabot-alerts` | `dependabot-alerts` |
 
-`checks/*.sh` remains reserved for fast, generic k-check heuristics and preflight-like checks.
-Small tool-availability checks may reside there, but not the actual scanner run with persistent
-assessment.
-
 ## The Families in Detail
-
-### k-check
-
-| | |
-|---|---|
-| Recipe | `k-playbook/reviews/review-k-check-security.md` |
-| Runner | `k-playbook/bin/k-check` |
-| Results | `k-playbook-local/results/k-check/YYYY-MM-DD/` |
-
-Typical auditable run:
-
-```bash
-k-playbook/bin/k-check \
-  --mode baseline \
-  --output k-playbook-local/results/k-check/YYYY-MM-DD/raw/k-check-baseline.txt \
-  --metadata-output k-playbook-local/results/k-check/YYYY-MM-DD/run-metadata.json
-```
-
-`--output` receives stdout/stderr and additionally writes the complete raw stream.
-`--metadata-output` writes the command, exit code, timestamp, roots, mode, check configuration,
-and version or Git commit where available.
-
-Existing target files are not overwritten. Use unique names for repeat runs on the same day, for
-example `k-check-baseline-e2e.txt` and `run-metadata-e2e.json`.
 
 ### Secret Scanning
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-secret-scanning.md` |
+| Recipe | `k-playbook:/reviews/review-secret-scanning.md` |
 | Results | `k-playbook-local/results/secret-scanning/YYYY-MM-DD/` |
 | Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-secret-scanning.md` |
 | Audit scope | `gitleaks`, `trufflehog` |
@@ -299,7 +271,7 @@ The tools are provided locally on the host by
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-dependency-cve.md` |
+| Recipe | `k-playbook:/reviews/review-dependency-cve.md` |
 | Results | `k-playbook-local/results/dependency-cve/YYYY-MM-DD/` |
 | Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-dependency-cve.md` |
 | Audit scope | `pip-audit`, `trivy`, `grype`, `osv-scanner`, `govulncheck` |
@@ -314,7 +286,7 @@ that carry at least one evidence item from an audit-scope tool.
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-dependabot-alerts.md` |
+| Recipe | `k-playbook:/reviews/review-dependabot-alerts.md` |
 | Results | `k-playbook-local/results/dependabot-alerts/YYYY-MM-DD/` |
 | Audit run model | disabled; rationale and examined alternatives are in the recipe |
 
@@ -329,7 +301,7 @@ disabled Dependabot PRs, for example `open-pull-requests-limit: 0`, are not a fi
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-iac-container.md` |
+| Recipe | `k-playbook:/reviews/review-iac-container.md` |
 | Results | `k-playbook-local/results/iac-container/YYYY-MM-DD/` |
 | Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-iac-container.md` |
 | Audit scope | `trivy`, `syft`, `grype` |
@@ -345,7 +317,7 @@ that carry at least one evidence item from an audit-scope tool.
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-sast.md` |
+| Recipe | `k-playbook:/reviews/review-sast.md` |
 | Results | `k-playbook-local/results/sast/YYYY-MM-DD/` |
 | Audit perspective | `k-playbook-local/results/YYYY-MM-DD/review-sast.md` |
 | Audit scope | `semgrep`, `gosec`, `ruff`, `njsscan` |
@@ -362,7 +334,7 @@ secrets to Secret Scanning, and IaC or container configuration to IaC/Container.
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-tech.md` |
+| Recipe | `k-playbook:/reviews/review-tech.md` |
 | Results | `k-playbook-local/results/tech/YYYY-MM-DD/` |
 | Audit entry | Evidence source `tech`, SARIF under `k-playbook-local/results/YYYY-MM-DD/raw/tech.sarif` |
 
@@ -374,7 +346,7 @@ evidence sources** below.
 
 | | |
 |---|---|
-| Recipe | `k-playbook/reviews/review-code.md` |
+| Recipe | `k-playbook:/reviews/review-code.md` |
 | Results | `k-playbook-local/results/code/YYYY-MM-DD/` |
 | Audit entry | Evidence source `code`, SARIF under `k-playbook-local/results/YYYY-MM-DD/raw/code.sarif` |
 | Diff of a task | Section `## Ergebnisform für den Diff eines Tasks` in the recipe, for `/k-task-run` |
@@ -417,12 +389,11 @@ their inputs are available as evidence in `review-input.json` or a separate scop
 
 | Recipe | Reason |
 |---|---|
-| `review-k-check-security.md` | `k-check` results are not yet modeled as evidence in the merge. |
 | `review-dependabot-alerts.md` | Input arrives externally through `gh api` — with a service of the personal access file through `k-playbook github run` (`defaults/commands/_shared/gh.md`) — and is not yet a tool entry in the run merge. |
 
-Both recipes contain their detailed examination themselves: their **Position in the audit run
-model** section states which part of the evidence contract blocks them and what a conversion would
-require. Until then, their `review-triage.md` goes directly to `/k-remediation`, **without**
+The recipe contains its detailed examination itself: its **Position in the audit run
+model** section states which part of the evidence contract blocks it and what a conversion would
+require. Until then, its `review-triage.md` goes directly to `/k-remediation`, **without**
 consolidation across families and **without** deduplication against other sources. The same
 applies to every independent `/k-review` run of a family recipe: the family directory is outside
 every run directory and is not combined with the audit run.
@@ -459,15 +430,13 @@ k-playbook-local/results/
 Example:
 
 ```text
-k-playbook-local/results/k-check/2026-07-24/
+k-playbook-local/results/secret-scanning/2026-07-24/
 ├── review-input.json
 ├── review-triage.md
 ├── run-metadata.json
 └── raw/
-    └── k-check-baseline.txt
+    └── gitleaks.json
 ```
-
-Results never belong next to the checks: `k-playbook/checks/` holds only the shipped executable checks, and there are no project-owned checks since task 134.
 
 ### `results/` Is Not Versioned
 
@@ -551,7 +520,7 @@ with scope, output, and handoff.
 Example handoff:
 
 ```text
-/k-remediation k-playbook-local/results/k-check/2026-07-24/review-triage.md
+/k-remediation k-playbook-local/results/secret-scanning/2026-07-24/review-triage.md
 ```
 
 Alongside this, `k-playbook-local/known-decisions.md` records what was deliberately decided. The
@@ -563,7 +532,7 @@ merge step reads this single file and writes its effect visibly into `review-inp
 The status table below is a **read path for legacy holdings**: those values belong to
 `findings.md`, which new runs no longer write. It is listed here because `/k-remediation` still
 reads such directories when no `review-triage.md` exists beside them. The rules that follow it —
-ID stability, the k-check ID schema, and coverage from `known-decisions.md` — apply to the current
+ID stability and coverage from `known-decisions.md` — apply to the current
 model as well.
 
 | Status | Meaning | Relevant to remediation |
@@ -577,14 +546,6 @@ model as well.
 
 Finding IDs must remain stable. IDs assigned once must not be renamed during re-runs, status
 changes, or remediation.
-
-Schema for k-check:
-
-```text
-kcheck-<area>-NNN
-```
-
-Examples: `kcheck-logging-003`, `kcheck-secrets-001`, `kcheck-user-scope-014`.
 
 Scanner families may retain their tool's native rule prefixes so a finding remains traceable to
 its raw report.

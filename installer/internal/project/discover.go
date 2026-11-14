@@ -1,5 +1,5 @@
-// Package project findet die k-playbook-Installation eines Projekts und richtet
-// dessen Assistenten-Verlinkung ein.
+// Package project findet das k-playbook-Projekt — den Anker
+// .k-playbook/K-PLAYBOOK.yaml — und richtet dessen Assistenten-Verlinkung ein.
 package project
 
 import (
@@ -12,21 +12,24 @@ import (
 )
 
 // ConfigFileName ist der Anker. Er liegt unter ProjectDirName im
-// Hauptverzeichnis des Projekts, nicht in der Installation — dadurch bleibt
-// PlaybookDirName vollständig ersetzbar.
+// Hauptverzeichnis des Projekts.
 //
-// Anker ist die Datei, nicht das Verzeichnis ProjectDirName: Das Quell-Repo
-// versioniert ProjectDirName/.gitignore, jede Installation trägt das
-// Verzeichnis also selbst, und die Link-Pflege legt es auch ohne
-// Konfiguration an. Am Verzeichnis allein fände Discover ein Projekt in der
-// Installation.
+// Anker ist die Datei, nicht das Verzeichnis ProjectDirName: Die Link-Pflege
+// legt das Verzeichnis auch ohne Konfiguration an (für den Link share), und
+// ein liegengebliebener Clone <projekt>/k-playbook/ (Altbestand, siehe
+// PlaybookDirName) kann es aus einem älteren Stand des Quell-Repos tragen. Am
+// Verzeichnis allein fände Discover ein Projekt, wo keines ist.
 const ConfigFileName = "K-PLAYBOOK.yaml"
 
-// PlaybookDirName ist der Name der Installation innerhalb des Projekts. Er ist
-// fest; wie das Projektverzeichnis selbst heißt, spielt keine Rolle.
+// PlaybookDirName ist der Name des früheren Clones innerhalb des Projekts: Bis
+// Task 156 lag die Installation als Git-Clone unter <projekt>/k-playbook/.
+// Heute ist die Installation das Binary allein, und /k-upgrade (Umstellung
+// 3.8) löscht einen liegengebliebenen Clone. Den Namen braucht nur noch, wer
+// Altbestand erkennt: alte Links, der Wrapper, das Zurücksetzen der
+// Konfiguration, der Vorschlag beim ersten Start.
 const PlaybookDirName = "k-playbook"
 
-// ErrNotFound meldet, dass oberhalb des Startverzeichnisses keine Installation liegt.
+// ErrNotFound meldet, dass ab dem Startverzeichnis aufwärts kein Projekt liegt.
 var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 
 // Discover liefert das Hauptverzeichnis des Projekts, erkannt an
@@ -38,9 +41,9 @@ var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 // an sein Projektverzeichnis kommt: Umgezogen ist, bevor irgendwer liest.
 //
 // Gesucht wird ab startDir aufwärts, ein Kandidat je Ebene. Die Suche bricht
-// bewusst nicht am Git-Worktree-Root ab: die Installation ist selbst ein Clone
-// und damit ein eigener Worktree, die Config liegt eine Ebene darüber. Ein
-// Abbruch dort würde sie unerreichbar machen.
+// bewusst nicht am Git-Worktree-Root ab: Das Repository kann unterhalb des
+// Hauptverzeichnisses liegen (project.repo_root), die Config liegt dann eine
+// Ebene darüber. Ein Abbruch dort würde sie unerreichbar machen.
 func Discover(startDir string) (string, error) {
 	dir, err := filepath.Abs(startDir)
 	if err != nil {
@@ -72,7 +75,8 @@ func Discover(startDir string) (string, error) {
 	}
 }
 
-// PlaybookDir ist die Installation innerhalb eines Projekts.
+// PlaybookDir ist der Ort des früheren Clones innerhalb eines Projekts (siehe
+// PlaybookDirName). Ob dort noch etwas liegt, sagt der Pfad nicht.
 func PlaybookDir(projectDir string) string {
 	return filepath.Join(projectDir, PlaybookDirName)
 }

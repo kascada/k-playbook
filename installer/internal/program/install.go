@@ -102,8 +102,7 @@ type Result struct {
 // die SHA256SUMS des Tags geprüft hat. Nachgerechnet wird an der Datei selbst,
 // ohne sie auszuführen und ohne zweiten Abruf.
 //
-// Ein Fehler lässt den Aufrufer weiterlaufen. Der Clone des Projekts wird
-// weder gelesen noch gebraucht.
+// Ein Fehler lässt den Aufrufer weiterlaufen.
 func Install(ctx context.Context, tag string) (Result, error) {
 	result := Result{}
 
@@ -165,8 +164,8 @@ func AssetName() string {
 }
 
 // Verify prüft die Datei unter target gegen den Eintrag des Plattform-Assets
-// in der SHA256SUMS des Release-Tags tag — geladen aus dem Repo, nicht aus
-// dem Clone. Install braucht sie nicht: release.Install prüft vor dem
+// in der SHA256SUMS des Release-Tags tag, geladen aus dem Repo auf GitHub.
+// Install braucht sie nicht: release.Install prüft vor dem
 // Ersetzen. Sie ist die Frage „ist das am Ziel das Release-Binary von tag?“
 // für eine Datei, die schon liegt.
 func Verify(ctx context.Context, tag string, target string) error {

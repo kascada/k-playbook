@@ -44,7 +44,8 @@ func TestVersionGibtNurDieVersionAus(t *testing.T) {
 // Startet `k-playbook` aus einem Programm, das älter ist als das neueste
 // Release, steht genau eine Zeile im Terminal, mit `k-playbook upgrade` als
 // Weg. Gleich, neuer und unbekannt bleiben still; ohne eigene Version wird der
-// Tag gar nicht abgerufen. Die VERSION im Clone spielt keine Rolle.
+// Tag gar nicht abgerufen. Eine VERSION in einem alten Verzeichnis
+// k-playbook/ spielt keine Rolle.
 func TestStartAusAelteremProgrammMeldetEineZeile(t *testing.T) {
 	root := t.TempDir()
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n")
@@ -73,7 +74,7 @@ func TestStartAusAelteremProgrammMeldetEineZeile(t *testing.T) {
 			t.Errorf("die Zeile nennt %q nicht: %q", want, line)
 		}
 	}
-	for _, gone := range []string{"v9.9.9", project.BootstrapCommand} {
+	for _, gone := range []string{"v9.9.9", "make -C " + project.PlaybookDirName + " install"} {
 		if strings.Contains(line, gone) {
 			t.Errorf("die Zeile nennt noch %q: %q", gone, line)
 		}

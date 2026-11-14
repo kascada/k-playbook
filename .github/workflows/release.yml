@@ -167,35 +167,26 @@ jobs:
 
           ```bash
           curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
-          # aus dem Clone im Projekt:
-          make -C k-playbook install
-          # ohne make:
-          k-playbook/bin/install
+          # ohne curl:
+          wget -qO- https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
           ```
 
-          Alle drei tun dasselbe: Sie installieren das Binary des neuesten Releases, geprüft
-          gegen die `SHA256SUMS` des Tags, und danach Kephalaion, wenn es fehlt. `VERSION` und
-          `SHA256SUMS` eines Clones lesen sie nicht. Gebraucht werden `curl` oder `wget` und
-          `sha256sum` oder `shasum`; `~/.local/bin` muss im PATH liegen, sonst bricht die
-          Installation ab, bevor sie etwas lädt.
+          Das Skript installiert das Binary des neuesten Releases, geprüft gegen die
+          `SHA256SUMS` des Tags, und danach Kephalaion, wenn es fehlt. Gebraucht werden `curl`
+          oder `wget` und `sha256sum` oder `shasum`; `~/.local/bin` muss im PATH liegen, sonst
+          bricht die Installation ab, bevor sie etwas lädt. Ins Projekt wird dabei nichts
+          kopiert: Die Installation ist das Binary allein.
 
-          Ein installiertes Programm aktualisiert sich aus dem Release, nicht aus dem Clone:
-          `k-playbook upgrade` im Terminal oder „Programm aktualisieren“ in der Oberfläche. Die
-          Umgebungsprüfung (Briefing, `k-playbook health`) warnt, wenn das Programm älter ist
-          als das neueste Release, und `k-playbook version --all` nennt beide Versionen. Ein
-          Clone-Update allein lädt kein Binary.
+          Ein installiertes Programm aktualisiert sich aus dem Release: `k-playbook upgrade` im
+          Terminal oder „Programm aktualisieren“ in der Oberfläche. Die Umgebungsprüfung
+          (Briefing, `k-playbook health`) warnt, wenn das Programm älter ist als das neueste
+          Release, und `k-playbook version --all` nennt beide Versionen.
 
-          Ältere Programme rufen dafür noch `k-playbook/bin/install` des Clones auf und prüfen
-          das Ergebnis gegen dessen `VERSION` und `SHA256SUMS`: dort zuerst den Clone
-          aktualisieren (Update-Knopf der Oberfläche oder `make -C k-playbook installer-update`),
-          dann `k-playbook upgrade`.
-
-          **Reihenfolge in einem Bestandsprojekt des abgelösten Wrapper-Modells:** zuerst den
-          Clone aktualisieren, erst danach installieren. Vorher liegt `k-playbook/bin/install`
-          noch gar nicht im Projekt. Zwischen beiden Schritten zeigen Commands, der Anstoßblock
-          in `AGENTS.md` und die MCP-Registrierung noch auf den abgelösten Wrapper, und es gibt
-          kein funktionierendes Kommando. Nach der Installation zieht der nächste Aufruf von
-          `k-playbook` beides von selbst nach.
+          Ältere Programme (bis v0.16.38) aktualisieren sich noch über einen Clone
+          `k-playbook/` im Projekt. Liegt er noch, läuft ihr `k-playbook upgrade` weiter wie
+          bisher, über die Dateien, die dafür auf `main` liegen bleiben (`VERSION`,
+          `SHA256SUMS`, `bin/install`). Fehlt der Clone schon, hilft die Installation oben.
+          Den Clone löscht danach `/k-upgrade`.
           EOF
           )"
           gh release create "$TAG" dist/k-playbook-* \

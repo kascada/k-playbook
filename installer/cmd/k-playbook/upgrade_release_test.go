@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,15 +16,15 @@ import (
 )
 
 // Programmschritt gegen den neuesten Release-Tag (Task 149): Verglichen wird
-// die eigene Version mit dem Tag, nie mit VERSION im Clone, und installiert
-// wird nur bei „älter".
+// die eigene Version mit dem Tag, nie mit einer VERSION im Projekt, und
+// installiert wird nur bei „älter".
 
 // stubInstall ersetzt die Installation und zählt, mit welchem Tag sie gerufen
 // wurde. Das Ergebnis ist ein gelungener Binärwechsel nach target.
 func stubInstall(t *testing.T, target string) *[]string {
 	t.Helper()
 	tags := []string{}
-	stubUpgradeSteps(t, nil, func(_ context.Context, tag string) (program.Result, error) {
+	stubUpgradeSteps(t, func(_ context.Context, tag string) (program.Result, error) {
 		tags = append(tags, tag)
 		return program.Result{Target: target, Expected: tag, Installed: true}, nil
 	})
@@ -82,7 +81,8 @@ func TestUpgradeVergleichtMitDemNeuestenTag(t *testing.T) {
 }
 
 // Die JSON-Antwort trägt latest statt clone, kein versionChanged und kein
-// mcpRepaired am Programmschritt mehr; die Fassung ist gestiegen.
+// mcpRepaired am Programmschritt mehr, seit Task 156 auch keine Felder zum
+// Pull; die Fassung ist gestiegen.
 func TestUpgradeJSONTraegtLatestStattClone(t *testing.T) {
 	upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
@@ -93,12 +93,12 @@ func TestUpgradeJSONTraegtLatestStattClone(t *testing.T) {
 			t.Errorf("upgrade --check --json: %v", err)
 		}
 	})
-	for _, erwartet := range []string{`"schemaVersion": "2"`, `"latest": "v0.17.0"`, `"running": "v0.16.8"`, `"outdated": true`} {
+	for _, erwartet := range []string{`"schemaVersion": "3"`, `"latest": "v0.17.0"`, `"running": "v0.16.8"`, `"outdated": true`} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
 		}
 	}
-	for _, verboten := range []string{`"clone"`, `"versionChanged"`} {
+	for _, verboten := range []string{`"clone"`, `"versionChanged"`, `"update"`, `"pulled"`, `"pullOutput"`, `"remoteSwitched"`} {
 		if strings.Contains(stdout, verboten) {
 			t.Errorf("%s steht noch in:\n%s", verboten, stdout)
 		}
@@ -159,9 +159,9 @@ func TestUpgradeTagUnbekannt(t *testing.T) {
 	}
 }
 
-// Ohne Clone laufen Vergleich und Installation trotzdem: --check meldet den
-// Stand, ein Lauf installiert, und der fehlende Clone wird gemeldet — ohne zu
-// behaupten, es gebe nichts zu aktualisieren. Einen Pull gibt es nicht.
+// Ohne Verzeichnis k-playbook/ laufen Vergleich und Installation: --check
+// meldet den Stand, ein Lauf installiert. Ein fehlender Clone wird nicht mehr
+// gemeldet (Task 156).
 func TestUpgradeOhneCloneVergleichtUndInstalliert(t *testing.T) {
 	t.Setenv(viaCommandEnv, "")
 	root := upgradeProjectDir(t, "v0.17.0")
@@ -170,19 +170,9 @@ func TestUpgradeOhneCloneVergleichtUndInstalliert(t *testing.T) {
 	setOwnVersion(t, "v0.16.8")
 	target := filepath.Join(root, "k-playbook-neu")
 	tags := stubInstall(t, target)
-	upgradeUpdate = func(string) (project.UpdateResult, error) {
-		t.Error("ohne Clone wurde gepullt")
-		return project.UpdateResult{}, nil
-	}
-	stubCheckUpdate(t, project.UpdateStatus{})
-	upgradeCheckUpdate = func(string) (project.UpdateStatus, error) {
-		t.Error("ohne Clone wurde der Remote-Stand gefragt")
-		return project.UpdateStatus{}, nil
-	}
 
 	check := runUpgradeText(t, "--check")
 	assertOrder(t, check,
-		"Programm: die Installation "+project.PlaybookDirName+"/ fehlt",
 		"Programm-Stand: v0.16.8 ist älter als das neueste Release (v0.17.0); ein Lauf installierte das Programm nach",
 		kUpgradeVorschau,
 	)
@@ -192,14 +182,15 @@ func TestUpgradeOhneCloneVergleichtUndInstalliert(t *testing.T) {
 
 	stdout := runUpgradeText(t)
 	assertOrder(t, stdout,
-		"Programm: die Installation "+project.PlaybookDirName+"/ fehlt; der Pull entfällt.",
 		"Programm: v0.17.0 installiert nach "+target,
 		"Projekt: nachgezogen vom neuen Programm.",
 		"Das Programm hat gewechselt: die Sitzung neu starten",
 		kUpgradeHinweis,
 	)
-	if strings.Contains(stdout, "nichts zu aktualisieren") {
-		t.Errorf("die Meldung zum fehlenden Clone behauptet, es gebe nichts zu aktualisieren:\n%s", stdout)
+	for _, gone := range []string{"Installation fehlt", project.PlaybookDirName + "/ fehlt", "der Pull entfällt"} {
+		if strings.Contains(check, gone) || strings.Contains(stdout, gone) {
+			t.Errorf("der fehlende Clone wird noch gemeldet (%q):\n%s\n%s", gone, check, stdout)
+		}
 	}
 	if len(*tags) != 1 || (*tags)[0] != "v0.17.0" {
 		t.Errorf("installiert mit %v, erwartet einmal v0.17.0", *tags)
@@ -209,27 +200,21 @@ func TestUpgradeOhneCloneVergleichtUndInstalliert(t *testing.T) {
 // staleMCP ist ein Eintrag auf den abgelösten Wrapper — MCPStateOutdated.
 const staleMCP = `{"mcpServers":{"` + project.MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
 
-// Die MCP-Reparatur hängt nicht mehr am Pull: Scheitert er, repariert der
-// Projektschritt den veralteten Eintrag trotzdem und meldet es.
-func TestUpgradeRepariertMCPNachGescheitertemPull(t *testing.T) {
+// Der Projektschritt repariert einen veralteten MCP-Eintrag und meldet es.
+func TestUpgradeRepariertVeraltetenMCPEintrag(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.17.0")
-	withClone(t, root)
 	mustWriteMCPFile(t, filepath.Join(root, ".mcp.json"), staleMCP)
-	stubUpgradeSteps(t, func(string) (project.UpdateResult, error) {
-		return project.UpdateResult{Output: "fatal: unable to access"}, errors.New("git pull --ff-only fehlgeschlagen")
-	}, nil)
 
 	report := runUpgradeJSON(t)
 	messages := strings.Join(report.Messages, "\n")
 	assertOrder(t, messages,
-		"Programm: Pull im Clone fehlgeschlagen — git pull --ff-only fehlgeschlagen",
 		"Programm-Stand: nichts zu tun",
 		"Projekt: MCP-Registrierung nachgezogen: .mcp.json",
 	)
-	if report.Program.Pulled || report.Program.Error == "" {
-		t.Errorf("program = %+v, erwartet einen gemeldeten Fehlschlag des Pulls", report.Program)
+	if report.Program.Error != "" {
+		t.Errorf("program = %+v, erwartet keinen Fehler", report.Program)
 	}
 	content, err := os.ReadFile(filepath.Join(root, ".mcp.json"))
 	if err != nil || strings.Contains(string(content), "k-playbook/bin/k-playbook") {
@@ -240,34 +225,22 @@ func TestUpgradeRepariertMCPNachGescheitertemPull(t *testing.T) {
 	}
 }
 
-// Nach gelungenem Pull repariert der Projektschritt im Umfang des Starts: Er
-// ergänzt auch einen fehlenden Eintrag, wenn die Zieldatei nicht von git
-// erfasst ist. Früher lief nach gelungenem Pull nur der enge Modus. --check
+// Der Projektschritt repariert im Umfang des Starts: Er ergänzt auch einen
+// fehlenden Eintrag, wenn die Zieldatei nicht von git erfasst ist. --check
 // meldet davon nichts — die hingenommene Lücke.
-func TestUpgradeErgaenztFehlendenMCPEintragNachGelungenemPull(t *testing.T) {
+func TestUpgradeErgaenztFehlendenMCPEintrag(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.17.0")
-	withClone(t, root)
 	// project.vcs none: nichts ist von git erfasst.
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: "+project.SchemaVersion+"\n\nproject:\n  repo_root: .\n  vcs: none\n")
 	foreign := `{"mcpServers":{"fremd":{"command":"anderes","args":["dienen"]}}}` + "\n"
 	mustWriteMCPFile(t, filepath.Join(root, ".mcp.json"), foreign)
-	pulled := false
-	stubUpgradeSteps(t, func(string) (project.UpdateResult, error) {
-		pulled = true
-		return project.UpdateResult{}, nil
-	}, nil)
-	stubCheckUpdate(t, project.UpdateStatus{Branch: "main", Local: "aaaaaaaaaaaa", Remote: "aaaaaaaaaaaa"})
-
 	if check := runUpgradeText(t, "--check"); strings.Contains(check, "MCP") {
 		t.Errorf("--check meldet den fehlenden Eintrag — die Lücke ist geschlossen, der Test und die Doku ziehen nach:\n%s", check)
 	}
 
 	stdout := runUpgradeText(t)
-	if !pulled {
-		t.Fatalf("der Pull ist nicht gelaufen:\n%s", stdout)
-	}
 	if !strings.Contains(stdout, "Projekt: MCP-Registrierung nachgezogen: .mcp.json") {
 		t.Errorf("die Ergänzung wird nicht gemeldet:\n%s", stdout)
 	}

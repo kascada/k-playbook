@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 )
 
 // readProject legt ein Projekt mit beiden Ebenen unter instructions/ an und
@@ -18,18 +19,18 @@ func readProject(t *testing.T) string {
 
 	root := todoProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/instructions/always/010-a.md":         "---\ntitle: A\n---\n\n## A\n",
-		"k-playbook/defaults/instructions/always/100-b.md":         "## B mitgeliefert\n",
-		"k-playbook/defaults/instructions/always/200-c.md":         "## C\n",
-		"k-playbook/defaults/instructions/on-demand/thema.md":      "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
+		"test-defaults/instructions/always/010-a.md":               "---\ntitle: A\n---\n\n## A\n",
+		"test-defaults/instructions/always/100-b.md":               "## B mitgeliefert\n",
+		"test-defaults/instructions/always/200-c.md":               "## C\n",
+		"test-defaults/instructions/on-demand/thema.md":            "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
 		"test-collection/k-playbook/instructions/always/100-b.md":  "## B lokal\n\nText.\n",
 		"test-collection/k-playbook/instructions/always/200-c.md":  "# Abgeschaltet\n",
 		"test-collection/k-playbook/instructions/always/notiz.md":  "## Notiz\n\nText.\n",
 		"test-collection/k-playbook/instructions/on-demand/aus.md": "",
-		"k-playbook/defaults/instructions/on-demand/aus.md":        "## Aus\n",
+		"test-defaults/instructions/on-demand/aus.md":              "## Aus\n",
 		"k-playbook/commands/k-upgrade.md":                         "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
-		"k-playbook/defaults/commands/k-upgrade.md":                "# k-upgrade\n\nText aus defaults.\n",
-		"k-playbook/defaults/commands/k-gui.md":                    "# k-gui\n\nText aus defaults.\n",
+		"test-defaults/commands/k-upgrade.md":                      "# k-upgrade\n\nText aus defaults.\n",
+		"test-defaults/commands/k-gui.md":                          "# k-gui\n\nText aus defaults.\n",
 		".k-playbook/commands/k-gui.md":                            "# k-gui\n\nlokal\n",
 		"k-playbook-local/commands/k-upgrade.md":                   "# am alten Ort, nicht mehr gelesen\n",
 	}
@@ -283,11 +284,11 @@ func TestReadHilfeIstFolgenlos(t *testing.T) {
 func TestReadSetztIncludesEin(t *testing.T) {
 	root := readProject(t)
 	for rel, content := range map[string]string{
-		"k-playbook/defaults/includes/context.md":                       "---\ntitle: Kontext\n---\n\n## Kontext\n\nBaustein.\n",
-		"k-playbook/defaults/commands/k-danke.md":                       "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
-		"k-playbook/defaults/commands/verschachtelt.md":                 "# V\n\ninclude: k-danke.md\n",
-		"k-playbook/defaults/commands/zyklus-a.md":                      "include: zyklus-b.md\n",
-		"k-playbook/defaults/commands/zyklus-b.md":                      "include: zyklus-a.md\n",
+		"test-defaults/includes/context.md":                             "---\ntitle: Kontext\n---\n\n## Kontext\n\nBaustein.\n",
+		"test-defaults/commands/k-danke.md":                             "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
+		"test-defaults/commands/verschachtelt.md":                       "# V\n\ninclude: k-danke.md\n",
+		"test-defaults/commands/zyklus-a.md":                            "include: zyklus-b.md\n",
+		"test-defaults/commands/zyklus-b.md":                            "include: zyklus-a.md\n",
 		"test-collection/k-playbook/instructions/always/1000-kaputt.md": "## Kaputt\n\ninclude: fehlt.md\n",
 	} {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -360,11 +361,7 @@ func TestReadKUpgradeAusDefaultsMitInclude(t *testing.T) {
 		t.Fatalf("defaults/commands/_shared/erster-schritt.md im Repo nicht gefunden: %v", err)
 	}
 	root := todoProject(t)
-	playbook := filepath.Join(root, "k-playbook")
-	if err := os.MkdirAll(playbook, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(repoDefaults, filepath.Join(playbook, "defaults")); err != nil {
+	if err := os.Symlink(repoDefaults, filepath.Join(root, defaultstest.DefaultsDir)); err != nil {
 		t.Skipf("Symlink nicht möglich: %v", err)
 	}
 

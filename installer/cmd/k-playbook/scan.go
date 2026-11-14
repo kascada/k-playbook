@@ -32,8 +32,9 @@ func runScan(args []string) error {
 // scanRun ist der Teil von runScan hinter der Pause. Eigene Funktion, damit
 // ein Test ihn erreicht, solange review.Paused sperrt.
 //
-// Den Clone <projekt>/k-playbook/ verlangt er nicht: Scan-Katalog und Skripte
-// kommen aus SharedDir(), der Lauf aus k-playbook-local/ (Task 154).
+// Scan-Katalog und Skripte kommen aus SharedDir(), der Lauf aus
+// k-playbook-local/; den früheren Clone <projekt>/k-playbook/ verlangt er
+// seit Task 154 nicht mehr.
 func scanRun(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("kein Lauf angegeben: k-playbook scan <lauf> [eintrag …]")

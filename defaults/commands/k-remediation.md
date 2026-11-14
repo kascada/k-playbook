@@ -115,7 +115,7 @@ Akzeptierte direkte Argumente:
 - `<RESULTS_DIR>/<family>/<date>/review-triage.md`
 - Legacy: `<RESULTS_DIR>/summary-*.md`, soweit im Projekt noch eine liegt
 - Legacy: `<RESULTS_DIR>/<family>/<date>/assessment.md`, wenn dort kein `review-triage.md` liegt
-- Projektrelative Varianten davon, mit oder ohne Präfix `project:/`, z. B. `project:/k-playbook-local/results/2026-07-23/review-triage.md` oder `project:/k-playbook-local/results/k-check/2026-07-23/review-triage.md`
+- Projektrelative Varianten davon, mit oder ohne Präfix `project:/`, z. B. `project:/k-playbook-local/results/2026-07-23/review-triage.md` oder `project:/k-playbook-local/results/dependabot-alerts/2026-07-23/review-triage.md`
 
 Wenn nicht:
 
@@ -312,13 +312,13 @@ Remediation-Anker: <QUELLE_REF> <bündel-id>
 ```
 
 `QUELLE_REF` ist die Quelle der Arbeitsdatei als Verweis, `project:/<projektrelativer Pfad>`,
-etwa `project:/k-playbook-local/results/k-check/2026-07-23/review-triage.md`; `<bündel-id>`
+etwa `project:/k-playbook-local/results/dependabot-alerts/2026-07-23/review-triage.md`; `<bündel-id>`
 die Bündel- oder Gruppen-ID, etwa `B1` oder `P1-01`.
 
 1. Je geplantem Bündel mit `k_playbook_doc_grep` über die Sorte suchen: `kind: tasks`,
    `user: "*"`, `done: true`, `pattern` = die Ankerzeile, am Zeilenanfang und am Zeilenende
    verankert, Punkte und andere Sonderzeichen maskiert, etwa
-   `^Remediation-Anker: project:/k-playbook-local/results/k-check/2026-07-23/review-triage\.md B1$`.
+   `^Remediation-Anker: project:/k-playbook-local/results/dependabot-alerts/2026-07-23/review-triage\.md B1$`.
    Die Antwort nennt je Treffer `ref` und die Zeile.
 2. **Alte Tasks ohne Anker.** Ein alter Task ist einer ohne **jede** Ankerzeile; ein Task mit
    Anker für ein anderes Bündel derselben Quelle ist keiner. Gesucht wird in drei Schritten,
@@ -330,7 +330,7 @@ die Bündel- oder Gruppen-ID, etwa `B1` oder `P1-01`.
       einen Anker.
    b) **Tasks, die die Quelle nennen.** Einmal ebenso mit dem bisherigen Muster suchen:
       `pattern` = der projektrelative Pfad der Quelle als Regex (Punkte maskiert, etwa
-      `results/k-check/2026-07-23/review-triage\.md`). Von den Tasks mit einem Zähler über 0
+      `results/dependabot-alerts/2026-07-23/review-triage\.md`). Von den Tasks mit einem Zähler über 0
       jeden verwerfen, dessen `ref` unter a) einen Zähler über 0 hat. Übrig bleiben die alten
       Tasks, die die Quelle nennen.
    c) **Zuordnung zum Bündel.** Für jeden übrigen Task je geplantem Bündel mit
@@ -654,7 +654,7 @@ Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auc
 
    | Datum | Review | Scope | Output |
    |---|---|---|---|
-   | 2026-07-12 | remediation | k-check/2026-07-12/review-triage.md | 4 Bündel / 2 Tasks / 1 behoben / 1 akzeptiert |
+   | 2026-07-12 | remediation | dependabot-alerts/2026-07-12/review-triage.md | 4 Bündel / 2 Tasks / 1 behoben / 1 akzeptiert |
 
 - `Datum`: `context.now.date`.
 - `Review`: `remediation`.

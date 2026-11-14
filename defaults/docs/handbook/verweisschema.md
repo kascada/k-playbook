@@ -36,8 +36,9 @@ More examples:
   [Assembling a directory](#assembling-a-directory)). Every other directory, such as
   `instructions/on-demand/` or `instructions/` itself, is read file by file with its name; a
   reference to it ending in `/` lacks the file name and is an error (`invalid_input`).
-- **`k-playbook:` is read only through k-playbook**, never directly from `k-playbook/`,
-  `k-playbook-local/` or `keph:/k-playbook/`. k-playbook decides whether a local version replaces or disables the
+- **`k-playbook:` is read only through k-playbook**, never directly from
+  `k-playbook-local/` or `keph:/k-playbook/`, and never from `k-playbook/` -- a clone left
+  over from the former model, which the program no longer reads. k-playbook decides whether a local version replaces or disables the
   shipped one; whoever looks on disk can pick the wrong version.
 - **A reference k-playbook does not know is an error.** The tool reports it with an error
   code; it does not fall back to reading from disk, and the session reports it instead of
@@ -59,10 +60,8 @@ Older text still carries relative links and bare paths where a reference is mean
 a place is recognized, which prefix a bare path gets, what stays untouched as evidence and
 how it is changed stands once, for sessions, in
 `instructions/on-demand/verweise-nachziehen.md` (task 108); `/k-task-refine`, `/k-upgrade`
-3.3 and every later check follow it. `checks/check_verweise.sh` reports the part that is
-recognizable in the text of the shipped and project-own commands, instructions,
-guidelines and skills; it does not correct anything, and deliberate exceptions are listed in
-`checks/verweis-exceptions.tsv` (see [checks/README.md](../../../checks/README.md#verweise-ohne-präfix)).
+3.3 and every session follow it. It also says which part is recognizable in the text alone and
+which part needs a judgment.
 
 ## Placeholder `~` for the Own User
 
@@ -134,8 +133,8 @@ What each prefix answers:
   `unsupported` like any other path outside these kinds) and, as targets of includes, `includes/` and
   `testdata/`, plus the README templates in `docs/` (see below). A `k-playbook:` path outside these kinds is refused as
   `unsupported` -- `k-playbook:/checks/check_x.sh` is a valid reference whose kind is not
-  resolved: checks are scripts that run, skills live with the assistant; nobody reads them
-  through a reference. The message names only the reader kinds. Commands lie with the
+  resolved: checks no longer exist (task 155), skills live with the assistant; nobody reads
+  either through a reference. The message names only the reader kinds. Commands lie with the
   assistant only as a hull (frontmatter plus the reference `k-playbook:/commands/<name>.md`);
   their text is resolved like a review recipe, as a single file.
 

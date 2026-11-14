@@ -5,53 +5,58 @@ model and normal sequence; detailed workflows are on the linked topic pages.
 
 ## Purpose
 
-`k-playbook` is a toolkit for AI assistant work: slash commands, skills, review
-recipes, and checks. It is cloned into a subdirectory of the project it
-supports and sits alongside the project-owned artifacts.
+`k-playbook` is a toolkit for AI assistant work: slash commands, skills and review
+recipes. It is installed as one binary per machine; a project carries only
+its anchor and what it owns itself.
 
 The goal is controlled, traceable, and repeatable assistant work:
 
 - Keep shipped and project-owned content clearly separate.
-- Update commands, skills, review recipes, and checks using `git pull`.
+- Update commands, skills and review recipes with the program: `k-playbook upgrade`
+  brings the binary and what it unpacks, the hub brings the shipped texts.
 - Store tasks, reviews, and results in fixed locations.
 - Make review, task, and remediation flows auditable.
 - Establish docs as the first source for later AI sessions.
 
 ## Core model
 
-A project consists of three parts that never overlap:
+What k-playbook ships and what a project owns never overlap, and only the second
+lies in the project:
 
 ```text
 project/
 ├── .k-playbook/
-│   └── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
-├── k-playbook/           the installation, fully replaceable
+│   ├── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
+│   ├── commands/         project-owned commands (only when used)
+│   └── skills/           project-owned skills (only when used)
 └── k-playbook-local/     being phased out: never created any more
 ```
 
 | Part | Owner | What happens on update |
 |---|---|---|
 | `.k-playbook/K-PLAYBOOK.yaml` | the project | remains untouched |
-| `k-playbook/` | k-playbook | is fully replaced |
-| `k-playbook-local/` | the project | being phased out: k-playbook no longer creates it and reads neither `k-playbook.md` nor `guidelines/` there (task 148); `/k-upgrade` clears leftovers and, as its last conversion, deletes the directory itself once only a `.gitignore`, a `README.md` and empty subdirectories remain (3.7, task 150); more on leftovers in [`k-playbook-format.md`](./k-playbook-format.md) |
+| the binary `~/.local/bin/k-playbook` and what it unpacks into `~/.local/share/k-playbook/` (commands, skills, scripts) | k-playbook | replaced by `k-playbook upgrade` or the update button |
+| the shipped texts in `<hub>:k-playbook/defaults/` | k-playbook | the hub fetches the new release |
+| `k-playbook-local/` | the project | being phased out: k-playbook no longer creates it and no longer reads `guidelines/` there (task 148); `/k-upgrade` clears leftovers and deletes the directory itself once only a `.gitignore`, a `README.md` and empty subdirectories remain (3.7, task 150); more on leftovers in [`k-playbook-format.md`](./k-playbook-format.md) |
 
-Because configuration is **beside**, rather than **in**, the installation,
-`k-playbook/` contains nothing project-owned. That is exactly why it can be
-updated completely.
+Because the installation is the binary alone, nothing shipped lies in the
+project, and an update cannot touch anything the project owns. In the former
+model the installation was a clone under `<project>/k-playbook/`; the program
+neither reads nor pulls such a directory any more (task 156), and `/k-upgrade`
+3.8 deletes an old clone.
 
 ```mermaid
 flowchart LR
-    Anchor[".k-playbook/K-PLAYBOOK.yaml"] --> Playbook["k-playbook/"]
-    Anchor --> Project[".k-playbook/"]
-
-    Playbook --> Base["reviews/ · checks/<br>commands/ · skills/"]
-    Playbook --> Tool["bin/ · scripts/"]
+    Binary["k-playbook, the binary"] --> Share["~/.local/share/k-playbook/<br>commands/ · skills/ · scripts/"]
+    Hub["hub: k-playbook/defaults/"] --> Base["reviews/ · instructions/ · guidelines/"]
+    Anchor[".k-playbook/K-PLAYBOOK.yaml"] --> Project[".k-playbook/"]
 
     Project --> Overlay["commands/ · skills/"]
     Anchor --> Layer["project collection: keph:/k-playbook/reviews/ · instructions/"]
     Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
 
-    Base --> Effective["effective set"]
+    Share --> Effective["effective set"]
+    Base --> Effective
     Overlay --> Effective
     Layer --> Effective
 
@@ -62,8 +67,7 @@ flowchart LR
 
 There is no longer a `paths:` block. Every location derives from the location
 of `K-PLAYBOOK.yaml`: project-owned commands and skills are under `.k-playbook/`,
-project knowledge under `keph:/docs/` in the project collection, and shipped checks under
-`k-playbook/checks/`. Review results have no place at present; review runs are paused
+and project knowledge under `keph:/docs/` in the project collection. Review results have no place at present; review runs are paused
 (task 147). Tasks are documents in the project collection as well,
 `keph:/user/<user>/tasks/`, not files on disk. A command therefore neither guesses
 nor reads a path: it derives it, or it takes the reference.
@@ -74,9 +78,9 @@ The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
 Three directories exist twice: `reviews/`, `commands/`, and `skills/`. What
 applies is the union of both sides. **For the same name, the project-owned entry
-wins, completely**: the shipped entry is not read at all. Checks exist only once,
-shipped under `k-playbook/checks/`: there are no project-owned checks since task 134,
-and `/k-upgrade` removes a leftover `k-playbook-local/checks/`.
+wins, completely**: the shipped entry is not read at all. Checks no longer exist
+(task 155), neither shipped nor project-owned; `/k-upgrade` removes a leftover
+`k-playbook-local/checks/`.
 
 Content is disabled with an **empty** local entry: nothing except blank lines
 and comments. This lets the file record its own reason, without requiring a
@@ -112,7 +116,7 @@ it offers on request; see [`mcp.md`](./mcp.md).
 One answer also means once per session. The output does not change while work
 is underway, so the next command does not retrieve it again but continues with
 the existing result. Retrieve it again only after writing `K-PLAYBOOK.yaml`,
-changing the set of reviews or checks, or moving work to a
+changing the set of reviews, or moving work to a
 different project.
 
 ### Instructions at two levels
@@ -124,17 +128,15 @@ different project.
 
 Both levels reach a session through the briefing and through references
 (`k-playbook:/instructions/…`); a project-owned document of the same name
-replaces the shipped one, an empty one disables it. A file `k-playbook.md` is no
-longer read on either level (task 148). `AGENTS.md` in the project root receives
+replaces the shipped one, an empty one disables it. `AGENTS.md` in the project root receives
 only a short prompt that names `k-playbook briefing`; existing content remains
 untouched.
 
 ## Installation
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
 cd /path/to/project
-git clone https://github.com/kascada/k-playbook.git
-make -C k-playbook install
 k-playbook
 ```
 
@@ -143,10 +145,9 @@ release tag, downloads the release asset of that tag for the current platform,
 verifies it against the `SHA256SUMS` committed at the tag,
 and installs it to `~/.local/bin/k-playbook`. If `kephalaion` is missing from the
 `PATH`, it then installs it as well, through the `install.sh` of the latest
-Kephalaion release. This one bootstrap needs network access and `curl` or `wget` (no
-`git`), and `~/.local/bin` must be on `PATH`. It also runs without a clone
-(`curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`)
-and does the same from one: `VERSION` and `SHA256SUMS` of the clone are not read.
+Kephalaion release. This one bootstrap runs once per host and once per DevContainer,
+needs network access and `curl` or `wget` (no `git`), and `~/.local/bin` must be on
+`PATH`. Nothing is copied into the project.
 Afterwards the program updates itself from the release: the health check warns
 when it is older than the newest published release (read from a cache under
 `~/.cache/k-playbook/`, at most a few hours old), and `k-playbook upgrade` or the
@@ -156,8 +157,7 @@ server, and link assistants. Each write happens only after confirmation.
 
 ```mermaid
 flowchart TD
-    A["git clone ..."] --> A2["make -C k-playbook install"]
-    A2 --> B["k-playbook"]
+    A["curl … bin/install | bash"] --> B["k-playbook"]
     B --> C["Create K-PLAYBOOK.yaml"]
     C --> E["Register MCP server"]
     E --> F["Link assistants"]
@@ -176,7 +176,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
 | Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings |
 | Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
-| Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check docs follow-up and `k-check`, diagnose tests, read histories, mark VS Code |
+| Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check docs follow-up (`/k-enforcement` temporarily unavailable), diagnose tests, read histories, mark VS Code |
 
 New or changed commands become visible only after restarting the assistant.
 
@@ -284,33 +284,23 @@ which tool wrote it under `generated.by`. No command writes doc files in
 `keph:/docs/manual/`; other documentation maintained by a project also remains
 untouched. k-playbook claims only its own directory.
 
-## Docs follow-up and checks
+## Docs follow-up
 
 The always-instruction "Doku nachziehen" makes every session update the hand-written
 documentation, `README.md` and `AGENTS.md` in the same pass as a code change, before it
-finishes the change. `/k-enforcement` is the explicit report: it determines the changed
-files of the working tree, runs `k-check --mode changed` over the same files and reports
-the docs follow-up. After a code
+finishes the change. `/k-enforcement` is the explicit report on the docs follow-up for the
+changed files of the working tree; it is temporarily unavailable while it is rebuilt without
+checks (task 155). After a code
 change the generated documentation is not regenerated on the spot: the session queues a
 documentation order in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`), which `/k-docs-code` or
 `/k-docs-tools` works off in one run; `/k-docs` shows the open orders.
 
-`k-playbook/bin/k-check` is not a slash command but a CLI runner for the
-effective set of shipped and project-owned `.sh` checks:
-
-```bash
-k-playbook/bin/k-check --mode changed
-k-playbook/bin/k-check --mode baseline
-```
-
-Details are in [`../checks/README.md`](../../../checks/README.md).
-
 ## Operating rules
 
-- Each project carries its own installation. No fixed host path and no global symlink.
-- `k-playbook/` is fully replaced on every update; never touch anything beside it.
-- Do not edit shipped reviews or checks. A project diverges from a review through an overlay: a same-named local file replaces it, and an empty one disables it. Checks have no overlay; only the shipped ones run.
+- The installation is the binary alone, one per machine. A project carries no copy of the tool.
+- What k-playbook ships is replaced by an update; nothing the project owns is touched by one.
+- Do not edit shipped reviews. A project diverges from a review through an overlay: a same-named local file replaces it, and an empty one disables it.
 - Paths are derived, not guessed or configured.
 - `K-PLAYBOOK.yaml` is configuration, not documentation. An existing file is never overwritten.
 - Projects may use their own venvs; security tools run separately, host/user-local or in dedicated k-playbook tool venvs.

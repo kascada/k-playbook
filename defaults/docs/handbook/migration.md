@@ -13,7 +13,7 @@ The migration to the project-local model is complete and incorporated into the d
 | Topic | Where it is documented |
 |---|---|
 | Model, anchor, directory layout, overlay rules, configuration | [`k-playbook-format.md`](./k-playbook-format.md) |
-| Clone, bootstrap, the four setup steps, updating | [`installation.md`](./installation.md) |
+| Bootstrap, the setup steps, updating | [`installation.md`](./installation.md) |
 | Core model and standard workflows | [`manual.md`](./manual.md) |
 | Commands, `context` once per session | [`commands.md`](./commands.md) |
 | Recipes, results, remediation policy | [`code-review.md`](./code-review.md), [`k-playbook-format.md`](./k-playbook-format.md#remediation) |
@@ -24,9 +24,12 @@ The migration to the project-local model is complete and incorporated into the d
 ## Division Of Work: Development Repository Vs. Installation
 
 **`~/dev/k-playbook` is the development repository -- not an installation.** This is where the
-skills, commands, checks, reviews and rules, the installer, and the documentation are created
-and made available through Git. Work happens against the repository state; the installation
-alongside it under `k-playbook/` is a separate clone and may carry a different version.
+skills, commands, reviews and rules, the installer, and the documentation are created
+and made available through Git. Work happens against the repository state; what is
+installed is something else and may carry a different version: the binary under
+`~/.local/bin/k-playbook`, what it unpacks into `~/.local/share/k-playbook/`, and the texts
+the hub carries. Until task 156 the installation was a separate clone alongside it under
+`k-playbook/`.
 
 **The actual installation is different.** The reference project for testing and adapting is
 `/home/kleist/dev/Aiva/kascada/`. Every change is checked there against a real, evolved
@@ -231,24 +234,24 @@ previously wrote `summary-YYYY-MM-DD.md`; it is gone, and `review-tech` has rece
 family. Nothing creates summaries anymore -- `/k-remediation` still reads existing ones as legacy
 input.
 
-Two recipes remain outside the audit run, `dependabot-alerts` and `k-check-security`. Both were
-seriously examined for `audit.mode: evidence`; why this fails is documented in the respective
-recipe under **Position in the Audit Run Model** and requires one task each. Until then, their
-`review-triage.md` goes directly to `/k-remediation` -- without cross-family consolidation and
+One recipe remains outside the audit run, `dependabot-alerts`; the second, `k-check-security`,
+was removed together with the checks (task 155). It was seriously examined for
+`audit.mode: evidence`; why this fails is documented in the recipe under **Position in the Audit
+Run Model** and requires a task. Until then, its `review-triage.md` goes directly to `/k-remediation` -- without cross-family consolidation and
 without deduplication against other sources. The same applies to every independent `/k-review`
 run of a family recipe. This is the deliberate consequence of the migration: `/k-remediation`
 accepts exactly one result file and is not extended for multiple sources.
 
-**What the removal means for already configured projects.** In a target project that updates the
-clone, it means three things:
+**What the removal means for already configured projects.** In a target project that updated
+its installation -- at that time a clone -- it meant three things:
 
 - Existing `summary-*.md` under `k-playbook-local/results/` remain. Nothing creates them
   anymore; `/k-remediation` continues to read them as legacy input. Anyone who no longer needs
   them deletes them manually -- `results/` is not versioned anyway.
 - With the update, the command disappears from the catalog, and the symlinks under
   `.claude/commands/` and `.opencode/commands/` are then orphaned.
-  Setup in the interface removes them itself. The order cannot be reversed: first update the
-  clone, then set up. In reverse, setup still resolves the catalog from the old state and creates
+  Setup in the interface removes them itself. The order cannot be reversed: first update,
+  then set up. In reverse, setup still resolves the catalog from the old state and creates
   the links again.
 - **A project-local overlay otherwise remains alive.** A same-named file under
   `.k-playbook/commands/` (before task 129 `k-playbook-local/commands/`) previously overlaid
@@ -345,12 +348,13 @@ addressed in this order:
    historical `assessment.md`/`findings.md` remain legacy fallback. Only the concrete quality of
    task creation from bundles remains open in the end-to-end test.
 
-**Small cleanup item: installation sync.** The last two merges required `chmod u+w` on the
-installation clone so that `scripts/severity.tsv` (from Task 016) was available. As soon as the
-current state is pushed to the remote and installations are updated through the regular `git pull`
-path, the workaround is no longer needed. Nevertheless, we will check whether there is a more
-convenient way to synchronize the installation clone with the development state -- today that is
-one manual step, tomorrow it is a recurring detail.
+**Small cleanup item: installation sync -- overtaken.** At the time the installation was a
+write-protected clone in the project, and the last two merges needed it unlocked by hand so
+that `scripts/severity.tsv` (from Task 016) was available; the open question was a more
+convenient way to bring the development state into that clone. The question is gone with
+the clone (task 156): the scripts come with the binary and are unpacked into
+`~/.local/share/k-playbook/scripts/`, and `make dev-install` in the source repository brings
+a development state onto the machine.
 
 ## Open, Without A Specific Date
 
@@ -425,13 +429,6 @@ Discuss individually before work begins:
   was lost. Progress is read from `entries/*.json`; additionally, the server writes coarse status
   lines about the run, tool/job states, and completion to stdout.
 - What happens to `trufflehog` and `pip-audit`, which cannot produce SARIF: convert or replace.
-- **`k-check` as an MCP tool.** Today the runner emits terminal text;
-  `review-k-check-security` saves it as `raw/k-check-<mode>.txt`, and the assistant reads and
-  interprets it. Its parameters -- `--mode changed|baseline`, `--files-from`, `--base-ref`,
-  `--exclude`, `--timeout` -- are prose in the recipe. A tool could carry them as a schema and,
-  rather than returning raw output, state which checks ran and which failed with file and line.
-  `--metadata-output` already writes JSON; the structure therefore exists, it just does not reach
-  the assistant. Raw output remains in `raw/` -- it is auditable and not replaced.
 - **The changed state as an MCP tool.** What counts and what does not in an assessment is today
   prose in `commands/_task-run/diff-review.md`, the review module of `/k-task-run` ("generated
   files, lockfiles, and binary files are omitted"; for more than ~100 lines, summarize) and is

@@ -296,8 +296,8 @@ Unterkommandos:
              Arbeitsverzeichnis verwendet; eine vorhandene Datei bleibt immer
              unverändert.
   context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
-            Konfiguration und die effektiven Kataloge für reviews und
-            checks. Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
+            Konfiguration und den effektiven Katalog für reviews.
+            Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
             Zieht dabei die Assistenten-Verlinkung auf den Katalog nach;
             was sich geändert hat, steht unter "links".
   mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
@@ -401,10 +401,9 @@ Unterkommandos:
   upgrade   Aktualisiert Kephalaion und das Programm und zieht das Projekt
             nach: k-playbook upgrade [--check] [--json]. Zuerst Kephalaion
             (kephalaion upgrade --auto; fehlt es im PATH, wird es
-            installiert); dann git pull im Clone, solange es ihn gibt, und
-            das Release-Binary des neuesten Tags direkt von GitHub, geprüft
-            gegen die SHA256SUMS des Tags — nur wenn das laufende Programm
-            älter ist als der neueste Release-Tag, auch ohne Clone; dann
+            installiert); dann das Release-Binary des neuesten Tags direkt
+            von GitHub, geprüft gegen die SHA256SUMS des Tags — nur wenn das
+            laufende Programm älter ist als der neueste Release-Tag; dann
             AGENTS.md (Anstoß, abgelöste Blöcke), CLAUDE.md, Verlinkung und
             MCP-Einträge. Je
             Schritt eine Meldung, am Ende der Hinweis auf den Neustart der

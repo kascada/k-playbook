@@ -14,13 +14,13 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 
 | Feld | Bedeutung |
 |---|---|
-| `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"6"`. |
+| `schemaVersion` | Die Fassung der Briefing-Ausgabe, heute `"7"`. |
 | `session` | Die Kennung dieser Sitzung, mit jedem Briefing neu vergeben, etwa `20261024-183012-3fa9c1`. Sie steht in allem, was die Sitzung später wiederfinden muss — im Kopf eines Befunds unter `sitzung`, nach dem `/k-danke` sucht. Lädt eine Sitzung das Briefing neu, gilt die neue Kennung, und die frühere gehört weiter zu ihr. |
 | `documents.always` | Das zusammengebaute Verzeichnis `k-playbook:/instructions/always/`: `ref`, `content` (der Text selbst, Includes eingesetzt — eine Sitzung muss ihn nicht eigens lesen), `parts` in der Reihenfolge des Texts, `problems` (übergangene Teile). |
 | `documents.onDemand`, `documents.reviews`, `documents.guidelines` | Die Einträge der Sorte, je ein Dokument für sich: `ref`, `title`, `description`, `origin` (`dist`, `local`, `override` oder `disabled` für einen abgeschalteten Eintrag). Bei Anweisungen und Reviews sind mitgeliefert und projekteigen schon gegeneinander aufgelöst; Guidelines kommen nur mitgeliefert, ihre Herkunft ist immer `dist`. Gelesen wird über `ref` mit `k_playbook_doc_read`. |
 | `work` | Die eigene offene Arbeit aus der Projekt-Collection: `available` und `message` (ob die Collection lesbar war und sonst warum nicht), `user` (der eigene Kephalaion-User), `tasks` und `workbench` (je `ref`, `title`, `updated` und `problem`, wenn Kephalaion das Frontmatter nicht lesen konnte oder der Titel vermutlich an „ #“ abgeschnitten ist — gemeldet, nicht repariert; offen heißt: nicht in `done/`), `openFindings` (Zahl der offenen Befunde in `queue/findings/`). |
 | `projectDocs` | Der Einstieg der Projektdokumentation, als Verweis. |
-| `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, …), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
+| `health` | Die Umgebungsprüfung: `ok` (kein Eintrag der Stufe `error`; Warnungen lassen es wahr) und `problems`, je Eintrag `level` (`error` oder `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`, `program`), `message` (ein Satz, nie ein Token oder Wert) und `hint` (die Abhilfe), sortiert nach Bereich, dann Stufe. Ohne Problem ist `problems` leer. Dieselbe Antwort wie `k_playbook_health` und `k-playbook health --json`; Einzelheiten unten. |
 | `context` | Der Rest von `k-playbook context`: jedes Feld der Kontextausgabe unter seinem Namen, das das Briefing nicht in eigenen Abschnitten liefert — `catalogs.reviews` fehlt darum. Ein Übergang: Jedes Feld bekommt noch einen eigenen Platz oder entfällt. |
 
 ### Der Abschnitt `context`
@@ -34,7 +34,6 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.project.repoRoot`, `context.project.vcs` | Das Code-Repository für Git-Operationen, und ob es unter Versionskontrolle steht. |
 | `context.project.config` | Der Pfad der Konfiguration `K-PLAYBOOK.yaml`. Nur zur Auskunft; gelesen wird sie nie selbst. |
 | `context.project.languages` | Die Sprachen, für die das Projekt Werkzeuge braucht. Immer gefüllt — ein fehlender Eintrag fällt auf den Standard zurück, es gibt nichts zu deuten. |
-| `context.playbook.dir` | Die Installation. Nur lesen; sie wird bei jedem Update ersetzt. |
 | `context.local.dir` | Alles, was das Projekt besitzt. |
 | `context.remediation` | Wie Befunde abgearbeitet werden: `mode`, `target`, `grouping`, `quickWins`, `branchPrefix`, `prRequired`, `directFixes`, `configured`. |
 | `context.docs` | Was die Docs-Erzeuger beim Code-Scan zusätzlich zu ihren festen Ausschlüssen auslassen, aus dem Block `docs` in `K-PLAYBOOK.yaml`: `exclude` (Muster wie in `.gitignore`, relativ zu `project.repoRoot`; leer ohne Block) und `problems` (verworfene Einträge, je `pattern` und `reason`). Von hier lesen — nie die Datei selbst; eingetragen wird über `k_playbook_docs_exclude_add`. |
@@ -42,7 +41,6 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.mcp` | Die Pflichtliste der MCP-Server aus der Konfiguration (`required`, `configured`). Liest kein Command; Sache der Oberfläche. |
 | `context.git` | Ob die Oberfläche das Umschalten des Branches anbietet (`switch`, `allow`, `environments`, `configured`). Liest kein Command. |
 | `context.baseTools` | Die Werkzeuge, die k-playbook selbst aufruft, und was davon fehlt: `matrix`, `present`, `missing` (je `name`, `role`, `methods`), `ok`, `installCommand`. |
-| `context.catalogs.checks` | Die Checks — nur die mitgelieferten, `origin` immer `dist`; projekteigene Checks gibt es nicht. Reviews stehen nicht hier, sondern unter `documents.reviews`. |
 | `context.versionSources` | Zustand der Quellenkonfiguration des Versionsinventars `keph:/k-playbook/inventory.md`: ob sie da und lesbar ist, welche Zusatzquellen sie nennt, welche Bereiche sie ausschließt und welche Helm-Werte sie ausdrücklich nennt. Von hier lesen — nie das Dokument selbst. Einzelheiten unten. |
 | `context.kephalaion` | Die Anbindung des Projekts an seine Collection: `address`, `ok`, `user`, `message` u. a.; Hub und Collection aus dem Block `kephalaion:` von `.k-playbook/K-PLAYBOOK.yaml`, `account` und seine Herkunft `choice` (`override`, `default`, `only`) aus der Auskunft von Kephalaion. `keph:`-Verweise sind nur erreichbar, wenn `ok` wahr ist. |
 | `context.links` | Die Selbstheilung der Assistenten-Verknüpfungen: `healed`, `open`, `note`. Nur da, wenn es etwas zu melden gab; `note` sagt, was das für diese Sitzung heißt. |
@@ -56,9 +54,10 @@ welchem Zustand es ist, `present`, ob es da ist, `schemaVersion`, welche Vertrag
 erklärt (gelesen wird nur `3`), `sources` die konfigurierten Zusatzquellen (`path`, `kind`,
 `env`, `note`, `optional` je Eintrag), `exclude` die Muster, die der Standardlauf übergeht, und
 `helmValues` die konfigurierten Helm-Werte (`path`, `key`, `item` je Eintrag). Jeder Pfad steht
-relativ zur Projektwurzel; gelesen wird nur unterhalb von ihr. Die Installation `<playbook.dir>`
-durchsucht der Standardlauf nicht, und sie steht nicht in `exclude` — diese Regel kommt aus dem
-Vertrag, nicht aus dem Dokument.
+relativ zur Projektwurzel; gelesen wird nur unterhalb von ihr. Ein Verzeichnis `k-playbook/` im
+Projekt — ein liegengebliebener Clone aus dem früheren Modell — durchsucht der Standardlauf
+nicht, und es steht nicht in `exclude`: Diese Regel kommt aus dem Vertrag, nicht aus dem
+Dokument.
 
 `state` ist einer von vier Werten:
 
@@ -92,7 +91,10 @@ kommen. Je fehlendem Basis-Werkzeug
 `roots` (`state` `invalid`) — `error`; ebenso, wenn sie nicht erreichbar ist (`unavailable`),
 außer Kephalaion selbst ist nicht bereit: Dann trägt den Fehler schon der Bereich
 `kephalaion`. Die Einzelheiten stehen in `context.versionSources.error`. Liegt noch die alte
-`<local.dir>/version-sources.yaml` — `warning`, Abhilfe `/k-upgrade`.
+`<local.dir>/version-sources.yaml` — `warning`, Abhilfe `/k-upgrade`. Das Programm ist älter
+als das neueste veröffentlichte Release (Bereich `program`) — `warning`, Abhilfe
+`k-playbook upgrade`; das neueste Release liest die Prüfung aus einem Zwischenspeicher, der
+einige Stunden alt sein kann, und ohne Netz schweigt sie.
 Was eine Sitzung mit den Einträgen tut, steht in den immer geltenden Anweisungen: in der
 ersten Antwort nennen, Fehler vor der Arbeit, nichts still beheben, die Abhilfe aus `hint`
 anbieten. Nach einer Abhilfe liefert `k_playbook_health` den Stand neu, ohne das Briefing neu
@@ -147,7 +149,7 @@ Das Briefing gilt für die ganze Sitzung; der aufgelöste Stand ändert sich wä
 nicht. Neu geladen wird nur, wenn eines davon zutrifft:
 
 - `K-PLAYBOOK.yaml` wurde seit dem Laden geschrieben.
-- Ein Katalogeintrag — Regel, Review, Check, Guideline oder Anweisung — ist seit dem Laden
+- Ein Katalogeintrag — Review, Guideline oder Anweisung — ist seit dem Laden
   hinzugekommen, weggefallen oder geleert worden.
 - k-playbook wurde aktualisiert.
 - Die Arbeit ist in ein anderes Projekt gewechselt. Das Briefing sucht `K-PLAYBOOK.yaml` vom

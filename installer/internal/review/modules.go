@@ -28,8 +28,9 @@ const ManifestGoModule = "go.mod"
 // Werkzeug auf — sie sucht die Gegenstände, über die anschließend aufgefächert
 // wird. Es gibt keinen Aufruf, in dem sie stehen könnte.
 var moduleSearchExcluded = map[string]bool{
-	// Die Installationskopie ist ein eigener Clone mit eigenem Modul. Ihr Code
-	// ist ausgeliefertes Material, nicht Code des Projekts.
+	// Altbestand: ein liegengebliebener Clone des Werkzeugs aus der Zeit vor
+	// Task 156, mit eigenem Modul. Sein Code ist ausgeliefertes Material,
+	// nicht Code des Projekts.
 	"k-playbook": true,
 	// Ergebnisse, Tasks und Notizen — hier ganz und nicht nur results/ wie in
 	// den Scans: Projektcode liegt dort keiner, ein Modul hätte nichts zu

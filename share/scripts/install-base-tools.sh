@@ -75,7 +75,7 @@ Optionen:
   --prefix <dir>    User-lokales Prefix für den Release-Weg. Standard: ~/.local.
   --bin-dir <dir>   Bin-Verzeichnis. Standard: erstes PATH-sichtbares aus
                     ~/.opencode/bin oder ~/.local/bin, sonst <prefix>/bin.
-  --yes             Keine Rückfrage stellen. Für eine RUN-Zeile im Dockerfile.
+  --yes             Keine Rückfrage stellen, für einen unbeaufsichtigten Lauf.
   --dry-run         Zeigen, was geschähe, aber nichts installieren.
   -h, --help        Diese Hilfe zeigen.
 

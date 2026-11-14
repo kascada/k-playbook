@@ -13,10 +13,9 @@ Felder aus zwei Ladungen werden nie gemischt.
 Die Felder jeder Sitzung:
 
 - `context.now.date` ist das Datum. Nie raten, nie `date` rufen.
-- `context.project.dir`, `context.local.dir` und `context.playbook.dir` sind die drei Wurzeln.
-  Projekteigenes liegt unter `local.dir`, projekteigene Commands und Skills unter
-  `.k-playbook/commands/` und `.k-playbook/skills/` im `project.dir`; nach `playbook.dir` wird
-  nie geschrieben.
+- `context.project.dir` und `context.local.dir` sind die beiden Wurzeln. Projekteigenes liegt
+  unter `local.dir`, projekteigene Commands und Skills unter `.k-playbook/commands/` und
+  `.k-playbook/skills/` im `project.dir`. Was k-playbook mitliefert, liegt nicht im Projekt.
 - `documents.*` sind Verweise, gelesen mit `k_playbook_doc_read`. Einträge mit der Herkunft
   `disabled` werden übersprungen; die Überlagerung ist schon gerechnet.
 - `work` ist die eigene offene Arbeit.
@@ -27,8 +26,9 @@ nennst du, bevor du mit der Arbeit beginnst, und bietest die Abhilfe aus `hint` 
 Warnung arbeitest du weiter. Nichts davon behebst du still — das tut der Nutzer oder beauftragt
 es ausdrücklich. Bei `Umgebung: keine Probleme` schweigst du; `k_playbook_health` prüft neu.
 
-Nicht selbst lesen: `K-PLAYBOOK.yaml` und die Katalogverzeichnisse unter `k-playbook/` und
-`k-playbook-local/`. Ihr Inhalt kommt mit dem Briefing.
+Nicht selbst lesen: `K-PLAYBOOK.yaml` und die Katalogverzeichnisse unter `k-playbook-local/`
+und unter `k-playbook/` — einem liegengebliebenen Clone aus dem früheren Modell, falls das
+Projekt noch einen hat. Was gilt, kommt mit dem Briefing.
 
 Ablegen: Jeder Ort leitet sich aus `local.dir` ab. Was wohin gehört, steht in
 `k-playbook:/guidelines/betrieb.md`. Ein fehlendes Verzeichnis wird erfragt, nicht still angelegt.

@@ -12,13 +12,14 @@ den MCP-Server registrieren, Assistenten verlinken. Und es
 selbst tun muss. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug — siehe
 „Der MCP-Server".
 
-Alles Weitere — Reviews, Tasks, Checks — machen Commands und Skills im Assistenten, nicht
+Alles Weitere — Reviews, Tasks — machen Commands und Skills im Assistenten, nicht
 dieses Programm.
 
 Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`. Ausgeliefert wird es
 als ein Binary je Plattform; im Betrieb liegt es unter `~/.local/bin/k-playbook` und wird
-unter dem bloßen Namen `k-playbook` aufgerufen. Einen Einstiegspunkt im Projekt-Clone
-gibt es nicht mehr — `bin/install` ist der Bootstrap, nicht der Aufruf.
+unter dem bloßen Namen `k-playbook` aufgerufen. Einen Einstiegspunkt im Projekt gibt es
+nicht mehr, und auch keinen Clone des Werkzeugs dort — `bin/install` ist der Bootstrap,
+nicht der Aufruf.
 
 ## Acht Einstiege
 
@@ -38,8 +39,8 @@ if len(args) == 0 {
 ```
 
 Ohne Argument die Oberfläche — genauer: der **Client-Pfad** `runGUI()` in
-`cmd/k-playbook/gui.go`. Er räumt Altlasten weg, sperrt die
-Installation und sieht dann in der Laufzeitdatei nach, ob für dieses Projekt schon ein
+`cmd/k-playbook/gui.go`. Er räumt Altlasten weg und sieht dann in der Laufzeitdatei
+nach, ob für dieses Projekt schon ein
 Server läuft. Läuft einer, öffnet er nur den Browser; läuft keiner, startet er das eigene
 Binary mit `K_PLAYBOOK_SERVE=1` als abgekoppelten Server und endet, sobald der antwortet
 (siehe „Lebenszyklus"). Diese Umgebungsmarke ist der **verdeckte Servermodus**: kein
@@ -50,27 +51,25 @@ ohne Browser, die Ausgaben gehen ins Log.
 (`cmd/k-playbook/upgrade.go`): zuerst Kephalaion (Absatz „Kephalaion“ unter
 „Direktinstallation“), dann das Programm, dann das Projekt.
 
-Der Programmschritt hat zwei Teile, in dieser Reihenfolge. Erst `project.Update()`, der
-Pull im Clone, solange es ihn gibt: Er dient nur noch den Inhalten, die am Clone hängen, und
-entscheidet nicht mehr über Version und Installation. Dann der Vergleich der eigenen
+Der Programmschritt: der Vergleich der eigenen
 Version mit dem neuesten Release-Tag auf GitHub (`program.CheckStatus()`, Abschnitt „Version
 und Installation aus dem Release“) und — nur wenn das laufende Programm älter ist —
 `program.Install()`: das Release-Binary dieses Tags, geprüft gegen die `SHA256SUMS` des
 Tags. Ein Build über dem neuesten Tag (`make dev-install VERSION=…`) gilt als aktuell, und
-herabgestuft wird nie. Vergleich und Installation laufen, ob es den Clone gibt oder nicht
-und ob der Pull gelingt oder nicht; ein fehlender Clone und ein gescheiterter Pull werden
-gemeldet. Ohne eigene Version wird der Tag nicht abgerufen; ist er unbekannt — ohne Netz,
+herabgestuft wird nie. Ohne eigene Version wird der Tag nicht abgerufen; ist er unbekannt — ohne Netz,
 ohne git, Zeitüberschreitung —, sagt die Meldung das, und das Projekt wird trotzdem
-nachgezogen.
+nachgezogen. Einen Pull gibt es nicht mehr (Task 156): Der Pull, die Prüfung des
+Remote-Stands und der Schreibschutz sind entfallen, ein Verzeichnis `k-playbook/` im Projekt fasst der Lauf
+nicht an und nennt es nicht — weder mit `upgrade` noch mit `--check` oder `--json`. Einen
+alten Clone löscht /k-upgrade (Umstellung 3.8).
 
 Der Projektschritt: zuerst der Umzug der Anbindung aus einer alten
 `k-playbook-local/K-PLAYBOOK.local.yaml` in den Block `kephalaion:` von `K-PLAYBOOK.yaml`
 (`project.MigrateKephalaionBinding()`, Abschnitt „Altbestand `K-PLAYBOOK.local.yaml`“), dann
 `ApplyAssistantSetup()`, dann immer die MCP-Einträge: `project.RepairMCPReport()` mit der
 Schreibregel des Starts (`MCPWriteOutdatedAndUnversioned`), auch unter `--project-only`.
-Die Reparatur hängt nicht mehr am Pull — `project.Update()` repariert nicht selbst. Das
-ist gewollt mehr als früher nach einem gelungenen Pull, der nur veraltete Einträge
-ersetzte: Ein Lauf ergänzt auch einen fehlenden Eintrag bzw. eine fehlende Datei, wenn die
+Ein Lauf ersetzt einen veralteten Eintrag und ergänzt auch einen fehlenden Eintrag bzw. eine
+fehlende Datei, wenn die
 Zieldatei nicht von git erfasst ist. Hat die Installation das Binary ersetzt, führt
 nicht der noch laufende alte Prozess den Projektschritt aus — er hätte alte Vorlagen und
 alte Erkennung —, sondern er startet das neu installierte Programm mit
@@ -80,7 +79,7 @@ kam. Den Schalter `--repair-mcp` nimmt `--project-only` weiter an, er entscheide
 nichts mehr: Ein Binary von vor Task 149 gab damit mit, dass sein Pull entfiel, und startet
 das neu installierte Programm noch so.
 
-Je Schritt eine Meldung, ohne Clone oder ohne Netz eine klare Meldung statt eines
+Je Schritt eine Meldung, ohne Netz eine klare Meldung statt eines
 Abbruchs, ein gescheiterter Download oder Install eine eigene — mit der Erstinstallation
 (`curl … | bash`, `project.FirstInstallCommand`) als Weg im Terminal, denn `upgrade` selbst
 ist dann gescheitert; am Ende, wenn das Binary
@@ -89,12 +88,12 @@ behält das alte Programm, und ein eigener, wenn Kephalaion aktualisiert oder se
 gestartet wurde. Hat der Lauf das Binary
 gewechselt, sagt die letzte Zeile, dass /k-upgrade in einer neuen Sitzung die
 Umstellungen nachzieht — der Hinweis hängt allein am Binärwechsel; `--check` gibt dafür eine
-Vorschauzeile aus, wenn das Programm älter als der neueste Tag und installierbar ist oder der
-Clone hinter seinem Remote liegt, `--project-only` nichts —,
+Vorschauzeile aus, wenn das Programm älter als der neueste Tag und installierbar ist,
+`--project-only` nichts —,
 außer `K_PLAYBOOK_VIA_COMMAND=1` ist gesetzt (gelesen allein in `upgradeViaCommand`), wie es
 Hülle und Ersatzaufruf von /k-upgrade tun: eine Variable statt eines Schalters, weil ein altes
 Binary einen unbekannten Schalter abwiese und die Einbettung scheitern ließe. `--check` schreibt nichts: `kephalaion upgrade --check --json` für
-Kephalaion (nie `--auto`), `CheckUpdate()` für den Clone und
+Kephalaion (nie `--auto`),
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
 `PendingLinkChanges()`, `CheckMCP()` und `MigrateKephalaionBinding()` mit `check` für das,
 was ein Lauf am Projekt täte — kein
@@ -148,9 +147,10 @@ Quellen — Manifeste, Lockfiles, Container-, DevContainer-, Helm- und CI-Dateie
 unterhalb der Projektwurzel, dazu die im Frontmatter der Quellenkonfiguration
 `keph:/k-playbook/inventory.md` konfigurierten (Task 144; `inventory.Run` liest sie über
 denselben Store, über den es schreibt) —, fragt kein Netz und führt
-kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei die Installation
-`<projekt>/k-playbook/` — ein Clone des Werkzeugs, der in jedem Zielprojekt dieselben
-Manifeste trägt — und die Muster aus `exclude:` der Quellenkonfiguration; beide Ausschlüsse
+kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei ein Verzeichnis
+`<projekt>/k-playbook/` — Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem
+früheren Modell, dessen Manifeste nichts über das Projekt sagen — und die Muster aus
+`exclude:` der Quellenkonfiguration; beide Ausschlüsse
 stehen mit der Zahl der übergangenen Quellen im Inventar, und ein Eintrag in `sources:`
 holt jede Quelle daraus wieder herein. Eine Quelle, die gelesen, aber als Ganzes nicht
 ausgewertet werden konnte — eigener Parse-Fehler, fehlendes Wurzelpaket einer
@@ -409,8 +409,9 @@ installer/
 │   │                            unbekannt
 │   ├── path.go                  zeigt `k-playbook` im PATH auf ~/.local/bin/k-playbook?
 │   └── install.go               Version einer Datei über `k-playbook version` lesen,
-│                                bin/install des Clones anstoßen, Ergebnis gegen
-│                                SHA256SUMS prüfen
+│                                das Release-Binary des neuesten Tags über
+│                                release.Install installieren, eine Datei gegen die
+│                                SHA256SUMS des Tags prüfen
 ├── internal/procgroup/
 │   ├── procgroup.go             externer Prozess in eigener Prozessgruppe: Frist oder
 │   │                            Abbruch beenden die ganze Gruppe (SIGKILL an -pid)
@@ -472,7 +473,6 @@ installer/
 │   │                            liest das Token und baut ChildEnv
 │   ├── git_settings.go          Abschnitt git: lesen und prüfen, git.allow-Muster,
 │   │                            Branch-Namen prüfen
-│   ├── update.go                Remote-Stand prüfen, Fast-Forward
 │   ├── docs.go                  Handbook: die Handbücher der Oberfläche (k-playbook aus
 │   │                            docs/handbook/ der mitgelieferten Ebene, Projekt aus
 │   │                            keph:/docs/manual/handbook/) auflisten und lesen
@@ -720,14 +720,16 @@ Der zentrale Mechanismus, in `project/discover.go`:
 
 1. Ab `startDir` aufwärts, ein Kandidat je Ebene: `<dir>/.k-playbook/K-PLAYBOOK.yaml`
    (`ConfigPath`).
-2. Fund: `ProjectDir = <dir>`, `PlaybookDir = <dir>/k-playbook`.
+2. Fund: `ProjectDir = <dir>`. Einen zweiten Pfad für eine Installation im Projekt gibt
+   es nicht mehr (Task 157); `PlaybookDir(<dir>)` nennt nur noch den Ort eines früheren
+   Clones, für den Code, der Altbestand erkennt.
 3. Grenze sind `$HOME` und `/`, jeweils einschließlich.
 4. Nichts gefunden: `ErrNotFound`. Nicht raten, nichts anlegen.
 
-Der Anker ist die **Datei**, nicht das Verzeichnis `.k-playbook/`: Das Quell-Repo
-versioniert `.k-playbook/.gitignore`, jede Installation `k-playbook/` trägt das Verzeichnis
-also selbst, und die Link-Pflege (`sharelink.go`) legt es auch ohne Konfiguration an. Am
-Verzeichnis allein fände `Discover` ein Projekt in der Installation.
+Der Anker ist die **Datei**, nicht das Verzeichnis `.k-playbook/`: Die Link-Pflege
+(`sharelink.go`) legt das Verzeichnis auch ohne Konfiguration an, und ein liegengebliebener
+Clone `<projekt>/k-playbook/` kann es aus einem älteren Stand des Quell-Repos tragen. Am
+Verzeichnis allein fände `Discover` ein Projekt, wo keines ist.
 
 **Umzug vom früheren Ort.** Bis 2026-11 lag der Anker als `<dir>/K-PLAYBOOK.yaml` direkt
 im Hauptverzeichnis (`legacyConfigPath`). `Discover` ruft vor der Prüfung jeder Ebene
@@ -737,12 +739,11 @@ zeigt, und der Link entfernt). `CreateConfig` zieht ebenso um, bevor es anlegt. 
 keine Phase, in der beide Orte gelesen werden — ein Release genügt, und ein älteres
 Programm findet ein umgezogenes Projekt nicht mehr; jede Umgebung des Projekts braucht dann
 das neue. Die Quelle `anchor` der Umgebungsprüfung meldet, wenn der Umzug im Index noch
-nicht nachvollzogen ist (siehe „Umgebungsprüfung: `health`“). `bin/k-check` liest nur den
-neuen Ort.
+nicht nachvollzogen ist (siehe „Umgebungsprüfung: `health`“).
 
-**Die Suche darf nicht am Git-Worktree-Root abbrechen.** `<projekt>/k-playbook/` ist ein
-eigener Clone und damit ein eigener Worktree; wer von dort aus sucht, käme sonst nie an
-die Konfiguration eine Ebene darüber. Das ist der häufigste Fall, nicht der Sonderfall.
+**Die Suche darf nicht am Git-Worktree-Root abbrechen.** Das Repository des Projekts kann
+unterhalb des Hauptverzeichnisses liegen (`project.repo_root`) und ist dann ein eigener
+Worktree; wer von dort aus sucht, käme sonst nie an die Konfiguration eine Ebene darüber.
 
 `homeDir()` löst Symlinks auf, damit der Vergleich auch bei verlinktem `$HOME` greift.
 
@@ -751,14 +752,16 @@ tragen ihre eigene `K-PLAYBOOK.yaml` und werden gleich behandelt. Der einzige Un
 ist installiert oder nicht — siehe `Environment` in `project/environment.go`.
 
 Für das Entwicklungsrepo heißt das: der Anker ist `<repo>/.k-playbook/K-PLAYBOOK.yaml`
-(dort ignoriert, nicht versioniert), die Installation liegt darunter in `<repo>/k-playbook/` und ist ein eigener Clone. Es gibt das
-Playbook dort also zweimal — den Arbeitsstand im Repo und die installierte Fassung
-daneben. Dass beide auseinanderlaufen können, wird bewusst in Kauf genommen; gearbeitet
-wird am Repo-Stand, aufgelöst wird gegen die Installation.
+(dort ignoriert, nicht versioniert). Es gibt das Playbook dort trotzdem zweimal — den
+Arbeitsstand im Repo und die installierte Fassung: das Binary unter `~/.local/bin`, was
+es nach `~/.local/share/k-playbook/` entpackt, und die Texte auf dem Hub. Dass beide
+auseinanderlaufen können, wird bewusst in Kauf genommen; gearbeitet wird am Repo-Stand,
+aufgelöst wird gegen die installierte Fassung. Bis Task 156 war die installierte Fassung
+ein eigener Clone unter `<repo>/k-playbook/`.
 
 ## Ort vorschlagen, wenn nichts gefunden wurde
 
-Nach einem `git clone` existiert noch keine Config, die Suche schlägt also fehl. `Suggest()`
+In einem neuen Projekt existiert noch keine Config, die Suche schlägt also fehl. `Suggest()`
 in `project/config.go` **darf** raten, anders als `Discover` — geschrieben wird ohnehin
 erst nach Bestätigung. Kandidaten in dieser Reihenfolge:
 
@@ -779,6 +782,11 @@ liegt, sondern was in `project.repo_root` gehört:
 | `A/.git` vorhanden | `A` | `.` |
 | `A/G/.git`, `A` selbst ohne `.git` | `A` | `G` |
 | mehrere Kandidaten unter `A` | `A` | leer, der Nutzer wählt |
+
+Ein Unterverzeichnis `k-playbook` zählt dabei nie als Kandidat: Ein liegengebliebener Clone
+des Werkzeugs aus dem früheren Modell hat ein `.git` und wäre sonst das „Repository“ des
+Projekts. Der Kommentar, den `renderConfig()` in jede neue `K-PLAYBOOK.yaml` schreibt, nennt
+keine Installation im Projekt mehr (Task 157).
 
 ## Config lesen ohne YAML-Parser
 
@@ -821,13 +829,12 @@ unberührt; ein Projekt ohne das Verzeichnis bleibt nach Start der Oberfläche, 
 `LocalDir()`), für die Leser von Altbestand: die Gesundheitsprüfung, den Umzug in
 `k-playbook upgrade` und `/k-upgrade`, die lokale
 Ebene von `testdata/`, die Liste der bisherigen Review-Läufe
-und die Vorprüfung beim Branchwechsel. Die Instruktionsdatei `k-playbook.md` und die lokale
-Ebene `k-playbook-local/guidelines/` liest seit Task 148 nichts mehr. Mit Task 147 entfallen
+und die Vorprüfung beim Branchwechsel. Die lokale Ebene `k-playbook-local/guidelines/` liest
+seit Task 148 nichts mehr. Mit Task 147 entfallen
 sind:
 
 - Die Liste der Einträge in `project/local.go` samt ihren Funktionen zum Prüfen und
-  Anlegen, dazu die Vorlagen der READMEs und der projekteigenen `k-playbook.md`. Zuletzt
-  standen noch `priv/` und `k-playbook.md` in der Liste.
+  Anlegen, dazu die Vorlagen der READMEs.
 - Der selbsttätige Weg in der Startpflege (`careForHost()` in `cmd/k-playbook/gui.go`), der
   das ganz fehlende Verzeichnis anlegte.
 - Die Karte „Projekteigene Struktur" der Setup-Seite mit dem Knopf „Anlegen"
@@ -855,9 +862,8 @@ Was früher in der Liste stand und wohin es gegangen ist:
   der Projekt-Collection unter `keph:/k-playbook/<sorte>/` (`NewKephProjectLayerSource()` in
   `project/projectlayer.go`, unten unter „Kataloge auflösen“);
   `k-playbook-local/instructions/`, `includes/` und `reviews/` liest nichts mehr.
-- `checks/` (Task 134): Projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen:
-  `bin/k-check` führt nur die mitgelieferten aus `k-playbook/checks/` aus, und der Katalog
-  `checks` hat keine lokale Ebene (`resolveCatalog()`, unten).
+- `checks/` (Task 134): Projekteigene Checks gab es danach nicht mehr; seit Task 155 gibt es
+  auch keine mitgelieferten, keinen Runner `bin/k-check` und keinen Katalog `checks`.
 - Die Quellenkonfiguration des Versionsinventars (Task 144): Sie ist das Dokument
   `keph:/k-playbook/inventory.md` in der Projekt-Collection (`versionsources.DocName`),
   angelegt von `/k-doc-inventory` bei der ersten bestätigten Ergänzung. Liegt die alte
@@ -1003,10 +1009,10 @@ beide **lesen** wollen: `assistantHandler()` (`GET /api/assistant`) und `Context
 — und damit vom Subkommando `context` wie vom MCP-Werkzeug.
 
 Der Grund ist eine Zuordnung, die lange falsch herum gedacht war. Welche Links gelten,
-folgt dem **Katalog dieses Projekts**, nicht dem Weg, auf dem die Installation zu ihrem
+folgt dem **Katalog dieses Projekts**, nicht dem Weg, auf dem das Programm zu seinem
 Stand kam. Hing das Nachziehen an einem Weg — dem Update-Handler —, blieb die
-Registrierung bei jedem anderen stehen: `make -C k-playbook installer-update`,
-ein `git pull` von Hand. Und zwar unbemerkt; gesehen hat es nur, wer die
+Registrierung bei jedem anderen stehen — damals `make -C k-playbook installer-update`
+und ein `git pull` von Hand, die es seit Task 156 nicht mehr gibt. Und zwar unbemerkt; gesehen hat es nur, wer die
 Assistenten-Karte öffnete. Der Lesepfad ist die richtige Stelle, weil er ohnehin bei
 jedem Sitzungsstart betreten wird und weil er dasselbe Projekt meint.
 
@@ -1165,8 +1171,8 @@ das er nicht einlöst, ist schlechter als ein Hinweis.
 
 Die Gegenrichtung — `stale` — braucht ein Kriterium dafür, welche Links von uns stammen.
 `ownedLinks()` löst jeden Symlink auf und nimmt nur die, die nach `.k-playbook/share`,
-`.k-playbook/commands/`, `.k-playbook/skills/`, `k-playbook-local/` oder in den Clone
-`k-playbook/` zeigen. Clone und `k-playbook-local/` stehen dabei, damit die Links aus der Zeit
+`.k-playbook/commands/`, `.k-playbook/skills/`, `k-playbook-local/` oder in den früheren
+Clone `k-playbook/` zeigen. Clone und `k-playbook-local/` stehen dabei, damit die Links aus der Zeit
 vor Stufe 2 und vor Task 129 als unsere gelten: was noch im Katalog steht, ist `wrong` und
 wird umgesetzt, was nicht, ist `stale` und verschwindet. Alles andere im Verzeichnis gehört dem Projekt und wird
 weder bewertet noch angefasst.
@@ -1232,9 +1238,10 @@ wie unter `k-playbook:` — `k-playbook:/guidelines/betrieb.md` ist
   Vorhabens „Clone abschaffen“. Im Quell-Repo selbst gilt damit der veröffentlichte Stand vom
   Hub, nicht der Arbeitsbaum `defaults/` — wie vorher mit dem Clone.
 - **Tests** fragen den Node nicht: Das Paket `project` setzt in `TestMain` einen
-  `kephtest.Store` ein, gefüllt beim Öffnen aus dem Baum, den ein Test unter
-  `k-playbook/defaults/` anlegt (`isolateDefaults`); die anderen Pakete nehmen dafür
-  `project/defaultstest`. Tests gegen den echten Lieferumfang füllen den Store aus dem
+  `kephtest.Store` ein, gefüllt beim Öffnen aus dem Baum, den ein Test in seinem
+  Testprojekt unter `test-defaults/` anlegt (`isolateDefaults`, `testDefaultsDir`; bis
+  Task 157 lag er unter `k-playbook/defaults/`); die anderen Pakete nehmen dafür
+  `project/defaultstest` mit derselben Konstante `DefaultsDir`. Tests gegen den echten Lieferumfang füllen den Store aus dem
   `defaults/` des Repos (`kephtest.Defaults`).
 
 ## Die projekteigene Ebene aus der Collection des Projekts
@@ -1290,13 +1297,6 @@ Anstoß in `AGENTS.md`:
 | `<hub>:k-playbook/defaults/instructions/` | jedes Projekt, das k-playbook nutzt | der Hub holt den neuen Release |
 | `keph:/k-playbook/instructions/` (Collection des Projekts, seit Task 143) | nur dieses Projekt | bleibt |
 
-Die frühere Instruktionsdatei `k-playbook.md` — mitgeliefert oben in der Installation,
-projekteigen in `k-playbook-local/` — gibt es nicht mehr (Task 148): `instructionFiles()`
-und das Feld `instructions` der Kontextausgabe sind entfernt, die mitgelieferte Datei ist
-aus dem Quell-Repo gelöscht (oben und unter `defaults/`), und kein Command lässt „die
-Dateien aus `instructions`" lesen. `TestBuildContextNenntKeineInstructions` hält fest, dass
-die Kontextausgabe eine liegengebliebene Datei nicht nennt.
-
 Die Sorte `instructions` — das Verzeichnis `instructions/` mit `always/` und `on-demand/` —
 hängt nicht in `catalogKinds()`; die Kontextausgabe nennt sie nicht, das Briefing liefert
 sie (`documents.always`, `documents.onDemand`).
@@ -1311,8 +1311,8 @@ Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `alw
 `NewKephDefaultsSource` in `project/defaultsdocs.go`) — ebenso jede andere Sorte unter
 `k-playbook:`: `commands`, deren Text in `defaults/commands/` liegt, während die Hülle für den
 Assistenten aus dem Binary kommt (Task 092), die Include-Sorten `includes` und `testdata`
-(Task 093) und `reviews`, `guidelines`. Aus der Installation `k-playbook/` liest
-keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg.
+(Task 093) und `reviews`, `guidelines`. Aus dem früheren Clone `k-playbook/` im Projekt
+liest keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg.
 Regeln und Zugriffswege:
 [`../../defaults/docs/handbook/verweisschema.md`](../../defaults/docs/handbook/verweisschema.md).
 
@@ -1340,8 +1340,8 @@ einmal je Host oder DevContainer installierte `k-playbook` unter seinem Namen.
 
 Der Marker allein war zu wenig. Ein Bestandsprojekt trug den Anstoß des abgelösten
 Wrapper-Modells (`k-playbook/bin/k-playbook context`); weil der Marker dastand, tat
-`applyRootInstructions()` nichts — und der Git-Update-Weg erreicht die Datei nicht, denn
-sie liegt im Hauptverzeichnis und nicht im Clone. Nach dem Entfernen des Wrappers zeigte
+`applyRootInstructions()` nichts — und der damalige Git-Update-Weg erreichte die Datei
+nicht, denn sie liegt im Hauptverzeichnis und lag nicht im Clone. Nach dem Entfernen des Wrappers zeigte
 sie dauerhaft auf eine Datei, die es nicht mehr gibt. Dasselbe gilt seit dem Briefing für
 die Fassung mit `k-playbook context`, die das Binary bis dahin auslieferte.
 
@@ -1398,7 +1398,7 @@ Drei Einstiege, wie bei MCP:
 
 | Weg | Einstieg | Tut |
 |---|---|---|
-| ausdrücklich | `ApplyRootInstructions()`, Einrichten, „Aktualisieren“ nach gelungenem Pull und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Zusatzblöcke entfernen, `opencode.json` registrieren |
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Zusatzblöcke entfernen, `opencode.json` registrieren |
 | ausdrücklich, im Terminal | `k-playbook upgrade` (`cmd/k-playbook/upgrade.go`), über `ApplyAssistantSetup()` | dasselbe, nach dem Programm-Update; `--check` meldet aus `CheckRootInstructions()`, was ein Lauf täte |
 | selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen, Zusatzblöcke entfernen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
 
@@ -1446,23 +1446,22 @@ nichts ab, und das Feld `guidelines` der Kontextausgabe ist entfernt. Das Einric
 Verzeichnis nicht an, `/k-upgrade` löscht es; projekteigene Guidelines liegen unter
 `keph:/docs/guidelines/`, wie sie von dort gelesen werden, ist Todo #40.
 
-Zwei Sorten, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 135 entfallen:
+Eine Sorte, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 135 entfallen,
+die für Checks seit Task 155:
 
 | Sorte | Verzeichnis | Muster |
 |---|---|---|
 | `reviews` | `reviews/` | `review-*.md` |
-| `checks` | `checks/` | `*.sh` |
 
 Mitgeliefert liegt `reviews` seit Task 131 in `<hub>:k-playbook/defaults/`, projekteigen seit
 Task 143 in der Collection des Projekts unter `k-playbook/reviews/`:
 `resolveCatalog()` nimmt für beide Ebenen dieselben Quellen wie die Verweise
-(`NewProjectDefaultsSource`, `NewProjectLocalDocSource`),
-`checks` liest weiter aus der Installation `k-playbook/checks/` (die Checks fallen ohnehin
-weg). `checks` hat seit Task 134 keine lokale Ebene: `resolveCatalog()` lässt `Local` leer,
-jeder Eintrag ist `dist`, keiner abgeschaltet, ein `k-playbook-local/checks/` wird nicht
-gelesen. `path` eines Eintrags ist darum nicht immer ein Plattenpfad: bei `checks` die Datei
-in der Installation, bei `reviews` immer der wirksame Verweis `k-playbook:/reviews/<name>`,
-gleich ob `dist`, `local` oder `override`. Den Ort eines projekteigenen Rezepts in der
+(`NewProjectDefaultsSource`, `NewProjectLocalDocSource`).
+`path` eines Eintrags ist darum kein Plattenpfad, sondern immer der wirksame Verweis
+`k-playbook:/reviews/<name>`, gleich ob `dist`, `local` oder `override`. Ein
+liegengebliebenes `k-playbook/checks/` oder `k-playbook-local/checks/` wird nicht mehr gelesen.
+Im Briefing fehlt `catalogs` darum ganz: `catalogs.reviews` steht unter `documents.reviews`,
+und `dropOrderedField()` lässt ein Objekt fallen, das dabei leer wird. Den Ort eines projekteigenen Rezepts in der
 Collection nennt das Feld `location` (`keph:/k-playbook/reviews/<name>`), nie `path`. Wer den Inhalt braucht,
 liest über `project.ReadCatalogEntry()` — Verweis über frische `ProjectDocLayers`, sonst die
 Platte; so liest `readAIRecipeMetadata()` in `mcpserver/review.go` ein einzelnes Rezept, auch
@@ -1505,8 +1504,7 @@ statt einen zweiten Mechanismus zu brauchen. Es steht außerdem im Repo, version
 mit Begründung, statt in einer Konfigurationszeile.
 
 `isCatalogEntry()` filtert, was nie ein Eintrag ist: `README.md`, Dotfiles und alles, was
-nicht zum Muster passt. Unterverzeichnisse wie `checks/lib/` ebenso — dort liegt
-Hilfscode.
+nicht zum Muster passt. Unterverzeichnisse ebenso.
 
 Der Security-Tool-Preflight fehlt im Kontext bewusst — aber nicht, weil eine
 Werkzeugprüfung generell zu teuer wäre. Entscheidend ist, **was** geprüft wird:
@@ -1530,45 +1528,39 @@ anderes.
 
 ## Aktualisieren
 
-`project/update.go`, zwei Schritte:
+Aktualisiert wird nur noch das Programm, aus dem Release (nächster Abschnitt), und danach
+das Projekt. Einen Clone zieht nichts mehr nach (Task 156): `project/update.go` mit der
+Prüfung des Remote-Stands (`git ls-remote` gegen den Upstream des Clones), dem Pull
+(`git pull --ff-only`) und den Ergebnistypen beider ist entfallen, ebenso
+`project/permissions.go` mit dem Schreibschutz um den Pull
+und aus `publicremote.go` die Umstellung eines SSH-Remotes auf
+`https://github.com/kascada/k-playbook.git`. Geblieben sind `GitOutput()` (jetzt in
+`gitrun.go`), `RepairMCPReport()`/`MCPRepairReport` (jetzt in `mcp.go`) und in
+`publicremote.go` die drei Lesefunktionen für `context.github` (`upstreamRemote()`,
+`remoteRawURL()`, `projectRemoteURL()`).
 
-`CheckUpdate()` fragt den Remote-Stand ab. Bewusst `git ls-remote` statt `git fetch`: die
-Prüfung läuft ungefragt nach dem Start und darf den Zustand des Repositorys nicht
-anfassen. Upstream wird aus `branch.<name>.remote` und `branch.<name>.merge` gelesen; ohne
-Upstream, ohne Branch oder bei nicht erreichbarem Remote gibt es eine Meldung statt eines
-Fehlers. Ein Timeout von 15 Sekunden verhindert, dass ein hängender Remote die
-Oberfläche blockiert.
+Was damit im Programm nicht mehr vorkommt: kein `git ls-remote` und kein `git pull` in
+einem Verzeichnis `k-playbook/`, kein `chmod` darauf — weder beim Start der Oberfläche
+(`protectProjectInstallation()` ist entfallen) noch nach dem Anlegen oder Zurücksetzen der
+Konfiguration —, keine Zeile dazu in `k-playbook upgrade`, `upgrade --check` und `--json`
+und kein Feld `playbookPresent` in `Environment`. Ein Projekt ohne `k-playbook/` ist
+vollständig. Liegt ein alter Clone noch da, bleibt er unberührt, auch mit dem Schreibschutz
+früherer Versionen; gelöscht wird er von /k-upgrade, Umstellung 3.8
+(`defaults/commands/k-upgrade.md`), die danach auch die Zeilen für `k-playbook/` und
+`k-playbook-local/` aus den `.gitignore`-Dateien streicht. Sie verlangt ein Programm ab
+v0.16.39, erkannt an `neuestes Release` in der Zeile `Programm-Stand: nichts zu tun — …`:
+Ein Binary bis v0.16.38 braucht den Clone noch für sein eigenes Upgrade.
 
-`Update()` holt den Stand per `git pull --ff-only`. Nur Fast-Forward: ein Merge im Clone
-erzeugte eine lokale Historie, die niemand pflegt. Wer dort committet hat, soll das selbst
-auflösen. Die Installation ist normalerweise read-only; `Update()` macht sie unmittelbar
-vor dem Pull für den Eigentümer beschreibbar und setzt sie per `defer` danach wieder
-read-only.
-
-Das Repo ist öffentlich, die Anleitung ließ es aber lange per SSH klonen. Ein so
-angelegter Clone verlangte bei jedem Pull einen Schlüssel. `publicremote.go` erkennt die
-SSH-Formen des offiziellen Repos auf github.com (`git@github.com:kascada/k-playbook`,
-`ssh://git@github.com/kascada/k-playbook`, mit oder ohne `.git`). `Update()` stellt den
-Upstream dann vor dem Pull bleibend auf `https://github.com/kascada/k-playbook.git` um und
-meldet das in `UpdateResult.RemoteSwitched`; `k-playbook upgrade` gibt es als eigene Zeile
-aus. `CheckUpdate()` fragt in diesem Fall nur über HTTPS und lässt den Clone unverändert.
-Gelesen wird der rohe Eintrag `remote.<name>.url`, nicht `git remote get-url`, das
-`insteadOf` schon angewendet hat. Ein Alias-Host aus `~/.ssh/config` (`git@github-<name>:…`)
-und jedes andere Repo bleiben stehen: Wer so etwas einträgt, hat das bewusst gewählt.
-
-Beim Start der Oberfläche ruft `protectProjectInstallation()` denselben Schutz auf. Das
-ist keine Sicherheitsgrenze gegen den Besitzer des Verzeichnisses, sondern eine wirksame
-Barriere gegen versehentliche Schreibwerkzeuge: in `k-playbook/` wird nur noch in
-gezielten Wartungswegen geschrieben.
+Im Quell-Repo sind mit dem Pull auch die Make-Ziele `installer-update`,
+`installer-writable` und `installer-readonly` samt `INSTALLATION_DIR` entfallen.
 
 ### Version und Installation aus dem Release
 
 Es gibt genau zwei Versionsquellen: die eigene Version im Binary (`buildinfo.Version`) und
 den Tag des neuesten veröffentlichten Release auf GitHub. Jeder Vergleich und jede Installation des Programms
-geht von diesen beiden aus (Task 149). Der Clone `<projekt>/k-playbook/` spielt dabei keine
-Rolle mehr: Kein Vergleich und keine Installation liest seine `VERSION`, seine
-`SHA256SUMS` oder ruft sein `bin/install` auf. Der Pull im Clone bleibt vorerst für die
-Inhalte, die noch an ihm hängen; über Version und Installation entscheidet er nicht.
+geht von diesen beiden aus (Task 149). Der frühere Clone `<projekt>/k-playbook/` spielt
+dabei keine Rolle mehr: Kein Vergleich und keine Installation liest seine `VERSION`, seine
+`SHA256SUMS` oder ruft sein `bin/install` auf.
 
 Die zweite Quelle kennt das Blattpaket `internal/release` — gelesen wird über HTTPS und
 anonym, weil das Repo öffentlich ist und kein Nutzer einen Schlüssel brauchen soll, und
@@ -1609,7 +1601,7 @@ Den Cache nehmen die reinen Hinweise: die Quelle `program` der Umgebungsprüfung
 `k_playbook_health`, `k-playbook health`), der Hinweis beim Start der Oberfläche und
 `GET /api/update` beim Laden der Seite. Frisch fragen alle Wege, die installieren oder
 ausdrücklich prüfen: `k-playbook upgrade` samt `--check`, `version --all`,
-`POST /api/update`, `POST /api/update/program` und `GET /api/update?fresh=1` (der Knopf
+`POST /api/update/program` und `GET /api/update?fresh=1` (der Knopf
 „Update prüfen“). `program.CheckStatus()` bekommt das als Parameter (`program.Fresh`,
 `program.Cached`).
 
@@ -1676,34 +1668,26 @@ Prüfung lädt je etwas.
 
 ### Die Verlinkung wird mitgezogen
 
-`relinkAfterUpdate()` in `webui/update.go` ruft nach erfolgreichem Pull
-`ApplyAssistantSetup()` auf. Das ist kein Komfort, sondern nötig: seit Commands und
-Skills **einzeln** verlinkt werden, kommt ein neu mitgelieferter Command nicht mehr von
-selbst an. Ein Verzeichnis-Symlink hatte das automatisch getan; ein Update, das den
-Katalog ändert, ihn aber nicht registriert, wäre halb erledigt — und zwar unsichtbar.
+Seit Commands und Skills **einzeln** verlinkt werden, kommt ein neu mitgelieferter Command
+nicht mehr von selbst an. Ein Verzeichnis-Symlink hatte das automatisch getan; ein Update,
+das den Katalog ändert, ihn aber nicht registriert, wäre halb erledigt — und zwar
+unsichtbar.
 
-Aufgerufen wird derselbe Ablauf wie beim Einrichten, nicht bloß `ApplyLinks()`. Drei
-Änderungen an diesem Einstieg sind gewollt und stehen deshalb im Antworttext: das
-Aktualisieren bringt jetzt den Anstoß mit — der Marker macht das idempotent —, es zieht
-einen veralteten Anstoß nach und entfernt die abgelösten Zusatzblöcke (`describeSetup()`),
-und in einem Projekt ohne `AGENTS.md` legt es die Datei erstmals aus der Vorlage an. Sonst
-bliebe ein Projekt mit nur echter `CLAUDE.md` über „Aktualisieren" für immer unverändert.
-Im Terminal tut `k-playbook upgrade` dasselbe (§„Acht Einstiege").
-Umbenennung und Konflikt gehören ebenfalls in den Antworttext.
+Die Oberfläche hat dafür keinen eigenen Schritt mehr: `POST /api/update` samt
+`relinkAfterUpdate()` ist entfernt, weil die Seite die Route seit dem Wegfall des Pulls
+(Task 156) nicht mehr aufrief. Nachgezogen wird an drei Stellen:
 
-`PendingLinkChanges()` liest vorher die Bilanz und meldet sie: dazugekommen, entfernt,
-auf eine andere Quelle umgesetzt. Die Namen werden **über alle Ziele zusammengefasst**,
-sonst zählte ein einzelner neuer Command doppelt — er steht in `.claude/` und
-`.opencode/`.
+- auf dem Lesepfad (siehe [Selbstheilung auf dem Lesepfad](#selbstheilung-auf-dem-lesepfad)),
+  also beim nächsten Lesezugriff nach einer Programmaktualisierung;
+- über den Knopf *Einrichten* der Assistenten-Karte: `setupMessage()` in
+  `webui/assistant.go` ruft `ApplyAssistantSetup()` und formuliert den Antworttext
+  (`describeSetup()`) — Anstoß, veralteter Anstoß, abgelöste Zusatzblöcke, eine erstmals
+  angelegte `AGENTS.md`, Umbenennung und Konflikt;
+- im Terminal mit `k-playbook upgrade` (§„Acht Einstiege").
 
-Schlägt das Nachziehen fehl, bleibt das Update gültig: der Pull ist durch, und die
-Verlinkung lässt sich über die Assistenten-Karte nachholen.
-
-Seit die Heilung auf dem Lesepfad sitzt (siehe
-[Selbstheilung auf dem Lesepfad](#selbstheilung-auf-dem-lesepfad)), ist dieser Aufruf
-nicht mehr die einzige Absicherung, sondern die frühestmögliche: Er meldet die Bilanz
-schon im Antworttext des Updates, statt sie dem nächsten Lesezugriff zu überlassen. Und
-er tut mehr — `ApplyAssistantSetup()` statt bloß `ApplyLinks()`.
+`PendingLinkChanges()` liest die Bilanz der Verlinkung: dazugekommen, entfernt, auf eine
+andere Quelle umgesetzt. Die Namen werden **über alle Ziele zusammengefasst**, sonst zählte
+ein einzelner neuer Command doppelt — er steht in `.claude/` und `.opencode/`.
 
 ## Direktinstallation
 
@@ -1726,7 +1710,7 @@ Kephalaion alte Clients über `--format` trägt —, Projektschritt und `/k-upgr
 Node, und ein Neustart des Nodes ist so einmal am Anfang erledigt. Drei Wege
 (`upgradeKephalaion()`): Fehlt `kephalaion`, lädt `program.InstallKephalaion()` das
 `install.sh` des neuesten Kephalaion-Releases (`release.KephalaionInstallURL`, über
-`release.Fetch()` erst ganz geladen, dann mit `sh` ausgeführt) — auch ohne Clone; Erfolg
+`release.Fetch()` erst ganz geladen, dann mit `sh` ausgeführt); Erfolg
 heißt, dass `kephalaion.FindBinary()` das Binary danach findet. Scheitert es, nennt die
 Meldung die Installation von Hand (`kephalaion.InstallCommand`). Das `install.sh` läuft in
 einer eigenen Prozessgruppe (`internal/procgroup`, unten): Läuft `InstallTimeout` ab,
@@ -1737,7 +1721,7 @@ zurück. Liegt es da, ruft der Schritt `kephalaion upgrade --auto --json`
 Upgrade gefahrlos ist — Hub, globale config, dev build, Hub noch nicht so neu, DevContainer —,
 entscheidet Kephalaion, k-playbook hat dafür keine eigene Regel. Kennt das Binary `--auto`
 nicht (Exit 2), folgt `upgrade --check --json` (`program.KephalaionCheckUpgrade()`) und die
-Meldung, ob ein neueres Release da ist. Kein Weg braucht den Clone. `--check` ruft
+Meldung, ob ein neueres Release da ist. `--check` ruft
 nur `--check --json` und meldet ein fehlendes `kephalaion` samt dem, was ein Lauf täte. Die Frist für `--auto` ist `KephalaionAutoTimeout` (3 Minuten), für
 `--check` `KephalaionCheckTimeout` (30 s); stdout (JSON) und stderr werden getrennt gelesen.
 Bei Fristablauf bekommt der Prozess SIGTERM und `KephalaionStopGrace` Zeit, kein sofortiges
@@ -1751,8 +1735,10 @@ Node. Im JSON stehen `auto`, `check`, `autoUnsupported`, `outcomeUnknown` und
 `restartRequired` unter `kephalaion`. `schemaVersion` ist seit Task 149 `2`:
 `program.status` trägt `latest` (dazu `latestError`) statt `clone`, `program.versionChanged`
 und `program.mcpRepaired` entfallen, `project` trägt `mcpRepairedPortable` und `mcpMessage`.
+Seit Task 156 ist sie `3`: `program.update`, `program.pulled`, `program.pullOutput` und
+`program.remoteSwitched` entfallen mit dem Pull.
 
-Der Schritt läuft im aufrufenden Prozess, vor dem Pull; das neue Programm nach einem
+Der Schritt läuft im aufrufenden Prozess, vor dem Programmschritt; das neue Programm nach einem
 Binärwechsel führt nur `upgrade --project-only` aus und fasst Kephalaion nicht an. Einmal beim
 Übergang von einem Binary vor Task 141 arbeitet der alte Prozess noch in alter Reihenfolge
 (Programm, dann nur die Installation von Kephalaion): Dieser erste Lauf ruft kein `--auto`,
@@ -1793,17 +1779,18 @@ Projektschritt, `vscodeext.Install()` — starten weiter ohne eigene Gruppe.
 aufrufbar, bestimmt es Tag und Prüfsumme wie das Paket `release` (neuestes Release über die
 Weiterleitung von `releases/latest` mit curl oder wget, `SHA256SUMS` des Tags über HTTPS)
 und installiert das Release-Binary direkt nach `~/.local/bin/k-playbook`, danach
-Kephalaion. Aus einem Clone aufgerufen (`make -C k-playbook install`,
-`k-playbook/bin/install`) verhält es sich gleich: Es liest weder `VERSION` noch `SHA256SUMS`
-neben sich und installiert das neueste Release. `git` braucht es nicht; den Cache des
+Kephalaion. Aus einem Checkout aufgerufen — `make install` im Quell-Repo oder, von einem
+Binary bis v0.16.38, `k-playbook/bin/install` im früheren Clone eines Projekts — verhält es
+sich gleich: Es liest weder `VERSION` noch `SHA256SUMS` neben sich und installiert das
+neueste Release. `git` braucht es nicht; den Cache des
 neuesten Release schreibt es nicht. Der ganze Ablauf steht in `main` und wird erst in der
 letzten Zeile gerufen: Unter `curl | bash` liest bash das Skript von stdin, und so führt ein
 abgebrochener Download nichts aus, und kein Kindprozess frisst den Rest des Skripts.
 
 Der normale Aufruf ist danach immer `k-playbook`; der GUI-**Start** installiert oder
 aktualisiert kein Binary selbst. Aktualisiert wird über `k-playbook upgrade` und über den
-Update-Knopf der Oberfläche — beide über `program.Install()`, also ohne `bin/install` und
-ohne Clone, und nie ungefragt.
+Update-Knopf der Oberfläche — beide über `program.Install()`, also ohne `bin/install`,
+und nie ungefragt.
 
 Hingenommen für Binaries von vor Task 149, die `bin/install` noch aus dem Clone aufrufen
 und danach die Datei gegen `SHA256SUMS` und `VERSION` **des Clones** prüfen: Steht der Clone
@@ -1864,9 +1851,10 @@ entfernt.
 Beim Start der Oberfläche entfernt `RemoveLegacyWrapper()` in
 `project/legacywrapper.go` zusätzlich die Wrapper-Datei des abgelösten Modells,
 `<projekt>/k-playbook/bin/k-playbook`. Das Quell-Repo kennt sie nicht mehr, und
-`.gitignore` deckt sie nicht ab — sie bliebe sonst als zusätzliche Datei im Clone
-liegen. Der Clone ist read-only, deshalb macht die Funktion ihn für den Löschvorgang
-kurz beschreibbar und setzt ihn per `defer` wieder zurück. Gemeldet wird nur, wenn
+`.gitignore` deckt sie nicht ab — sie bliebe sonst als zusätzliche Datei in einem
+liegengebliebenen Clone liegen. Frühere Versionen haben `k-playbook/` den Schreibzugriff entzogen; deshalb gibt
+die Funktion vor dem Löschen das Verzeichnis des Wrappers frei, und nur dieses. Wieder
+gesperrt wird nichts (Task 156). Gemeldet wird nur, wenn
 wirklich etwas wegfällt; ein Fehler hält den Start nicht auf, und der nächste Start
 versucht es erneut.
 
@@ -1879,33 +1867,47 @@ diese Trennung kollidierten beide.
 
 Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 
-**Das Binary** gibt es an mehreren Orten. **Die Dateien** — Reviews, Checks —
-kommen dagegen aus `PlaybookDir(projektDir)`, also aus `<projekt>/k-playbook/`; Commands,
-Skills und `scripts/` (Skripte, Tool-Matrizen, Scanner- und Severity-Katalog) kommen seit
-2026-10-25 aus `~/.local/share/k-playbook/` (unten). Das Binary liest nie neben sich.
+**Das Binary** gibt es an mehreren Orten. **Die Dateien** kommen dagegen von zwei festen
+Stellen: Commands, Skills und `scripts/` (Skripte, Tool-Matrizen, Scanner- und
+Severity-Katalog) seit 2026-10-25 aus `~/.local/share/k-playbook/` (unten), die Texte —
+Reviews, Instruktionen, Guidelines, Command-Texte, Handbuch — seit Task 131 vom Hub, aus
+`<hub>:k-playbook/defaults/`. Das Binary liest nie neben sich und nie aus dem Projekt:
+`PlaybookDir(projektDir)`, also `<projekt>/k-playbook/`, war bis dahin die Quelle und ist
+heute nur noch der Ort eines früheren Clones.
 
-Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist nicht an einen
-bestimmten Projekt-Clone gebunden. Es leitet den Projektinhalt ausschließlich aus dem
-Arbeitsverzeichnis und dem Anker ab.
+Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist an kein Projekt
+gebunden. Es leitet den Projektinhalt ausschließlich aus dem Arbeitsverzeichnis und dem
+Anker ab.
 
-**Wer den Clone noch verlangt.** Auf `Environment.PlaybookPresent` prüfen nur noch die
-Wege, die im Clone selbst etwas tun: der Pull in `k-playbook upgrade` (`upgrade.go`) und in
-`POST /api/update` (`webui/update.go`), dazu Aufräumen und Schreibschutz im Clone beim
-Start der Oberfläche (`gui.go`). `k-playbook scan` (`scanRun`, hinter der Pause aus
+**Niemand verlangt den Clone mehr.** Das Feld von `Environment`, das meldete, ob
+`k-playbook/` vorliegt, gibt es seit Task 156
+nicht mehr: Der Pull in `k-playbook upgrade` (`upgrade.go`) und in
+`POST /api/update` (`webui/update.go`, die Route selbst ist danach entfernt) und der Schreibschutz beim
+Start der Oberfläche (`gui.go`) sind entfallen, und `cleanUpLegacyWrapper()` kommt ohne die
+Prüfung aus — `RemoveLegacyWrapper()` tut nichts, wenn die Wrapper-Datei nicht liegt.
+Die Konstanten für den Aufruf `make -C k-playbook install`, die nur noch die
+Meldung zum fehlenden Clone trug, sind mit ihr gefallen. `k-playbook scan` (`scanRun`, hinter der Pause aus
 Task 147), die MCP-Review-Werkzeuge (`resolveReviewEnvironment`) und die Seiten
 „Assistenten“ und „MCP“ (`assistantState`, `mcpState`, in der Seite `app.js` und `mcp.js`)
-verweigern ohne `k-playbook/` nicht mehr mit „Installation fehlt“ (Task 154): Rezepte und
+verweigern ohne `k-playbook/` nicht mehr mit der Meldung zur fehlenden Installation (Task 154): Rezepte und
 Instruktionen kommen vom Hub, Skripte und Scan-Katalog aus `SharedDir()`. Mit den Sperren
 fiel `playbookDir` aus dem Review-Umschlag, aus der Antwort von `GET /api/config` und aus
 dem JSON der beiden Preflight-Skripte; die Skripte nennen ihr Verzeichnis in der Ausgabe
 `Skripte:`. Meldungen, die ein Nachziehen verlangen — `describePreflightError` bei
 „Unknown argument“, `CheckSchema` bei neuerer `schema_version`, `renderNewerConfig` —,
-nennen `k-playbook upgrade` statt `git pull` im Clone. Ohne Clone bleibt allein der Katalog
-`checks` leer, weil `resolveCatalog` ihn noch aus `PlaybookDir` liest.
+nennen `k-playbook upgrade` statt `git pull` im Clone. Den Katalog `checks`, der als letzter
+noch aus `PlaybookDir` las, gibt es seit Task 155 nicht mehr. Mit Task 157 sind auch die
+letzten Felder gefallen, die den Ort nannten: `playbook` in der Kontextausgabe
+(`project.Context`, damit `k-playbook context`, `k_playbook_context` und der Abschnitt
+`context` des Briefings, Fassung `"7"`), `playbook` in `display` von `GET /api/context` und
+`playbookDir` in `Environment` (damit in den Antworten mit `environment`). `PlaybookDir()`
+und `PlaybookDirName` bleiben für den Code, der Altbestand erkennt: `links.go` (alte Links),
+`legacywrapper.go`, `reset.go`, `config.go` (`LegacyModels`, `suggestRepoRoot`) und
+`instructions.go` (abgelöster Befunde-Block).
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
-| `~/.local/bin/k-playbook` | direkt installiertes Binary | `k-playbook upgrade` und der Update-Knopf der Oberfläche; erstmals `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install \| bash` (aus einem Clone: `make -C k-playbook install`, ohne make `k-playbook/bin/install`); im Entwicklungsrepo `make dev-install` |
+| `~/.local/bin/k-playbook` | direkt installiertes Binary | `k-playbook upgrade` und der Update-Knopf der Oberfläche; erstmals `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install \| bash`; im Entwicklungsrepo `make dev-install` |
 | `<entwicklungsrepo>/dist/` | Build des Arbeitsstands | `make dist` / `make dist-host` |
 
 `bin/install` und `release.Install()` ermitteln die Plattform, laden das Release-Asset des
@@ -1916,7 +1918,7 @@ Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
 
 ### Mitgelieferte Dateien unter `~/.local/share/k-playbook/`
 
-Der Weg, auf dem der Clone `<projekt>/k-playbook/` wegfallen soll: Was die Assistenten als
+Der Weg, auf dem der Clone `<projekt>/k-playbook/` weggefallen ist: Was die Assistenten als
 Datei auf der Platte brauchen, trägt das Binary selbst und entpackt es einmal je Rechner
 nach `~/.local/share/k-playbook/` (`$K_PLAYBOOK_SHARE_DIR`, wenn gesetzt, sonst
 `$XDG_DATA_HOME/k-playbook/`; auf macOS derselbe Pfad). Heute sind das `commands/`, `skills/` und `scripts/`; letzteres liest das
@@ -1951,25 +1953,22 @@ Stufe 2 verlinkt die Projekte dorthin, durch `.k-playbook/share` (siehe „Der U
   `0444`, die Verzeichnisse `0755`: gesperrte Verzeichnisse hielten auch ein `rm -rf` auf.
 - **Einzige Fassung:** `commands/` und `skills/` oben im Repo gibt es seit 2026-10-25 nicht
   mehr; `share/` ist die Quelle. Weil `share/` ins Binary geht, beobachten der
-  VERSION-Wächter und der Test-Workflow auch `share/**`. Der Check
-  `check_command_tool_guards.sh` liest die mitgelieferten Hüllen aus
-  `<playbook.dir>/share/commands/` — derselbe Stand wie das Binary dieser Version — und seit
-  Task 108 die Texte der Commands aus `<playbook.dir>/defaults/commands/`, mit eigenem
-  Schlüssel je Wurzel; `check_verweise.sh` liest `defaults/`, `share/` und die
-  projekteigenen Gegenstücke.
+  VERSION-Wächter und der Test-Workflow auch `share/**`.
 
 ### Entwicklungsstand
 
-Im Entwicklungsrepo fallen Quelle und Installation auseinander: `~/dev/k-playbook/` ist
-der Arbeitsstand, `~/dev/k-playbook/k-playbook/` ein eigener Clone auf dem zuletzt
-gepushten Commit.
+Im Entwicklungsrepo fallen Quelle und installierte Fassung auseinander: `~/dev/k-playbook/`
+ist der Arbeitsstand; installiert ist, was unter `~/.local/bin` und
+`~/.local/share/k-playbook/` liegt und was der Hub trägt.
 
 Das bleibt so und ist gewollt. `make dev-install` baut den Arbeitsstand und ersetzt damit
-das Binary unter `~/.local/bin`; der Inhalt — Reviews, Checks, Commands, Skills —
-kommt weiterhin aus dem Clone unter `k-playbook/` und damit vom zuletzt gepushten Stand.
-Der Preis dafür ist bewusst bezahlt: der Clone bleibt ein read-only Vendor-Verzeichnis,
-in das nichts eingespielt wird. Es gibt keinen Sync-Weg aus dem Arbeitsstand in die
-Installation und keine Ausnahme davon in der Oberfläche.
+das Binary unter `~/.local/bin`; Commands, Skills und Skripte reisen im Binary mit und
+tragen danach denselben Stand. Die Texte — Reviews, Instruktionen, Guidelines,
+Command-Texte — kommen weiterhin vom Hub und damit aus dem zuletzt veröffentlichten
+Release, nicht aus dem Arbeitsbaum `defaults/`. Es gibt keinen Sync-Weg aus dem
+Arbeitsstand auf den Hub und keine Ausnahme davon in der Oberfläche. Bis Task 156 lag
+unter `~/dev/k-playbook/k-playbook/` ein eigener Clone auf dem zuletzt gepushten Commit,
+aus dem der Inhalt kam.
 
 **Der Hintergrunddienst erkennt auch einen dev-Build.** Verglichen wird nicht die
 `VERSION`, sondern die Datei dahinter, siehe „Lebenszyklus": Größe und Änderungszeit von
@@ -2166,24 +2165,6 @@ nicht gepflegt, und Layer-Caching hält dieselbe Version fest. Der Grund ist: es
 Version, die die Distribution ohnehin testet, sie braucht keinen Netzzugriff auf die
 GitHub-API, und für ein Basis-Werkzeug ist eine vorhandene Version wichtiger als eine neue.
 
-### Für ein Dockerfile
-
-`--yes` schaltet jede Rückfrage ab, damit eine einzelne RUN-Zeile unbeaufsichtigt
-durchläuft. Als root mit `apt-get` greift für jeden Eintrag Fall 1:
-
-```dockerfile
-RUN bash /opt/projekt/k-playbook/share/scripts/install-base-tools.sh --install --yes
-```
-
-Ein DevContainer übernimmt dieselbe Zeile. Zwei Dinge sind dabei zu wissen:
-
-- Der Lauf endet mit **3**, wenn ein Werkzeug auf diesem Host keinen Weg hat — etwa
-  apt-only ohne apt. Das ist kein Fehlschlag, aber `docker build` bricht darauf ab. Wer das
-  nicht will, hängt `|| test $? -eq 3` an; wer es will, lässt es stehen und sieht die
-  Lücke beim Bauen.
-- Wird als nicht-root gebaut, greift für `rg` Fall 2 und das Ziel hängt an `$HOME`; die
-  übrigen Einträge fallen dann in Fall 3 und geben nur den `sudo apt-get`-Befehl aus.
-
 ### Root-Doktrin beider Skripte
 
 Im Security-Skript ist root der Abbruch, im Basis-Skript der Installationsweg. Das sieht
@@ -2249,7 +2230,7 @@ Stelle.
 ### Die geteilte Bibliothek
 
 `scripts/lib/install-common.sh` ist eine gesourcete Bibliothek neben den ausführbaren
-Skripten — im Muster von `checks/lib/`, das dort schon Hilfscode trägt. Ein
+Skripten. Ein
 `lib/`-Unterverzeichnis ist kein Katalogeintrag: `isCatalogEntry()` übergeht es, und der
 Assistent sieht es nicht.
 
@@ -2314,8 +2295,9 @@ dazu in `internal/vscodeext`.
 **Die VSIX ist eingecheckt und per `go:embed` im Binary.** Nicht bei jedem Build mit vsce
 erzeugt: vsce schreibt die Bauzeit und die mtimes der Quelldateien in das Zip, und
 `SHA256SUMS` muss bitgleich nachbaubar bleiben — CI baut den Tag nach und prüft dagegen.
-Nicht im Clone: Clones verschiedener Projekte auf einer Maschine tragen verschiedene
-Stände und würden abwechselnd ältere und neuere Fassungen installieren. Nicht in Go
+Nicht je Projekt abgelegt, wie es der frühere Clone im Projekt getan hätte: Verschiedene
+Projekte auf einer Maschine trügen verschiedene Stände und würden abwechselnd ältere und
+neuere Fassungen installieren. Nicht in Go
 zusammengebaut: das wäre ein Nachbau von vsce. Die Erweiterung hat deshalb eine eigene
 Version in `installer/vscode/package.json`, nicht die `VERSION` des Programms — die VSIX
 wird vor dem Tag eingecheckt und kennt die künftige Nummer nicht.
@@ -3555,6 +3537,12 @@ Zwischenspeicher der Statusseite ein, wie das Unterkommando ihn über `ContextFo
 Anzeigeform — die Kürzung auf `~` braucht das Home-Verzeichnis und kann nur serverseitig
 passieren. Die übrigen Pfade kürzt die Oberfläche gegen das Projektverzeichnis.
 
+Ein Feld `playbook` trägt weder der Kontext noch `display` mehr (Task 157): Die
+Kontextangaben nennen Projekt, Repository, VCS, Konfiguration und das projekteigene
+Verzeichnis, aber keine „Installation“, und der Kopf der Seiten (`hero.html`) zeigt neben
+Projekt und Repository keinen Eintrag „Installation:“ mehr. `Environment` trägt dafür kein
+`playbookDir` mehr. Der Wächter ist `TestKopfUndKontextNennenKeineInstallation`.
+
 ## Doku in der Oberfläche
 
 Die Oberfläche zeigt zwei Handbücher, jedes unter einem eigenen Menüpunkt und mit derselben
@@ -3584,7 +3572,7 @@ bekommt die API über `data-docs-api` am `body` (aus dem Bereich, `/api/docs` od
 `/api/handbook`), `docs.js` ist für beide dasselbe.
 
 Nichts davon ist ins Binary eingebettet, und es gibt keinen Rückfall auf die Platte — auch
-nicht auf einen Clone der Installation. Ist ein Handbuch nicht lesbar, antwortet die API
+nicht auf einen liegengebliebenen Clone im Projekt. Ist ein Handbuch nicht lesbar, antwortet die API
 mit einer Meldung statt einer Liste, und das Feld `code` sagt, warum:
 
 - `kephalaion_unavailable` — Kephalaion ist nicht erreichbar. Die Meldung nennt den Ort und
@@ -3638,7 +3626,7 @@ Index, bleibt gar kein Eintrag markiert statt der vorige.
 
 **Ein Verweis kann aus dem Handbuch herausführen, und das ist kein Fehler.** Seiten des
 Handbuchs von k-playbook zeigen mit relativen Repo-Links (`../../../…`) auf Dateien außerhalb
-von `defaults/docs/handbook/` — auf `installer/docs/architecture.md`, `checks/README.md`,
+von `defaults/docs/handbook/` — auf `installer/docs/architecture.md`,
 `share/scripts/*.tsv`, `defaults/reviews/`. Im Repository und auf GitHub führen sie
 richtig, nur dieser Bereich reicht nicht so weit: ausgeliefert ist allein das Handbuch, und
 `handbookPath()` lässt nichts außerhalb zu. Das bleibt so. Deshalb erkennt `resolveDocPath()` den Fall
@@ -4206,9 +4194,8 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `POST` | `/api/kephalaion/save` | prüft erneut und schreibt nur bei `ok` `hub` und `collection` zeilenweise in den Block `kephalaion:` von `K-PLAYBOOK.yaml`, nie einen Account; Antwort mit Hinweis auf das Committen; 409 mit Zustand bei nicht bestandenem Test oder einer Form, die sich nicht sicher ändern lässt; verwirft den Zwischenspeicher |
 | `GET` | `/api/remediation` | `remediation:`-Block lesen |
 | `POST` | `/api/remediation` | `remediation:`-Block setzen |
-| `GET` | `/api/update` | per `git ls-remote` prüfen, ob der Clone zurückliegt, und zusätzlich, ob das laufende Programm älter ist als der neueste Release-Tag (`program` mit `running`, `latest`, `latestError`, samt PATH-Befund; auch ohne Clone); den Tag aus dem Cache, mit `fresh=1` frisch gefragt; rein lesend, lädt nie etwas |
-| `POST` | `/api/update` | `git pull --ff-only` ausführen; scheitert er oder fehlt der Clone, trägt die Antwort Meldung und Ausgabe mit 409 — aber erst, nachdem veraltete MCP-Einträge korrigiert und das Programm geprüft sind; ist das laufende Programm älter als der neueste Tag, folgen Installation und Neustart wie bei `/api/update/program` (dann 200, damit die Seite der neuen Adresse folgt) |
-| `POST` | `/api/update/program` | das Release-Programm des neuesten Tags installieren (`program.Install()`, geprüft gegen die `SHA256SUMS` des Tags, ohne Clone) und den Dienst daraus neu starten; 409 bei laufendem Ablauf, nicht älterem Programm, unbekanntem Tag oder falschem PATH, 428 mit Rückfrage bei laufender Arbeit (`?confirm=1` bestätigt), 500 mit Fehler und Ausgabe, wenn der Dienst weiterläuft |
+| `GET` | `/api/update` | prüfen, ob das laufende Programm älter ist als der neueste Release-Tag (`program` mit `running`, `latest`, `latestError`, samt PATH-Befund); den Tag aus dem Cache, mit `fresh=1` frisch gefragt; rein lesend, lädt nie etwas; einen Clone prüft die Route nicht mehr, die Felder `available`, `branch`, `local`, `remote` und `output` sind entfallen (Task 156) |
+| `POST` | `/api/update/program` | das Release-Programm des neuesten Tags installieren (`program.Install()`, geprüft gegen die `SHA256SUMS` des Tags) und den Dienst daraus neu starten; 409 bei laufendem Ablauf, nicht älterem Programm, unbekanntem Tag oder falschem PATH, 428 mit Rückfrage bei laufender Arbeit (`?confirm=1` bestätigt), 500 mit Fehler und Ausgabe, wenn der Dienst weiterläuft |
 | `GET` | `/api/context` | aufgelösten Arbeitsstand lesen, read-only |
 | `GET` | `/api/docs` | mitgelieferte Doku auflisten, read-only |
 | `GET` | `/api/docs/file` | eine Datei daraus als HTML lesen, read-only |
@@ -4250,9 +4237,9 @@ Projektkonfiguration eine Umleitung nach `/setup`), `/setup`, `/workflows` mit
 `/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` mit denselben
 Fragmenten für Kopf, linke Spalte, Sperrfläche und Workflow-Karten — keine Seite trägt
 einen eigenen Kopf. Mitgeliefert werden der aktive Bereich, die Auskunft, ob eine
-Installation gefunden wurde, und die Version des Binarys: sie steht rechts oben im Kopf als
-Marke, weil die Installation daneben einen anderen Stand tragen kann und ein offenes Fenster
-nach einem Update sonst nicht verrät, welcher Server gerade antwortet. Ein Build ohne
+Projektkonfiguration gefunden wurde, und die Version des Binarys: sie steht rechts oben im
+Kopf als Marke, weil ein offenes Fenster nach einer Aktualisierung des Programms sonst
+nicht verrät, welcher Server gerade antwortet. Ein Build ohne
 `-ldflags` zeigt dort „ohne Version".
 
 Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". `POST
@@ -4436,7 +4423,7 @@ Standvergleich des GUI-Servers greift hier nicht: es gibt keine Laufzeitdatei, k
 Port und keinen zweiten Prozess, der nachsehen könnte.
 
 Der Schaden ist begrenzt, aber real. Die **Inhalte** sind aktuell: `contextTool` ruft bei
-jedem Aufruf `project.ContextForDir()`, Reviews, Checks und Instruktionen kommen
+jedem Aufruf `project.ContextForDir()`, Reviews und Instruktionen kommen
 frisch von der Platte. Veraltet ist der **Code** der Werkzeuge — und `tools/list` geht
 genau einmal beim Start, ein seither hinzugekommenes Werkzeug kann die laufende Sitzung
 deshalb nie sehen.
@@ -4608,23 +4595,19 @@ hängen, obwohl es einen Projektpfad meint.
 | Weg | Einstieg | Modus (`MCPWriteScope`) | Schreibt bei | Geschriebene Form |
 |---|---|---|---|---|
 | ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört | absoluter Pfad |
-| selbsttätig | `RepairMCP()`, „Aktualisieren“ in der Oberfläche (`applyUpdateHandler()`), nach dem Pull — auch wenn er gescheitert ist | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` | erfasst oder unbeantwortet `k-playbook`, sonst absoluter Pfad |
-| selbsttätig | `RepairMCP()`, jeder Start und der Projektschritt von `k-playbook upgrade` (`upgradeProject()`, auch unter `--project-only`) | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | `MCPStateOutdated` wie nach „Aktualisieren“; Ergänzen und Anlegen absoluter Pfad |
+| ohne Aufrufer | `RepairMCP()`; war „Aktualisieren“ in der Oberfläche (`POST /api/update`, entfernt) | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` | erfasst oder unbeantwortet `k-playbook`, sonst absoluter Pfad |
+| selbsttätig | `RepairMCP()`, jeder Start und der Projektschritt von `k-playbook upgrade` (`upgradeProject()`, auch unter `--project-only`) | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | `MCPStateOutdated` wie im engen Modus; Ergänzen und Anlegen absoluter Pfad |
 
 Alle gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied, und er
 ist ein Parameter von `RepairMCP()`, weil die selbsttätigen Aufrufer verschieden
-weit gehen dürfen. Am Pull im Clone hängt die Reparatur nicht mehr (Task 149):
-`Update()` in `project/update.go` repariert nicht selbst — die Registrierung liegt im
-Hauptverzeichnis, nicht im Clone, und soll auch dann nachgezogen werden, wenn der Pull
-scheitert oder es keinen Clone gibt. Die Aufrufer tun es über `project.RepairMCPReport()`
+weit gehen dürfen. An einem Pull hängt die Reparatur nicht (Task 149), und seit Task 156
+gibt es keinen mehr. Die Aufrufer gehen über `project.RepairMCPReport()`
 (Ergebnis `MCPRepairReport.Repaired`, die Dateien mit bloßem Namen zusätzlich in
-`MCPRepairReport.Portable`, ein Fehlschlag in `Message`). „Aktualisieren“ in der
-Oberfläche soll den Eintrag auf den abgelösten Wrapper nachziehen
-und sonst nichts. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) und der
+`MCPRepairReport.Portable`, ein Fehlschlag in `Message`). Der enge Modus zieht nur den
+Eintrag auf den abgelösten Wrapper nach und sonst nichts; seit `POST /api/update` entfernt
+ist, ruft ihn nichts mehr. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) und der
 Projektschritt von `k-playbook upgrade` dürfen
-mehr — `upgrade` repariert immer im Umfang des Starts, ob ein Pull lief oder nicht; das
-ist gewollt mehr als früher nach einem gelungenen Pull, der nur veraltete Einträge
-ersetzte. `upgrade --check` meldet weiter nur veraltete Einträge (`MCPStateOutdated`) und
+mehr — `upgrade` repariert immer im Umfang des Starts. `upgrade --check` meldet weiter nur veraltete Einträge (`MCPStateOutdated`) und
 sagt damit weniger, als ein Lauf täte; die Lücke ist hingenommen. Die Grenze ist gemessen,
 nicht geraten:
 
@@ -4670,7 +4653,7 @@ nicht geraten:
   die übergeht der Start nicht. Beim Auflösen kämen neue offene Fragen hinzu: ein Ziel
   außerhalb des Repos, eines in einem anderen Repo, ein toter Link. Die Prüfung sitzt im
   Startzweig von `mcpTargetNeedsWrite()`, nicht in `applyMCPTarget()`. Der Knopf schreibt
-  deshalb weiter durch den Link, der enge Modus nach „Aktualisieren“ bleibt unverändert, und
+  deshalb weiter durch den Link, der enge Modus bleibt unverändert, und
   `MCPStateOutdated` wird auch hinter einem Link korrigiert; für dessen Form wird dort
   das Linkziel gemessen (nächster Punkt). Offen bleiben harte Links:
   `os.Lstat` erkennt sie nicht, `ls-files` misst den nicht erfassten Linkpfad, und
@@ -4705,8 +4688,7 @@ eingecheckt. Die Startmeldung sagt beim Eintragen deshalb dazu, dass die Datei e
 rechnerbezogenen Pfad trägt und unversioniert bleiben sollte, und unterscheidet
 „eingetragen" von „korrigiert" anhand des Zustands vor dem Lauf. Welche Form geschrieben
 wurde, liefert `RepairMCP()` selbst zurück (`[]MCPWrite` mit `Path` und `Command`). Steht
-der bloße Name darin, sagen die Startmeldung, `describeMCPRepair()` nach „Aktualisieren“
-in der Oberfläche — auch nach einem gescheiterten Pull — und der Projektschritt von
+der bloße Name darin, sagen die Startmeldung und der Projektschritt von
 `k-playbook upgrade` (`upgradeProjectReport.messages()`) das und nennen den Preis: ein aus Dock oder Finder gestarteter Client braucht
 den absoluten Pfad, von Hand eingetragen. Die Meldung hängt an der geschriebenen Form,
 nicht am Tracking-Ergebnis. Fremde Einträge bleiben in jedem Fall unangetastet — gepatcht
@@ -4724,9 +4706,9 @@ git erfasste Datei wird durch das Ergänzen verändert. Ohne das machte jeder St
 getrackten MCP-Dateien eines Projekts dreckig, und ein Repo mit eingecheckter
 Registrierung käme nie an einem sauberen Arbeitsbaum vorbei.
 
-Beide selbsttätigen Stellen sind nötig: der `git pull` erreicht die Dateien nicht, weil
-sie im Hauptverzeichnis liegen und nicht im Clone, und ein `git pull` von Hand oder
-`make -C k-playbook installer-update` geht am Update-Handler ganz vorbei — für den ist
+Beide selbsttätigen Stellen sind nötig: Die Dateien liegen im Hauptverzeichnis, und wer
+das Programm am Update-Handler vorbei aktualisiert — `k-playbook upgrade` in einem anderen
+Projekt, `make dev-install` —, erreicht sie in diesem Projekt nicht; für den ist
 der Start der Auffangweg. Ein **Entfernen** gibt es weiterhin nicht: die Oberfläche
 richtet ein, sie räumt nicht ab.
 
@@ -4977,8 +4959,8 @@ sie unverändert zurück, wenn der Nachfolger nicht kommt, und nach einer Freiga
 die Datei über `defer`; SIGINT und SIGTERM werden gleich behandelt, damit sie auch nach
 einem `kill` weg ist.
 
-Warum das Laufzeitverzeichnis und nicht das Projekt: die Installation ist read-only,
-`k-playbook-local/` gehört dem Projekt. `$XDG_RUNTIME_DIR` trennt Host und DevContainer,
+Warum das Laufzeitverzeichnis und nicht das Projekt: Die Datei gehört zu diesem Rechner,
+und `k-playbook-local/` gehört dem Projekt. `$XDG_RUNTIME_DIR` trennt Host und DevContainer,
 weil es je Sitzung vergeben wird. Der Rückfall ins Home — auf macOS immer — nimmt ein
 geteiltes Home als bekannte Grenze in Kauf: ist dort der Projektpfad identisch gemountet,
 sieht die andere Seite eine PID aus fremdem Namensraum und ein Loopback, das nicht
@@ -5012,7 +4994,7 @@ Die Version wird beim Build mit `-ldflags -X` in das Binary gestempelt. Der Wert
 aus der `VERSION` des Standes, der gebaut wird: `make dist`, `make dist-host` und
 `make dev-install` lesen sie über `INSTALLER_BUILD_VERSION`, der Release-Workflow liest
 dieselbe Datei und stempelt denselben Wert in die vier Assets. Der Bootstrap
-`make -C k-playbook install` stempelt nichts; er lädt das fertig gestempelte Asset.
+`bin/install` stempelt nichts; er lädt das fertig gestempelte Asset.
 
 Genau daraus folgt, dass die Version allein nicht reicht: ein lokaler Entwicklungsbuild
 und das Release-Asset derselben `VERSION` tragen dieselbe Kennung, und zwei
@@ -5042,7 +5024,7 @@ dem Umschlüsseln muss schon die nächste Antwort den neuen tragen.
 ### Der Aufruf
 
 `runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `careForHost()` mit
-`cleanUpLegacy()`, der Migrationsbereinigung und `protectProjectInstallation()` — und
+`cleanUpLegacy()` und der Migrationsbereinigung — und
 richtet dann das Projekt nach, soweit das ohne Schaden geht; und zwar bei **jedem** Aufruf, auch bei dem,
 der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start. Die
 selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
@@ -5129,27 +5111,25 @@ damit ein Aussetzer die Seite nicht totstellt. Die Sperrfläche der Statusseite 
 und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 `Dienst beenden` sagt, was er tut: er beendet den Server für alle Fenster.
 
-`POST /api/update` holt den neuen Stand des Clones und prüft danach das Programm
-(`applyUpdateHandler()` in `webui/update.go`): Ist das laufende Programm älter als der
-neueste Release-Tag (`checkProgram()`, also `program.CheckStatus()`), läuft derselbe Ablauf
-wie hinter dem Knopf „Programm aktualisieren". Sonst läuft der Dienst weiter und liest den
-neuen Stand bei der nächsten Anfrage.
+`POST /api/update` gibt es nicht mehr: Die Route zog nach dem Wegfall des Pulls (Task 156)
+nur noch MCP-Einträge und Einrichtung nach und prüfte das Programm, und die Seite rief sie
+nicht mehr auf. Der Knopf kennt die Programmaktualisierung (`POST /api/update/program`,
+`applyProgramHandler()` in `webui/restart.go`) und das erneute Prüfen
+(`GET /api/update?fresh=1`); veraltete MCP-Einträge korrigiert der Start, die Einrichtung
+zieht die Assistenten-Karte nach.
 
-Knopf und Neustart hängen am Tag, nicht am Pull: Ob der Pull etwas bewegt hat, spielt
-keine Rolle, und der Handler kehrt nach einem gescheiterten Pull — oder ohne Clone — nicht
-zurück, bevor die veralteten MCP-Einträge korrigiert (`project.RepairMCPReport()` mit
-`MCPWriteOutdatedOnly`) und das Programm geprüft sind. Der gescheiterte Pull wird weiter
-gemeldet, mit 409; hat der Dienst neu gestartet, mit 200, damit die Seite der neuen Adresse
-folgt. Nur „älter" löst aus, nie „ungleich": Ein Programm über dem neuesten Tag
+Knopf und Neustart hängen am Tag (`checkProgram()`, also `program.CheckStatus()`); ein
+Verzeichnis `k-playbook/` liest und nennt der Handler nicht. Nur „älter" löst aus, nie
+„ungleich": Ein Programm über dem neuesten Tag
 (`make dev-install VERSION=…`) gilt als aktuell, und bei einem Vergleich auf Ungleichheit
 stufte der Dienst sich selbst auf ein älteres Release herab. Ist der Tag unbekannt oder
 trägt das Programm keine Version, wird nichts verlangt: eine Version, die sich nicht lesen
 lässt, ist kein Nachweis.
 
-`project.Update()` weiß davon nichts mehr: `UpdateResult` trägt nur noch die Ausgabe des
-Pulls und eine umgestellte Remote-Adresse; `VersionChanged`, `Version` und das Lesen von
-`VERSION` sind entfallen, ebenso `project.InstalledVersion()`. Nach einem `git pull` von
-Hand greift der Standvergleich des Clients beim nächsten Aufruf — und der erkennt über die
+`project.Update()` und `UpdateResult` gibt es nicht mehr (Task 156); `VersionChanged`,
+`Version` und das Lesen von `VERSION` waren schon mit Task 149 entfallen, ebenso
+`project.InstalledVersion()`. Nach einer Aktualisierung am Dienst vorbei greift der
+Standvergleich des Clients beim nächsten Aufruf — und der erkennt über die
 Build-Kennung auch ein frisch gebautes Binary bei unveränderter Version.
 
 `k-playbook stop` nutzt dieselbe Einordnung: läuft der eigene Server, `POST
@@ -5207,14 +5187,12 @@ Fehler — ein Startweg ist das nicht, Starten bleibt der argumentlose Aufruf.
 ### Programm aktualisieren und neu starten
 
 Ist das laufende Programm älter als der neueste Release-Tag, meldet `GET /api/update` das
-zusätzlich zum Remote-Vergleich des Clones (`checkProgram()`), und die Oberfläche zeigt statt
-„Update verfügbar" den Knopf „Programm aktualisieren (v0.9.3 → v0.9.4)" (`program.latest` in
-der Antwort, gelesen in `static/service.js`). Der Vergleich hängt weder am Clone noch an
-dessen Remote: Er steht auch da, wenn es keinen Clone gibt oder dessen `ls-remote`
-scheitert. Er braucht aber selbst das Netz — den Tag liest `release.LatestTag()`; ist er
-unbekannt, meldet die Prüfung nichts und nennt den Grund in `program.latestError`. Trifft
-beides zu, hat das ältere Programm Vorrang — ein Pull allein hilft dann nicht, das Programm
-kommt aus dem Release, nicht aus dem Clone.
+(`checkProgram()`), und die Oberfläche zeigt den Knopf „Programm aktualisieren (v0.9.3 →
+v0.9.4)" (`program.latest` in der Antwort, gelesen in `static/service.js`). Das ist der
+einzige Zustand, in dem der Knopf etwas tut außer erneut zu prüfen: Den Modus `"pull"` mit
+„Update verfügbar“ gibt es seit Task 156 nicht mehr, ein Clone wird nicht verglichen. Der
+Vergleich braucht das Netz — den Tag liest `release.LatestTag()`; ist er
+unbekannt, meldet die Prüfung nichts und nennt den Grund in `program.latestError`.
 
 Verglichen wird **semantisch** (`internal/version`, `Compare()`): `v0.10.0` ist neuer als
 `v0.9.4`, obwohl es lexikalisch davor steht. Nur „älter" löst aus; „unbekannt" ist kein
@@ -5282,7 +5260,7 @@ registriert, weder zwei noch keiner.
 
 **Startpflege ohne Browser.** Der neue Dienst erledigt sie selbst, mit seinem eigenen Code:
 `K_PLAYBOOK_HOST_CARE=1` lässt `main.go` im Servermodus `careForHost()` laufen — dieselbe
-Folge wie beim argumentlosen Aufruf (MCP-Reparatur, Schreibschutz, Altlasten, `AGENTS.md`),
+Folge wie beim argumentlosen Aufruf (MCP-Reparatur, Altlasten, `AGENTS.md`),
 nur ohne Browser und mit der Ausgabe im Log. Deshalb liegt die Wartegrenze auf den neuen
 Dienst über `guiproc.StartupTimeout`.
 
@@ -5294,9 +5272,7 @@ zweimal frei. Solange installiert und gestartet wird, gilt der Dienst nie als le
 
 **Laufende Arbeit.** Läuft ein Command oder hängt eine Chat-Ansicht am Ereignisstrom,
 antwortet `POST /api/update/program` ohne `?confirm=1` mit 428 und der Rückfrage; die Seite
-stellt sie und schickt den Aufruf bestätigt erneut. Im Pfad über `POST /api/update` wird in
-diesem Fall gar nicht neu gestartet — der Pull ist gelaufen oder gemeldet, und die Prüfung
-meldet danach „Programm älter".
+stellt sie und schickt den Aufruf bestätigt erneut.
 
 **Wie die Seite den neuen Dienst findet.** Der Port ist zufällig, ein `reconnect()` auf die
 alte Adresse fände nur den Dienst, der sich gerade beendet. Die Antwort trägt deshalb die
@@ -5334,7 +5310,7 @@ eine Fremddomain) kommt der Host-Header vom Browser unverändert und wäre sonst
 abgewiesen. Das Schema bleibt außen vor, weil Codespaces TLS terminiert. Der Zufallsport
 macht DNS-Rebinding ohnehin unpraktikabel. Der Grund für die Prüfung ist die Lebensdauer:
 der Prozess lebt jetzt Stunden statt Minuten, und eine beliebige Seite im Browser könnte
-sonst Endpunkte treffen, hinter denen `git pull` und Schreibvorgänge stehen.
+sonst Endpunkte treffen, hinter denen die Installation des Programms und Schreibvorgänge stehen.
 
 Der Browser wird nicht automatisch geschlossen, wenn der Server endet. Browser blockieren
 das in vielen Fällen, und `open`/`xdg-open` liefern keinen verlässlichen Tab-Handle.
@@ -5425,8 +5401,8 @@ Hinweis auf die Port-Weiterleitung.
 - Abgeschaltet wird über eine leere Datei, nicht über eine Liste in der Konfiguration.
   Ein Mechanismus statt zweier.
 - `git status --porcelain` und `git rev-list --count @{u}..HEAD` für den lokalen Zustand.
-- `git ls-remote` zum Prüfen, `git pull --ff-only` zum Holen. Nichts, was den Zustand des
-  Clones ungefragt verändert.
+- Kein Clone im Projekt und kein Pull (Task 156): Das Programm kommt aus dem Release, die
+  Inhalte kommen mit dem Programm und vom Hub.
 - Kein Projekt-Store. Es gibt keine Liste bekannter Projekte mehr — das Werkzeug arbeitet
   auf dem Projekt, in dem es liegt.
 - Die Oberfläche läuft als Hintergrunddienst je Projekt, wiedergefunden über eine
@@ -5436,8 +5412,8 @@ Hinweis auf die Port-Weiterleitung.
   Projekt nicht kollisionsfrei vergeben und wäre für fremde Seiten im Browser
   vorhersagbar. Dass die URL bei jedem Serverstart wechselt, ist in Kauf genommen — der
   Aufruf gibt sie aus und öffnet den Browser ohnehin.
-- Das Laufzeitverzeichnis statt Projekt oder Installation: die eine ist read-only, das
-  andere gehört dem Projekt. Ein geteiltes Home im Rückfall ist bekannte Grenze.
+- Das Laufzeitverzeichnis statt des Projekts: Die Laufzeitdatei gehört zu diesem Rechner,
+  nicht ins Projekt. Ein geteiltes Home im Rückfall ist bekannte Grenze.
   Verworfen wird eine Laufzeitdatei nur, wenn ihr Prozess nachweislich nicht mehr läuft —
   PID tot oder Startzeit passt nicht.
 - Same-Origin-Vergleich statt Host-Liste für schreibende Endpunkte: der Host-Anteil von

@@ -12,7 +12,7 @@ import (
 )
 
 // untrackedScanTimeout begrenzt den rein lokalen `git status`-Aufruf, mit dem
-// zusätzliche Dateien in der Installation gesucht werden. Hängen kann er nur
+// zusätzliche Dateien im früheren Clone gesucht werden. Hängen kann er nur
 // bei einem blockierten Index.
 const untrackedScanTimeout = 10 * time.Second
 
@@ -42,14 +42,15 @@ type ResetResult struct {
 	PreviousVersion string `json:"previousVersion"`
 }
 
-// LegacyContentError meldet Projektinhalte, die im Installationsverzeichnis
-// liegen.
+// LegacyContentError meldet Projektinhalte, die im Verzeichnis des früheren
+// Clones liegen (<projekt>/k-playbook/).
 //
 // Unter Modell 1 lagen Tasks, Checks, Reviews und die TODO.md in
-// `k-playbook/` — genau dem Verzeichnis, das unter dem heutigen Modell der
-// ersetzbare Clone ist. Wird nur die Konfiguration erneuert, sieht das Projekt
-// gesund aus, und das nächste Update löscht die Inhalte. Deshalb bricht das
-// Zurücksetzen hier ab, statt eine stille Falle zu hinterlassen.
+// `k-playbook/` — genau dem Verzeichnis, das danach der ersetzbare Clone war
+// und das /k-upgrade (Umstellung 3.8) als Clone ganz löscht. Wird nur die
+// Konfiguration erneuert, sieht das Projekt gesund aus, und die Inhalte gehen
+// mit dem Clone verloren. Deshalb bricht das Zurücksetzen hier ab, statt eine
+// stille Falle zu hinterlassen.
 type LegacyContentError struct {
 	// Paths sind die gefundenen Inhalte, relativ zum Hauptverzeichnis.
 	Paths []string
@@ -57,8 +58,8 @@ type LegacyContentError struct {
 
 func (e *LegacyContentError) Error() string {
 	return fmt.Sprintf("in %s/ liegen Projektinhalte aus dem abgelösten Modell (%s); "+
-		"sie gehören nach %s/ und müssen zuerst dorthin umziehen — %s/ wird beim nächsten "+
-		"Update ersetzt",
+		"sie gehören nach %s/ und müssen zuerst dorthin umziehen — %s/ ist der Ort des "+
+		"früheren Clones, den /k-upgrade löscht",
 		PlaybookDirName, strings.Join(e.Paths, ", "), LocalDirName, PlaybookDirName)
 }
 
@@ -132,7 +133,7 @@ func backupPath(configPath string, version string) (string, error) {
 	return candidate, nil
 }
 
-// LegacyContent sucht Projektinhalte im Installationsverzeichnis.
+// LegacyContent sucht Projektinhalte im Verzeichnis des früheren Clones.
 //
 // Zwei Wege, weil keiner allein reicht: die alte Datei nennt ihre Orte in
 // `paths.*` und ist damit die genaue Auskunft — aber nur, solange sie
@@ -159,10 +160,10 @@ func LegacyContent(projectDir string) []string {
 }
 
 // legacyPathsFromConfig liest den paths-Block der alten Datei und behält, was
-// unterhalb der Installation liegt und wirklich existiert.
+// unterhalb des früheren Clones liegt und wirklich existiert.
 //
-// Zeigt ein Eintrag woandershin, ist der Inhalt nicht gefährdet: ersetzt wird
-// nur das Installationsverzeichnis.
+// Zeigt ein Eintrag woandershin, ist der Inhalt nicht gefährdet: gelöscht wird
+// nur das Verzeichnis des Clones.
 func legacyPathsFromConfig(projectDir string) []string {
 	data, err := os.ReadFile(ConfigPath(projectDir))
 	if err != nil {
@@ -204,8 +205,9 @@ func legacyPathsFromConfig(projectDir string) []string {
 	return paths
 }
 
-// insidePlaybookDir prüft, ob ein Pfad aus der alten Konfiguration in der
-// Installation liegt, und liefert ihn relativ zum Hauptverzeichnis.
+// insidePlaybookDir prüft, ob ein Pfad aus der alten Konfiguration im
+// Verzeichnis des früheren Clones liegt, und liefert ihn relativ zum
+// Hauptverzeichnis.
 func insidePlaybookDir(value string) (string, bool) {
 	value = strings.Trim(value, `"'`)
 	if value == "" || filepath.IsAbs(value) {
@@ -222,13 +224,13 @@ func insidePlaybookDir(value string) (string, bool) {
 	return cleaned, true
 }
 
-// legacyPathsFromDir liest den Zustand des Installationsverzeichnisses.
+// legacyPathsFromDir liest den Zustand des Verzeichnisses k-playbook/.
 //
 // Unter Modell 1 war es kein Clone, sondern ein reines Projektverzeichnis —
-// dann gehört alles darin dem Projekt. Ist es ein Clone, gehört ihm alles
-// Verfolgte; projekteigen ist genau das Untracked. Verfolgte Dateien, die
-// lokal geändert wurden, bleiben außen vor: die meldet der Update-Block, und
-// sie sind kein Grund, das Zurücksetzen zu blockieren.
+// dann gehört alles darin dem Projekt. Ist es ein liegengebliebener Clone,
+// gehört ihm alles Verfolgte; projekteigen ist genau das Untracked. Verfolgte
+// Dateien, die lokal geändert wurden, bleiben außen vor: sie sind kein
+// Grund, das Zurücksetzen zu blockieren.
 func legacyPathsFromDir(dir string) []string {
 	if isDir(filepath.Join(dir, ".git")) {
 		return untrackedInPlaybookDir(dir)

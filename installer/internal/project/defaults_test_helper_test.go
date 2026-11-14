@@ -18,8 +18,9 @@ var realOpenDefaultsStore = OpenDefaultsStore
 
 // isolateDefaults setzt für das ganze Paket eine öffentliche Collection im
 // Speicher ein (TestMain): Kein Test fragt den Node dieses Rechners. Gefüllt
-// wird sie beim Öffnen aus dem Baum, den ein Test unter k-playbook/defaults/
-// seines Projekts anlegt — dem Lieferumfang, wie der Release ihn packt; fehlt
+// wird sie beim Öffnen aus dem Baum, den ein Test unter testDefaultsDir
+// (test-defaults/) seines Projekts anlegt — dem Lieferumfang, wie der Release
+// ihn packt; fehlt
 // er, steht nur VERSION darin. Gelesen wird über den Store, nicht über die
 // Platte.
 //
@@ -40,7 +41,7 @@ func isolateDefaults() func() {
 		return kephtest.Collection(filepath.Join(projectDir, testCollectionDir))
 	}
 	OpenDefaultsStore = func(projectDir string) (DefaultsStore, string, error) {
-		store, err := kephtest.Defaults(filepath.Join(PlaybookDir(projectDir), defaultsDirName))
+		store, err := kephtest.Defaults(filepath.Join(projectDir, testDefaultsDir))
 		if err != nil {
 			return nil, testDefaultsAddress, err
 		}
@@ -65,6 +66,13 @@ var realOpenProjectLayerStore = OpenProjectLayerStore
 
 // testProjectAddress ist die Adresse der Collection des Projekts in Tests.
 const testProjectAddress = "test:projekt"
+
+// testDefaultsDir ist das Verzeichnis im Projekt eines Tests, aus dem
+// isolateDefaults die öffentliche Collection baut:
+// test-defaults/reviews/x.md ist dort defaults/reviews/x.md, also
+// k-playbook:/reviews/x.md. Derselbe Name wie defaultstest.DefaultsDir. Das
+// Programm liest es nie.
+const testDefaultsDir = "test-defaults"
 
 // testCollectionDir ist das Verzeichnis im Projekt eines Tests, aus dem
 // isolateDefaults die Collection des Projekts baut:

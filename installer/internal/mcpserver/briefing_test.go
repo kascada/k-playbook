@@ -89,7 +89,9 @@ func TestBriefingWerkzeugListetDokumente(t *testing.T) {
 	if _, ok := section.Field("guidelines"); ok {
 		t.Errorf("context trägt guidelines")
 	}
-	if raw, ok := section.Field("catalogs"); !ok || strings.Contains(string(raw), `"rules"`) || !strings.Contains(string(raw), `"checks"`) {
+	// reviews steht unter documents; einen anderen Katalog gibt es nicht mehr
+	// (rules Task 135, checks Task 155), also fällt catalogs ganz weg.
+	if raw, ok := section.Field("catalogs"); ok {
 		t.Errorf("context.catalogs: %s", raw)
 	}
 }

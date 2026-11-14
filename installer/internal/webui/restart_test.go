@@ -166,7 +166,6 @@ func newRestartFixture(t *testing.T, running string, latest string, asset string
 	if assetMissing {
 		source.RemoveAsset(latest, program.AssetName())
 	}
-	t.Cleanup(func() { makeWritable(projectDir) })
 	chdir(t, projectDir)
 
 	key, err := guiproc.Key()
@@ -335,7 +334,7 @@ func TestInstallationScheitertDienstLaeuftWeiter(t *testing.T) {
 			t.Errorf("Meldung ohne %q: %s", want, response.Message)
 		}
 	}
-	if strings.Contains(response.Message, project.BootstrapCommand) {
+	if strings.Contains(response.Message, "make -C "+project.PlaybookDirName+" install") {
 		t.Errorf("die Meldung nennt noch den Bootstrap des Clones: %s", response.Message)
 	}
 	if got := program.ReadVersion(f.target); got != "v0.9.90" {
@@ -391,72 +390,51 @@ func TestGleichzeitigerStartInDerLueckeGewinnt(t *testing.T) {
 	}
 }
 
-// Der Weg über „Update verfügbar": Ist das laufende Programm älter als der
-// neueste Release-Tag, installiert und startet derselbe Ablauf neu. Knopf und
-// Neustart hängen am Tag, nicht am Pull: Es geht nach einem Pull, der die
-// VERSION im Clone gar nicht bewegt, und ebenso nach einem gescheiterten Pull.
-func TestUpdateInstalliertUndStartetNeuBeiAelteremProgramm(t *testing.T) {
+// Ein altes Verzeichnis k-playbook/ bleibt bei der Programmaktualisierung
+// unberührt (Task 156): kein Pull, und auch die Startpflege des neuen
+// Dienstes setzt keinen Schreibschutz mehr.
+func TestProgrammaktualisierungLaesstAltenCloneUnberuehrt(t *testing.T) {
 	asset := buildProgram(t, "v0.9.91")
+	target := isolateHome(t)
+	writeExecutable(t, target, versionScript("v0.9.90"))
 
-	for _, fall := range []struct {
-		name       string
-		breakPull  bool
-		pullFailed string
-	}{
-		{name: "nach gelungenem Pull"},
-		{name: "nach gescheitertem Pull", breakPull: true, pullFailed: "git pull --ff-only fehlgeschlagen"},
-	} {
-		t.Run(fall.name, func(t *testing.T) {
-			target := isolateHome(t)
-			writeExecutable(t, target, versionScript("v0.9.90"))
+	projectDir := updateProject(t, "v0.9.91")
+	cloneFile := oldClone(t, projectDir)
+	serveRelease(t, "v0.9.91", asset)
+	chdir(t, projectDir)
 
-			projectDir, upstream := gitProject(t, "v0.9.91")
-			pushChange(t, upstream, filepath.Join("commands", "k-neu.md"), "neu\n")
-			if fall.breakPull {
-				gitCmd(t, filepath.Join(projectDir, project.PlaybookDirName), "remote", "set-url", "origin", filepath.Join(t.TempDir(), "gibt-es-nicht.git"))
-			}
-			serveRelease(t, "v0.9.91", asset)
-			chdir(t, projectDir)
+	key, err := guiproc.Key()
+	if err != nil {
+		t.Fatal(err)
+	}
+	registration, err := guiproc.Register(guiproc.Record{
+		Key: key, Addr: "127.0.0.1:1", PID: os.Getpid(), Version: "v0.9.90",
+		StartTime: guiproc.OwnStartTime().Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = registration.Remove() })
+	t.Cleanup(func() { stopRegistered(t, registration.Path()) })
 
-			key, err := guiproc.Key()
-			if err != nil {
-				t.Fatal(err)
-			}
-			registration, err := guiproc.Register(guiproc.Record{
-				Key: key, Addr: "127.0.0.1:1", PID: os.Getpid(), Version: "v0.9.90",
-				StartTime: guiproc.OwnStartTime().Unix(),
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = registration.Remove() })
-			t.Cleanup(func() { stopRegistered(t, registration.Path()) })
-
-			shutdown, wasStopped := shutdownProbe()
-			state := &serverState{version: "v0.9.90", registration: registration, shutdown: shutdown}
-			code, response := postUpdate(t, state, pullHandler, "/api/update")
-			// Auch nach einem gescheiterten Pull 200: die Seite muss der neuen
-			// Adresse folgen.
-			if code != http.StatusOK || !response.Restarted || response.Version != "v0.9.91" {
-				t.Fatalf("Status %d, Antwort %+v", code, response)
-			}
-			if fall.pullFailed != "" && !strings.Contains(response.Message, fall.pullFailed) {
-				t.Errorf("der gescheiterte Pull wird nicht gemeldet: %s", response.Message)
-			}
-			_, pullErr := os.Stat(filepath.Join(projectDir, project.PlaybookDirName, "commands", "k-neu.md"))
-			if (pullErr == nil) == fall.breakPull {
-				t.Errorf("Pull angekommen = %v, erwartet %v", pullErr == nil, !fall.breakPull)
-			}
-			record, ok, err := guiproc.Read(registration.Path())
-			if err != nil || !ok || record.Version != "v0.9.91" || record.URL() != response.URL {
-				t.Fatalf("Laufzeitdatei = %+v (%v, %v)", record, ok, err)
-			}
-			if got := program.ReadVersion(target); got != "v0.9.91" {
-				t.Errorf("am Ziel liegt %q", got)
-			}
-			if !wasStopped() {
-				t.Error("der alte Dienst beendet sich nicht")
-			}
-		})
+	shutdown, wasStopped := shutdownProbe()
+	state := &serverState{version: "v0.9.90", registration: registration, shutdown: shutdown}
+	code, response := postUpdate(t, state, programHandler, "/api/update/program")
+	if code != http.StatusOK || !response.Restarted || response.Version != "v0.9.91" {
+		t.Fatalf("Status %d, Antwort %+v", code, response)
+	}
+	if strings.Contains(response.Message, "Pull") {
+		t.Errorf("die Meldung nennt noch einen Pull: %s", response.Message)
+	}
+	assertCloneUntouched(t, cloneFile)
+	record, ok, err := guiproc.Read(registration.Path())
+	if err != nil || !ok || record.Version != "v0.9.91" || record.URL() != response.URL {
+		t.Fatalf("Laufzeitdatei = %+v (%v, %v)", record, ok, err)
+	}
+	if got := program.ReadVersion(target); got != "v0.9.91" {
+		t.Errorf("am Ziel liegt %q", got)
+	}
+	if !wasStopped() {
+		t.Error("der alte Dienst beendet sich nicht")
 	}
 }

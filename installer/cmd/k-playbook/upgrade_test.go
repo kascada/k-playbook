@@ -67,10 +67,11 @@ nachzuziehen ist.
 Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.
 `
 
-// upgradeProject baut ein Projekt mit Installation (ohne Git) und alter
-// AGENTS.md auf und macht es zum Arbeitsverzeichnis. latest ist der neueste
-// Release-Tag: Eine Ersatzquelle nennt ihn, ohne Assets — kein Test fragt das
-// echte GitHub. Die VERSION im Clone weicht bewusst ab: Sie wird nicht gelesen.
+// upgradeProject baut ein Projekt mit altem Verzeichnis k-playbook/ (ohne Git)
+// und alter AGENTS.md auf und macht es zum Arbeitsverzeichnis. latest ist der
+// neueste Release-Tag: Eine Ersatzquelle nennt ihn, ohne Assets — kein Test
+// fragt das echte GitHub. Das Verzeichnis k-playbook/ liegt bewusst da, mit
+// abweichender VERSION: Der Lauf liest es nicht und fasst es nicht an.
 func upgradeProjectDir(t *testing.T, latest string) string {
 	t.Helper()
 
@@ -142,14 +143,12 @@ func stubKephalaion(t *testing.T, find func() (string, bool), install func(conte
 	upgradeFindKephalaion, upgradeInstallKephalaion = find, install
 }
 
-func stubUpgradeSteps(t *testing.T, update func(string) (project.UpdateResult, error),
-	install func(context.Context, string) (program.Result, error)) {
+// stubUpgradeSteps ersetzt die Installation des Release-Binaries und stellt sie
+// samt dem Aufruf des neuen Programms nach dem Test wieder her.
+func stubUpgradeSteps(t *testing.T, install func(context.Context, string) (program.Result, error)) {
 	t.Helper()
-	beforeUpdate, beforeInstall, beforeReexec := upgradeUpdate, upgradeInstall, upgradeReexec
-	t.Cleanup(func() { upgradeUpdate, upgradeInstall, upgradeReexec = beforeUpdate, beforeInstall, beforeReexec })
-	if update != nil {
-		upgradeUpdate = update
-	}
+	beforeInstall, beforeReexec := upgradeInstall, upgradeReexec
+	t.Cleanup(func() { upgradeInstall, upgradeReexec = beforeInstall, beforeReexec })
 	if install != nil {
 		upgradeInstall = install
 	}
@@ -297,9 +296,9 @@ func TestUpgradeCheckMeldetUnbestimmbarenBlockNurAlsHinweis(t *testing.T) {
 	})
 }
 
-// Der Lauf ohne Clone-Git: der Pull entfällt mit Meldung, das Projekt wird
-// trotzdem nachgezogen — AGENTS.md auf die neue Vorlage, Prosa bleibt,
-// CLAUDE.md ist die Include-Datei —, und der zweite Lauf hat nichts zu tun.
+// Der Lauf zieht das Projekt nach — AGENTS.md auf die neue Vorlage, Prosa
+// bleibt, CLAUDE.md ist die Include-Datei —, und der zweite Lauf hat nichts zu
+// tun. Einen Pull gibt es nicht mehr, auch keine Zeile dazu.
 func TestUpgradeZiehtProjektNach(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.16.8")
 	setOwnVersion(t, "v0.16.8")
@@ -310,7 +309,6 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 		}
 	})
 	for _, erwartet := range []string{
-		"kein Git-Repository; der Pull entfällt",
 		"Programm-Stand: nichts zu tun",
 		"veraltete Anstoß in AGENTS.md wurde auf k-playbook briefing gebracht",
 		"Session-Memory-Block und Befunde-Block aus AGENTS.md entfernt",
@@ -380,19 +378,12 @@ func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 	}
 
 	stubUpgradeSteps(t,
-		func(string) (project.UpdateResult, error) {
-			return project.UpdateResult{}, nil
-		},
 		func(_ context.Context, tag string) (program.Result, error) {
 			if tag != "v0.17.0" {
 				t.Errorf("installiert wird %q, erwartet der neueste Tag v0.17.0", tag)
 			}
 			return program.Result{Target: stub, Expected: "v0.17.0", Installed: true}, nil
 		})
-	// Den Pull nicht entfallen lassen: der Clone bekommt ein .git-Verzeichnis.
-	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	stdout := captureStdout(t, func() {
 		if err := runUpgrade(nil); err != nil {
@@ -400,7 +391,6 @@ func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 		}
 	})
 	for _, erwartet := range []string{
-		"Clone k-playbook/ per Pull auf dem Stand seines Remotes",
 		"v0.17.0 installiert nach " + stub,
 		"Projekt: nachgezogen vom Stub.",
 		"Das Programm hat gewechselt: die Sitzung neu starten",
@@ -412,51 +402,6 @@ func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 	content, _ := os.ReadFile(filepath.Join(root, project.RootInstructionsFile))
 	if string(content) != "# vom neuen Programm\n" {
 		t.Errorf("der alte Prozess hat Schritt (2) selbst ausgeführt:\n%s", content)
-	}
-}
-
-// Scheitert der Pull (hier: an lokalen Änderungen), wird trotzdem verglichen
-// und installiert: Der Pull dient nur noch den Inhalten des Clones. Das neue
-// Programm zieht das Projekt nach — ohne --repair-mcp, denn es repariert die
-// MCP-Einträge im Projektschritt immer.
-func TestUpgradeInstalliertNachGescheitertemPull(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.17.0")
-	installTargetInPath(t)
-	setOwnVersion(t, "v0.16.8")
-
-	stub := filepath.Join(t.TempDir(), "k-playbook-neu")
-	script := "#!/bin/sh\n" +
-		"[ \"$1\" = upgrade ] && [ \"$2\" = --project-only ] && [ $# = 2 ] || exit 7\n" +
-		"printf 'Projekt: nachgezogen vom Stub.\\n'\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	stubUpgradeSteps(t,
-		func(string) (project.UpdateResult, error) {
-			return project.UpdateResult{Output: "error: Your local changes would be overwritten"}, os.ErrInvalid
-		},
-		func(context.Context, string) (program.Result, error) {
-			return program.Result{Target: stub, Expected: "v0.17.0", Installed: true}, nil
-		})
-	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	stdout := captureStdout(t, func() {
-		if err := runUpgrade(nil); err != nil {
-			t.Errorf("upgrade: %v", err)
-		}
-	})
-	assertOrder(t, stdout,
-		"Pull im Clone fehlgeschlagen",
-		"Your local changes would be overwritten",
-		"v0.17.0 installiert nach "+stub,
-		"Projekt: nachgezogen vom Stub.",
-		"Das Programm hat gewechselt: die Sitzung neu starten",
-	)
-	if strings.Contains(stdout, "konnte das Projekt nicht nachziehen") {
-		t.Errorf("das neue Programm wurde mit --repair-mcp gerufen:\n%s", stdout)
 	}
 }
 
@@ -484,19 +429,13 @@ func TestUpgradeRepairMCPNurMitProjectOnly(t *testing.T) {
 // Scheitert Download oder Install, bleibt das eine eigene Meldung mit dem Weg
 // im Terminal; Schritt (2) läuft trotzdem, mit dem laufenden Programm.
 func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.17.0")
+	upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
 	stubUpgradeSteps(t,
-		func(string) (project.UpdateResult, error) {
-			return project.UpdateResult{}, nil
-		},
 		func(context.Context, string) (program.Result, error) {
 			return program.Result{Output: "Geladen: https://example.invalid/k-playbook"}, os.ErrDeadlineExceeded
 		})
-	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	stdout := captureStdout(t, func() {
 		if err := runUpgrade(nil); err != nil {
@@ -517,7 +456,7 @@ func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
 	if strings.Contains(stdout, "neu starten") {
 		t.Errorf("ohne Binärwechsel kein Neustart-Hinweis:\n%s", stdout)
 	}
-	if strings.Contains(stdout, project.BootstrapCommand) {
+	if strings.Contains(stdout, "make -C "+project.PlaybookDirName+" install") {
 		t.Errorf("die Meldung nennt noch bin/install des Clones:\n%s", stdout)
 	}
 }
@@ -610,7 +549,7 @@ func TestUpgradeJSON(t *testing.T) {
 			t.Errorf("upgrade --check --json: %v", err)
 		}
 	})
-	for _, erwartet := range []string{`"schemaVersion": "2"`, `"check": true`, `"hasOutdatedAnstoss": true`, `"Session-Memory-Block"`, `"messages": [`} {
+	for _, erwartet := range []string{`"schemaVersion": "3"`, `"check": true`, `"hasOutdatedAnstoss": true`, `"Session-Memory-Block"`, `"messages": [`} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
 		}
@@ -1019,7 +958,7 @@ func TestUpgradeProjectOnlyFasstKephalaionNichtAn(t *testing.T) {
 	}
 }
 
-// removeClone nimmt dem Projekt die Installation k-playbook/ — Binary-only.
+// removeClone nimmt dem Projekt das Verzeichnis k-playbook/ — Binary-only.
 func removeClone(t *testing.T, root string) {
 	t.Helper()
 	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
@@ -1041,7 +980,7 @@ func TestUpgradeOhneCloneRuftAuto(t *testing.T) {
 			t.Errorf("upgrade: %v", err)
 		}
 	})
-	assertOrder(t, stdout, "Kephalaion: v0.4.1 ist aktuell.", "Programm: die Installation "+project.PlaybookDirName+"/ fehlt")
+	assertOrder(t, stdout, "Kephalaion: v0.4.1 ist aktuell.", "Programm-Stand: nichts zu tun")
 	if calls := fake.Calls(t); !reflect.DeepEqual(calls, [][]string{upgradeAutoArgs}) {
 		t.Errorf("Aufrufe von kephalaion = %q, erwartet genau upgrade --auto --json", calls)
 	}
@@ -1078,7 +1017,7 @@ func TestUpgradeOhneCloneInstalliertKephalaion(t *testing.T) {
 	messages := strings.Join(check.Messages, "\n")
 	assertOrder(t, messages,
 		"Kephalaion: fehlt im PATH; ein Lauf installiert es über das install.sh des neuesten Kephalaion-Releases (von Hand: "+kephalaion.InstallCommand+").",
-		"Programm: die Installation "+project.PlaybookDirName+"/ fehlt",
+		"Programm-Stand: nichts zu tun",
 	)
 
 	report := runUpgradeJSON(t)
@@ -1092,10 +1031,9 @@ func TestUpgradeOhneCloneInstalliertKephalaion(t *testing.T) {
 	assertOrder(t, messages,
 		"Kephalaion: installiert nach /home/u/.local/bin/kephalaion.",
 		"  Installiert: /home/u/.local/bin/kephalaion",
-		"Programm: die Installation "+project.PlaybookDirName+"/ fehlt; der Pull entfällt.",
 		"Programm-Stand: nichts zu tun",
 	)
-	for _, gone := range []string{"installiert dieser Lauf es nicht", "bin/install-kephalaion"} {
+	for _, gone := range []string{"installiert dieser Lauf es nicht", "bin/install-kephalaion", "Installation fehlt", "der Pull entfällt"} {
 		if strings.Contains(messages, gone) {
 			t.Errorf("die Meldung nennt noch %q:\n%s", gone, messages)
 		}
@@ -1133,7 +1071,7 @@ func TestUpgradeOhneCloneLaedtInstallSkriptVonKephalaion(t *testing.T) {
 		t.Fatalf("kephalaion = %+v", report.Kephalaion)
 	}
 	messages := strings.Join(report.Messages, "\n")
-	assertOrder(t, messages, "Kephalaion: installiert nach "+want+".", "  Ersatz-install.sh", "Programm: die Installation "+project.PlaybookDirName+"/ fehlt")
+	assertOrder(t, messages, "Kephalaion: installiert nach "+want+".", "  Ersatz-install.sh", "Programm-Stand: nichts zu tun")
 	found := false
 	for _, request := range source.Requests() {
 		found = found || request == "/kephalaion/install.sh"
@@ -1150,15 +1088,8 @@ const (
 	kUpgradeVorschau = "Ein Lauf holt Neues; bringt er eine neue Version, zieht danach /k-upgrade"
 )
 
-// stubCheckUpdate ersetzt die Abfrage des Remote-Stands bei --check.
-func stubCheckUpdate(t *testing.T, status project.UpdateStatus) {
-	t.Helper()
-	before := upgradeCheckUpdate
-	t.Cleanup(func() { upgradeCheckUpdate = before })
-	upgradeCheckUpdate = func(string) (project.UpdateStatus, error) { return status, nil }
-}
-
-// withClone gibt der Installation ein .git-Verzeichnis, damit der Pull läuft.
+// withClone gibt dem Verzeichnis k-playbook/ ein .git-Verzeichnis: ein alter
+// Clone, wie ihn frühere Versionen nachgezogen haben.
 func withClone(t *testing.T, root string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
@@ -1184,10 +1115,9 @@ func runUpgradeText(t *testing.T, args ...string) string {
 // sagt „in einer neuen Sitzung“. Der Hinweis hängt allein am Binärwechsel.
 func TestUpgradeHinweisAufKUpgradeNachBinaerwechsel(t *testing.T) {
 	t.Setenv(viaCommandEnv, "")
-	root := upgradeProjectDir(t, "v0.17.0")
+	upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
-	withClone(t, root)
 
 	stub := filepath.Join(t.TempDir(), "k-playbook-neu")
 	script := "#!/bin/sh\n" +
@@ -1197,9 +1127,6 @@ func TestUpgradeHinweisAufKUpgradeNachBinaerwechsel(t *testing.T) {
 		t.Fatal(err)
 	}
 	stubUpgradeSteps(t,
-		func(string) (project.UpdateResult, error) {
-			return project.UpdateResult{}, nil
-		},
 		func(context.Context, string) (program.Result, error) {
 			return program.Result{Target: stub, Expected: "v0.17.0", Installed: true}, nil
 		})
@@ -1211,8 +1138,8 @@ func TestUpgradeHinweisAufKUpgradeNachBinaerwechsel(t *testing.T) {
 	}
 }
 
-// Ohne Binärwechsel kein Hinweis — auch dann nicht, wenn der Pull gelaufen
-// ist: Der Hinweis hängt allein daran, dass das Binary ersetzt wurde. Mit
+// Ohne Binärwechsel kein Hinweis: Er hängt allein daran, dass das Binary
+// ersetzt wurde. Mit
 // K_PLAYBOOK_VIA_COMMAND=1 — der Aufruf aus /k-upgrade — auch nach einem
 // Binärwechsel nicht.
 func TestUpgradeKeinHinweisAufKUpgrade(t *testing.T) {
@@ -1228,12 +1155,7 @@ func TestUpgradeKeinHinweisAufKUpgrade(t *testing.T) {
 			root := upgradeProjectDir(t, "v0.17.0")
 			installTargetInPath(t)
 			setOwnVersion(t, fall.own)
-			withClone(t, root)
-			pulled := false
-			stubUpgradeSteps(t, func(string) (project.UpdateResult, error) {
-				pulled = true
-				return project.UpdateResult{Output: "Updating 1111111..2222222"}, nil
-			}, func(context.Context, string) (program.Result, error) {
+			stubUpgradeSteps(t, func(context.Context, string) (program.Result, error) {
 				if !fall.installed {
 					t.Error("ohne älteres Programm wurde installiert")
 				}
@@ -1247,9 +1169,6 @@ func TestUpgradeKeinHinweisAufKUpgrade(t *testing.T) {
 			if strings.Contains(stdout, "/k-upgrade") {
 				t.Errorf("unerwarteter Hinweis auf /k-upgrade:\n%s", stdout)
 			}
-			if !pulled {
-				t.Errorf("der Pull ist nicht gelaufen:\n%s", stdout)
-			}
 			if fall.installed != strings.Contains(stdout, "Das Programm hat gewechselt") {
 				t.Errorf("Binärwechsel = %v passt nicht zur Ausgabe:\n%s", fall.installed, stdout)
 			}
@@ -1261,14 +1180,9 @@ func TestUpgradeKeinHinweisAufKUpgrade(t *testing.T) {
 // nur vom aufrufenden Prozess.
 func TestUpgradeProjectOnlyOhneHinweisAufKUpgrade(t *testing.T) {
 	t.Setenv(viaCommandEnv, "")
-	root := upgradeProjectDir(t, "v0.17.0")
+	upgradeProjectDir(t, "v0.17.0")
 	setOwnVersion(t, "v0.16.8")
-	withClone(t, root)
 	stubUpgradeSteps(t,
-		func(string) (project.UpdateResult, error) {
-			t.Error("--project-only hat gepullt")
-			return project.UpdateResult{}, nil
-		},
 		func(context.Context, string) (program.Result, error) {
 			t.Error("--project-only hat installiert")
 			return program.Result{}, nil
@@ -1280,27 +1194,22 @@ func TestUpgradeProjectOnlyOhneHinweisAufKUpgrade(t *testing.T) {
 }
 
 // --check sagt in einer eigenen Vorschauzeile, dass ein Lauf Neues holt: wenn
-// der Clone hinter seinem Remote liegt oder das laufende Programm älter als
-// der neueste Release-Tag und installierbar ist. Sonst keine Zeile, und mit K_PLAYBOOK_VIA_COMMAND=1 nie.
+// das laufende Programm älter als der neueste Release-Tag und installierbar
+// ist. Sonst keine Zeile, und mit K_PLAYBOOK_VIA_COMMAND=1 nie.
 func TestUpgradeCheckVorschauAufKUpgrade(t *testing.T) {
-	hinter := project.UpdateStatus{Available: true, Branch: "main", Local: "aaaaaaaaaaaa", Remote: "bbbbbbbbbbbb"}
-	gleich := project.UpdateStatus{Branch: "main", Local: "aaaaaaaaaaaa", Remote: "aaaaaaaaaaaa"}
 	for _, fall := range []struct {
 		name, via, own string
-		update         project.UpdateStatus
 		erwartet       bool
 	}{
-		{"hinter dem Remote", "", "v0.17.0", hinter, true},
-		{"älteres installierbares Programm", "", "v0.16.8", gleich, true},
-		{"nichts Neues", "", "v0.17.0", gleich, false},
-		{"aus /k-upgrade", "1", "v0.16.8", hinter, false},
+		{"älteres installierbares Programm", "", "v0.16.8", true},
+		{"nichts Neues", "", "v0.17.0", false},
+		{"aus /k-upgrade", "1", "v0.16.8", false},
 	} {
 		t.Run(fall.name, func(t *testing.T) {
 			t.Setenv(viaCommandEnv, fall.via)
 			upgradeProjectDir(t, "v0.17.0")
 			installTargetInPath(t)
 			setOwnVersion(t, fall.own)
-			stubCheckUpdate(t, fall.update)
 
 			stdout := runUpgradeText(t, "--check")
 			if fall.erwartet {
@@ -1312,6 +1221,73 @@ func TestUpgradeCheckVorschauAufKUpgrade(t *testing.T) {
 			}
 			if strings.Contains(stdout, kUpgradeHinweis) || strings.Contains(stdout, "neuere Version") {
 				t.Errorf("--check gibt den Hinweis eines Laufs aus:\n%s", stdout)
+			}
+		})
+	}
+}
+
+// Task 156: upgrade, upgrade --check und --json nennen keinen Clone mehr —
+// weder mit einem alten Clone im Projekt noch ohne Verzeichnis k-playbook/.
+// Kein Pull, kein Schreibschutz, keine Meldung „Installation fehlt“; ein alter
+// Clone bleibt unberührt liegen, sein Löschen ist Sache von /k-upgrade.
+//
+// Der Testname trägt das Wort bewusst nicht: Er steht im Pfad des
+// Testverzeichnisses, und den nennt die JSON-Antwort.
+func TestUpgradeNenntDasPlaybookVerzeichnisNicht(t *testing.T) {
+	for _, fall := range []struct {
+		name  string
+		clone bool
+	}{
+		{"mit altem Verzeichnis samt .git", true},
+		{"ohne Verzeichnis", false},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			t.Setenv(viaCommandEnv, "")
+			root := upgradeProjectDir(t, "v0.16.8")
+			setOwnVersion(t, "v0.16.8")
+			playbook := filepath.Join(root, project.PlaybookDirName)
+			if fall.clone {
+				withClone(t, root)
+			} else {
+				removeClone(t, root)
+			}
+
+			outputs := map[string]string{
+				"--check":        runUpgradeText(t, "--check"),
+				"--check --json": runUpgradeText(t, "--check", "--json"),
+				"Lauf":           runUpgradeText(t),
+				"--json":         runUpgradeText(t, "--json"),
+			}
+			for name, output := range outputs {
+				if !strings.Contains(output, "Programm-Stand: nichts zu tun — laufend v0.16.8, neuestes Release v0.16.8") {
+					t.Errorf("%s: die Zeile zum Programm-Stand fehlt:\n%s", name, output)
+				}
+				for _, gone := range []string{
+					"Clone", "Pull", "pull", "Installation fehlt", "Installation:", "die Installation",
+					" " + project.PlaybookDirName + "/", "Remote",
+					`"update"`, `"pulled"`, `"pullOutput"`, `"remoteSwitched"`,
+				} {
+					if strings.Contains(output, gone) {
+						t.Errorf("%s nennt noch %q:\n%s", name, gone, output)
+					}
+				}
+			}
+
+			info, err := os.Stat(playbook)
+			if !fall.clone {
+				if err == nil {
+					t.Errorf("%s/ wurde angelegt", project.PlaybookDirName)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("der alte Clone ist weg: %v", err)
+			}
+			if info.Mode().Perm()&0o200 == 0 {
+				t.Errorf("der alte Clone ist schreibgeschützt: %v", info.Mode().Perm())
+			}
+			if content, err := os.ReadFile(filepath.Join(playbook, "VERSION")); err != nil || string(content) != "v0.0.1\n" {
+				t.Errorf("VERSION im alten Clone: %q, %v", content, err)
 			}
 		})
 	}

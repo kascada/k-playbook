@@ -12,8 +12,8 @@
 // Datei kann längst einem fremden Prozess gehören, und eine PID kann nach
 // unsauberem Ende neu vergeben sein.
 //
-// Die Datei liegt im Laufzeitverzeichnis des Nutzers, nicht im Projekt: die
-// Installation ist read-only, und k-playbook-local/ gehört dem Projekt.
+// Die Datei liegt im Laufzeitverzeichnis des Nutzers, nicht im Projekt: Sie
+// gehört zu diesem Rechner, und k-playbook-local/ gehört dem Projekt.
 package guiproc
 
 import (

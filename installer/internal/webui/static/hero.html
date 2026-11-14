@@ -16,7 +16,7 @@
         <div class="brand-row">
           <img class="brand-logo" src="/static/logo.png" alt="k-playbook Logo">
           <h1>{{.Title}}</h1>
-          <span class="version-badge" title="Version des k-playbook-Binarys, das diesen Dienst bereitstellt. Die Installation daneben kann einen anderen Stand tragen.">{{.Version}}</span>
+          <span class="version-badge" title="Version des k-playbook-Binarys, das diesen Dienst bereitstellt.">{{.Version}}</span>
         </div>
         <div class="hero-subrow">
           <p class="eyebrow path">
@@ -27,11 +27,6 @@
             <span class="path-entry{{if not .RepoRoot}} hidden{{end}}">
               <span class="path-key">Repository:</span>
               {{.RepoRoot}}
-            </span>
-            <span class="path-entry{{if not .PlaybookDir}} hidden{{end}}"
-                  title="Hieraus kommen Skripte, Reviews und Checks. Eigener Clone, kann einen anderen Stand tragen.">
-              <span class="path-key">Installation:</span>
-              {{.PlaybookDir}}
             </span>
           </p>
           {{if or (eq .Area "status") (and (eq .Page "/setup") (not .Installed))}}

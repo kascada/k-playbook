@@ -11,6 +11,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/inventory"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
@@ -66,7 +67,7 @@ func putVersionsTemplate(t *testing.T, root string) {
 	if err != nil {
 		t.Fatalf("Vorlage lesen: %v", err)
 	}
-	target := filepath.Join(project.PlaybookDir(root), "defaults", rel)
+	target := filepath.Join(root, defaultstest.DefaultsDir, rel)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestSubkommandoOhneKephalaionBrichtAb(t *testing.T) {
 // leere README entsteht nicht.
 func TestSubkommandoOhneVorlageSchreibtDasInventar(t *testing.T) {
 	root, store := fixtureProject(t, "vollstaendig")
-	if err := os.RemoveAll(filepath.Join(project.PlaybookDir(root), "defaults", "docs")); err != nil {
+	if err := os.RemoveAll(filepath.Join(root, defaultstest.DefaultsDir, "docs")); err != nil {
 		t.Fatal(err)
 	}
 

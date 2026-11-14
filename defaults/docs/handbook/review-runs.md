@@ -500,7 +500,8 @@ cannot itself be performed, due to a read error or missing permissions, is `fail
 whether a module exists is then unknown, and `skipped` would claim that there is nothing
 to do.
 
-The search skips the installation copy `k-playbook/`, the project-owned
+The search skips `k-playbook/` -- legacy: a clone of the tool left over from the former
+model --, the project-owned
 `k-playbook-local/`, plus `vendor/`, `testdata/`, `node_modules/`, and everything with a
 leading dot: none of these contain a project module. This list is in code rather than the
 catalog: unlike a tool exclusion, it does not belong to an invocation.

@@ -16,7 +16,7 @@ func newProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	// Der Clone steht noch, solange er Regeln, Skripte und Checks trägt; die
+	// Der Clone steht noch, solange er Regeln und Skripte trägt; die
 	// Commands und Skills kommen schon aus dem mitgelieferten Verzeichnis.
 	writeFile(t, filepath.Join(root, project.PlaybookDirName, "VERSION"), "v0.0.0\n")
 	writeFile(t, filepath.Join(sharetest.Dir(t), "commands", "k-test.md"), "test\n")
@@ -45,130 +45,6 @@ func readFile(t *testing.T, path string) string {
 	return string(data)
 }
 
-// Das Aktualisieren bekommt denselben Ablauf wie das Einrichten. Ohne das
-// bliebe ein Projekt mit nur echter CLAUDE.md über „Aktualisieren" für immer
-// unverändert.
-func TestRelinkAfterUpdateRichtetEin(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), "# Unser Projekt\n")
-
-	_, message := relinkAfterUpdate(root, "Aktualisiert.")
-
-	agents := filepath.Join(root, project.RootInstructionsFile)
-	content := readFile(t, agents)
-	if !strings.Contains(content, "# Unser Projekt") {
-		t.Errorf("der mitgebrachte Inhalt fehlt in AGENTS.md:\n%s", content)
-	}
-	if !strings.Contains(content, "\n    k-playbook briefing\n") {
-		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
-	}
-
-	// CLAUDE.md ist danach die Include-Datei: regulär, mit der Import-Zeile,
-	// ohne den umbenannten Inhalt.
-	claude := filepath.Join(root, "CLAUDE.md")
-	if info, err := os.Lstat(claude); err != nil || !info.Mode().IsRegular() {
-		t.Errorf("CLAUDE.md ist keine reguläre Datei: %v", err)
-	}
-	if claudeContent := readFile(t, claude); !strings.Contains(claudeContent, "\n"+project.ClaudeIncludeLine+"\n") ||
-		strings.Contains(claudeContent, "# Unser Projekt") {
-		t.Errorf("CLAUDE.md ist kein reiner Include:\n%s", claudeContent)
-	}
-	if !project.LinksOK(project.CheckLinks(root)) {
-		t.Errorf("nach dem Aktualisieren nicht eingerichtet: %+v", project.CheckLinks(root))
-	}
-
-	// Die Umbenennung gehört in den Antworttext des Updates, nicht nur in den
-	// des Einrichtens.
-	if !strings.Contains(message, "umbenannt") {
-		t.Errorf("die Umbenennung fehlt im Antworttext: %s", message)
-	}
-}
-
-// Ein Projekt ohne beide Dateien bekommt AGENTS.md erstmals aus der Vorlage.
-// Das ist neues Verhalten für diesen Einstieg und deshalb gewollt benannt.
-func TestRelinkAfterUpdateLegtWurzeldateiAn(t *testing.T) {
-	root := newProject(t)
-
-	_, message := relinkAfterUpdate(root, "Aktualisiert.")
-
-	content := readFile(t, filepath.Join(root, project.RootInstructionsFile))
-	if !strings.Contains(content, "\n    k-playbook briefing\n") {
-		t.Errorf("der Anstoß fehlt in AGENTS.md:\n%s", content)
-	}
-	if !strings.Contains(message, project.RootInstructionsFile) {
-		t.Errorf("die angelegte Wurzeldatei fehlt im Antworttext: %s", message)
-	}
-
-	// Ein zweiter Lauf ändert nichts mehr.
-	relinkAfterUpdate(root, "Aktualisiert.")
-	if readFile(t, filepath.Join(root, project.RootInstructionsFile)) != content {
-		t.Error("der zweite Lauf hat AGENTS.md verändert")
-	}
-}
-
-// Ein Bestandsprojekt mit der alten Vorlage kommt über „Aktualisieren" auf die
-// neue, und der Antworttext sagt, was sich an der Projektdatei geändert hat.
-func TestRelinkAfterUpdateZiehtAlteVorlageNach(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, project.RootInstructionsFile), `# AGENTS.md
-
-<!-- k-playbook:anstoss -->
-## k-playbook
-
-Für dieses Projekt gilt k-playbook. Rufe zu Beginn
-
-    k-playbook context
-
-auf und lies die Dateien aus `+"`instructions`"+` in der angegebenen Reihenfolge,
-bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
-die effektiven Kataloge für Regeln, Reviews und Checks.
-
-<!-- k-playbook:session-memory -->
-## Projektwissen zuerst
-
-Die autoritative Projektdokumentation beginnt bei
-`+"`k-playbook-local/docs/README.md`"+`. Lies diesen Index zuerst, bevor du den
-Code analysierst. Erst wenn die Dokumentation fehlt, nicht passt oder ein
-konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
-
-## Unsere Regeln
-
-Bleiben.
-`)
-
-	_, message := relinkAfterUpdate(root, "Aktualisiert.")
-
-	content := readFile(t, filepath.Join(root, project.RootInstructionsFile))
-	if !strings.Contains(content, "\n    k-playbook briefing\n") || strings.Contains(content, "k-playbook context") {
-		t.Errorf("der Anstoß wurde nicht ersetzt:\n%s", content)
-	}
-	if strings.Contains(content, "k-playbook:session-memory") || !strings.Contains(content, "## Unsere Regeln\n\nBleiben.\n") {
-		t.Errorf("der Block wurde nicht entfernt oder Projekttext ging verloren:\n%s", content)
-	}
-	for _, erwartet := range []string{"k-playbook briefing", "Session-Memory-Block aus AGENTS.md entfernt"} {
-		if !strings.Contains(message, erwartet) {
-			t.Errorf("%q fehlt im Antworttext: %s", erwartet, message)
-		}
-	}
-}
-
-// Ein Konflikt gehört ebenfalls in den Antworttext — er bedeutet, dass Claude
-// Code das Playbook bis zur Handarbeit nicht kennt.
-func TestRelinkAfterUpdateMeldetKonflikt(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, project.RootInstructionsFile), "# A\n")
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), "# eigenständig\n")
-
-	_, message := relinkAfterUpdate(root, "Aktualisiert.")
-
-	if !strings.Contains(message, "sieht Claude Code den Anstoß nicht") {
-		t.Errorf("der Konflikt fehlt im Antworttext: %s", message)
-	}
-	if content := readFile(t, filepath.Join(root, "CLAUDE.md")); content != "# eigenständig\n" {
-		t.Errorf("CLAUDE.md wurde verändert: %q", content)
-	}
-}
-
 // Scheitert die Programmaktualisierung, nennt die Meldung den Weg im
 // Terminal: `k-playbook upgrade`. Geprüft wird der ganze Satz, nicht nur ein
 // Wortbestandteil: die Meldung ist die Stelle, an der ein Nutzer erfährt, wie
@@ -189,7 +65,7 @@ func TestInstallationsfehlerNenntUpgrade(t *testing.T) {
 			t.Errorf("in der Meldung fehlt %q: %s", want, message)
 		}
 	}
-	for _, gone := range []string{"make", project.BootstrapCommandNoMake} {
+	for _, gone := range []string{"make", project.PlaybookDirName + "/bin/install"} {
 		if strings.Contains(message, gone) {
 			t.Errorf("die Meldung nennt noch %q: %s", gone, message)
 		}
@@ -220,67 +96,19 @@ func TestOberflaecheNenntDenselbenWeg(t *testing.T) {
 	}
 	for _, gone := range []string{
 		"make -C " + project.PlaybookDirName + " install",
-		project.BootstrapCommandNoMake,
+		project.PlaybookDirName + "/bin/install",
 		"program.clone",
 		"älter als die Installation",
 		"zum Clone passende Programm",
+		// Task 156: kein Pull mehr, kein Modus dafür und kein Stand des Clones.
+		`"pull"`,
+		"Update verfügbar",
+		"data.available",
+		"data.branch",
+		"Clone",
 	} {
 		if strings.Contains(script, gone) {
 			t.Errorf("service.js nennt noch %q", gone)
 		}
-	}
-}
-
-// Nach „Aktualisieren“ hängt der Dock/Finder-Hinweis an der geschriebenen
-// Form: nur wo der bloße Name steht, wird er genannt.
-func TestDescribeMCPRepairNenntDiePortableForm(t *testing.T) {
-	if nothing := describeMCPRepair(project.MCPRepairReport{}); nothing != "" {
-		t.Errorf("ohne Reparatur eine Meldung: %q", nothing)
-	}
-	absolute := describeMCPRepair(project.MCPRepairReport{Repaired: []string{".mcp.json"}})
-	if !strings.Contains(absolute, ".mcp.json") {
-		t.Errorf("Meldung nennt die Datei nicht: %q", absolute)
-	}
-	if strings.Contains(absolute, "bloße Name") || strings.Contains(absolute, "Dock oder Finder") {
-		t.Errorf("Meldung ohne portable Form nennt den Hinweis: %q", absolute)
-	}
-
-	portable := describeMCPRepair(project.MCPRepairReport{
-		Repaired: []string{".mcp.json", "opencode.json"},
-		Portable: []string{".mcp.json"},
-	})
-	for _, want := range []string{"bloße Name " + project.InstalledCommandName, "In .mcp.json steht", "Dock oder Finder", "von Hand"} {
-		if !strings.Contains(portable, want) {
-			t.Errorf("Meldung enthält %q nicht: %q", want, portable)
-		}
-	}
-}
-
-// Bricht das Einrichten mit einem Fehler ab, nennt der Antworttext des
-// Updates trotzdem den README-Schritt (Task 137): Er steht neben dem
-// Fehlerwert im Ergebnis. Hier ohne Anbindung des Testprojekts als Hinweis.
-func TestRelinkAfterUpdateNenntReadmesAuchImFehlerzweig(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, project.RootInstructionsFile), "# AGENTS.md\n\n<!-- k-playbook:anstoss -->\n## k-playbook\n\n"+
-		"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn\n\n"+
-		"    k-playbook context\n\n"+
-		"auf und lies die Dateien aus `instructions`.\n\n"+
-		"Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n")
-
-	_, message := relinkAfterUpdate(root, "Aktualisiert.")
-	if !strings.Contains(message, "konnte nicht nachgezogen werden") {
-		t.Fatalf("kein Fehlerzweig: %s", message)
-	}
-	if !strings.Contains(message, "README unter keph:/docs/: nicht versucht") {
-		t.Errorf("der README-Schritt fehlt im Antworttext: %s", message)
-	}
-}
-
-// Im Erfolgszweig nennt describeSetup den README-Schritt.
-func TestRelinkAfterUpdateNenntReadmes(t *testing.T) {
-	root := newProject(t)
-	_, message := relinkAfterUpdate(root, "Aktualisiert.")
-	if !strings.Contains(message, "README unter keph:/docs/") {
-		t.Errorf("der README-Schritt fehlt im Antworttext: %s", message)
 	}
 }

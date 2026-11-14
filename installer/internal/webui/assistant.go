@@ -77,9 +77,18 @@ func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ein Ablauf für alles: Einordnen und Auflösen der Instruktionsdateien, der
-	// Anstoß, dann die Verlinkung. Die Reihenfolge steckt in der Funktion.
-	setup, err := project.ApplyAssistantSetup(environment.ProjectDir)
+	writeJSON(w, http.StatusOK, assistantState(setupMessage(environment.ProjectDir)))
+}
+
+// setupMessage richtet ein und formuliert den Antworttext dazu.
+//
+// Ein Ablauf für alles: Einordnen und Auflösen der Instruktionsdateien, der
+// Anstoß, dann die Verlinkung. Die Reihenfolge steckt in
+// project.ApplyAssistantSetup. Ein Fehler steht hinter dem, was bis dahin
+// getan wurde — auch der README-Schritt, der neben dem Fehlerwert im Ergebnis
+// steht.
+func setupMessage(projectDir string) string {
+	setup, err := project.ApplyAssistantSetup(projectDir)
 
 	message := "Verlinkung eingerichtet."
 	if note := describeSetup(setup); note != "" {
@@ -88,7 +97,7 @@ func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		message += " Nicht vollständig eingerichtet: " + err.Error()
 	}
-	writeJSON(w, http.StatusOK, assistantState(message))
+	return message
 }
 
 // describeSetup nennt im Klartext, was das Einrichten an den

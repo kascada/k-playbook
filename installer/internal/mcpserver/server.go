@@ -22,10 +22,10 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// serverName und serverVersion melden sich beim Client an. k-playbook führt
-// keine Versionsnummer — der Stand ergibt sich aus dem Git-Clone der
-// Installation. Der Wert hier ist reine Anzeige: die Spec verlangt das Feld,
-// und sie hält ausdrücklich fest, dass es nicht für Entscheidungen taugt.
+// serverName und serverVersion melden sich beim Client an. Der Wert hier ist
+// reine Anzeige und nicht die Version des Binarys (die nennt `k-playbook
+// version`): die Spec verlangt das Feld, und sie hält ausdrücklich fest, dass
+// es nicht für Entscheidungen taugt.
 const (
 	serverName    = "k-playbook"
 	serverVersion = "0.1.0"
@@ -44,8 +44,8 @@ type contextInput struct {
 
 const toolDescription = `Gibt den aufgelösten Arbeitsstand eines k-playbook-Projekts zurück: ` +
 	`Pfade, Remediation-Policy ` +
-	`und die effektiven Kataloge für reviews und checks — reviews mitgeliefert und ` +
-	`projekteigen bereits zusammengeführt, checks nur mitgeliefert (origin immer dist). Zieht dabei die Assistenten-Verlinkung ` +
+	`und den effektiven Katalog für reviews — mitgeliefert und ` +
+	`projekteigen bereits zusammengeführt. Zieht dabei die Assistenten-Verlinkung ` +
 	`auf den Katalog nach und meldet unter "links", was sich geändert hat. ` +
 	`Dieselbe Antwort wie das Subkommando "k-playbook context".`
 

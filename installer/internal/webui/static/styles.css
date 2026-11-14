@@ -533,7 +533,7 @@ h2 {
   gap: var(--space-5);
 }
 
-/* Projekt, Repository und Installation stehen als eigene Zeilen links. So
+/* Projekt und Repository stehen als eigene Zeilen links. So
    bleibt erkennbar, dass Projektanker und Git-Repository verschieden sein
    können. */
 .path-entry {

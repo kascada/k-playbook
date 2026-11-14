@@ -1,8 +1,9 @@
 // Package defaultstest schirmt Tests anderer Pakete von der öffentlichen
 // Collection k-playbook am Node dieses Rechners ab: Isolate setzt
 // project.OpenDefaultsStore auf einen Store im Speicher (kephtest), gefüllt
-// beim Öffnen aus dem Baum, den ein Test unter k-playbook/defaults/ seines
-// Projekts anlegt — dem Lieferumfang, wie der Release ihn packt. Gelesen wird
+// beim Öffnen aus dem Baum, den ein Test unter DefaultsDir (test-defaults/)
+// seines Projekts anlegt — dem Lieferumfang, wie der Release ihn packt:
+// test-defaults/reviews/x.md ist dort defaults/reviews/x.md. Gelesen wird
 // über den Store, nicht über die Platte. Nur Tests importieren das Paket; das
 // Paket project selbst hat dafür eine eigene Fassung (defaults_test_helper_test.go),
 // weil es dieses Paket nicht importieren kann.
@@ -23,6 +24,13 @@ const Address = "test:k-playbook"
 
 // ProjectAddress ist die Adresse der Collection des Projekts in Tests.
 const ProjectAddress = "test:projekt"
+
+// DefaultsDir ist das Verzeichnis im Projekt eines Tests, aus dem Isolate die
+// öffentliche Collection baut: test-defaults/reviews/x.md ist dort
+// <hub>:k-playbook/defaults/reviews/x.md, also k-playbook:/reviews/x.md. Das
+// echte defaults/ des Repos liest Isolate nicht, und das Programm liest das
+// Verzeichnis nie.
+const DefaultsDir = "test-defaults"
 
 // CollectionDir ist das Verzeichnis im Projekt eines Tests, aus dem Isolate
 // die Collection des Projekts baut: test-collection/k-playbook/reviews/x.md
@@ -47,7 +55,7 @@ func Isolate() func() {
 		return kephtest.Collection(filepath.Join(projectDir, CollectionDir))
 	}
 	project.OpenDefaultsStore = func(projectDir string) (project.DefaultsStore, string, error) {
-		store, err := kephtest.Defaults(filepath.Join(project.PlaybookDir(projectDir), "defaults"))
+		store, err := kephtest.Defaults(filepath.Join(projectDir, DefaultsDir))
 		if err != nil {
 			return nil, Address, err
 		}

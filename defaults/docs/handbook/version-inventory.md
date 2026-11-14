@@ -163,13 +163,15 @@ Two areas are within the project yet are not searched automatically. This is not
 ban, as the trust boundary continues to allow them, but a statement about what counts as a
 source **of the project** without intervention.
 
-1. **The `<project>/k-playbook/` installation.** It is a clone of the tool, is located in
-   the same place in every target project, contains the same manifests there, and is
-   completely replaced with every update. Its `go.mod` describes the dependencies of
-   k-playbook, not those of the project; the deviation between it and a package of the same
-   name in the project would be the same in every project and could not be fixed in any of
-   them: `k-playbook/` is never written to. An assertion that is the same everywhere and
-   fixable nowhere is not an insight.
+1. **A leftover `<project>/k-playbook/` clone.** This is legacy: until task 156 the
+   installation was a clone of the tool in this directory; today the installation is the
+   binary alone, and `/k-upgrade` deletes a clone that is still there. Until it is gone, the
+   fixed rule `k-playbook/**` stays. Its `go.mod` describes the dependencies of k-playbook,
+   not those of the project; the deviation between it and a package of the same name in the
+   project would be the same in every project and could not be fixed in any of them:
+   `k-playbook/` is never written to. An assertion that is the same everywhere and fixable
+   nowhere is not an insight. The origin of the rule in the inventory file is still called
+   `installation`.
 2. **Every pattern from `exclude:`** in the source configuration. This lets a project
    exclude its test fixtures and example projects: maintained content whose versions are
    deliberately old or contradictory and say nothing about the project. Only the project
@@ -503,11 +505,11 @@ is rejected as a whole (see "Error cases"); an absolute `path` in `sources:` or
 `helm_values:` is rejected as an entry. A file outside the project root cannot be read into
 the inventory.
 
-`playbook.dir` is not a special root. It is below the project root and **may** be read
-like any other directory; nothing is ever written there anyway. That default detection
-nevertheless does not search it is a separate matter: it is stated under "Where default
-detection does not search" and changes nothing about this boundary: an entry in `sources:`
-that points there is read.
+A leftover clone `<project>/k-playbook/` is not a special root. It is below the project
+root and **may** be read like any other directory; nothing is ever written there anyway.
+That default detection nevertheless does not search it is a separate matter: it is stated
+under "Where default detection does not search" and changes nothing about this boundary: an
+entry in `sources:` that points there is read.
 
 ### Path Normalization
 

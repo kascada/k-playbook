@@ -26,11 +26,7 @@
 #                              nicht fehlen, während ein Skript läuft.
 #               selbsterklaerend — ungeguarded, der Fehlschlag benennt sich aber
 #                              selbst; eine bewusst zurückgestellte Ausnahme
-#                              von der Guard-Pflicht für Commands. Der Wert nimmt
-#                              keinen Aufruf aus: check_command_tool_guards.sh
-#                              meldet jede Fundstelle in einem Command, bis sie
-#                              einzeln in checks/command-tool-guard-exceptions.tsv
-#                              steht.
+#                              von der Guard-Pflicht für Commands.
 #               ja-seit-045  — in dieser Runde nachgezogen.
 #               Die Spalte verhindert, dass bestehende Guards ein zweites Mal
 #               gebaut werden.
@@ -58,10 +54,10 @@
 #               getroffen. Endet der Name nicht auf .tar.gz oder .tgz, gilt das
 #               Asset als blanke Binary und wird direkt installiert.
 name	group	role	guarded	methods	apt_package	github_repo	asset_ref	asset_pattern
-bash	-	Interpreter der Skripte, Checks und Installer	interpreter	apt	bash	-	-	-
+bash	-	Interpreter der Skripte und Installer	interpreter	apt	bash	-	-	-
 git	-	Repository-Zugriff für Tasks, Reviews, Enforcement und den Docs-Index	selbsterklaerend	apt	git	-	-	-
 curl	download	Download von Release-Assets und des Installer-Binaries	ja	apt	curl	-	-	-
 wget	download	Download-Rückfall, wenn curl fehlt	ja	apt	wget	-	-	-
 tar	-	Entpacken der Release-Archive	ja	apt	tar	-	-	-
-python3	-	Auflösung der GitHub-Releases und Auswertung in den Checks	ja	apt	python3	-	-	-
+python3	-	Auflösung der GitHub-Releases	ja	apt	python3	-	-	-
 rg	-	Volltextsuche über die AI-Verläufe in /k-verlauf	ja-seit-045	apt,github	ripgrep	BurntSushi/ripgrep	ripgrep	^{tool}-{version}-{arch_raw}-{vendor_os}\.tar\.gz$

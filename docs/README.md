@@ -1,7 +1,7 @@
 # Documentation
 
-k-playbook is a toolkit of slash commands, skills, review recipes, and
-checks. It is cloned into a subdirectory of the project it is meant to support.
+k-playbook is a toolkit of slash commands, skills, and review recipes.
+It is installed as one binary per machine; a project carries only its anchor and what it owns.
 
 The handbook pages live in [`../defaults/docs/handbook/`](../defaults/docs/handbook/) and are
 shipped with every release; the interface shows them under "Docs". This directory keeps only
@@ -13,7 +13,7 @@ what is not shipped: this index and `knowledge-aktuell.md`.
 |---|---|
 | [`overview.md`](../defaults/docs/handbook/overview.md) | What k-playbook is for: the three kinds of work — building, diagnosis, quality — the means that apply to all of them, and the project documentation in `keph:/docs/` they share. One diagram. |
 | [`manual.md`](../defaults/docs/handbook/manual.md) | Purpose, core model, standard workflows, operating rules. The central page. |
-| [`installation.md`](../defaults/docs/handbook/installation.md) | Clone, the three setup steps, security tools, updating, troubleshooting. |
+| [`installation.md`](../defaults/docs/handbook/installation.md) | Installing the binary, the three setup steps, security tools, updating, troubleshooting. |
 | [`k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md) | The contract: `K-PLAYBOOK.yaml`, directory layout, overlay rules. |
 | [`commands.md`](../defaults/docs/handbook/commands.md) | Index of slash commands and their responsibilities. |
 | [`faq.md`](../defaults/docs/handbook/faq.md) | Short answers about installation, paths, overlays, and security tools. |
@@ -39,7 +39,6 @@ what is not shipped: this index and `knowledge-aktuell.md`.
 |---|---|
 | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) | Architecture of the Go tool: finding anchors, linking, web API, design decisions. |
 | [`../installer/README.md`](../installer/README.md) | Quick start and checks for working on the tool. |
-| [`../checks/README.md`](../checks/README.md) | Interface and use of `bin/k-check`. |
 | [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv) | Canonical security tool matrix for the script, interface, and review recipes. |
 
 ## Skills
@@ -68,10 +67,9 @@ questions and the ordered work list.
 - `.k-playbook/share` / `K_PLAYBOOK_SHARE_DIR` / `commands missing in DevContainer` -> [`installation.md`](../defaults/docs/handbook/installation.md#3-link-assistants), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-umweg-link-k-playbookshare)
 - `BROWSER` / `browser does not open` / `DevContainer` -> [`installation.md`](../defaults/docs/handbook/installation.md#browser-on-startup), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#browser-öffnen)
 - `sections` / `setup` / `workflows` / `switch` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md#bereiche-und-die-linke-spalte), [`installation.md`](../defaults/docs/handbook/installation.md#reviews-and-tasks)
-- `checks` / `k-check` -> [`../checks/README.md`](../checks/README.md), [`commands.md`](../defaults/docs/handbook/commands.md#k-check)
 - `commands` -> [`commands.md`](../defaults/docs/handbook/commands.md)
 - `docs first` -> [`manual.md`](../defaults/docs/handbook/manual.md#docs-first)
-- `enforcement` / `docs follow-up` / `/k-enforcement` -> [`commands.md`](../defaults/docs/handbook/commands.md), [`manual.md`](../defaults/docs/handbook/manual.md#docs-follow-up-and-checks)
+- `enforcement` / `docs follow-up` / `/k-enforcement` -> [`commands.md`](../defaults/docs/handbook/commands.md), [`manual.md`](../defaults/docs/handbook/manual.md#docs-follow-up)
 - `queue/docs/` / `documentation orders` / `Doku-Aufträge` -> [`mcp.md`](../defaults/docs/handbook/mcp.md#document-tools-in-the-collection), [`commands.md`](../defaults/docs/handbook/commands.md)
 - `findings` / `status values` -> [`code-review.md`](../defaults/docs/handbook/code-review.md#status-model)
 - `Kephalaion` / `collection` / `kephalaion:` block / `kephalaion node client` / `choice` / `K-PLAYBOOK.local.yaml` (old binding) / `whoami` -> [`installation.md`](../defaults/docs/handbook/installation.md#kephalaion-collection), [`k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md#kephalaion), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung)
@@ -83,7 +81,7 @@ questions and the ordered work list.
 - `gh` / `GitHub CLI` / `gh auth login` -> [`installation.md`](../defaults/docs/handbook/installation.md#github-cli), [`k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md#toolsgh)
 - `GitHub SSH` / `deploy key` -> [`local-github-ssh.md`](../defaults/docs/handbook/local-github-ssh.md), [`github-access.md`](../defaults/docs/handbook/github-access.md#ssh-key-or-host)
 - `github.yaml` / `GitHub access file` / `service` / `k-playbook github` / `K_PLAYBOOK_GITHUB_CONFIG` / `health github` / `availability` / `k_playbook_github_test` / `/github-access` / `github run` -> [`github-access.md`](../defaults/docs/handbook/github-access.md), [`mcp.md`](../defaults/docs/handbook/mcp.md#github-test-contract), [`mcp.md`](../defaults/docs/handbook/mcp.md#health-contract)
-- `installation` / `git clone` -> [`installation.md`](../defaults/docs/handbook/installation.md)
+- `installation` / `bootstrap` / `bin/install` -> [`installation.md`](../defaults/docs/handbook/installation.md)
 - `MCP` / `.mcp.json` / `mcpServers` / `approval` -> [`mcp.md`](../defaults/docs/handbook/mcp.md), [`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server)
 - `k-playbook-local` / `project-owned` -> [`k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md), [`installation.md`](../defaults/docs/handbook/installation.md#k-playbook-local-is-no-longer-created)
 - `interface` / `k-gui` / `web API` -> [`../installer/docs/architecture.md`](../installer/docs/architecture.md)
@@ -115,6 +113,6 @@ questions and the ordered work list.
 - `schema_version` -> [`k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md#schema_version)
 - `security tools` / `tool matrix` -> [`installation.md`](../defaults/docs/handbook/installation.md#security-tools), [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv)
 - `tasks` -> [`task-flow.md`](../defaults/docs/handbook/task-flow.md)
-- `update` / `git pull` -> [`installation.md`](../defaults/docs/handbook/installation.md#update)
+- `update` / `k-playbook upgrade` / `old clone k-playbook/` -> [`installation.md`](../defaults/docs/handbook/installation.md#update)
 - `version inventory` / `inventory` / `keph:/k-playbook/inventory.md` / `version-sources.yaml` (legacy) / `pin type` / `trust boundary` -> [`version-inventory.md`](../defaults/docs/handbook/version-inventory.md)
 - `VS Code` / `extension` / `VSIX` / `OpenCode in a tab` / `k-playbook vscode` / `extensions.json` / `code-workspace` / `keph://` / `vscode collections` -> [`vscode.md`](../defaults/docs/handbook/vscode.md)

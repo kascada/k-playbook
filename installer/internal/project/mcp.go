@@ -212,8 +212,8 @@ func MCPCommand() (string, []string, error) {
 // wird nicht mit dem Wrapper zusammen entfernt.
 const legacyWrapperCommand = "k-playbook/bin/k-playbook"
 
-// legacyWrapperTail ist der Rest desselben Pfades ohne das Installationsver-
-// zeichnis. Ein Zielprojekt konnte ihn auch so eintragen.
+// legacyWrapperTail ist der Rest desselben Pfades ohne das Verzeichnis des
+// früheren Clones. Ein Zielprojekt konnte ihn auch so eintragen.
 const legacyWrapperTail = "bin/k-playbook"
 
 // isOutdatedMCPCommand ist die enge Definition von „veraltet": der alte
@@ -226,7 +226,7 @@ const legacyWrapperTail = "bin/k-playbook"
 //   - Ein **relativer** Eintrag konnte immer nur den projektlokalen Wrapper
 //     meinen; es genügt, dass er auf bin/k-playbook endet.
 //   - Ein **absoluter** Eintrag muss auf k-playbook/bin/k-playbook enden, also
-//     auf den Wrapper unterhalb einer Installation. Sonst fiele das neue
+//     auf den Wrapper unterhalb eines früheren Clones. Sonst fiele das neue
 //     ~/.local/bin/k-playbook selbst darunter — es endet ebenfalls auf
 //     bin/k-playbook — und die Auto-Korrektur schriebe endlos.
 func isOutdatedMCPCommand(command string) bool {
@@ -390,28 +390,25 @@ const (
 	// MCPWriteAll: alles, was nicht zur Menge der akzeptierten Formen gehört
 	// — der Klick auf „Einrichten" (ApplyMCP).
 	MCPWriteAll MCPWriteScope = iota
-	// MCPWriteOutdatedOnly: ausschließlich MCPStateOutdated —
-	// „Aktualisieren“ in der Oberfläche (applyUpdateHandler), nach dem Pull,
-	// auch wenn er gescheitert ist. Es soll den Eintrag auf den abgelösten
-	// Wrapper nachziehen und sonst nichts.
+	// MCPWriteOutdatedOnly: ausschließlich MCPStateOutdated — den Eintrag
+	// auf den abgelösten Wrapper nachziehen und sonst nichts. Der Modus war
+	// der von „Aktualisieren“ in der Oberfläche (POST /api/update); seit die
+	// Route entfernt ist, hat er im Programm keinen Aufrufer mehr.
 	MCPWriteOutdatedOnly
 	// MCPWriteOutdatedAndUnversioned: MCPStateOutdated, dazu eine fehlende
 	// Datei und ein fehlender Eintrag, wenn die Zieldatei nicht von git
 	// erfasst ist — der Start und der Projektschritt von `k-playbook upgrade`,
-	// der immer in diesem Umfang repariert, ob ein Pull lief oder nicht. Die
+	// der immer in diesem Umfang repariert. Die
 	// fehlende Datei zusätzlich nur, wenn der Assistent eine eigene Spur im
 	// Projekt hat.
 	MCPWriteOutdatedAndUnversioned
 )
 
-// RepairMCP ist der **selbsttätige** Weg: er läuft nach „Aktualisieren“ in der
-// Oberfläche, im Projektschritt von `k-playbook upgrade` und bei jedem Start,
-// ohne dass jemand eigens einen Knopf dafür drückt. Wie weit er gehen darf,
-// sagt der Modus — die Oberfläche übergibt nach „Aktualisieren“
-// MCPWriteOutdatedOnly, der Start und `k-playbook upgrade`
-// MCPWriteOutdatedAndUnversioned. Am Pull im Clone hängt er nicht mehr
-// (Task 149): project.Update repariert nicht selbst, die Aufrufer tun es über
-// RepairMCPReport.
+// RepairMCP ist der **selbsttätige** Weg: er läuft im Projektschritt von
+// `k-playbook upgrade` und bei jedem Start, ohne dass jemand eigens einen
+// Knopf dafür drückt. Wie weit er gehen darf, sagt der Modus — der Start und
+// `k-playbook upgrade` übergeben MCPWriteOutdatedAndUnversioned.
+// `k-playbook upgrade` geht über RepairMCPReport.
 //
 // Zurück kommen die geschriebenen Dateien, relativ zum Hauptverzeichnis, je mit
 // dem Kommando, das jetzt darin steht — leer, wenn nichts zu tun war. Die Form
@@ -460,6 +457,44 @@ func MCPWritePaths(writes []MCPWrite) []string {
 		paths = append(paths, write.Path)
 	}
 	return paths
+}
+
+// MCPRepairReport ist der Ausgang einer selbsttätigen Reparatur der
+// MCP-Registrierung, so wie die Meldungen ihn brauchen.
+type MCPRepairReport struct {
+	// Repaired nennt die geschriebenen MCP-Dateien, relativ zum
+	// Hauptverzeichnis.
+	Repaired []string `json:"mcpRepaired,omitempty"`
+	// Portable nennt die Dateien aus Repaired, in denen danach der bloße
+	// Kommandoname steht — die Datei ist erfasst, oder die Tracking-Frage
+	// blieb unbeantwortet. Der Hinweis auf den absoluten Pfad hängt an dieser
+	// Form.
+	Portable []string `json:"mcpRepairedPortable,omitempty"`
+	// Message nennt, was nicht vollständig gelang. Ein Fehlschlag entwertet
+	// den Lauf nicht: Der nächste Start versucht es erneut.
+	Message string `json:"message,omitempty"`
+}
+
+// RepairMCPReport repariert die MCP-Registrierung im Umfang scope
+// (RepairMCP) und fasst das Ergebnis für die Meldungen zusammen.
+//
+// Die Registrierung liegt im Hauptverzeichnis; ein Bestandsprojekt bliebe
+// sonst bei einem Eintrag, der auf den abgelösten Wrapper zeigt. Wer wie weit
+// geht: `k-playbook upgrade` im Projektschritt mit
+// MCPWriteOutdatedAndUnversioned.
+func RepairMCPReport(projectDir string, scope MCPWriteScope) MCPRepairReport {
+	var report MCPRepairReport
+	repaired, err := RepairMCP(projectDir, scope)
+	report.Repaired = MCPWritePaths(repaired)
+	for _, write := range repaired {
+		if write.Portable() {
+			report.Portable = append(report.Portable, write.Path)
+		}
+	}
+	if err != nil {
+		report.Message = "MCP-Registrierung nicht vollständig korrigiert: " + err.Error()
+	}
+	return report
 }
 
 // writeMCPEntries ist der gemeinsame Schreibweg aller Einstiege; der Modus
@@ -855,7 +890,7 @@ func mcpRepairTargetTracked(projectRoot string, path string) bool {
 // mcpTargetNeedsWrite ist die eine Stelle, an der alle Schreibwege ihre
 // Entscheidung treffen.
 //
-// „Aktualisieren“ in der Oberfläche (MCPWriteOutdatedOnly): ausschließlich ein
+// Der enge Modus (MCPWriteOutdatedOnly): ausschließlich ein
 // vorhandener, im engen Sinn veralteter Eintrag. Eine fehlende Datei, ein
 // fehlender Eintrag und jede akzeptierte Form bleiben unangetastet.
 //

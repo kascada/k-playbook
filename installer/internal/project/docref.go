@@ -75,8 +75,8 @@ const docTestdataRoot = "testdata"
 
 // docReaderKinds sind die Sorten unter k-playbook:, deren Dateien Lesestoff
 // für eine Sitzung sind — die, die Hilfetext und Werkzeugbeschreibung nennen.
-// checks und skills fehlen bewusst: Skripte laufen, Skills liegen beim
-// Assistenten; beides liest niemand über einen Verweis. Commands liegen beim
+// checks und skills fehlen bewusst: Checks gibt es seit Task 155 nicht mehr,
+// Skills liegen beim Assistenten; beides liest niemand über einen Verweis. Commands liegen beim
 // Assistenten nur noch als Hülle; ihr Text ist Lesestoff.
 var docReaderKinds = []string{docInstructionsRoot, "reviews", docGuidelinesRoot, docCommandsRoot}
 
@@ -296,7 +296,7 @@ type DocLayers struct {
 // projekteigene Ebene (siehe NewProjectLocalDocSource — teils in der
 // Collection des Projekts, teils auf der Platte), das
 // Projekt selbst ab seiner Wurzel und, auf Abruf, seine Collection
-// (OpenKephDocs). Von der Installation k-playbook/ liest keine Ebene mehr.
+// (OpenKephDocs). Vom früheren Clone k-playbook/ liest keine Ebene mehr.
 func ProjectDocLayers(projectDir string) DocLayers {
 	return DocLayers{
 		Dist:    NewProjectDefaultsSource(projectDir),

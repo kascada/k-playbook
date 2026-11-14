@@ -20,8 +20,8 @@ func briefingProject(t *testing.T) string {
 
 	root := readProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/reviews/review-code.md":         "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
-		"k-playbook/defaults/guidelines/betrieb.md":          "# Betrieb\n\nText.\n",
+		"test-defaults/reviews/review-code.md":               "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
+		"test-defaults/guidelines/betrieb.md":                "# Betrieb\n\nText.\n",
 		"k-playbook-local/guidelines/stil.md":                "# Stil\n\nText.\n",
 		"test-collection/k-playbook/reviews/review-eigen.md": "# Eigenes Review\n\nText.\n",
 	}
@@ -113,7 +113,6 @@ func TestBriefingKlartext(t *testing.T) {
 	for _, want := range []string{
 		"\n  project:\n    config: " + project.ConfigPath(root) + "\n    dir: " + root + "\n",
 		"\n  now:\n    date: ",
-		"\n  catalogs:\n    checks: (keine)\n",
 		"\n  kephalaion:\n",
 		"\n  remediation:\n    branchPrefix: ",
 	} {
@@ -121,8 +120,13 @@ func TestBriefingKlartext(t *testing.T) {
 			t.Errorf("Rest enthält nicht %q:\n%s", want, contextPart)
 		}
 	}
-	// Die abgedeckten Felder fehlen im Rest.
-	for _, absent := range []string{"\n  guidelines", "    rules:", "    reviews:"} {
+	// Die abgedeckten Felder fehlen im Rest; catalogs fällt ganz, seit es
+	// neben reviews keinen Katalog mehr gibt (Task 155). Ein Feld playbook
+	// gibt es nicht mehr (Task 157): die Wurzeln sind project und local.
+	if !strings.Contains(contextPart, "\n  local:\n    dir: "+project.LocalDir(root)+"\n") {
+		t.Errorf("Rest enthält local.dir nicht:\n%s", contextPart)
+	}
+	for _, absent := range []string{"\n  guidelines", "    rules:", "    reviews:", "\n  catalogs:", "checks", "\n  playbook:", "playbook.dir"} {
 		if strings.Contains(contextPart, absent) {
 			t.Errorf("Rest enthält %q:\n%s", absent, contextPart)
 		}
@@ -172,6 +176,9 @@ func TestBriefingJSON(t *testing.T) {
 	}
 	if _, ok := briefing.Context.Field("guidelines"); ok {
 		t.Errorf("context trägt guidelines: %+v", briefing.Context)
+	}
+	if _, ok := briefing.Context.Field("playbook"); ok {
+		t.Errorf("context trägt playbook: %+v", briefing.Context)
 	}
 	// Die JSON-Ausgabe trägt die Listen auch leer als Listen, nie als null.
 	var raw map[string]json.RawMessage
@@ -243,7 +250,7 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &briefing); err != nil {
 		t.Fatalf("kein JSON: %v", err)
 	}
-	if briefing.SchemaVersion != "6" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
+	if briefing.SchemaVersion != "7" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
 		t.Errorf("health im JSON: %q %+v", briefing.SchemaVersion, briefing.Health)
 	}
 }

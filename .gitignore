@@ -18,9 +18,11 @@
 # trotzdem nicht aufnimmt, prüft make -C priv quell-ausnahmen vor jedem Commit
 # aus Release und Sicherung.
 #
-# Die Installation unter k-playbook/ entsteht lokal beim ersten Start und gehört
-# in keins der beiden Repos. In einem echten Zielprojekt gilt das Gegenteil:
-# dort wird .k-playbook/K-PLAYBOOK.yaml committet.
+# k-playbook/ ist ein alter Clone dieses Repos aus der Zeit, als ein Projekt ihn
+# brauchte. Das Programm liest und aktualisiert ihn nicht mehr (Task 156); die
+# Zeile /k-playbook/ unten hält ihn aus beiden Repos, bis /k-upgrade 3.8 ihn
+# hier löscht und die Zeile streicht. In einem echten Zielprojekt wird
+# .k-playbook/K-PLAYBOOK.yaml committet, hier nicht (siehe oben).
 #
 # /K-PLAYBOOK.yaml ist der frühere Ort. Bis das neue Programm installiert ist,
 # liegt dort ein Link auf die neue Datei, damit das alte das Projekt findet;

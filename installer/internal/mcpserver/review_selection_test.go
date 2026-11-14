@@ -30,7 +30,7 @@ func newSelectionProject(t *testing.T) (string, []string) {
 		t.Fatal("kein Rezept unter defaults/reviews/ an der Repo-Wurzel")
 	}
 	root := newReviewProject(t)
-	reviewsDir := filepath.Join(root, "k-playbook", "defaults", "reviews")
+	reviewsDir := filepath.Join(root, defaultstest.DefaultsDir, "reviews")
 	if err := os.RemoveAll(reviewsDir); err != nil {
 		t.Fatalf("Vorlagen entfernen: %v", err)
 	}

@@ -13,5 +13,5 @@ suchst du danach, bevor du die Änderung abschließt, und fragst im Zweifel den 
 Abschluss nennt den Verweis auf den Auftrag oder sagt, warum nichts eingereiht wurde; ist
 bewusst keine Doku-Änderung nötig, sagt er kurz, warum.
 
-Den ausdrücklichen Prüfbericht über den Doku-Nachzug, samt `k-check` über die geänderten
-Dateien, liefert `/k-enforcement`.
+Den ausdrücklichen Prüfbericht über den Doku-Nachzug liefert `/k-enforcement`; es ist
+vorübergehend nicht verfügbar und wird neu aufgebaut.

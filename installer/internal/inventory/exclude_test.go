@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// withInstallation legt neben dem Projekt die Installation an — dieselbe Lage
-// wie in jedem Zielprojekt: `k-playbook/` liegt neben den eigenen Quellen und
-// bringt eigene mit.
+// withInstallation legt im Projekt einen liegengebliebenen Clone des Werkzeugs
+// an (Altbestand): `k-playbook/` liegt neben den eigenen Quellen und bringt
+// eigene mit.
 func withInstallation(t *testing.T) Options {
 	t.Helper()
 
@@ -25,9 +25,9 @@ func withInstallation(t *testing.T) Options {
 	return options
 }
 
-// Die Installation ist keine Standardquelle: ihre Versionsangaben beschreiben
-// das Werkzeug, nicht das Projekt, und sie werden beim nächsten Update
-// ausgetauscht.
+// Ein liegengebliebener Clone des Werkzeugs (Altbestand) ist keine
+// Standardquelle: seine Versionsangaben beschreiben das Werkzeug, nicht das
+// Projekt.
 func TestInstallationIstKeineStandardquelle(t *testing.T) {
 	options := withInstallation(t)
 

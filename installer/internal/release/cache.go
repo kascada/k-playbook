@@ -14,7 +14,7 @@ import (
 // Hinweis beim Start der Oberfläche, GET /api/update — fragen GitHub nur, wenn
 // der letzte Eintrag nicht mehr frisch ist (CachedLatestTag). Was installiert
 // oder ausdrücklich prüft — `k-playbook upgrade` samt `--check`,
-// `version --all`, POST /api/update und /api/update/program — fragt immer
+// `version --all`, POST /api/update/program — fragt immer
 // sofort (LatestTag); jedes Ergebnis landet dabei im Cache.
 //
 // Der Eintrag liegt unter $XDG_CACHE_HOME/k-playbook/, sonst unter

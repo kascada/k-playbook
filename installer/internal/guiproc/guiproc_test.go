@@ -134,7 +134,7 @@ func TestKeyForNimmtProjectDirSonstArbeitsverzeichnis(t *testing.T) {
 	// Erster Start aus der projektlokalen Installation: ProjectDir ist
 	// aufgelöst, Installed aber noch nicht — der Schlüssel folgt trotzdem dem
 	// Verzeichnis, damit er nach dem Anlegen der Konfiguration derselbe bleibt.
-	setup := project.Environment{ProjectDir: "/home/x/projekt", PlaybookPresent: true}
+	setup := project.Environment{ProjectDir: "/home/x/projekt"}
 	if got := keyFor(setup, workdir); got != "/home/x/projekt" {
 		t.Errorf("Ersteinrichtung: Schlüssel = %q", got)
 	}

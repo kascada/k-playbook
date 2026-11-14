@@ -85,7 +85,7 @@ const DefaultsVersion = "v0.0.0-test\n"
 // Defaults baut die öffentliche Collection k-playbook im Speicher:
 // defaults/VERSION und jede Datei unter dir als defaults/<relativer Pfad> —
 // etwa aus dem defaults/ des Repos oder aus dem Baum, den ein Test als
-// Installation anlegt. Fehlt dir, steht nur VERSION darin.
+// Lieferumfang anlegt (test-defaults/). Fehlt dir, steht nur VERSION darin.
 func Defaults(dir string) (*Store, error) {
 	store := New()
 	store.Put("defaults/VERSION", DefaultsVersion)

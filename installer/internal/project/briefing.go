@@ -43,8 +43,9 @@ import (
 // Abschnitt context, Fassung 3 den Text der immer geltenden Anweisungen in
 // documents.always.content, Fassung 4 den Abschnitt health, Fassung 5 die
 // Sitzungskennung session; in Fassung 6 entfällt documents.rules, die Sorte
-// rules gibt es nicht mehr.
-const BriefingSchemaVersion = "6"
+// rules gibt es nicht mehr; in Fassung 7 entfällt context.playbook, den Clone
+// k-playbook/ im Projekt gibt es nicht mehr.
+const BriefingSchemaVersion = "7"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -292,7 +293,9 @@ func briefingContextFields(built Context) ([]BriefingContextField, error) {
 }
 
 // dropOrderedField nimmt das Feld unter path aus einem Objekt heraus, auch in
-// der Tiefe. Fehlt es, bleibt das Objekt, wie es ist.
+// der Tiefe. Fehlt es, bleibt das Objekt, wie es ist. Ein Objekt, das dadurch
+// leer wird, fällt mit: Seit es keinen Katalog checks mehr gibt (Task 155),
+// bliebe von catalogs sonst ein leeres {} stehen.
 func dropOrderedField(fields []BriefingContextField, path []string) ([]BriefingContextField, error) {
 	kept := make([]BriefingContextField, 0, len(fields))
 	for _, field := range fields {
@@ -309,6 +312,9 @@ func dropOrderedField(fields []BriefingContextField, path []string) ([]BriefingC
 		}
 		if inner, err = dropOrderedField(inner, path[1:]); err != nil {
 			return nil, err
+		}
+		if len(inner) == 0 {
+			continue
 		}
 		value, err := marshalOrderedObject(inner)
 		if err != nil {

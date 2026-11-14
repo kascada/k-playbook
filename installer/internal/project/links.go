@@ -535,8 +535,9 @@ func staleRegistryLinks(projectRoot string, target string, wanted []RegistryEntr
 
 // ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link, in die
 // projekteigenen Quellen .k-playbook/commands/ und .k-playbook/skills/, ins
-// lokale Verzeichnis oder in den Clone zeigen — also die, die von uns stammen.
-// Der Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere
+// lokale Verzeichnis oder in den früheren Clone k-playbook/ zeigen — also die,
+// die von uns stammen. Der Clone steht dabei, damit die Links aus der Zeit vor
+// Stufe 2 als unsere
 // erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben;
 // ebenso das lokale Verzeichnis für die Links in den früheren Ort
 // k-playbook-local/<sorte>/, den seit Task 129 nichts mehr liest.
@@ -663,10 +664,10 @@ func (r LinkRepair) Quiet() bool {
 //
 // Der Aufruf gehört auf den Lesepfad, nicht nur hinter einen Knopf. Welche
 // Links gelten, hängt am Projekt — an seinem Katalog aus mitgelieferten und
-// projekteigenen Einträgen —, nicht an der Installation. Wie die Installation
-// zu ihrem Stand kam, ist dabei gleichgültig: ein Update über die Oberfläche,
-// ein Ziel im Makefile, ein Clone von Hand. Hinge das Nachziehen an einem
-// dieser Wege, bliebe die Registrierung bei allen anderen stehen, und zwar
+// projekteigenen Einträgen —, nicht am Weg, auf dem das Programm zu seinem
+// Stand kam: ein Update über die Oberfläche, `k-playbook upgrade`, eine
+// Installation von Hand. Hinge das Nachziehen an einem dieser Wege, bliebe
+// die Registrierung bei allen anderen stehen, und zwar
 // unbemerkt — der umbenannte Command fehlt, der alte Link zeigt ins Leere, und
 // beides sieht nur, wer zufällig die Assistenten-Karte öffnet.
 //

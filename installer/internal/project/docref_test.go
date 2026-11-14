@@ -822,15 +822,15 @@ func TestDocRefSorteCommands(t *testing.T) {
 func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	root := newContextProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/reviews/README.md":      "# Liesmich\n",
-		"k-playbook/defaults/reviews/review-code.md": "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
-		"k-playbook/defaults/reviews/review-tech.md": "# Tech\n",
-		"k-playbook/defaults/reviews/review-sast.md": "# SAST\n",
-		"k-playbook/defaults/reviews/notiz.md":       "# kein Rezept\n",
-		"k-playbook-local/reviews/review-sast.md":    "",
-		"k-playbook-local/reviews/review-tech.md":    "# Abgeschaltet.\n",
-		"k-playbook-local/reviews/review-eigen.md":   "# Eigen\n\nText.\n",
-		"k-playbook-local/reviews/.versteckt.md":     "# versteckt\n",
+		"test-defaults/reviews/README.md":          "# Liesmich\n",
+		"test-defaults/reviews/review-code.md":     "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
+		"test-defaults/reviews/review-tech.md":     "# Tech\n",
+		"test-defaults/reviews/review-sast.md":     "# SAST\n",
+		"test-defaults/reviews/notiz.md":           "# kein Rezept\n",
+		"k-playbook-local/reviews/review-sast.md":  "",
+		"k-playbook-local/reviews/review-tech.md":  "# Abgeschaltet.\n",
+		"k-playbook-local/reviews/review-eigen.md": "# Eigen\n\nText.\n",
+		"k-playbook-local/reviews/.versteckt.md":   "# versteckt\n",
 	}
 	for rel, content := range files {
 		write(t, filepath.Join(root, filepath.FromSlash(rel)), content)
@@ -888,20 +888,20 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 
 	// commands: Registry und Verweis.
 	for rel, content := range map[string]string{
-		"share:commands/k-upgrade.md":               "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
-		"k-playbook/defaults/commands/k-upgrade.md": "# k-upgrade\n\nText\n",
-		"share:commands/k-gui.md":                   "# k-gui\n\nHülle\n",
-		"k-playbook/defaults/commands/k-gui.md":     "# k-gui\n\nText\n",
-		"share:commands/k-danke.md":                 "# k-danke\n",
-		"k-playbook/defaults/commands/k-danke.md":   "# k-danke\n\nText\n",
-		"share:commands/_x/eins.md":                 "# eins\n\nHülle\n",
-		"share:commands/_x/zwei.md":                 "# zwei\n\nHülle\n",
-		"k-playbook/defaults/commands/_x/eins.md":   "# eins\n\nText\n",
-		"k-playbook/defaults/commands/_x/zwei.md":   "# zwei\n\nText\n",
-		".k-playbook/commands/k-gui.md":             "# k-gui\n\nlokal\n",
-		".k-playbook/commands/k-danke.md":           "",
-		".k-playbook/commands/eigener.md":           "# eigener\n\nText.\n",
-		".k-playbook/commands/_x/eins.md":           "# eins\n\nlokal\n",
+		"share:commands/k-upgrade.md":         "---\ndescription: Hülle\n---\n\n# k-upgrade\n\nHülle\n",
+		"test-defaults/commands/k-upgrade.md": "# k-upgrade\n\nText\n",
+		"share:commands/k-gui.md":             "# k-gui\n\nHülle\n",
+		"test-defaults/commands/k-gui.md":     "# k-gui\n\nText\n",
+		"share:commands/k-danke.md":           "# k-danke\n",
+		"test-defaults/commands/k-danke.md":   "# k-danke\n\nText\n",
+		"share:commands/_x/eins.md":           "# eins\n\nHülle\n",
+		"share:commands/_x/zwei.md":           "# zwei\n\nHülle\n",
+		"test-defaults/commands/_x/eins.md":   "# eins\n\nText\n",
+		"test-defaults/commands/_x/zwei.md":   "# zwei\n\nText\n",
+		".k-playbook/commands/k-gui.md":       "# k-gui\n\nlokal\n",
+		".k-playbook/commands/k-danke.md":     "",
+		".k-playbook/commands/eigener.md":     "# eigener\n\nText.\n",
+		".k-playbook/commands/_x/eins.md":     "# eins\n\nlokal\n",
 		// Der frühere Ort wird nicht mehr gelesen (Task 129).
 		"k-playbook-local/commands/k-upgrade.md": "",
 		"k-playbook-local/commands/alt.md":       "# alt\n\nText.\n",
@@ -968,7 +968,7 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 
 // Die mitgelieferte Ebene eines Projekts liest jede Sorte aus der
 // öffentlichen Collection unter defaults/ (Task 131) — instructions,
-// commands, reviews, guidelines. Was oben in der Installation
+// commands, reviews, guidelines. Was in einem liegengebliebenen Clone
 // k-playbook/ liegt, liest sie nicht: weder eine Leitlinie noch eine Hülle.
 func TestProjectDocLayersLiestAllesAusDefaults(t *testing.T) {
 	root := t.TempDir()
@@ -1013,8 +1013,8 @@ func TestProjectDocLayersLiestAllesAusDefaults(t *testing.T) {
 	expectDocError(t, layers, "k-playbook:/skills/overlay/SKILL.md", DocCodeUnsupported)
 }
 
-// Ohne Installation k-playbook/ im Projekt bleibt die mitgelieferte Ebene
-// dieselbe: Sie hängt allein an der Collection.
+// Ohne Verzeichnis k-playbook/ im Projekt — dem Normalfall — bleibt die
+// mitgelieferte Ebene dieselbe: Sie hängt allein an der Collection.
 func TestProjectDocLayersOhneInstallation(t *testing.T) {
 	root := t.TempDir()
 	store := defaultsStore(map[string]string{"commands/k-task-create.md": "# k-task-create\n\nText\n"})

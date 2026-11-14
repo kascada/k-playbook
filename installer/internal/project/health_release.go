@@ -14,8 +14,8 @@ import (
 //
 // Verglichen werden die beiden einzigen Versionsquellen: die eigene Version im
 // Binary (buildinfo.Version) und der Tag des neuesten veröffentlichten
-// Release auf GitHub (über HTTPS und anonym). Der Clone k-playbook/ des
-// Projekts und seine VERSION spielen keine Rolle.
+// Release auf GitHub (über HTTPS und anonym). Die VERSION des früheren Clones
+// k-playbook/ im Projekt spielt keine Rolle mehr.
 //
 // Gewarnt wird nur bei „älter". Sonst schweigt die Quelle:
 //

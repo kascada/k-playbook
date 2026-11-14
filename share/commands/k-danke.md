@@ -127,8 +127,10 @@ für die erzeugte Doku als eingereihten Auftrag in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`). Dieser Schritt ist das Auffangnetz,
 nicht der Hauptweg.
 
-Führe dafür **`/k-enforcement`** aus. Baue die Prüfung nicht nach — sie gehört dorthin,
-samt `k-check` über die geänderten Dateien.
+Führe dafür **`/k-enforcement`** aus. Baue die Prüfung nicht nach — sie gehört dorthin.
+Solange `/k-enforcement` vorübergehend nicht verfügbar ist, nennst du im Abschluss, was die
+Anweisung „Doku nachziehen“ ohnehin verlangt: den Verweis auf den Auftrag, oder warum nichts
+eingereiht wurde.
 
 Der Ausgang **„eingereiht“** zählt als erledigt: Liegt für die erzeugte Doku schon ein
 offener Auftrag dieser Sitzung vor, oder reiht `/k-enforcement` ihn nach Freigabe ein, ist

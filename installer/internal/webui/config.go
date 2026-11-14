@@ -27,8 +27,9 @@ type configResponse struct {
 	SchemaVersion string               `json:"schemaVersion"`
 	// LegacyModel beschreibt das abgelöste Modell, zu dem die Datei gehört.
 	LegacyModel string `json:"legacyModel,omitempty"`
-	// LegacyContent sind Projektinhalte im Installationsverzeichnis. Solange
-	// welche daliegen, wird nicht zurückgesetzt.
+	// LegacyContent sind Projektinhalte im Verzeichnis des früheren Clones
+	// (<projekt>/k-playbook/). Solange welche daliegen, wird nicht
+	// zurückgesetzt.
 	LegacyContent []string `json:"legacyContent,omitempty"`
 	// BackupPath ist die weggesicherte alte Datei, nach dem Zurücksetzen.
 	BackupPath string `json:"backupPath,omitempty"`
@@ -65,10 +66,6 @@ func (state *serverState) createConfigHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 	state.rekey()
-	if err := project.SetInstallationReadOnly(request.ProjectDir); err != nil {
-		writeJSON(w, http.StatusOK, configState(project.ConfigFileName+" angelegt. Hinweis: Installation konnte nicht read-only gesetzt werden: "+err.Error()))
-		return
-	}
 
 	writeJSON(w, http.StatusOK, configState(project.ConfigFileName+" angelegt."))
 }
@@ -101,15 +98,13 @@ func resetConfigHandler(w http.ResponseWriter, r *http.Request) {
 	state := configState(project.ConfigFileName + " neu angelegt, die alte Datei liegt als " +
 		filepath.Base(result.BackupPath) + " daneben.")
 	state.BackupPath = result.BackupPath
-	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
-		state.Message += " Hinweis: Installation konnte nicht read-only gesetzt werden: " + err.Error()
-	}
 	writeJSON(w, http.StatusOK, state)
 }
 
 // configState ermittelt den aktuellen Zustand. Gesucht wird ab dem
 // Arbeitsverzeichnis aufwärts; erst wenn nichts gefunden wird, greift der
-// aus dem Ort des Binaries abgeleitete Vorschlag.
+// Vorschlag aus project.Suggest — das Repository, in dem der Aufruf
+// stattfindet, sonst das Arbeitsverzeichnis.
 func configState(message string) configResponse {
 	environment := project.Detect()
 	response := configResponse{

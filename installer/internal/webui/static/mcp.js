@@ -36,7 +36,7 @@ const STATE_NOTES = {
   "missing-file": "Die Datei entsteht beim Einrichten neu.",
   "missing-entry": "Die Datei bleibt erhalten, es kommt nur der eigene Eintrag hinzu.",
   outdated:
-    "Der Eintrag stammt aus dem abgelösten Wrapper-Modell. Das ist der eine Fall, den k-playbook von sich aus richtigstellt — beim Clone-Update und beim nächsten Start, ohne Klick auf Einrichten.",
+    "Der Eintrag stammt aus dem abgelösten Wrapper-Modell. Das ist der eine Fall, den k-playbook von sich aus richtigstellt — bei k-playbook upgrade und beim nächsten Start, ohne Klick auf Einrichten.",
   stale:
     "Der Schlüssel k-playbook gehört k-playbook. Ein abweichender Wert ist kein Konflikt, sondern ein falscher Stand — er wird beim Einrichten überschrieben, aber nicht von selbst.",
   unreadable:

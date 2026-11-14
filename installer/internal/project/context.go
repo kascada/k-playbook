@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,7 +33,6 @@ type Context struct {
 	// ein geratenes Datum in einem Protokoll ist schlechter als keines.
 	Now         ContextNow     `json:"now"`
 	Project     ContextProject `json:"project"`
-	Playbook    ContextDir     `json:"playbook"`
 	Local       ContextDir     `json:"local"`
 	Remediation Remediation    `json:"remediation"`
 	// Docs ist der Block docs: — was die Docs-Erzeuger beim Code-Scan
@@ -145,7 +143,7 @@ func buildNow() ContextNow {
 }
 
 // CatalogEntry ist ein aufgelöster Eintrag eines Katalogs: reviews mit
-// Overlay, checks nur mitgeliefert.
+// Overlay. Einen Katalog checks gibt es nicht mehr (Task 155).
 type CatalogEntry struct {
 	// Name ist der Dateiname und zugleich die Vergleichseinheit zwischen
 	// mitgeliefert und projekteigen.
@@ -157,16 +155,14 @@ type CatalogEntry struct {
 	// projekteigen oder überschreibend — beide Ebenen liegen in Collections
 	// (<hub>:k-playbook unter defaults/, die Collection des Projekts unter
 	// k-playbook/); gelesen wird er mit ReadCatalogEntry über die Ebenen.
-	// checks liegen nur in der Installation: dort ein Pfad auf der Platte.
 	Path string `json:"path"`
-	// Origin: dist, local oder override; bei checks immer dist.
+	// Origin: dist, local oder override.
 	Origin string `json:"origin"`
 	// Location ist bei local und override, auch abgeschaltet, der Ort des
 	// projekteigenen Eintrags als keph:-Verweis (keph:/k-playbook/reviews/
 	// <name>); leer bei dist.
 	Location string `json:"location,omitempty"`
-	// Disabled: eine leere projekteigene Datei schaltet den Eintrag ab; bei
-	// checks nie, sie haben keine lokale Ebene.
+	// Disabled: eine leere projekteigene Datei schaltet den Eintrag ab.
 	Disabled bool         `json:"disabled,omitempty"`
 	Audit    *CatalogMode `json:"audit,omitempty"`
 	Review   *CatalogMode `json:"review,omitempty"`
@@ -194,8 +190,8 @@ type CatalogScope struct {
 	Paths []string `json:"paths,omitempty"`
 }
 
-// catalogKind beschreibt einen Katalog: reviews mit lokaler Ebene, checks
-// ohne (Task 134).
+// catalogKind beschreibt einen Katalog: reviews mit lokaler Ebene. Den
+// Katalog checks gibt es seit Task 155 nicht mehr.
 type catalogKind struct {
 	name    string
 	dirName string
@@ -206,7 +202,6 @@ type catalogKind struct {
 func catalogKinds() []catalogKind {
 	return []catalogKind{
 		{name: "reviews", dirName: "reviews", suffix: ".md", prefix: "review-"},
-		{name: "checks", dirName: "checks", suffix: ".sh"},
 	}
 }
 
@@ -289,7 +284,6 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 		return Context{}, err
 	}
 
-	playbookDir := PlaybookDir(projectDir)
 	localDir := LocalDir(projectDir)
 
 	context := Context{
@@ -302,7 +296,6 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 			Config:    ConfigPath(projectDir),
 			Languages: languages,
 		},
-		Playbook:    ContextDir{Dir: playbookDir},
 		Local:       ContextDir{Dir: localDir},
 		Remediation: remediation,
 		Docs:        contextDocs(config),
@@ -346,12 +339,7 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 //
 // Die Ebenen von reviews sind dieselben Quellen wie hinter
 // k-playbook:-Verweisen: mitgeliefert <hub>:k-playbook unter defaults/,
-// projekteigen die Collection des Projekts unter k-playbook/ (Task 143);
-// checks liest weiter aus der Installation k-playbook/.
-//
-// checks hat keine lokale Ebene mehr (Task 134): Local bleibt leer, ein
-// k-playbook-local/checks/ wird nicht gelesen, jeder Eintrag ist dist und
-// keiner abgeschaltet.
+// projekteigen die Collection des Projekts unter k-playbook/ (Task 143).
 //
 // Vergleichseinheit ist der Dateiname: beide Seiten benutzen dieselbe
 // Namenskonvention. Ein projekteigener Eintrag ersetzt den gleichnamigen
@@ -359,11 +347,7 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 // Ein fehlendes Verzeichnis ist ein leerer Katalog; eine unlesbare Datei ist
 // ein Fehler, kein stiller Eintrag ohne Befund.
 func resolveCatalog(projectDir string, layers DocLayers, kind catalogKind) ([]CatalogEntry, error) {
-	playbookDir := PlaybookDir(projectDir)
 	layers = DocLayers{Dist: layers.Dist, Local: layers.Local}
-	if kind.name == "checks" {
-		layers = DocLayers{Dist: NewDiskDocSource(playbookDir)}
-	}
 	resolved, _, err := overlayDocDir(layers, kind.dirName, func(name string) bool { return isCatalogEntry(name, kind) })
 	if err != nil {
 		return nil, fmt.Errorf("Katalog %s: %w", kind.name, err)
@@ -373,12 +357,7 @@ func resolveCatalog(projectDir string, layers DocLayers, kind catalogKind) ([]Ca
 	for _, item := range resolved {
 		entry := CatalogEntry{Name: item.Name, Key: catalogKey(item.Name, kind), Origin: item.Origin,
 			Location: item.Location, Disabled: item.Disabled}
-		switch {
-		case kind.name == "checks":
-			entry.Path = filepath.Join(playbookDir, kind.dirName, item.Name)
-		default:
-			entry.Path = DocSchemeKPlaybook + ":/" + path.Join(kind.dirName, item.Name)
-		}
+		entry.Path = DocSchemeKPlaybook + ":/" + path.Join(kind.dirName, item.Name)
 		if kind.name == "reviews" && !entry.Disabled {
 			modes := parseReviewModes(item.Content)
 			entry.Audit = &CatalogMode{
@@ -403,7 +382,7 @@ func resolveCatalog(projectDir string, layers DocLayers, kind catalogKind) ([]Ca
 // seinen Path: einen Verweis k-playbook:/… über frische Ebenen des Projekts
 // (ProjectDocLayers, Rohtext ohne eingesetzte Includes) — mitgeliefert,
 // projekteigen oder überschreibend —, sonst die Datei auf der Platte, etwa
-// einen check oder einen Pfad aus einem älteren Lauf. Jeder Aufruf mit einem
+// einen Pfad aus einem älteren Lauf. Jeder Aufruf mit einem
 // Verweis öffnet die Ebenen neu;
 // wer mehrere Einträge liest, nimmt ReadCatalogEntryWith.
 func ReadCatalogEntry(projectDir string, entryPath string) ([]byte, error) {
@@ -773,7 +752,7 @@ func contextLinks(repair LinkRepair) *ContextLinks {
 // Dabei zieht er die Assistenten-Registrierung nach. Das gehört hierher, weil
 // dieser Aufruf am Anfang jeder Sitzung steht — über das Unterkommando context
 // und über MCP — und weil die Registrierung projektbezogen ist: sie folgt dem
-// Katalog dieses Projekts, nicht dem Weg, auf dem die Installation zu ihrem
+// Katalog dieses Projekts, nicht dem Weg, auf dem das Programm zu seinem
 // Stand kam.
 func ContextForDir(startDir string) (Context, error) {
 	return contextForDir(startDir, "", DocLayers{})

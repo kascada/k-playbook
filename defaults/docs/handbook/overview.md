@@ -11,7 +11,7 @@ and the same knowledge on the other.
 
 ```mermaid
 flowchart LR
-    Means["Means<br>guidelines<br>commands · skills<br>review recipes · checks<br>scanners"]
+    Means["Means<br>guidelines<br>commands · skills<br>review recipes<br>scanners"]
 
     Means --> Build
     Means --> Diagnose
@@ -69,11 +69,11 @@ flowchart LR
 
 ## The means, on the left
 
-Guidelines, commands, skills, review recipes, checks and the scanner
+Guidelines, commands, skills, review recipes and the scanner
 matrix are not owned by any one of the three. They exist once and apply to all
 of them. Commands, skills and review recipes exist twice — shipped with k-playbook and
 project-owned, in `.k-playbook/` or in the project collection — and what actually applies
-is the union, with the project-owned entry winning for the same name. Guidelines and checks
+is the union, with the project-owned entry winning for the same name. Guidelines
 are read shipped only; project-owned guidelines live in the project collection under
 `keph:/docs/guidelines/` and are not merged with the shipped ones (task 148).
 
@@ -111,7 +111,7 @@ reached through MCP.
 flowchart LR
     Guidelines["Guidelines"] --> Effective
     Skills["Commands · skills"] --> Effective
-    Recipes["Review recipes · checks"] --> Effective
+    Recipes["Review recipes"] --> Effective
     Scanners["Scanners · tool matrix"] --> Effective
 
     Effective["Effective set<br>shipped plus project-owned,<br>resolved by k-playbook context"]

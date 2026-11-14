@@ -29,8 +29,8 @@ nach `~/.local/bin/k-playbook`; danach installiert es Kephalaion, wenn es fehlt:
 curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
 ```
 
-Aus einem Clone aufgerufen (`make -C k-playbook install`) tut es dasselbe; `VERSION` und
-`SHA256SUMS` des Clones liest es nicht.
+Das ist die ganze Installation: ein Binary je Host oder DevContainer. Ins Projekt wird
+nichts vom Werkzeug kopiert; einen Clone `k-playbook/` im Projekt gibt es nicht mehr.
 
 Ohne Argument öffnet das Programm die lokale Oberfläche. Der Server dahinter läuft als
 Hintergrunddienst je Projekt weiter, das Terminal ist sofort wieder frei; ein zweiter
@@ -44,18 +44,17 @@ eigene offene Arbeit und, bis zum Abbau, der Rest der Kontextausgabe. `context` 
 Verzeichnisse und die Kataloge als JSON auf, damit kein Command
 die Overlay-Regeln selbst anwenden muss; die Commands rufen es noch, bis sie einzeln auf
 das Briefing umziehen. Beide räumen bewusst nichts auf — deren Ausgabe würde die
-Antwort stören. `upgrade` zieht Kephalaion, Programm und Projekt nach: Pull im Clone,
-solange es ihn gibt; das Binary nur, wenn das laufende älter ist als der neueste
-Release-Tag auf GitHub — dann direkt aus dem Release, geprüft gegen die `SHA256SUMS` des
-Tags, auch ohne Clone —; dann `AGENTS.md`, `CLAUDE.md`, Verlinkung und
-MCP-Einträge; `--check` meldet nur, was ein Lauf täte.
+Antwort stören. `upgrade` zieht Kephalaion, Programm und Projekt nach: das Binary nur,
+wenn das laufende älter ist als der neueste Release-Tag auf GitHub — dann direkt aus dem
+Release, geprüft gegen die `SHA256SUMS` des Tags —; dann `AGENTS.md`, `CLAUDE.md`,
+Verlinkung und MCP-Einträge; `--check` meldet nur, was ein Lauf täte.
 
 Es gibt genau zwei Versionsquellen: die eigene Version im Binary und den neuesten
 Release-Tag. `k-playbook version` nennt die erste, `k-playbook version --all` zusätzlich
 die mitgereiste VS-Code-Erweiterung und die zweite; die Umgebungsprüfung
 (`k-playbook health`, das Briefing) warnt, wenn das Programm älter ist als das neueste
-Release. `VERSION`, `SHA256SUMS` und `bin/install` eines Clones liest und ruft das
-Programm dafür nicht mehr (Pakete `internal/release`, `internal/version`).
+Release. `VERSION`, `SHA256SUMS` und `bin/install` des früheren Clones im Projekt liest
+und ruft das Programm dafür nicht mehr (Pakete `internal/release`, `internal/version`).
 
 Zum Entwickeln:
 
@@ -78,10 +77,10 @@ ohnehin nur die gestartet wird.
 | VS-Code-Erweiterung installieren | „k-playbook Workspace Tools“ im VS-Code-Server der Umgebung; beim Start des Dienstes im Hintergrund, ausdrücklich mit `k-playbook vscode install` |
 
 Dazu kommen ein rein lesender Block für die Security-Tools, die Remediation-Policy, die
-mitgelieferte Doku, der aufgelöste Kontext und das Aktualisieren per
-`git pull --ff-only`. Die Installation wird dabei als read-only Vendor-Clone behandelt:
-der Start der Oberfläche sperrt Schreibrechte, ein Update macht sie nur für den Pull
-temporär beschreibbar.
+mitgelieferte Doku, der aufgelöste Kontext und das Aktualisieren des Programms aus dem
+neuesten Release. Den früheren Clone `k-playbook/` im Projekt zieht das Werkzeug nicht
+mehr nach und sperrt ihn nicht mehr; einen liegengebliebenen löscht `/k-upgrade`
+(Umstellung 3.8).
 
 Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt. Eine vorhandene
 `K-PLAYBOOK.yaml` wird nie überschrieben.

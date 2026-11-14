@@ -13,6 +13,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
@@ -521,7 +522,7 @@ func TestInventarAnstossSchreibtDieReadmeAusDerVorlage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(project.PlaybookDir(root), "defaults", rel)
+	target := filepath.Join(root, defaultstest.DefaultsDir, rel)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		t.Fatal(err)
 	}

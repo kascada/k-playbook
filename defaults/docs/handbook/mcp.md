@@ -2,9 +2,9 @@
 
 k-playbook includes an MCP server. It gives an assistant the same information that
 `k-playbook context` provides on the command line: the resolved paths,
-the remediation policy, and the effective catalogs
-for reviews and checks -- shipped and project-owned reviews already merged; checks are
-shipped only, their `origin` is always `dist`.
+the remediation policy, and the effective catalog
+for reviews -- shipped and project-owned reviews already merged. A catalog for checks no
+longer exists (task 155).
 
 `k_playbook_context` and `k_playbook_briefing` are the only tools that also write as a side
 effect: they synchronize the project's assistant linking with the catalog, just as the
@@ -242,7 +242,7 @@ path counts as current. The bare name is written automatically only into tracked
 which binary starts -- not which project is intended. At runtime, the server resolves this by
 searching upward for `.k-playbook/K-PLAYBOOK.yaml`, beginning in its working directory. That is the
 assistant's working directory. Anyone opening the assistant in a subdirectory -- for example
-in the code repository, which may sit beside the playbook according to
+in the code repository, which may lie in a subdirectory of the project root according to
 [`installation.md`](./installation.md#1-create-configuration) -- gets a server that does
 not find their project. The interface states the condition in the block and clearly points it
 out if it itself was not started in the project root.
@@ -252,10 +252,13 @@ out if it itself was not started in the project root.
 A project whose registration still names the retired wrapper is corrected without manual
 work in two places:
 
-- during a **clone update** through the interface. `git pull` alone does not reach the files:
-  they are in the project root, not in `k-playbook/`.
+- by **`k-playbook upgrade`**, in its project step, on every run -- and so by `/k-upgrade`,
+  whose hull runs that call.
 - at **every start** of `k-playbook`. This is the fallback path for everything that bypasses
-  it -- a manual `git pull` or `make -C k-playbook installer-update`.
+  the first, such as a program installed by hand.
+
+In the former model the first place was the clone update through the interface; with the
+clone in the project and its pull it is gone (task 156).
 
 Clicking *Set up* is not required for this; it remains the explicit write path alongside it.
 
@@ -265,10 +268,10 @@ only the form written depends on it (see below).
 No accepted form is touched, and an entry that is neither obsolete nor accepted (`stale`)
 is left alone -- it may come from a foreign `$HOME` and be valid there. Nothing is deleted.
 
-The two automatic paths differ in how far they go. The clone update replaces the obsolete
-entry and nothing else. The start goes further: it also **adds a missing entry and creates
-a missing file -- but only when the target file is not tracked by git.** That is the
-condition that keeps a clone's working tree clean, and it is measured, not guessed,
+The two automatic paths go equally far. Besides replacing the obsolete entry, each also
+**adds a missing entry and creates a missing file -- but only when the target file is not
+tracked by git.** That is the condition that keeps the working tree of a checkout clean,
+and it is measured, not guessed,
 in the project root: `.k-playbook/K-PLAYBOOK.yaml` unreadable counts as tracked (the question is
 unanswered, so nothing is written); `project.vcs` other than `git` means nothing is
 tracked; if `git rev-parse --show-toplevel` fails, nothing is tracked only when git
@@ -279,7 +282,7 @@ ownership" in a repository owned by someone else, an orphaned `.git` file, a `.g
 directory without `HEAD`, a timeout or a git that could not run -- counts as tracked. The
 call runs with `LC_ALL=C` so the wording stays comparable. After a successful `rev-parse`,
 `git ls-files --error-unmatch` decides -- exit 0 tracked, exit 1 not tracked, anything
-else counts as tracked. The start also adds nothing and creates nothing when the path to
+else counts as tracked. Neither path adds or creates anything when the path to
 the target file **goes through a symlink** -- the file itself (even a dangling link) or
 a directory on the way. Writing would land in the link target while the measurement saw
 the link, and a link is a deliberate setup of the project, so it is skipped rather than
@@ -291,7 +294,8 @@ missing file is additionally created only if the assistant has left a **trace of
 in the project: an entry in `.claude/` or `.opencode/` that is not one of the symlink
 targets k-playbook manages itself -- for example `.claude/settings.json` or a file of its
 own under `.opencode/`. The directories alone are no trace; k-playbook creates them in
-every project. Without that condition every start would create two files nobody needs.
+every project. Without that condition every start and every upgrade would create two files
+nobody needs.
 
 Which form is written depends on the case. **Adding** a missing entry and **creating** a
 missing file write what *Set up* writes: the absolute path. The start message says so -- the
@@ -318,8 +322,8 @@ reached through a symlinked path. A target in the same repository is measured wi
 that repository -- in no repository or in a nested one -- or one that cannot be resolved
 leaves the question unanswered and gets the bare name.
 
-When the bare name was written, the start message and the clone-update response say so and
-name its cost: a client launched from the Dock or Finder needs the absolute path, entered
+When the bare name was written, the start message and the report of `k-playbook upgrade`
+say so and name its cost: a client launched from the Dock or Finder needs the absolute path, entered
 manually.
 
 **Projects already migrated and committed stay as they are.** Earlier versions wrote the
@@ -328,8 +332,8 @@ is not replaced again. Affected projects enter the bare name `k-playbook` manual
 `.mcp.json` and `opencode.json`; automatic correction leaves it there.
 
 The prerequisite remains the one-time bootstrap per host or Dev Container --
-`make -C k-playbook install`, or without make `k-playbook/bin/install`: both correction paths
-run in the installed binary. Without an installed `k-playbook`, no path can be registered --
+`curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`:
+both correction paths run in the installed binary. Without an installed `k-playbook`, no path can be registered --
 then nothing is written and the interface says so.
 
 ## Tools
@@ -754,7 +758,7 @@ collection `<hub>:k-playbook` under `defaults/` through the node's replica (task
 of the project binding, the account Kephalaion chooses for it (`kephalaion node client`),
 collection `k-playbook`; without a ready binding, or with an
 empty `defaults/`, a `k-playbook:` reference is `kephalaion_unavailable`, also when a local file
-exists -- no fallback to the clone `k-playbook/`. For `commands/` that is the text of a command, while
+exists -- no fallback to the disk, and none to a leftover clone `k-playbook/`. For `commands/` that is the text of a command, while
 the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/commands/`) is only the hull the assistant registers (task 092,
 [verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
 `catalogs` in `k_playbook_context` (`overlayDocDir`): for `reviews`, name,
@@ -1229,7 +1233,7 @@ projectDocs, health, context}`:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"6"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules) |
+| `schemaVersion` | the version of the briefing output, `"7"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, the directory of the former clone in the project) |
 | `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` in its first line (see "Head of the plain text" below) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
@@ -1241,7 +1245,7 @@ projectDocs, health, context}`:
 | `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
-| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `playbook`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`). `catalogs` therefore carries only `checks`. The context output has no field `guidelines` any more (task 148); guidelines stand only under `documents.guidelines` |
+| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`). An object that is left empty this way is dropped as well, so `catalogs` does not appear in the section at all since the catalog `checks` was removed (task 155). The context output has no field `guidelines` any more (task 148); guidelines stand only under `documents.guidelines` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as
@@ -1251,7 +1255,7 @@ no local layer, its entries come only from the shipped `<hub>:k-playbook/default
 and nothing reads `k-playbook-local/guidelines/`.
 
 Deliberately not in the briefing's own sections: contents (except `documents.always.content`,
-see above), commands, skills, checks, scripts,
+see above), commands, skills, scripts,
 and k-playbook's own docs. The project documentation appears only as its entry
 `keph:/docs/` (`projectDocs`).
 
@@ -1550,7 +1554,7 @@ the bare name only so this machine has the same setting everywhere. Automatic co
 touches neither: the portable form belongs to the set of accepted forms, and only the old
 wrapper path is replaced automatically.
 
-This keeps the working tree clean with every clone update and every start. Clicking *Set up*
+This keeps the working tree clean with every upgrade and every start. Clicking *Set up*
 here writes nothing either, as long as `opencode.json` carries the memory block: the bare
 name is accepted. Only if that block were missing would *Set up* rebuild the entry with the
 absolute path -- a diff in a tracked file that must be reverted.

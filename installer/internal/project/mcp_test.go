@@ -556,3 +556,37 @@ func TestApplyMCPSchreibtOhneAenderungNichtErneut(t *testing.T) {
 		t.Errorf("ohne inhaltliche Änderung neu geschrieben:\n%s", danach)
 	}
 }
+
+// Ein Bestandsprojekt mit dem alten Wrapper-Pfad in .mcp.json darf nicht darauf
+// zurückbleiben: RepairMCPReport korrigiert den Eintrag und fasst das Ergebnis
+// für die Meldungen zusammen.
+//
+// Das Hauptverzeichnis hat keine K-PLAYBOOK.yaml: die Tracking-Frage ist
+// unbeantwortet, geschrieben wird seit Task 062 der bloße Name.
+func TestRepairMCPReportKorrigiertVeralteteMCPRegistrierung(t *testing.T) {
+	projectDir := newMCPProject(t)
+
+	stale := `{"mcpServers":{"` + MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
+	writeFile(t, filepath.Join(projectDir, ".mcp.json"), stale)
+
+	report := RepairMCPReport(projectDir, MCPWriteOutdatedOnly)
+	if len(report.Repaired) != 1 || report.Repaired[0] != ".mcp.json" || report.Message != "" {
+		t.Fatalf("Repaired = %v, Message %q, erwartet [.mcp.json]", report.Repaired, report.Message)
+	}
+
+	status := mcpStatusFor(t, CheckMCP(projectDir), ".mcp.json")
+	if !status.OK() {
+		t.Fatalf("nach der Reparatur nicht korrigiert: %+v", status)
+	}
+	if status.Detail != "-> "+InstalledCommandName {
+		t.Errorf("Detail = %q, erwartet den bloßen Namen %s", status.Detail, InstalledCommandName)
+	}
+	if len(report.Portable) != 1 || report.Portable[0] != ".mcp.json" {
+		t.Errorf("Portable = %v, erwartet [.mcp.json]", report.Portable)
+	}
+
+	// Der zweite Lauf hat nichts zu tun.
+	if again := RepairMCPReport(projectDir, MCPWriteOutdatedOnly); len(again.Repaired) != 0 || len(again.Portable) != 0 {
+		t.Errorf("zweiter Lauf: %+v", again)
+	}
+}

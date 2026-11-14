@@ -19,8 +19,7 @@ import (
 // Ist das laufende Programm älter als der neueste Release-Tag, installiert der
 // Dienst auf Knopfdruck das Release-Programm dieses Tags und startet sich
 // daraus neu. Laden, Prüfen gegen die SHA256SUMS des Tags und Ersetzen liegen
-// bei program.Install (über release.Install); der Clone des Projekts wird
-// dafür weder gelesen noch gebraucht.
+// bei program.Install (über release.Install).
 //
 // Die Übergabe der Laufzeitdatei hält eine Invariante: **nie zwei registrierte
 // Dienste für ein Projekt.** Die Datei entsteht mit O_CREAT|O_EXCL, ein neuer
@@ -74,8 +73,7 @@ func (o restartOutcome) applyTo(response *updateResponse) {
 }
 
 // applyProgramHandler installiert das Release-Programm des neuesten Tags und
-// startet den Dienst daraus neu. Er läuft nur auf ausdrücklichen Klick, und er
-// läuft, ob es den Clone gibt oder nicht.
+// startet den Dienst daraus neu. Er läuft nur auf ausdrücklichen Klick.
 //
 // Abgelehnt wird mit 409, wenn schon ein Ablauf läuft, wenn das laufende
 // Programm nicht älter ist als der neueste Tag — auch dann, wenn der Tag

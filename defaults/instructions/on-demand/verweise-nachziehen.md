@@ -1,6 +1,6 @@
 ---
 title: Verweise nachziehen
-description: Was in einem Task, Command oder einer Anweisung als Verweis gilt, welches Präfix ein nackter Pfad oder relativer Link bekommt, was unberührt bleibt, wie nachgezogen wird und was ein Check daran findet — die eine Stelle für /k-task-refine, /k-upgrade, check_verweise und jede Sitzung.
+description: Was in einem Task, Command oder einer Anweisung als Verweis gilt, welches Präfix ein nackter Pfad oder relativer Link bekommt, was unberührt bleibt, wie nachgezogen wird und was am Text allein erkennbar ist und was ein Urteil braucht — die eine Stelle für /k-task-refine, /k-upgrade und jede Sitzung.
 ---
 
 ## Verweise nachziehen
@@ -8,8 +8,8 @@ description: Was in einem Task, Command oder einer Anweisung als Verweis gilt, w
 Die Form eines Verweises steht in `k-playbook:/instructions/always/010-verweise.md`: ein
 einziger Pfad mit Präfix (`project:/`, `k-playbook:/`, `keph:/`). Diese Anweisung sagt, wie
 eine Stelle, die diese Form noch nicht hat, erkannt und nachgezogen wird. Sie ist die eine
-Stelle dafür: `/k-task-refine`, `/k-upgrade` (Umstellung 3.3), der Check `check_verweise.sh`,
-spätere Checks und jede Sitzung richten sich nach ihr und wiederholen sie nicht.
+Stelle dafür: `/k-task-refine`, `/k-upgrade` (Umstellung 3.3) und jede Sitzung richten sich
+nach ihr und wiederholen sie nicht.
 
 ### Was ein Verweis ist
 
@@ -80,9 +80,9 @@ Belege werden nicht umgeschrieben, auch wenn dort nackte Pfade oder alte Platten
 Jede Ersetzung ändert nur den Verweis, nicht den Satz um ihn. Bei einem Markdown-Link wird
 das Ziel ersetzt; der Linktext bleibt.
 
-### Check und KI
+### Am Text erkennbar und was ein Urteil braucht
 
-Ein Check sieht nur den Text. Er erkennt
+Am Text allein erkennbar sind
 
 - relative Markdown-Links, deren Ziel mit `../` oder `./` beginnt, überall,
 - Pfade ohne Präfix in Backticks, die mit einer bekannten Wurzel des Projekts beginnen, wenn
@@ -91,9 +91,9 @@ Ein Check sieht nur den Text. Er erkennt
 
 In umzäunten Codeblöcken zählen Überschriften und Pfade ohne Präfix nicht: Ein `## Referenzen`
 in einer Vorlage öffnet keinen Bereich, ein `# Kommentar` in einem Shell-Block beendet keinen.
-Relative Links meldet der Check weiter überall, auch in Codeblöcken.
+Relative Links zählen weiter überall, auch in Codeblöcken.
 
-Er erkennt nicht, ob ein Pfad in anderem Fließtext gelesen werden soll, und nicht, welches von
-zwei Präfixen gemeint ist. Der Check findet und meldet; er korrigiert nicht. Korrigiert wird
-von einer KI nach dieser Anweisung. Eine gemeldete Stelle, die doch eine Ortsangabe ist, kommt
-mit Grund in die Ausnahmeliste des Checks.
+Ein Urteil braucht, ob ein Pfad in anderem Fließtext gelesen werden soll und welches von zwei
+Präfixen gemeint ist. Das entscheidet, wer nachzieht, nach dieser Anweisung; was sich nicht
+eindeutig zuordnen lässt, wird erfragt. Eine Stelle, die nach dem Muster oben wie ein Verweis
+aussieht, aber eine Ortsangabe ist, bleibt, wie sie ist.

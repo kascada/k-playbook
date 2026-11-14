@@ -131,8 +131,15 @@ func TestAssistentUndMCPOhneClone(t *testing.T) {
 	}
 
 	assistant := getAssistant(t)
-	if assistant.Environment.PlaybookPresent {
+	if _, err := os.Stat(filepath.Join(root, project.PlaybookDirName)); err == nil {
 		t.Fatalf("%s/ ist noch da", project.PlaybookDirName)
+	}
+	// Die Umgebung in der Antwort nennt keinen Ort einer Installation im
+	// Projekt mehr (Task 157).
+	if encoded, err := json.Marshal(assistant.Environment); err != nil {
+		t.Fatalf("Environment kodieren: %v", err)
+	} else if strings.Contains(string(encoded), "playbookDir") {
+		t.Errorf("Environment trägt playbookDir: %s", encoded)
 	}
 	if strings.Contains(assistant.Message, "Installationsverzeichnis") {
 		t.Errorf("Assistenten: Message = %q, erwartet keine Sperre", assistant.Message)

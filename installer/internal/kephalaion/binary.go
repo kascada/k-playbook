@@ -15,8 +15,7 @@ const GlobalBinary = "/usr/local/bin/" + BinaryName
 // InstallCommand ist die Installation aus dem README von Kephalaion: das
 // install.sh des neuesten Releases. Die Hinweise von k-playbook nennen ihn als
 // Weg von Hand; `k-playbook upgrade` lädt dasselbe Skript selbst
-// (program.InstallKephalaion, Adresse release.KephalaionInstallURL) — ein
-// Clone mit bin/install-kephalaion wird dafür nicht gebraucht.
+// (program.InstallKephalaion, Adresse release.KephalaionInstallURL).
 const InstallCommand = "curl -fsSL https://github.com/kephalaion/kephalaion/releases/latest/download/install.sh | sh"
 
 // FindBinary sucht kephalaion an den Orten, die Kephalaion für Clients

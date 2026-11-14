@@ -15,9 +15,8 @@ import "path/filepath"
 // keph:/docs/guidelines/ (Todo #40), instructions, includes und reviews unter
 // keph:/k-playbook/<sorte>/ (Task 143), die Quellenkonfiguration des
 // Versionsinventars in keph:/k-playbook/inventory.md (Task 144). results
-// führt das Einrichten seit Task 146 nicht mehr; priv und k-playbook.md, die
-// letzten beiden Einträge, sind mit Task 147 gegangen, samt der Vorlagen und
-// der Schaltung „privat oder versioniert". /k-upgrade räumt die leeren
+// führt das Einrichten seit Task 146 nicht mehr; die letzten Einträge sind
+// mit Task 147 gegangen, samt der Vorlagen und der Schaltung „privat oder versioniert". /k-upgrade räumt die leeren
 // Verzeichnisse eines Bestandsprojekts ab.
 const LocalDirName = "k-playbook-local"
 

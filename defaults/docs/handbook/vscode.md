@@ -241,8 +241,9 @@ embedded with `go:embed`. It is not built during `make dist`, and that is the po
   for byte and the check would go red.
 - **No Node toolchain.** `make dist`, `make test` and the release CI work without Node.
   Node is a developer step for one target only.
-- **Not in the clone.** Clones of different projects on one machine carry different
-  states and would install older and newer versions in turn.
+- **Not per project.** In the former model the tool lay as a clone in every project;
+  clones of different projects on one machine carried different states and would have
+  installed older and newer versions in turn.
 
 The extension therefore has a version of its own in `installer/vscode/package.json`,
 starting at `0.1.0`, not the program's `VERSION`: the VSIX is committed before the tag

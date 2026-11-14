@@ -15,6 +15,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/review"
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
@@ -48,8 +49,8 @@ func TestReviewStatusAvailable(t *testing.T) {
 
 func TestReviewStatusAvailableTrenntAuditUndReviewAktivierung(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-review-only.md"), "---\ntitle: Review Only\nreview:\n  enabled: true\n---\n# Review Only\n")
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-disabled.md"), "---\naudit:\n  enabled: false\nreview:\n  enabled: false\n---\n# Disabled\n")
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-review-only.md"), "---\ntitle: Review Only\nreview:\n  enabled: true\n---\n# Review Only\n")
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-disabled.md"), "---\naudit:\n  enabled: false\nreview:\n  enabled: false\n---\n# Disabled\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -268,7 +269,7 @@ func TestReviewStatusExistingZeigtGespeichertenScopeSnapshot(t *testing.T) {
 	entry := aiEntry("tech")
 	entry.Scope = &review.Scope{Tools: []string{"old-tool"}}
 	mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, entry})
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [new-tool]\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [new-tool]\nreview:\n  enabled: true\n---\n# Fallback\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"})
 	if err != nil {
@@ -680,8 +681,7 @@ func newReviewProject(t *testing.T) string {
 	dirs := []string{
 		filepath.Join(sharetest.Dir(t), "scripts"),
 		filepath.Join(root, "k-playbook", "commands", "_audit"),
-		filepath.Join(root, "k-playbook", "defaults", "reviews"),
-		filepath.Join(root, "k-playbook", "checks"),
+		filepath.Join(root, defaultstest.DefaultsDir, "reviews"),
 		filepath.Join(root, project.ProjectDirName, "commands", "_audit"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
@@ -693,7 +693,7 @@ func newReviewProject(t *testing.T) string {
 	}
 	mustWriteFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), preflightScript(t))
@@ -971,7 +971,7 @@ func TestReadAIRecipeMetadataMeldetUnzulaessigeEvidenceKombination(t *testing.T)
 
 func TestReviewStatusAvailableTrenntEvidenceVonPerspektiven(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-hardspots.md"), evidenceRecipe())
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-hardspots.md"), evidenceRecipe())
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -1023,7 +1023,7 @@ func TestReviewStatusAvailableTrenntEvidenceVonPerspektiven(t *testing.T) {
 
 func TestReviewStatusAvailableHaeltUngueltigenAuditVertragAusDerAuswahl(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-broken.md"),
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-broken.md"),
 		"---\ntitle: Kaputt\naudit:\n  enabled: true\n  mode: evidence\n  resultRequired: true\n  ruleIds: [x]\n  scope:\n    paths: [installer/**]\n---\n# Kaputt\n")
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
@@ -1063,7 +1063,7 @@ func TestReviewStatusAvailableHaeltUngueltigenAuditVertragAusDerAuswahl(t *testi
 
 func TestReviewCreateFriertModusUndPfadScopeEin(t *testing.T) {
 	root := newReviewProject(t)
-	mustWriteFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-hardspots.md"), evidenceRecipe())
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-hardspots.md"), evidenceRecipe())
 
 	result, _, err := reviewCreateTool(context.Background(), nil, reviewCreateInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Day: "2026-08-19"})
 	if err != nil {
@@ -1197,7 +1197,7 @@ func containsValue(values []any, wanted string) bool {
 // Katalog, Betriebsart und Pfad-Scope im Eintrag eingefroren.
 func evidenceRun(t *testing.T, root string, name string) (string, review.Entry) {
 	t.Helper()
-	recipePath := filepath.Join(root, "k-playbook", "defaults", "reviews", "review-"+name+".md")
+	recipePath := filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-"+name+".md")
 	mustWriteFile(t, recipePath, evidenceRecipe())
 	entry := review.Entry{
 		Name:           name,
@@ -1737,9 +1737,10 @@ func triageStatus(t *testing.T, root string, run string) map[string]any {
 // (project) und den Audit-Parser (readAIRecipeMetadata, ValidateAuditContract)
 // und prüft, dass beide es auswählbar führen.
 //
-// BuildContext liest <projectDir>/k-playbook/reviews/. An der Repo-Wurzel wäre
-// das der Clone der installierten Version, nicht der Arbeitsstand. Der Test
-// kopiert die Rezepte deshalb in ein temporäres Projekt und ruft Katalog und
+// BuildContext liest die mitgelieferte Ebene über den Store; an der
+// Repo-Wurzel wäre das der veröffentlichte Stand vom Hub, nicht der
+// Arbeitsstand. Der Test kopiert die Rezepte deshalb in das Fixture-Verzeichnis
+// eines temporären Projekts (defaultstest.DefaultsDir) und ruft Katalog und
 // Auswahl nur dort auf.
 func TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag(t *testing.T) {
 	sources, err := filepath.Glob(filepath.Join("..", "..", "..", "defaults", "reviews", "review-*.md"))
@@ -1751,7 +1752,7 @@ func TestAusgelieferteRezepteErfuellenKatalogUndAuditVertrag(t *testing.T) {
 	}
 
 	root := newReviewProject(t)
-	reviewsDir := filepath.Join(root, "k-playbook", "defaults", "reviews")
+	reviewsDir := filepath.Join(root, defaultstest.DefaultsDir, "reviews")
 	// Nur die Rezepte des Arbeitsstands sollen im Katalog stehen, nicht die
 	// Vorlage aus newReviewProject.
 	if err := os.RemoveAll(reviewsDir); err != nil {

@@ -1,10 +1,10 @@
 # Katalog der Scan-Jobs: eine Zeile je Aufruf. Gelesen von `k-playbook scan`.
 # Fields: job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
 #
-# Katalog und Binary gehören zusammen: dieser Katalog kommt mit dem Clone, das Binary mit
-# `bin/install`. Nach einem Clone-Update mit VERSION-Wechsel gehört deshalb der Bootstrap
-# hinterher. Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen wird:
-# ein altes Binary läse einen um eine Spalte erweiterten Katalog gar nicht mehr und
+# Katalog und Binary gehören zusammen: Dieser Katalog ist im Binary eingebettet, und das
+# Binary entpackt ihn nach ~/.local/share/k-playbook/scripts/; beide tragen deshalb immer
+# denselben Stand. Nötig ist das, weil eine Zeile mit falscher Spaltenzahl hart abgewiesen
+# wird: ein altes Binary läse einen um eine Spalte erweiterten Katalog gar nicht mehr und
 # brächte keinen Lauf mehr zustande.
 #
 # Der Eintrag eines Laufs ist das Werkzeug, der Job ist der Aufruf. Ein Werkzeug kann
@@ -147,8 +147,9 @@
 # Dateien.
 #
 # Ausgeschlossen wird überall dort, wo das Werkzeug es zulässt:
-#   k-playbook/                die Installationskopie. Ihr ausgeliefertes Beispiel-
-#                              material ist kein Code des Projekts.
+#   k-playbook/                Altbestand: ein liegengebliebener Clone des Werkzeugs aus
+#                              dem früheren Modell (/k-upgrade löscht ihn). Sein
+#                              ausgeliefertes Beispielmaterial ist kein Code des Projekts.
 #   k-playbook-local/results/  die Ergebnisse früherer Läufe. Ohne den Ausschluss
 #                              fänden gitleaks und trufflehog im nächsten Lauf die
 #                              Funde des vorigen in dessen eigenem SARIF wieder.
@@ -159,7 +160,7 @@
 # dasselbe Verzeichnis meint. Grund: beide Werkzeuge können Pfade nur über ihre eigene
 # Konfiguration ausnehmen, und deren Muster laufen gegen den gemeldeten Pfad. Bei
 # absolutem Ziel ist der absolut — in einem Projekt, das selbst k-playbook heißt, träfe
-# ein Muster für die Installationskopie dann die ganze Projektwurzel, und der Lauf fände
+# ein Muster für einen solchen Clone dann die ganze Projektwurzel, und der Lauf fände
 # nichts mehr. Mit . sind die gemeldeten Pfade relativ zur Wurzel, und die Muster
 # greifen genau dort, wo sie sollen: gitleaks.toml mit ^ verankert, njsscan.yaml über
 # den Teilstring k-playbook/, der libsast genügt.
@@ -169,8 +170,8 @@
 # Scan-Wurzel angewandt. Nachgemessen in einem Repo, dessen Wurzel k-playbook heißt —
 # mit und ohne Flag dieselben 331 Verzeichnisse und dieselben vier Manifeste. Der
 # Schalter ist trotz des Namens experimental die einzige Ausschlussmöglichkeit des
-# Werkzeugs; ohne ihn meldet es die Abhängigkeiten der Installationskopie mit, deren
-# testdata/ in deren eigenem Clone nicht gitignored ist.
+# Werkzeugs; ohne ihn meldet es die Abhängigkeiten eines liegengebliebenen Clones mit,
+# dessen testdata/ dort nicht gitignored ist.
 #
 # syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
 # Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist

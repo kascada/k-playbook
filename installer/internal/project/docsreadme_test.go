@@ -66,7 +66,7 @@ func TestDocRefSorteDocsNurMitgeliefert(t *testing.T) {
 // gewinnt nicht; die Vorlage kommt aus <hub>:k-playbook/defaults/docs/.
 func TestDocRefDocsLokaleDateiGewinntNicht(t *testing.T) {
 	root := t.TempDir()
-	writeDocTree(t, filepath.Join(root, PlaybookDirName, defaultsDirName), map[string]string{
+	writeDocTree(t, filepath.Join(root, testDefaultsDir), map[string]string{
 		"docs/manual/README.md": "---\ntitle: \"Manual\"\n---\n\nmitgeliefert\n",
 	})
 	writeDocTree(t, LocalDir(root), map[string]string{

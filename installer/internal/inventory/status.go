@@ -39,8 +39,8 @@ type Status struct {
 	Deviations        int    `json:"deviations"`
 	Rejected          int    `json:"rejected"`
 	// SourcesExcluded ist die Zahl der Quellen, die eine Ausschlussregel
-	// übergangen hat — die Installation und, wenn konfiguriert, die Muster aus
-	// `exclude:`.
+	// übergangen hat — ein liegengebliebener Clone k-playbook/ (feste Regel)
+	// und, wenn konfiguriert, die Muster aus `exclude:`.
 	SourcesExcluded int `json:"sourcesExcluded"`
 	// SourcesUnevaluable ist die Zahl der Quellen im Zustand „nicht
 	// auswertbar": gelesen, aber als Ganzes nicht ausgewertet.

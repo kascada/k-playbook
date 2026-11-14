@@ -67,8 +67,8 @@ type serverState struct {
 	streams     chan struct{}
 	streamsOnce sync.Once
 
-	// updateMu ist die Sperre für Aktualisierung und Neustart: POST /api/update
-	// und POST /api/update/program nehmen sie mit TryLock, ein zweiter Aufruf
+	// updateMu ist die Sperre für Aktualisierung und Neustart:
+	// POST /api/update/program nimmt sie mit TryLock, ein zweiter Aufruf
 	// währenddessen bekommt 409. Zwei gleichzeitige Abläufe gäben dieselbe
 	// Laufzeitdatei zweimal frei und starteten zwei Nachfolger.
 	updateMu sync.Mutex
@@ -265,9 +265,8 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/branches/switch-check", branchesSwitchCheckHandler)
 	mux.HandleFunc("POST /api/branches/switch", branchesSwitchHandler)
 	mux.HandleFunc("GET /api/update", state.updateCheckHandler)
-	mux.HandleFunc("POST /api/update", state.applyUpdateHandler)
-	// Nur das Programm: installiert über den Bootstrap des Clones und startet
-	// den Dienst daraus neu. Läuft nie ungefragt, nur auf den Knopf hin.
+	// Nur das Programm: installiert das Release-Programm des neuesten Tags und
+	// startet den Dienst daraus neu. Läuft nie ungefragt, nur auf den Knopf hin.
 	mux.HandleFunc("POST /api/update/program", state.applyProgramHandler)
 	// Die Anbindung an die Kephalaion-Collection. Die GETs nehmen keinen
 	// Wert aus der Anfrage; Test und Eintragen nur per POST. Der
@@ -363,8 +362,8 @@ func routes(state *serverState) http.Handler {
 
 // sameOrigin weist schreibende Anfragen fremder Herkunft ab. Der Prozess lebt
 // jetzt Stunden statt Minuten, und eine beliebige Seite im Browser des
-// Nutzers könnte sonst Endpunkte treffen, hinter denen git pull und
-// Schreibvorgänge stehen.
+// Nutzers könnte sonst Endpunkte treffen, hinter denen die Installation des
+// Programms und Schreibvorgänge stehen.
 //
 // Geprüft wird ein echter Same-Origin-Vergleich: der Host-Anteil von Origin
 // gegen den Host-Header, ohne Fixierung auf 127.0.0.1:<port> und ohne
@@ -654,23 +653,21 @@ func mcpServerPageHandler(w http.ResponseWriter, r *http.Request) {
 func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, page string, title string) {
 	environment := project.Detect()
 	data := struct {
-		Mode        string
-		ModeLabel   string
-		Path        string
-		RepoRoot    string
-		PlaybookDir string
-		Installed   bool
-		Area        string
-		Page        string
+		Mode      string
+		ModeLabel string
+		Path      string
+		RepoRoot  string
+		Installed bool
+		Area      string
+		Page      string
 		// Title steht im Kopf und im Fensternamen. Alle Seiten teilen
 		// denselben Kopf aus hero.html; welche davon die Knöpfe für Update
 		// und Dienst tragen, entscheidet der Kopf selbst über Area, Page und
 		// Installed.
 		Title string
 		// Version ist die des Binarys, das diese Seite ausliefert. Sie steht
-		// rechts oben im Kopf, weil die Installation daneben einen anderen
-		// Stand tragen kann und ein Fenster nach einem Update sonst nicht
-		// verrät, welcher Server gerade antwortet.
+		// rechts oben im Kopf, weil ein Fenster nach einer Aktualisierung des
+		// Programms sonst nicht verrät, welcher Server gerade antwortet.
 		Version string
 	}{Installed: environment.Installed, Area: area, Page: page, Title: title, Version: displayVersion(guiproc.OwnVersion())}
 
@@ -681,10 +678,6 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 		if config, err := project.ReadConfig(environment.ProjectDir); err == nil {
 			data.RepoRoot = project.DisplayPath(project.RepoRootDir(environment.ProjectDir, config))
 		}
-		// Aus diesem Verzeichnis kommen Skripte, Reviews und Checks. Es
-		// ist ein eigener Clone und kann einen anderen Stand tragen als das
-		// Binary — deshalb gehört es in den Kopf und nicht hinter einen Klick.
-		data.PlaybookDir = project.DisplayPath(environment.PlaybookDir)
 	} else {
 		data.Mode = "none"
 		// Als Beschriftung eines Pfades gelesen, nicht als Zustandsmarke: der

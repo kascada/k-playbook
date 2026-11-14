@@ -46,7 +46,7 @@ const legacyInstructionsCommandLine = "\x00aufruf\x00"
 // legacyInstructionsBlocks sind die abgelösten Fassungen des Anstoßblocks, die
 // älteste zuerst.
 //
-// Die erste nannte den projekteigenen Wrapper unterhalb der Installation
+// Die erste nannte den projekteigenen Wrapper unterhalb des früheren Clones
 // (`k-playbook/bin/k-playbook context`); erkannt wird der Teilpfad und nicht
 // der ganze Wrapper-Pfad, damit auch eine Fassung trifft, die eine andere
 // Verzeichnisebene davorgeschrieben hat. Die Datei `bin/k-playbook` gibt es im
@@ -57,6 +57,11 @@ const legacyInstructionsCommandLine = "\x00aufruf\x00"
 // verlangte, die Dateien aus `instructions` zu lesen. Beides kommt seit dem
 // Briefing mit einem Aufruf; die aktuelle Fassung (instructionsBlock) nennt
 // deshalb `k-playbook briefing`.
+//
+// Beide nennen noch „Kataloge für Regeln, Reviews und Checks“. Das ist der
+// Wortlaut von damals, an dem der Block erkannt wird, nicht der heutige
+// Stand: Regeln und Checks gibt es nicht mehr (Task 135, Task 155). Wer ihn
+// ändert, erkennt die ausgelieferten Fassungen nicht mehr.
 var legacyInstructionsBlocks = []legacyInstructionsBlock{
 	{
 		command: "/bin/" + InstalledCommandName + " context",
@@ -328,8 +333,8 @@ func refreshRootInstructions(content string, appendAnstoss bool) (string, bool, 
 	if hasMarker {
 		// Der Marker steht — bisher war das gleichbedeutend mit „nichts zu
 		// tun". Ein Bestandsprojekt behielt damit dauerhaft den abgelösten
-		// Aufruf, und der Git-Update-Weg erreicht die Datei nicht: sie liegt
-		// im Hauptverzeichnis, nicht im Clone.
+		// Aufruf, und der frühere Git-Update-Weg erreichte die Datei nicht:
+		// sie liegt im Hauptverzeichnis, nicht im damaligen Clone.
 		replaced, ok, err := replaceOutdatedInstructionsBlock(content)
 		if err != nil {
 			hints = append(hints, err)
@@ -385,9 +390,8 @@ func (r RootInstructionsRepair) Changed() bool {
 }
 
 // RepairRootInstructions ist der Auffangweg beim Start, das Gegenstück zu
-// RepairMCP: ein `git pull` von Hand oder `make -C k-playbook
-// installer-update` erreicht AGENTS.md nicht, weil sie im Hauptverzeichnis
-// liegt und nicht im Clone.
+// RepairMCP: Er zieht AGENTS.md auch dann nach, wenn niemand über die
+// Oberfläche oder `k-playbook upgrade` aktualisiert hat.
 //
 // Genau zwei Fälle, beide idempotent:
 //
@@ -690,9 +694,9 @@ func rootInstructionsTemplate() string {
 // in dieser Reihenfolge wird der Block befolgt (gemessen 2026-10-18),
 // umgekehrt nicht.
 //
-// Er nennt bewusst keine Verzeichnisebenen: dieselbe Datei liegt im Projekt,
-// in der Installation und im Entwicklungsrepo, und ein Verweis auf eine Ebene
-// wäre an zwei dieser Orte falsch. Was es zu lesen gibt, sagt das Briefing.
+// Er nennt bewusst keine Verzeichnisebenen: dieselbe Datei liegt im Projekt
+// und im Entwicklungsrepo, und ein Verweis auf eine Ebene wäre an einem
+// dieser Orte falsch. Was es zu lesen gibt, sagt das Briefing.
 //
 // Aufgerufen wird das einmal je Host oder DevContainer installierte
 // k-playbook unter seinem Namen. Ein projektrelativer Pfad wäre doppelt falsch:

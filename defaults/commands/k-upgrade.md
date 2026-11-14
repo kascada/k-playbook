@@ -4,7 +4,7 @@ Zieht Kephalaion, Programm und Projekt auf den aktuellen Stand von k-playbook. Z
 das Programm allein kann, in dieser Reihenfolge: Kephalaion — `kephalaion upgrade --auto`
 aktualisiert es und startet seinen Node neu, soweit Kephalaion das selbst für gefahrlos hält,
 sonst steht in der Ausgabe, was zu tun ist —, dann das Binary, wenn das laufende älter ist als
-die Installation, dann `AGENTS.md` (Anstoß, abgelöste Blöcke), `CLAUDE.md`, die Verlinkung der
+das neueste Release, dann `AGENTS.md` (Anstoß, abgelöste Blöcke), `CLAUDE.md`, die Verlinkung der
 Commands und Skills und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
 dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Briefing danach
 den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
@@ -13,8 +13,10 @@ nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
 macht, nicht das Programm, gegen Ende das Aufräumen der Verzeichnisse, die das Einrichten
 nicht mehr anlegt, und der alten `K-PLAYBOOK.local.yaml`, dann der Umzug der
 Quellenkonfiguration des Versionsinventars aus der alten `version-sources.yaml` nach
-`keph:/k-playbook/inventory.md` und zuletzt das Löschen von `k-playbook-local/` selbst, wenn
-darin nur noch `.gitignore`, `README.md` und leere Unterverzeichnisse liegen.
+`keph:/k-playbook/inventory.md`, dann das Löschen von `k-playbook-local/` selbst, wenn
+darin nur noch `.gitignore`, `README.md` und leere Unterverzeichnisse liegen, und zuletzt das
+Löschen eines alten Clones `k-playbook/` samt der Zeilen, die `k-playbook/` oder
+`k-playbook-local/` in einer `.gitignore` ausnehmen.
 Der Command nimmt kein Argument.
 
 ## Schritt 1 — Briefing
@@ -75,13 +77,15 @@ Anlass vor, steht für Schritt 3 genau eine Zeile: `Umstellungen: alles erledigt
 Für alle Umstellungen gilt:
 
 - Gelöscht, verschoben oder überschrieben wird erst nach Bestätigung. Lege je Umstellung
-  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind drei Fälle, und
+  gebündelt vor, was du vorhast, und warte auf die Antwort. Ausgenommen sind vier Fälle, und
   nur sie: `cache/`, `inbox/` und `queue/` aus 3.0 a), die 3.0 ohne Inhaltsprüfung löscht, die
   Verzeichnisse, die 3.4 löscht — die leeren, dazu `guidelines/` und `results/` auch mit
-  Inhalt —, und `k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist. Alle drei löschen
-  ohne Vorlage und ohne auf eine Antwort zu warten.
+  Inhalt —, `k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist, und der Clone
+  `k-playbook/`, den 3.8 löscht, samt der Zeilen, die 3.8 streicht, auch in einer
+  versionierten `.gitignore`. Alle vier löschen und ändern ohne Vorlage und ohne auf eine
+  Antwort zu warten.
 - Bist du bei einem Eintrag unsicher, sag das in der Vorlage ausdrücklich, statt still zu
-  entscheiden; in 3.4 und 3.7, die nichts vorlegen, steht es in der Meldung, ohne neue
+  entscheiden; in 3.4, 3.7 und 3.8, die nichts vorlegen, steht es in der Meldung, ohne neue
   Rückfrage.
 - Braucht eine Umstellung die Projekt-Collection und steht `context.kephalaion.ok` nicht auf
   `true`, wird sie übersprungen; sag das und nenne den Grund aus `context.kephalaion.message`.
@@ -96,8 +100,9 @@ Für alle Umstellungen gilt:
     --exclude-dir=venv --exclude-dir=__pycache__ "<zeichenfolge>" <context.project.dir>
   ```
 
-  Danach streichst du aus dem Ergebnis die Installation unter `context.playbook.dir` und
-  alles, was die Umstellung sonst ausnimmt. Eine Stelle in einem anderen Git-Repository
+  Danach streichst du aus dem Ergebnis alles unter `<context.project.dir>/k-playbook/` —
+  Altbestand: den alten Clone von k-playbook, den 3.8 zuletzt löscht — und alles, was die
+  Umstellung sonst ausnimmt. Eine Stelle in einem anderen Git-Repository
   unterhalb des Projekts — einem Verzeichnis mit eigenem `.git`, etwa einem eingebetteten
   Clone — nennst du in der Vorlage mit `[fremd]`: Sie zählt als Verweis, wird gemeldet und
   nicht geändert.
@@ -182,7 +187,8 @@ beurteilst.
 Nicht gesucht wird in:
 
 - `material/` selbst, weil Befunde einander zitieren;
-- der Installation unter `context.playbook.dir`;
+- `<context.project.dir>/k-playbook/` — Altbestand: dem alten Clone von k-playbook, den 3.8
+  zuletzt löscht;
 - erledigten Tasks (`tasks/done/`, `keph:/user/*/tasks/done/`), weil sie Geschichte sind und
   ihre Verweise stehen bleiben.
 
@@ -567,8 +573,8 @@ Review-Rezepte liegen in der Projekt-Collection unter `keph:/k-playbook/instruct
 nicht mehr aus. `reviews/` hat das Einrichten angelegt, `instructions/` und `includes/` legten
 Projekte von Hand an. Der Inhalt von `rules/` hat keinen Nachfolger in
 der Collection: Die Sorte gibt es nicht mehr, k-playbook liest dort nichts. Auch der Inhalt von
-`checks/` hat keinen Nachfolger: `k-check` führt nur noch die mitgelieferten Checks aus,
-projekteigene Checks gibt es nicht, bis sie eine neue Form bekommen. Projekteigene Guidelines
+`checks/` hat keinen Nachfolger: Checks gibt es nicht mehr, weder mitgeliefert noch
+projekteigen. Projekteigene Guidelines
 liegen in der Projekt-Collection unter `keph:/docs/guidelines/`; `guidelines/` auf der Platte
 wird nicht umgezogen, sondern gelöscht (Ausnahme unten). `results/` nahm auf, was Reviews
 erzeugen: Ergebnisse je Lauf und Familie, dazu `log.md`. Auch es wird nicht umgezogen, sondern
@@ -709,8 +715,8 @@ dass diese Regeln nicht mehr gelesen werden: Ihr Inhalt gehört von Hand in Guid
 (`keph:/docs/`) oder Instructions. 3.4 zieht ihn nicht um.
 
 Für `checks/` nennt die Zeile `bleibt:` ebenso höchstens fünf Pfade und dazu als Hinweis, dass
-diese Checks nicht mehr laufen: `k-check` führt nur noch die mitgelieferten aus. 3.4 zieht
-nichts um und fragt nicht.
+diese Checks nicht mehr laufen: Checks gibt es nicht mehr. 3.4 zieht nichts um und fragt
+nicht.
 
 Für `guidelines/` gibt es nur die Zeile `gelöscht:`. Sie nennt jede Datei, auch über fünf, und
 dazu, dass projekteigene Guidelines unter `keph:/docs/guidelines/` liegen.
@@ -758,7 +764,7 @@ Liegt in `rules/` mehr als die README, lautet seine Zeile etwa:
 Liegt in `checks/` mehr als die README, lautet seine Zeile etwa:
 
 ```text
-  checks/      bleibt: README.md, check_eigen.sh — läuft nicht mehr; k-check führt nur noch die mitgelieferten Checks aus
+  checks/      bleibt: README.md, check_eigen.sh — läuft nicht mehr; Checks gibt es nicht mehr
 ```
 
 Liegt in `tmp/` mehr als README und verwaltete `.gitignore`, lautet seine Zeile etwa:
@@ -932,8 +938,8 @@ doppelt zu übernehmen. Committet wird nicht.
 Das Einrichten legt `<context.local.dir>` nicht mehr an, und das Programm liest dort nichts
 mehr außer `testdata/`. Was 3.0 bis 3.6 abgeräumt haben, lässt das Verzeichnis oft leer zurück,
 nur mit seiner `.gitignore` und vielleicht einer README. Diese Umstellung löscht es dann ohne
-Rückfrage; sonst meldet sie in einer Zeile, was noch darin liegt. Sie läuft als letzte, damit
-zählt, was die anderen abgeräumt haben, und braucht die Collection nicht.
+Rückfrage; sonst meldet sie in einer Zeile, was noch darin liegt. Sie läuft nach 3.0 bis 3.6,
+damit zählt, was sie abgeräumt haben, und braucht die Collection nicht.
 
 **Anlass:** `<context.local.dir>` liegt, als Verzeichnis oder als Symlink.
 
@@ -998,6 +1004,155 @@ Pfade, die 3.4 im selben Lauf schon als `bleibt: …` gemeldet hat, nennt 3.7 no
 Zeile „noch nicht leer“ erscheint bei jedem Lauf, solange etwas darin liegt, auch wenn es
 bewusst liegen bleibt, etwa eine rechnerlokale `.env`.
 
+### 3.8 — Clone `k-playbook/` und die `.gitignore`-Zeilen
+
+Bis v0.16.38 brauchte ein Projekt eine Kopie des k-playbook-Repos von GitHub unter
+`<context.project.dir>/k-playbook`: Das Programm zog sie nach und aktualisierte sich aus ihr.
+Heute kommt alles mit dem Programm; es liest den Clone nicht mehr und zieht ihn nicht mehr
+nach. Diese Umstellung löscht den Clone ganz, ohne Rückfrage, und streicht danach aus den
+`.gitignore`-Dateien die Zeilen, die `k-playbook/` oder `k-playbook-local/` aus Git
+heraushalten — jede erst, wenn ihr Verzeichnis weg ist, damit nichts davon versehentlich in
+einen Commit gerät. Sie läuft als letzte, nach 3.7, damit zählt, ob `k-playbook-local/` dann
+noch liegt, und braucht die Collection nicht.
+
+**Anlass:** `<context.project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder
+eine `.gitignore` von `context.project.dir` bis `context.project.repoRoot` trägt eine der
+Zeilen aus d) für ein Verzeichnis, das nicht mehr existiert.
+
+**Vorbedingung**, enger als in 3.4 und 3.7: Schritt 2 hat die Zeile
+`Programm-Stand: nichts zu tun — …` ausgegeben, und sie nennt `neuestes Release`. So schreibt
+sie erst ein Programm ab v0.16.39. Fehlt die Zeile oder nennt sie stattdessen `Installation`,
+löschst und änderst du nichts und meldest `k-playbook/ löschen wartet auf den Binärwechsel`:
+Ein älteres Programm schreibt die Zeile mit `Installation`, bekommt diesen Text aber über den
+Hub zu lesen und braucht den Clone für sein eigenes Upgrade. Die Wartezeile steht auch dann,
+wenn 3.4 wegen seiner Vorbedingung direkt zu Schritt 4 springt und der Anlass von 3.8 vorliegt.
+
+In allen Befehlen setzt du den Pfad in die doppelten Anführungszeichen ein; enthält er selbst
+`"`, `$`, `` ` `` oder `\`, steht davor ein `\`.
+
+**a) Prüfen, ob es ein Clone ist.** Liegt `<context.project.dir>/k-playbook` nicht, gehst du
+zu d). Sonst:
+
+```sh
+test -L "<context.project.dir>/k-playbook" && echo SYMLINK
+test -d "<context.project.dir>/k-playbook/.git" && ! test -L "<context.project.dir>/k-playbook/.git" && echo CLONE
+```
+
+Ohne Rückfrage gelöscht wird nur ein echtes Verzeichnis, kein Symlink, in dem direkt ein
+Verzeichnis `.git` liegt: Nur dann ist es eine Kopie von GitHub. In jedem anderen Fall löschst
+du nichts, weder das Verzeichnis noch einen Link noch sein Ziel, meldest in einer Zeile, warum
+es liegen bleibt, und gehst zu d):
+
+- ein Symlink: `k-playbook/ ist ein Symlink, nichts gelöscht`;
+- kein `.git` darin, oder `.git` ist eine Datei wie in einem Submodul oder Worktree, oder
+  `.git` ist ein Symlink: `k-playbook/ ist kein Clone, nichts gelöscht: <grund>`.
+
+**b) Nennen, was nicht vom Repo kam.** Ein Clone wird ganz gelöscht, auch mit unverfolgten,
+geänderten oder ignorierten Dateien und mit eigenen Commits darin. Vorher erhebst du, was
+davon verloren geht:
+
+```sh
+git -C "<context.project.dir>/k-playbook" status --porcelain --ignored || echo FEHLGESCHLAGEN
+git -C "<context.project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes || echo FEHLGESCHLAGEN
+```
+
+Jede Zeile des ersten Befehls ist eine Datei oder ein Verzeichnis, das nicht vom Repo kam; der
+zweite nennt die Zahl der Commits, die auf keinem Remote liegen. Meldet einer der beiden
+Befehle `FEHLGESCHLAGEN` — er endet mit einem anderen Exit-Status als 0, auch weil `git`
+fehlt —, löschst du nichts, meldest
+`k-playbook/ ließ sich nicht prüfen, nichts gelöscht: <fehler>` — `<fehler>` ist die
+Fehlermeldung, gekürzt auf eine Zeile — und gehst zu d).
+
+Gibt der erste Befehl etwas aus oder ist die Zahl größer als 0, nennst du das, bevor du
+löschst: jede Zeile des ersten Befehls, ohne die Grenze von fünf Pfaden, und die Zahl der
+Commits. Das ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage
+gibt es auch dann nicht.
+
+**c) Löschen.** Frühere Versionen haben dem Clone den Schreibzugriff entzogen; deshalb gibst du
+ihn zuerst frei und löschst dann das Verzeichnis samt Inhalt im Dateisystem:
+
+```sh
+chmod -R u+w -- "<context.project.dir>/k-playbook"
+rm -rf -- "<context.project.dir>/k-playbook"
+```
+
+Liegt das Verzeichnis danach noch, meldest du den Fehlschlag mit der Fehlermeldung; seine
+Zeilen in d) bleiben dann stehen. Committet wird nicht.
+
+**d) Die `.gitignore`-Zeilen streichen.** Durchsucht wird jede Datei `.gitignore` in den
+Verzeichnissen von `context.project.dir` aufwärts bis `context.project.repoRoot`, beide
+eingeschlossen. Liegt `context.project.repoRoot` nicht oberhalb von `context.project.dir` und
+ist es auch nicht dasselbe Verzeichnis, bleibt es bei der `.gitignore` in
+`context.project.dir`. Gemeint sind nur Zeilen, die genau eines der beiden Verzeichnisse
+treffen; verglichen wird die ganze Zeile, Leerraum am Zeilenende zählt nicht mit:
+
+- `k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, `**/k-playbook` und
+  `**/k-playbook/`;
+- dasselbe mit `k-playbook-local`;
+- in einer `.gitignore` oberhalb von `context.project.dir` dazu die Formen mit dem Pfad von
+  ihrem Verzeichnis bis zum Projektverzeichnis, etwa `<projektpfad>/k-playbook/`, mit und ohne
+  `/` vorn, mit und ohne `/` hinten, ebenso mit `k-playbook-local`.
+
+Kommentare und alle anderen Muster bleiben stehen, auch eine Verneinung (`!k-playbook/`), ein
+Muster mit Platzhalter (`k-playbook*`) oder ein Pfad darunter (`k-playbook/dist/`).
+
+Je Zeile gilt, nach dem Stand, den 3.7 und c) hinterlassen haben:
+
+- Ihr Verzeichnis ist `<context.project.dir>/k-playbook` bzw.
+  `<context.project.dir>/k-playbook-local`. Existiert es nicht oder nicht mehr, gleich wer es
+  gelöscht hat, fällt die Zeile. Steht es noch — auch als Symlink oder weil a) bis c) es
+  liegen ließen —, bleibt auch die Zeile, und die Meldung sagt warum.
+- Eine Zeile in einer `.gitignore` oberhalb von `context.project.dir` bleibt auch dann, wenn
+  sie unter `context.project.repoRoot` noch ein anderes vorhandenes Verzeichnis trifft, etwa
+  den Clone eines zweiten Projekts; die Meldung nennt die Zeile und dieses Verzeichnis. Eine
+  Zeile ohne Pfad und ohne `/` vorn trifft jedes Verzeichnis dieses Namens unterhalb ihrer
+  `.gitignore`, eine mit `/` vorn oder mit Pfad nur das eine ab ihrer `.gitignore`. Für die
+  erste Form suchst du, mit `k-playbook` bzw. `k-playbook-local` als Name:
+
+  ```sh
+  find "<verzeichnis der .gitignore>" -name .git -prune -o \( -type d -o -type l \) -name "k-playbook" -print
+  ```
+
+Die fallenden Zeilen streichst du mit dem Edit-Werkzeug, ohne Vorlage und ohne Rückfrage, auch
+in einer versionierten `.gitignore`; sonst änderst du an der Datei nichts, und sie bleibt
+liegen, auch wenn sie danach leer ist. Committet wird nicht. Ob eine geänderte `.gitignore`
+versioniert ist, sagt `git ls-files --error-unmatch <pfad>` in ihrem Verzeichnis.
+
+**Melden.** 3.8 meldet in Schritt 3 für den Clone genau eine dieser Zeilen, wenn
+`<context.project.dir>/k-playbook` lag oder die Vorbedingung fehlt:
+
+- `k-playbook/ gelöscht` — darunter, eingerückt, jede Zeile aus b), die nicht vom Repo kam, und
+  die Zahl der Commits, die auf keinem Remote lagen, wenn sie größer als 0 ist;
+- `k-playbook/ ist ein Symlink, nichts gelöscht`;
+- `k-playbook/ ist kein Clone, nichts gelöscht: <grund>`;
+- `k-playbook/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`;
+- `k-playbook/ löschen wartet auf den Binärwechsel`.
+
+Dazu je `.gitignore`, in der eine der Zeilen steht, eine Zeile mit ihrem Pfad ab
+`context.project.repoRoot`: was gestrichen wurde und was bleibt, mit dem Verzeichnis, das die
+Zeile hält. Wurde eine versionierte `.gitignore` geändert, folgt eine Zeile: Sie steht jetzt
+als geändert in `git status` und gehört in den nächsten Commit des Projekts; andere Checkouts
+lassen `/k-upgrade` laufen, bevor sie mit `git add -A` committen — wer diesen Commit holt und
+noch einen Clone hat, findet `k-playbook/` sonst als unverfolgtes Verzeichnis im Arbeitsbaum.
+
+```text
+Clone k-playbook/ und .gitignore
+  k-playbook/ gelöscht — darin lag, was nicht vom Repo kam:
+    ?? notizen.md
+     M Makefile
+    !! dist/
+    2 Commits auf keinem Remote
+  dienste/erstes/.gitignore: gestrichen /k-playbook/, /k-playbook-local/
+  .gitignore: gestrichen dienste/erstes/k-playbook-local/; bleibt k-playbook/ — trifft noch dienste/zweites/k-playbook
+  dienste/erstes/.gitignore und .gitignore sind versioniert und stehen als geändert in git status; andere Checkouts lassen /k-upgrade laufen, bevor sie mit git add -A committen
+```
+
+Das Beispiel stammt aus einem Projekt in `dienste/erstes/` eines Repos, in dem ein zweites
+Projekt seinen Clone noch hat.
+
+Die Umstellung ist wiederholbar: Eine Zeile, die bleibt, streicht der nächste Lauf, sobald ihr
+Verzeichnis weg ist.
+
 ## Schritt 4 — Schluss
 
 Nenne nur die Umstellungen, die etwas getan haben, bei denen etwas liegen geblieben ist oder die
@@ -1017,4 +1172,11 @@ die Zeile aus Schritt 3: `k-playbook-local/ gelöscht`, `k-playbook-local/ ist n
 dass es sich nicht prüfen ließ und nichts gelöscht wurde, oder dass das Löschen auf den
 Binärwechsel wartet. Die Wartezeile steht auch dann, wenn 3.4
 wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist und `<context.local.dir>/`
-noch liegt.
+noch liegt. Für 3.8 die Zeilen aus Schritt 3: `k-playbook/ gelöscht` mit jeder Zeile dessen,
+was darin nicht vom Repo kam, und der Zahl der Commits ohne Remote, dass es ein Symlink oder
+kein Clone ist und nichts gelöscht wurde, dass es sich nicht prüfen ließ und nichts gelöscht
+wurde, oder `k-playbook/ löschen wartet auf den Binärwechsel`; dazu je `.gitignore` die
+gestrichenen und die gebliebenen Zeilen mit Grund und, wenn eine versionierte `.gitignore`
+geändert wurde, die Zeile zu `git status` und den anderen Checkouts. Auch die Wartezeile von
+3.8 steht, wenn 3.4 wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist und
+der Anlass von 3.8 vorliegt.

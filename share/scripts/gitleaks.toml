@@ -12,9 +12,10 @@
 useDefault = true
 
 [[allowlists]]
-description = "k-playbook: Installationskopie und die Ergebnisse früherer Läufe"
-# Die Installationskopie unter <projekt>/k-playbook/ ist ausgeliefertes Material und
-# kein Code des Projekts. k-playbook-local/results/ trägt die Rohdaten früherer Läufe:
+description = "k-playbook: liegengebliebener Clone und die Ergebnisse früherer Läufe"
+# Altbestand: Ein liegengebliebener Clone des Werkzeugs unter <projekt>/k-playbook/ aus
+# dem früheren Modell (/k-upgrade löscht ihn) ist ausgeliefertes Material und kein Code
+# des Projekts. k-playbook-local/results/ trägt die Rohdaten früherer Läufe:
 # ohne diesen Ausschluss fände der nächste Lauf die Funde des vorigen in dessen
 # eigenem SARIF wieder und meldete sie als neue Treffer.
 #

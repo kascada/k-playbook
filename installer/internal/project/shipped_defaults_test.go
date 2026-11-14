@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -142,10 +143,56 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 			t.Errorf("Blatt nennt `context.%s` nicht", key)
 		}
 	}
-	// Die abgedeckten Felder stehen nicht als context.-Feld im Blatt.
-	for _, covered := range []string{"context.guidelines", "context.catalogs.reviews"} {
+	// Die abgedeckten Felder stehen nicht als context.-Feld im Blatt, und das
+	// entfallene Feld playbook auch nicht (Task 157).
+	for _, covered := range []string{"context.guidelines", "context.catalogs.reviews", "context.playbook"} {
 		if mentions(covered) {
-			t.Errorf("Blatt nennt `%s`, das das Briefing herausnimmt", covered)
+			t.Errorf("Blatt nennt `%s`, das das Briefing nicht trägt", covered)
+		}
+	}
+	// Das Blatt nennt die Fassung, die das Programm ausgibt.
+	if want := "heute `\"" + BriefingSchemaVersion + "\"`"; !strings.Contains(sheet, want) {
+		t.Errorf("Blatt nennt die Fassung %s nicht", want)
+	}
+}
+
+// Kein mitgelieferter Text nennt das Feld playbook der Kontextausgabe mehr
+// als Wurzel, Leseort oder Ausschluss (Task 157): weder context.playbook.dir
+// noch playbook.dir, weder unter defaults/ noch unter share/. Die Wurzeln
+// sind project.dir und local.dir; ein liegengebliebener Clone steht als
+// fester Pfad <context.project.dir>/k-playbook/ da, nicht als Feld. Nur die
+// Liste der Fassungen im Handbuch (mcp.md) nennt context.playbook noch, als
+// das, was Fassung 6 trug.
+func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
+	for _, dir := range []string{"defaults", "share"} {
+		root := filepath.Join("..", "..", "..", dir)
+		files := 0
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !entry.Type().IsRegular() {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			files++
+			for number, line := range strings.Split(string(data), "\n") {
+				for _, gone := range []string{"playbook.dir", "playbookDir"} {
+					if strings.Contains(line, gone) {
+						t.Errorf("%s:%d nennt %s: %s", path, number+1, gone, strings.TrimSpace(line))
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("%s durchsuchen: %v", dir, err)
+		}
+		if files < 20 {
+			t.Fatalf("%s: nur %d Dateien gelesen", dir, files)
 		}
 	}
 }
@@ -493,7 +540,8 @@ func assertSharedDocsKopfUndScope(t *testing.T, shared string) {
 		"gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` und `/k-docs-tools`",
 		"`/k-doc-inventory` und `ks-overlay-repo-analyse` binden dieses Modul auch ein, wenden den Scope aber nicht an",
 		"`SCAN_ROOT = context.project.repoRoot`", "**Stand**", "`EXTRA_PATH`", "**Immer ausgeschlossen**",
-		"`context.playbook.dir`", "`context.local.dir`", "`<context.project.dir>/.k-playbook/`", "**Versteckte Pfade**",
+		"`context.local.dir`", "`<context.project.dir>/.k-playbook/`", "`<context.project.dir>/k-playbook/`",
+		"Altbestand: ein liegengebliebener Clone", "**Versteckte Pfade**",
 		"**Weitere Ausschlüsse**", "`.gitignore`", "`context.docs.exclude`", "`context.docs.problems`", "Aus K-PLAYBOOK.yaml",
 		"`NEW_EXCLUDES`", "**Ausschlüsse speichern.**", "`k_playbook_docs_exclude_add`", "k-playbook docs exclude add",
 		"„Neu laden“", "`rejected`", "`unsupported`",
@@ -501,6 +549,11 @@ func assertSharedDocsKopfUndScope(t *testing.T, shared string) {
 		if !strings.Contains(scopeText, needle) {
 			t.Errorf("Scope nennt %q nicht", needle)
 		}
+	}
+	// Der Ausschluss des alten Clones ist ein fester Pfad, kein Feld mehr
+	// (Task 157).
+	if strings.Contains(scopeText, "context.playbook.dir") {
+		t.Errorf("Scope nennt noch context.playbook.dir")
 	}
 }
 
@@ -928,13 +981,13 @@ func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
 // liegen, dazu Unterverzeichnisse ohne jede Datei; sonst eine Zeile mit
 // höchstens fünf Pfaden. Ein Symlink wird nie gelöscht, und wie 3.4 wartet
 // 3.7 auf den Binärwechsel — auch wenn 3.4 deshalb zu Schritt 4 springt.
-// Schritt 3 nimmt 3.7 von der Bestätigung aus, Einleitung und Hülle nennen es
-// als letzten Schritt.
+// Schritt 3 nimmt 3.7 von der Bestätigung aus, Einleitung und Hülle nennen es;
+// seit Task 156 läuft 3.8 danach, und „zuletzt“ meint dort 3.8.
 func TestDefaultsKUpgradeLocalDirLoeschen(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.7 — "), strings.Index(file, "## Schritt 4 — ")
+	start, end := strings.Index(file, "### 3.7 — "), strings.Index(file, "### 3.8 — ")
 	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.7 nicht vor Schritt 4 gefunden")
+		t.Fatal("Abschnitt 3.7 nicht vor 3.8 gefunden")
 	}
 	if six := strings.Index(file, "### 3.6 — "); six < 0 || six > start {
 		t.Fatal("3.7 steht nicht nach 3.6")
@@ -976,16 +1029,17 @@ func TestDefaultsKUpgradeLocalDirLoeschen(t *testing.T) {
 	}
 	general := squashSpace(file[:strings.Index(file, "### 3.0 — ")])
 	for _, needle := range []string{
-		"Ausgenommen sind drei Fälle, und nur sie",
-		"und `k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist. Alle drei löschen ohne Vorlage",
-		"in 3.4 und 3.7, die nichts vorlegen, steht es in der Meldung",
-		"und zuletzt das Löschen von `k-playbook-local/` selbst",
+		"Ausgenommen sind vier Fälle, und nur sie",
+		"`k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist, und der Clone `k-playbook/`, den 3.8 löscht",
+		"Alle vier löschen und ändern ohne Vorlage",
+		"in 3.4, 3.7 und 3.8, die nichts vorlegen, steht es in der Meldung",
+		"dann das Löschen von `k-playbook-local/` selbst",
 	} {
 		if !strings.Contains(general, needle) {
 			t.Errorf("Einleitung oder Schritt 3 nennt %q nicht", needle)
 		}
 	}
-	if four := squashSpace(file[end:]); !strings.Contains(four, "Für 3.7 die Zeile aus Schritt 3") || !strings.Contains(four, "wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist") {
+	if four := squashSpace(file[strings.Index(file, "## Schritt 4 — "):]); !strings.Contains(four, "Für 3.7 die Zeile aus Schritt 3") || !strings.Contains(four, "wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist") {
 		t.Error("Schritt 4 wiederholt die Zeile von 3.7 nicht samt Sprung aus 3.4")
 	}
 	if four := squashSpace(file[strings.Index(file, "### 3.4 — "):start]); !strings.Contains(four, "nennst du dabei auch die Wartezeile von 3.7") {
@@ -996,11 +1050,121 @@ func TestDefaultsKUpgradeLocalDirLoeschen(t *testing.T) {
 		t.Fatal(err)
 	}
 	description := string(hull)
-	if !strings.Contains(description, "Zuletzt löscht er k-playbook-local/ ohne Rückfrage, wenn darin nur noch .gitignore, README.md und leere Unterverzeichnisse liegen.") {
+	if !strings.Contains(description, "Danach löscht er k-playbook-local/ ohne Rückfrage, wenn darin nur noch .gitignore, README.md und leere Unterverzeichnisse liegen.") {
 		t.Error("die Hülle nennt 3.7 nicht")
 	}
 	if n := strings.Count(strings.ToLower(description), "zuletzt"); n != 1 {
 		t.Errorf("die Hülle nennt %d-mal „zuletzt“, erwartet einmal", n)
+	}
+}
+
+// /k-upgrade 3.8 löscht seit Task 156 einen alten Clone k-playbook/ ganz und
+// ohne Rückfrage — nur ein echtes Verzeichnis mit eigenem .git-Verzeichnis,
+// nach dem Nennen dessen, was nicht vom Repo kam — und streicht danach die
+// Zeilen, die k-playbook/ oder k-playbook-local/ ausnehmen, aus jeder
+// .gitignore vom Projektverzeichnis bis zur Repo-Wurzel, sobald ihr Verzeichnis
+// weg ist. Die Vorbedingung ist enger als in 3.4 und 3.7: Die Zeile zum
+// Programm-Stand muss „neuestes Release“ nennen. 3.8 läuft als letzte;
+// Schritt 3, Schritt 4, Einleitung und Hülle nennen sie.
+func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
+	file := readRepoDefault(t, "commands/k-upgrade.md")
+	start, end := strings.Index(file, "### 3.8 — "), strings.Index(file, "## Schritt 4 — ")
+	if start < 0 || end < start {
+		t.Fatal("Abschnitt 3.8 nicht vor Schritt 4 gefunden")
+	}
+	if seven := strings.Index(file, "### 3.7 — "); seven < 0 || seven > start {
+		t.Fatal("3.8 steht nicht nach 3.7")
+	}
+	section := squashSpace(file[start:end])
+	for _, needle := range []string{
+		"Sie läuft als letzte, nach 3.7, damit zählt, ob `k-playbook-local/` dann noch liegt",
+		"**Anlass:** `<context.project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder eine `.gitignore` von `context.project.dir` bis `context.project.repoRoot` trägt eine der Zeilen",
+		"**Vorbedingung**, enger als in 3.4 und 3.7",
+		"`Programm-Stand: nichts zu tun — …` ausgegeben, und sie nennt `neuestes Release`",
+		"So schreibt sie erst ein Programm ab v0.16.39",
+		"Fehlt die Zeile oder nennt sie stattdessen `Installation`, löschst und änderst du nichts",
+		"`k-playbook/ löschen wartet auf den Binärwechsel`",
+		"braucht den Clone für sein eigenes Upgrade",
+		`test -L "<context.project.dir>/k-playbook" && echo SYMLINK`,
+		`test -d "<context.project.dir>/k-playbook/.git" && ! test -L "<context.project.dir>/k-playbook/.git" && echo CLONE`,
+		"nur ein echtes Verzeichnis, kein Symlink, in dem direkt ein Verzeichnis `.git` liegt",
+		"`.git` ist eine Datei wie in einem Submodul oder Worktree",
+		"`k-playbook/ ist ein Symlink, nichts gelöscht`",
+		"`k-playbook/ ist kein Clone, nichts gelöscht: <grund>`",
+		"auch mit unverfolgten, geänderten oder ignorierten Dateien und mit eigenen Commits darin",
+		`git -C "<context.project.dir>/k-playbook" status --porcelain --ignored`,
+		`git -C "<context.project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes`,
+		"`k-playbook/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`",
+		"ohne die Grenze von fünf Pfaden",
+		"Das ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage gibt es auch dann nicht.",
+		`chmod -R u+w -- "<context.project.dir>/k-playbook"`,
+		`rm -rf -- "<context.project.dir>/k-playbook"`,
+		"von `context.project.dir` aufwärts bis `context.project.repoRoot`, beide eingeschlossen",
+		"`k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, `**/k-playbook` und `**/k-playbook/`",
+		"dasselbe mit `k-playbook-local`",
+		"`<projektpfad>/k-playbook/`, mit und ohne `/` vorn, mit und ohne `/` hinten",
+		"Kommentare und alle anderen Muster bleiben stehen",
+		"Existiert es nicht oder nicht mehr, gleich wer es gelöscht hat, fällt die Zeile.",
+		"bleibt auch die Zeile, und die Meldung sagt warum",
+		"noch ein anderes vorhandenes Verzeichnis trifft, etwa den Clone eines zweiten Projekts",
+		"ohne Vorlage und ohne Rückfrage, auch in einer versionierten `.gitignore`",
+		"Committet wird nicht",
+		"`k-playbook/ gelöscht`",
+		"andere Checkouts lassen `/k-upgrade` laufen, bevor sie mit `git add -A` committen",
+		"findet `k-playbook/` sonst als unverfolgtes Verzeichnis im Arbeitsbaum",
+	} {
+		if !strings.Contains(section, needle) {
+			t.Errorf("3.8 nennt %q nicht", needle)
+		}
+	}
+	// Kein Befehl der Vorlage darf den Pfad ungequotet einsetzen, und keiner
+	// nimmt context.playbook.dir: Das Feld fällt mit Task 157.
+	for _, bare := range []string{"test -L <context.project.dir>", "rm -rf -- <context.project.dir>", "chmod -R u+w -- <context.project.dir>", "git -C <context.project.dir>", "context.playbook.dir"} {
+		if strings.Contains(section, bare) {
+			t.Errorf("3.8 setzt den Pfad ungequotet ein oder nennt das alte Feld: %q", bare)
+		}
+	}
+	general := squashSpace(file[:strings.Index(file, "### 3.0 — ")])
+	for _, needle := range []string{
+		"Ausgenommen sind vier Fälle, und nur sie",
+		"und der Clone `k-playbook/`, den 3.8 löscht, samt der Zeilen, die 3.8 streicht, auch in einer versionierten `.gitignore`",
+		"und zuletzt das Löschen eines alten Clones `k-playbook/` samt der Zeilen, die `k-playbook/` oder `k-playbook-local/` in einer `.gitignore` ausnehmen",
+		"wenn das laufende älter ist als das neueste Release",
+	} {
+		if !strings.Contains(general, needle) {
+			t.Errorf("Einleitung oder Schritt 3 nennt %q nicht", needle)
+		}
+	}
+	if seven := squashSpace(file[strings.Index(file, "### 3.7 — "):start]); strings.Contains(seven, "Sie läuft als letzte") {
+		t.Error("3.7 nennt sich noch die letzte Umstellung")
+	}
+	four := squashSpace(file[end:])
+	for _, needle := range []string{
+		"Für 3.8 die Zeilen aus Schritt 3",
+		"`k-playbook/ löschen wartet auf den Binärwechsel`",
+		"Auch die Wartezeile von 3.8 steht, wenn 3.4 wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist",
+	} {
+		if !strings.Contains(four, needle) {
+			t.Errorf("Schritt 4 nennt %q nicht", needle)
+		}
+	}
+	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	description := string(hull)
+	for _, needle := range []string{
+		"Zieht Kephalaion, Programm und Projekt nach",
+		"wenn es älter ist als das neueste Release",
+		"Zuletzt (3.8) löscht er ohne Rückfrage einen alten Clone k-playbook/ ganz",
+		"streicht aus jeder .gitignore vom Projektverzeichnis bis zur Repo-Wurzel die Zeilen, die k-playbook/ oder k-playbook-local/ ausnehmen, sobald das jeweilige Verzeichnis weg ist",
+	} {
+		if !strings.Contains(description, needle) {
+			t.Errorf("die Hülle nennt %q nicht", needle)
+		}
+	}
+	if strings.Contains(description, "älter ist als die Installation") {
+		t.Error("die Hülle vergleicht das Programm noch mit der Installation")
 	}
 }
 
@@ -1150,11 +1314,15 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 // /k-enforcement ist seit Task 124 Hülle plus Text: Die Hülle nennt nur den
 // Verweis und erlaubt genau die Werkzeuge des Prüfberichts samt Einreihen;
 // der Text ist deutsch, beginnt mit dem Include _shared/erster-schritt.md,
-// prüft den Doku-Nachzug nach 220-regeln-anwenden.md über dieselbe
-// Dateimenge wie k-check --mode changed, führt k-check selbst aus und reiht
-// erst nach Freigabe einen Doku-Auftrag ein. _shared/context.md, die
-// entfallene Regelprüfung, extracted/ und der Skill ks-enforcement kommen
-// nicht mehr vor.
+// prüft den Doku-Nachzug nach 220-regeln-anwenden.md über die geänderten
+// Dateien des Arbeitsbaums und reiht erst nach Freigabe einen Doku-Auftrag
+// ein. _shared/context.md, die entfallene Regelprüfung, extracted/ und der
+// Skill ks-enforcement kommen nicht mehr vor.
+//
+// Seit Task 155 ist /k-enforcement pausiert: k-check gibt es nicht mehr. Hülle
+// und Text tragen oben den Hinweis „Vorübergehend nicht verfügbar“ wie
+// /k-audit, die Beschreibung der Hülle beginnt damit, und keiner nennt
+// k-check noch. Der Text darunter bleibt Vorlage für den Neuaufbau (Todo #52).
 func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 	const ref = "k-playbook:/commands/k-enforcement.md"
@@ -1166,6 +1334,13 @@ func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 	hull := string(hullData)
 	if !strings.Contains(hull, "`"+ref+"`") || strings.Contains(hull, "## Schritt") || strings.Contains(hull, "_shared/context.md") {
 		t.Errorf("Hülle ohne Verweis auf den Text oder noch mit dem alten Ablauf:\n%s", hull)
+	}
+	const pause = "## Vorübergehend nicht verfügbar\n"
+	if !strings.Contains(hull, "\ndescription: Vorübergehend nicht verfügbar (") ||
+		!strings.Contains(hull, "\n"+pause) || strings.Index(hull, pause) > strings.Index(hull, "`"+ref+"`") ||
+		!strings.Contains(squashSpace(hull), "Führe nichts von dem aus, was darunter steht") ||
+		strings.Contains(hull, "k-check") {
+		t.Errorf("Hülle ohne Pause wie /k-audit oder noch mit k-check:\n%s", hull)
 	}
 	allowed := ""
 	for _, line := range strings.Split(hull, "\n") {
@@ -1188,12 +1363,14 @@ func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 	if strings.Index(file, line) > strings.Index(file, "## Schritt 2") {
 		t.Error("das Include steht nicht im ersten Schritt")
 	}
+	if !strings.HasPrefix(file, "# k-enforcement\n\n"+pause) || !strings.Contains(squashSpace(file), "Führe nichts von dem aus, was darunter steht") {
+		t.Errorf("k-enforcement.md ohne Pausenhinweis oben:\n%.400s", file)
+	}
 	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
 	wantText := strings.Replace(file, line, module+"\n", 1)
 	for _, needle := range []string{
 		"`k_playbook_doc_read`", "gegen `HEAD`, samt\nunverfolgten",
 		"git -C \"$ROOT\" diff --name-only HEAD", "git -C \"$ROOT\" ls-files --others --exclude-standard",
-		"bin/k-check\" --mode changed", "--target-root \"<context.project.repoRoot>\"", "--files-from",
 		"k-playbook:/instructions/always/220-regeln-anwenden.md", "interne Umbauten ohne geänderte Semantik",
 		"k-playbook:/instructions/on-demand/doku-auftraege.md", "nach Freigabe", "`k_playbook_doc_create` mit `kind: docs`",
 		"Kephalaion `write`", "`^sitzung: <session>$`", "eingereiht", "nachzuziehen", "Folge-Command: keiner",
@@ -1203,7 +1380,8 @@ func TestDefaultsKEnforcementIstHuelleUndText(t *testing.T) {
 		}
 	}
 	for _, stale := range []string{"_shared/context.md", "documents.rules", "k-playbook:/rules/", "catalogs.checks", "extracted/", "ks-enforcement",
-		"k-playbook context", "Check k-playbook enforcement rules", "nicht ausgeführt"} {
+		"k-playbook context", "Check k-playbook enforcement rules", "nicht ausgeführt",
+		"k-check", "--files-from", "--target-root", "context.playbook.dir", "## Schritt 4"} {
 		if strings.Contains(file, stale) {
 			t.Errorf("k-enforcement.md trägt noch %q", stale)
 		}

@@ -7,14 +7,18 @@ verweist hierher, statt den Ort ein zweites Mal zu begründen.
 
 ## Zwei Grundsätze
 
-**In `k-playbook/` wird nie geschrieben.** Das Verzeichnis ist ein Clone und wird bei
-jedem Update vollständig ersetzt. Was dort abgelegt wird, ist beim nächsten Update
-weg — ohne Fehlermeldung, ohne Spur. Alles, was das Projekt hervorbringt, liegt
-daneben in `k-playbook-local/`.
+**Mitgeliefertes wird nie geändert.** Was k-playbook liefert, liegt nicht im Projekt: Die
+Texte kommen über `k-playbook:`-Verweise, Commands, Skills und Skripte liegen unter
+`~/.local/share/k-playbook/` und gehören dem Programm. Was dort abgelegt oder geändert
+wird, ist nach der nächsten Aktualisierung weg — ohne Fehlermeldung, ohne Spur. Alles, was
+das Projekt hervorbringt, liegt im Projekt selbst, in `k-playbook-local/` oder in seiner
+Collection. Liegt im Projekt noch ein Verzeichnis `k-playbook/`, ist das ein
+liegengebliebener Clone aus dem früheren Modell: Auch dorthin wird nie geschrieben, und
+`/k-upgrade` löscht ihn.
 
 **Pfade werden nicht geraten.** Der Ort wird aus der Ausgabe von `k-playbook context`
-abgeleitet — im Briefing dieselben Felder unter `context` —: `local.dir` für alles
-Projekteigene, `playbook.dir` für die Installation. Jeder Ort unten leitet sich aus
+abgeleitet — im Briefing dieselben Felder unter `context` —: `project.dir` für das
+Hauptverzeichnis, `local.dir` für alles Projekteigene. Jeder Ort unten leitet sich aus
 `local.dir` ab, nie aus einer Konfiguration und nie durch Suchen. Ein fest verdrahteter
 Pfad geht in dem Moment kaputt, in dem ein Projekt anders heißt oder tiefer liegt. Für
 Text, den ein Mensch liest, bleibt die kurze Schreibweise `k-playbook-local/...` richtig;
@@ -56,7 +60,7 @@ Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
 | Projekteigener Skill | `.k-playbook/skills/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |
 | Projekteigene Vorgabe | `keph:/docs/guidelines/<thema>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
 | Projekteigene Anweisung | `keph:/k-playbook/instructions/always/<nummer>-<thema>.md` (gilt in jeder Sitzung) oder `keph:/k-playbook/instructions/on-demand/<thema>.md` (auf Abruf) — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
-| Check-Runner, Skripte, Werkzeugmatrizen | `<playbook.dir>/bin/k-check`, `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
+| Skripte, Werkzeugmatrizen | `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
 
 **Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage, die
 Dokumente unter `todos/` in der Projekt-Collection, gehört dem Werkzeug: gelesen und
@@ -92,8 +96,8 @@ den falschen Nachzug.
 
 - **Ein Plan als Datei.** Eine Umsetzung, die über einen trivialen Einzelschritt
   hinausgeht, wird eine Task — nicht `plan.md`, nicht `konzept.md` neben dem Code.
-- **Ein projekteigener Check in `checks/`.** Das Verzeichnis gibt es nicht mehr (Task 134):
-  `k-check` führt nur die mitgelieferten Checks aus, ein Skript dort läuft nie.
+- **Ein projekteigener Check in `checks/`.** Das Verzeichnis gibt es nicht mehr (Task 134),
+  und Checks gibt es überhaupt nicht mehr (Task 155): Ein Skript dort läuft nie.
   `/k-upgrade` räumt es ab.
 - **Eine zweite Doku-Wurzel.** Projektwissen für AI-Sessions hat genau einen Einstieg:
   `keph:/docs/`, das Briefing nennt ihn unter `Projektdoku`. Eine weitere Sammlung

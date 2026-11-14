@@ -315,16 +315,13 @@ func TestStartLaesstStaleLiegen(t *testing.T) {
 // Spur des Assistenten. Der Umfang des Starts (MCPWriteOutdatedAndUnversioned),
 // den der Projektschritt von `k-playbook upgrade` nimmt, ergänzt ihn.
 func TestRepairMCPReportEngerModusErgaenztKeinenFehlendenEintrag(t *testing.T) {
-	projectDir, _ := newGitInstallation(t)
+	projectDir := t.TempDir()
 	installTestBinary(t)
 	writeVCSConfig(t, projectDir, "none")
 	file := filepath.Join(projectDir, ".mcp.json")
 	writeFile(t, file, fremderEintrag)
 	writeFile(t, filepath.Join(projectDir, ".claude", "settings.json"), "{}\n")
 
-	if _, err := Update(projectDir); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
 	if report := RepairMCPReport(projectDir, MCPWriteOutdatedOnly); len(report.Repaired) != 0 {
 		t.Errorf("Repaired = %v, erwartet nichts", report.Repaired)
 	}
@@ -496,8 +493,9 @@ func TestKnopfSchreibtDurchSymlink(t *testing.T) {
 }
 
 // Der enge Modus ergänzt auch über einen Link keinen fehlenden Eintrag.
-// „Aktualisieren“ in der Oberfläche ruft RepairMCP mit genau diesem Modus
-// (applyUpdateHandler in webui/update.go).
+// Einen Aufrufer im Programm hat er nicht mehr: „Aktualisieren“ in der
+// Oberfläche (POST /api/update) rief RepairMCP mit genau diesem Modus und ist
+// entfernt.
 func TestUpdateLaesstSymlinkEinrichtungUnberuehrt(t *testing.T) {
 	root, shared, link := symlinkRepo(t)
 

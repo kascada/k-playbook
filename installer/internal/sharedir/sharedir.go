@@ -2,10 +2,9 @@
 // ~/.local/share/k-playbook/ (oder wohin EnvDir zeigt).
 //
 // Das Verzeichnis gilt für alle Projekte eines Rechners und wird einmal je
-// Rechner gepflegt, nicht je Projekt. Es ersetzt auf Dauer, was heute im Clone
-// <projekt>/k-playbook/ als Datei auf der Platte liegen muss: die Commands und
-// die Skills der Assistenten. In Stufe 1 (docs/knowledge-aktuell.md, Punkt 20
-// der Arbeitsliste) wird nur entpackt; verlinkt wird noch nichts.
+// Rechner gepflegt, nicht je Projekt. Es ersetzt, was früher im Clone
+// <projekt>/k-playbook/ als Datei auf der Platte liegen musste: die Commands,
+// die Skills der Assistenten und die Skripte.
 package sharedir
 
 import (

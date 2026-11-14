@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/buildinfo"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
+	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -206,11 +208,68 @@ func TestHilfeVerweiseZeigenInDieDoku(t *testing.T) {
 	}
 }
 
-// Jede Seite trägt rechts oben die Version des Binarys, das sie ausliefert.
-// Die Installation daneben kann einen anderen Stand haben; ohne die Marke
-// verriete ein Fenster nach einem Update nicht, welcher Server antwortet.
-// Ein Build ohne Flags zeigt das sichtbar an, statt eine leere Marke zu
-// tragen.
+// Der Kopf nennt keine Installation im Projekt mehr (Task 157): kein Eintrag
+// „Installation:“, auch wenn ein liegengebliebener Clone k-playbook/ daliegt,
+// und GET /api/context trägt weder unter context noch unter display ein Feld
+// playbook.
+func TestKopfUndKontextNennenKeineInstallation(t *testing.T) {
+	root := t.TempDir()
+	if err := project.CreateConfig(root, "."); err != nil {
+		t.Fatalf("Konfiguration anlegen: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	chdir(t, root)
+	// Die Kontextantwort trägt die Anbindung; der Node dieses Rechners wird
+	// dafür nicht gefragt.
+	kephtest.NoBinary(t)
+	t.Cleanup(dropKephalaionCache)
+	dropKephalaionCache()
+
+	for _, path := range []string{"/", "/setup", "/mcp"} {
+		status, body := getPage(t, path)
+		if status != http.StatusOK {
+			t.Fatalf("%s: Status = %d", path, status)
+		}
+		for _, gone := range []string{"Installation:", "Eigener Clone", "Die Installation daneben"} {
+			if strings.Contains(body, gone) {
+				t.Errorf("%s trägt noch %q", path, gone)
+			}
+		}
+		if !strings.Contains(body, "Repository:") {
+			t.Errorf("%s: der Kopf nennt das Repository nicht", path)
+		}
+	}
+
+	recorder := httptest.NewRecorder()
+	routes(&serverState{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/context", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("/api/context: %d %s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Available bool                       `json:"available"`
+		Context   map[string]json.RawMessage `json:"context"`
+		Display   map[string]json.RawMessage `json:"display"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("/api/context: %v", err)
+	}
+	if !response.Available || response.Context["local"] == nil || response.Display["local"] == nil {
+		t.Fatalf("/api/context: %s", recorder.Body.String())
+	}
+	if _, ok := response.Context["playbook"]; ok {
+		t.Errorf("context trägt playbook: %s", recorder.Body.String())
+	}
+	if _, ok := response.Display["playbook"]; ok {
+		t.Errorf("display trägt playbook: %s", recorder.Body.String())
+	}
+}
+
+// Jede Seite trägt rechts oben die Version des Binarys, das sie ausliefert:
+// Ohne die Marke verriete ein Fenster nach einer Aktualisierung des Programms
+// nicht, welcher Server antwortet. Ein Build ohne Flags zeigt das sichtbar
+// an, statt eine leere Marke zu tragen.
 func TestSeitenTragenDieVersion(t *testing.T) {
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {

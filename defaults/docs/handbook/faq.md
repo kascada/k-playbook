@@ -14,29 +14,23 @@ If you only want to know whether everything is correct, open the interface and l
 
 Preferably from the project you mean. Starting at the working directory, the tool searches upwards for `.k-playbook/K-PLAYBOOK.yaml` and uses the directory of the first match as the project root.
 
-If it finds nothing, for example immediately after cloning, it does not guess. Instead, it proposes a location and lets you confirm it. The strongest indication is the Git repository in which the command is called: whoever starts the tool is usually in the project they mean.
+If it finds nothing, for example in a project that is not set up yet, it does not guess. Instead, it proposes a location and lets you confirm it. The strongest indication is the Git repository in which the command is called: whoever starts the tool is usually in the project they mean.
 
 ## I have several projects. Must I install k-playbook several times?
 
-Yes, and that is intentional. Every project gets its own clone under `<project>/k-playbook/`.
+No. The installation is the binary alone, once per machine: once on the host and once in every DevContainer. The same `k-playbook` serves every project; which one it means follows from the directory in which it is called. A project needs only its anchor, `.k-playbook/K-PLAYBOOK.yaml`.
 
-The advantage is that projects can use different versions. A project that is not currently being touched remains at its version, and an update in another project does not change that. There is no central installation that affects all of them at once and no host path that must work on every machine.
+All projects of a machine therefore run with the same program version, and the shipped texts come from the Kephalaion hub of the project, in the release that hub carries. In the former model every project carried its own clone and could stay at an older version; that no longer exists.
 
-## Must the directory be named `k-playbook`?
+## Is there still a `k-playbook/` directory in the project?
 
-Yes. Commands and skills refer to it by that name. The name of the project directory above it does not matter.
+No. In the former model the installation was a clone of the k-playbook repository under `<project>/k-playbook/`. Today nothing of the tool lies in the project: commands, skills and scripts are unpacked by the binary into `~/.local/share/k-playbook/`, and the shipped texts come from the hub.
 
-```bash
-git clone https://github.com/kascada/k-playbook.git
-```
+A clone that is still there is not read any more. `/k-upgrade` deletes it as its last conversion (3.8) and then removes the line that kept it out of Git from `.gitignore`; see [`installation.md`](./installation.md#update).
 
-Without a destination argument, the name is derived from the repository name and is therefore correct automatically. You need your own argument only for a fork or mirror cloned under a different name; then it must be `k-playbook`.
+## Where is `K-PLAYBOOK.yaml`?
 
-## Why is `K-PLAYBOOK.yaml` not in `k-playbook/`?
-
-Because `k-playbook/` is completely replaced with every update. Everything owned by the project must sit beside it, otherwise it would be gone after the next `git pull`.
-
-Therefore, `.k-playbook/K-PLAYBOOK.yaml` is in the project root. `k-playbook-local/` beside it
+In the project root, under `.k-playbook/`: `.k-playbook/K-PLAYBOOK.yaml`. It belongs to the project, is committed with it and is never overwritten by an update. `k-playbook-local/` beside it
 held project-owned files; it is being phased out and no longer created, and `/k-upgrade`
 deletes it once nothing is left in it but a `.gitignore`, a `README.md` and empty
 subdirectories (3.7, task 150):
@@ -45,7 +39,6 @@ subdirectories (3.7, task 150):
 project/
 ├── .k-playbook/
 │   └── K-PLAYBOOK.yaml    the anchor
-├── k-playbook/            replaceable
 └── k-playbook-local/      being phased out; deleted by /k-upgrade once empty
 ```
 
@@ -53,7 +46,7 @@ Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The
 
 ## Where are the paths for tasks, reviews, and results?
 
-Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/` and shipped checks under `k-playbook/checks/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it. 3.7 finally deletes `k-playbook-local/` itself once it is empty.
+Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it. 3.7 finally deletes `k-playbook-local/` itself once it is empty.
 
 Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
@@ -68,7 +61,7 @@ keph:/k-playbook/reviews/review-code.md             applies on its own
 
 The local file **completely** replaces the shipped one. It must therefore contain the whole recipe; individual sections are not retained from the original. The cost is that later improvements to the original no longer reach this copy.
 
-Shipped checks cannot be changed this way: there are no project-owned checks since task 134. `k-check` runs only the shipped checks from `k-playbook/checks/`, and a leftover `k-playbook-local/checks/` is not read; `/k-upgrade` removes it.
+There are no checks any more (task 155): k-playbook ships none, and there are no project-owned ones either. A leftover `k-playbook-local/checks/` is not read; `/k-upgrade` removes it.
 
 ## How do I disable a shipped review recipe?
 
@@ -82,8 +75,6 @@ With an **empty** file of the same name. Because the local file completely repla
 ```
 
 The entry remains visible in the catalog and its content states that it is disabled.
-
-A shipped check cannot be disabled for a single project: checks have no project-owned side. A check that does not apply skips on its own.
 
 There is no list for this in the configuration.
 
@@ -101,7 +92,7 @@ The interface presents the same information in readable form in the `Resolved co
 
 In the briefing. `AGENTS.md` in the project root contains only a brief prompt that names `k-playbook briefing`, the one call at the start of a session. The briefing carries the instructions that always apply as one text: the shipped parts, updated with every release, and after them the project-owned parts from the project collection under `keph:/k-playbook/instructions/always/`. Instructions for a particular job are read on demand through a reference (`k-playbook:/instructions/on-demand/<topic>.md`); their project-owned side lies under `keph:/k-playbook/instructions/on-demand/`.
 
-Content that applies only to one project — structure and special characteristics, conventions, recurring flows — belongs there or into the project documentation under `keph:/docs/`. The former instruction file `k-playbook.md`, once shipped and once project-owned, is gone: nothing reads it any more, and the context output has no field `instructions` (task 148).
+Content that applies only to one project — structure and special characteristics, conventions, recurring flows — belongs there or into the project documentation under `keph:/docs/`.
 
 ## Can I add my own slash commands?
 
@@ -157,9 +148,9 @@ There is no longer a dedicated `/k-install-security-tools` command. It would onl
 
 ## Do I need Go?
 
-No. The `k-playbook/bin/install` bootstrap is a pure shell script. It determines the newest published release (the redirect of `releases/latest` on GitHub, over HTTPS; `curl` or `wget` suffice, `git` is not needed), selects the release asset of its tag for the platform, macOS or Linux, verifies it against the `SHA256SUMS` committed at the tag, and installs it as an actual file under `~/.local/bin/k-playbook`. It does not read `VERSION` or `SHA256SUMS` of a clone and also runs without one: `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`. It runs once per host or DevContainer and requires network access; every invocation then runs through the installed `k-playbook`.
+No. The bootstrap `bin/install` is a pure shell script, called with `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`. It determines the newest published release (the redirect of `releases/latest` on GitHub, over HTTPS; `curl` or `wget` suffice, `git` is not needed), selects the release asset of its tag for the platform, macOS or Linux, verifies it against the `SHA256SUMS` committed at the tag, and installs it as an actual file under `~/.local/bin/k-playbook`. It runs once per host or DevContainer and requires network access; every invocation then runs through the installed `k-playbook`.
 
-After that the program keeps itself current from the release: it compares its own version with the newest release tag, the health check warns when it is older, and `k-playbook upgrade` or the update button of the interface install the release binary of that tag, verified against its `SHA256SUMS`. `k-playbook version --all` shows both versions. Neither needs the clone or Go.
+After that the program keeps itself current from the release: it compares its own version with the newest release tag, the health check warns when it is older, and `k-playbook upgrade` or the update button of the interface install the release binary of that tag, verified against its `SHA256SUMS`. `k-playbook version --all` shows both versions. Neither needs Go.
 
 You need Go only if you work on the tool itself:
 

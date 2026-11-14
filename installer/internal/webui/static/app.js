@@ -277,8 +277,8 @@ function renderOutdatedConfig(data) {
 
   const legacy = data.legacyContent || [];
   if (legacy.length > 0) {
-    // Der Umzug geht vor: das Installationsverzeichnis wird beim nächsten
-    // Update ersetzt, und was dort liegt, wäre danach weg.
+    // Der Umzug geht vor: k-playbook/ ist der Ort des früheren Clones, den
+    // /k-upgrade löscht, und was dort liegt, wäre danach weg.
     addFact(elements.configFacts, "Zuerst umziehen nach k-playbook-local/", legacy.join(", "));
     setBlockState(elements.configPill, elements.configCreate, "blocked", RESET_LABELS);
     elements.configPill.textContent = "Veraltet";
@@ -466,7 +466,8 @@ function renderMCP(data) {
   elements.mcpWorkdir.classList.toggle("warn", Boolean(data.workdirMismatch));
 
   // Ohne Projektkonfiguration gibt es nichts einzurichten, der Button bleibt
-  // grau. Den Clone k-playbook/ braucht der Server nicht (Task 154).
+  // grau. Den früheren Clone k-playbook/ braucht der Server seit Task 154
+  // nicht mehr.
   const environment = data.environment || {};
   const usable = Boolean(environment.installed);
   const state = !usable ? "blocked" : data.ok ? "ok" : "todo";
@@ -1026,7 +1027,6 @@ const ORIGIN_LABELS = {
 // und trägt die Sorten alphabetisch; hier steht die fachliche Reihenfolge.
 const CATALOG_LABELS = {
   reviews: "Reviews",
-  checks: "Checks",
 };
 
 function renderContext(data) {
@@ -1047,7 +1047,6 @@ function renderContext(data) {
   addFact(elements.contextFacts, "Repository", display.repoRoot || context.project.repoRoot);
   addFact(elements.contextFacts, "VCS", context.project.vcs || "keines");
   addFact(elements.contextFacts, "Konfiguration", display.config || context.project.config);
-  addFact(elements.contextFacts, "Installation", display.playbook || context.playbook.dir);
   addFact(elements.contextFacts, "Projekteigen", display.local || context.local.dir);
   addFact(elements.contextFacts, "Umgang mit Befunden", context.remediation.mode || "unbekannt");
 

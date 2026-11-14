@@ -120,8 +120,7 @@ func newProject(t *testing.T) string {
 
 	root := t.TempDir()
 	for _, dir := range []string{
-		filepath.Join(root, "k-playbook", "defaults", "reviews"),
-		filepath.Join(root, "k-playbook", "checks"),
+		filepath.Join(root, defaultstest.DefaultsDir, "reviews"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", "guidelines"),
 	} {
@@ -518,7 +517,7 @@ func TestScanUndMergeSindGesperrt(t *testing.T) {
 func TestReviewStatusMeldetAuditModulUndFiltertAuditRezepte(t *testing.T) {
 	root := newMCPReviewProject(t)
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "commands", "_audit", "review-scan-triage.md"), "# Triage\n\nAktiv.\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-review-only.md"), "---\ntitle: Review Only\naudit:\n  enabled: false\nreview:\n  enabled: true\n---\n# Review Only\n")
+	mustWriteMCPFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-review-only.md"), "---\ntitle: Review Only\naudit:\n  enabled: false\nreview:\n  enabled: true\n---\n# Review Only\n")
 
 	stdout := speak(t, root, 2,
 		initialize(1),
@@ -850,8 +849,7 @@ func newMCPReviewProject(t *testing.T) string {
 	root := t.TempDir()
 	for _, dir := range []string{
 		filepath.Join(sharetest.Dir(t), "scripts"),
-		filepath.Join(root, "k-playbook", "defaults", "reviews"),
-		filepath.Join(root, "k-playbook", "checks"),
+		filepath.Join(root, defaultstest.DefaultsDir, "reviews"),
 		filepath.Join(root, "k-playbook-local", "reviews"),
 		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
 	} {
@@ -860,7 +858,7 @@ func newMCPReviewProject(t *testing.T) string {
 		}
 	}
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
-	mustWriteMCPFile(t, filepath.Join(root, "k-playbook", "defaults", "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
+	mustWriteMCPFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
@@ -885,7 +883,7 @@ func mustCreateMCPRun(t *testing.T, root string) string {
 	required := true
 	runDir, err := review.CreateRun(project.LocalDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, []review.Entry{
 		{Name: "mockscan", Kind: review.KindTool},
-		{Name: "tech", Kind: review.KindAI, RecipeKey: "tech", RecipePath: filepath.Join(root, "k-playbook", "defaults", "reviews", "review-tech.md"), RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-tech.md", Scope: &review.Scope{Tools: []string{"mockscan"}}},
+		{Name: "tech", Kind: review.KindAI, RecipeKey: "tech", RecipePath: filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-tech.md", Scope: &review.Scope{Tools: []string{"mockscan"}}},
 	})
 	if err != nil {
 		t.Fatalf("Lauf anlegen: %v", err)

@@ -108,7 +108,8 @@ Ohne Angabe läuft die Erhebung mit den Standardquellen; das ist eine gültige
 Antwort und kein Mangel.
 ```
 
-Die Installation `k-playbook/` ist immer ausgenommen und gehört nicht in Frage 4 — das
+Ein Verzeichnis `k-playbook/` im Projekt — Altbestand: ein liegengebliebener Clone von
+k-playbook aus dem früheren Modell — ist immer ausgenommen und gehört nicht in Frage 4; das
 regelt der Vertrag, nicht die Konfiguration.
 
 Nennt der Nutzer auf Frage 5 Werte, ordne jedem `path`, `key` und `item` zu, wie sie der

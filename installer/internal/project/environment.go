@@ -16,16 +16,12 @@ type Environment struct {
 	// ProjectDir ist das Hauptverzeichnis mit der Config. Leer, wenn nichts
 	// gefunden wurde.
 	ProjectDir string `json:"projectDir"`
-	// PlaybookDir ist die Installation darin. Leer, wenn nichts gefunden wurde.
-	PlaybookDir string `json:"playbookDir"`
-	// PlaybookPresent meldet, ob die Installation tatsächlich vorliegt. Nach
-	// einem frischen Clone des Projekts fehlt sie, die Config ist aber da.
-	PlaybookPresent bool `json:"playbookPresent"`
 	// SearchedFrom ist das Verzeichnis, ab dem gesucht wurde.
 	SearchedFrom string `json:"searchedFrom"`
 }
 
-// Detect sucht die Installation ab dem Arbeitsverzeichnis aufwärts.
+// Detect sucht das Projekt — die K-PLAYBOOK.yaml — ab dem Arbeitsverzeichnis
+// aufwärts.
 func Detect() Environment {
 	start, err := os.Getwd()
 	if err != nil {
@@ -45,8 +41,6 @@ func DetectFrom(startDir string) Environment {
 
 	environment.Installed = true
 	environment.ProjectDir = projectDir
-	environment.PlaybookDir = PlaybookDir(projectDir)
-	environment.PlaybookPresent = isDir(environment.PlaybookDir)
 	return environment
 }
 

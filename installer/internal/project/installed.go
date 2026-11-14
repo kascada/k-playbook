@@ -27,28 +27,6 @@ const UpgradeCommand = InstalledCommandName + " upgrade"
 // zeigt.
 const FirstInstallCommand = release.FirstInstallCommand
 
-// BootstrapCommand ist der Aufruf von bin/install aus dem Clone eines
-// Zielprojekts; BootstrapCommandNoMake derselbe Weg ohne make. Aus dem Clone
-// aufgerufen verhält sich bin/install wie über FirstInstallCommand: Es liest
-// weder VERSION noch SHA256SUMS neben sich und installiert den neuesten
-// Release-Tag.
-//
-// Beide stehen hier und nicht als Literal in den Meldungen, damit Oberfläche
-// und Dokumentation nicht auseinanderlaufen. Wichtig ist die Form: ein
-// Zielprojekt hat **kein eigenes** install-Target — sein Makefile ist das des
-// Clones, und der Aufruf geht deshalb immer über den Clone. Ein bloßes
-// `make install` liefe dort ins Leere. Gebraucht werden sie noch in der
-// Meldung zum fehlenden Clone; das Programm selbst ruft bin/install nicht
-// mehr auf.
-const (
-	BootstrapCommand       = "make -C " + PlaybookDirName + " install"
-	BootstrapCommandNoMake = PlaybookDirName + "/bin/install"
-)
-
-// BootstrapHint nennt beide Formen in einem Satzteil — die Fassung, die in
-// Meldungen eingesetzt wird.
-const BootstrapHint = BootstrapCommand + " (ohne make: " + BootstrapCommandNoMake + ")"
-
 // installedBinDirName und installedBinSubDir bilden das Verzeichnis, in das
 // installiert wird: ~/.local/bin. Die Aufteilung steht hier und nicht als
 // zusammengesetzter Pfad, damit filepath.Join den Trenner der Plattform setzt.

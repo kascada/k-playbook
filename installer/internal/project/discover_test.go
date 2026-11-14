@@ -1,18 +1,21 @@
 package project
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// newInstallation legt ein Projekt mit Anker und Installation an.
+// newInstallation legt ein Projekt mit Anker und dem Verzeichnis k-playbook/
+// eines liegengebliebenen Clones an (Altbestand).
 func newInstallation(t *testing.T, projectDir string) {
 	t.Helper()
 
 	if err := os.MkdirAll(PlaybookDir(projectDir), 0o755); err != nil {
-		t.Fatalf("Installation anlegen: %v", err)
+		t.Fatalf("k-playbook/ anlegen: %v", err)
 	}
 	writeFile(t, ConfigPath(projectDir), "schema_version: 2\n")
 }
@@ -59,20 +62,22 @@ func TestDiscoverFindetAnkerAusTieferUnterebene(t *testing.T) {
 	}
 }
 
-// Die Installation ist ein eigener Clone und damit ein eigener Git-Worktree.
-// Ein Abbruch am Worktree-Root würde den Anker eine Ebene darüber verdecken.
+// Ein Verzeichnis unterhalb des Hauptverzeichnisses kann ein eigener
+// Git-Worktree sein — das Repository des Projekts (project.repo_root) oder ein
+// liegengebliebener Clone k-playbook/. Ein Abbruch am Worktree-Root würde den
+// Anker eine Ebene darüber verdecken.
 func TestDiscoverLaeuftUeberGitWorktreeHinaus(t *testing.T) {
 	root := t.TempDir()
 	newInstallation(t, root)
 
 	playbook := PlaybookDir(root)
 	if err := os.MkdirAll(filepath.Join(playbook, ".git"), 0o755); err != nil {
-		t.Fatalf(".git in der Installation anlegen: %v", err)
+		t.Fatalf(".git in k-playbook/ anlegen: %v", err)
 	}
 
 	found, err := Discover(playbook)
 	if err != nil {
-		t.Fatalf("Discover aus der Installation heraus: %v", err)
+		t.Fatalf("Discover aus k-playbook/ heraus: %v", err)
 	}
 	if want := resolved(t, root); found != want {
 		t.Errorf("Discover = %q, erwartet %q", found, want)
@@ -88,7 +93,7 @@ func TestDiscoverMeldetKeinenFund(t *testing.T) {
 	}
 }
 
-func TestDetectFromLiefertBeideVerzeichnisse(t *testing.T) {
+func TestDetectFromLiefertProjektverzeichnis(t *testing.T) {
 	root := t.TempDir()
 	newInstallation(t, root)
 
@@ -99,17 +104,12 @@ func TestDetectFromLiefertBeideVerzeichnisse(t *testing.T) {
 	if want := resolved(t, root); environment.ProjectDir != want {
 		t.Errorf("ProjectDir = %q, erwartet %q", environment.ProjectDir, want)
 	}
-	if want := PlaybookDir(resolved(t, root)); environment.PlaybookDir != want {
-		t.Errorf("PlaybookDir = %q, erwartet %q", environment.PlaybookDir, want)
-	}
-	if !environment.PlaybookPresent {
-		t.Error("PlaybookPresent = false, erwartet true")
-	}
 }
 
-// Nach einem frischen Clone des Projekts ist die Config da, die Installation
-// aber noch nicht.
-func TestDetectFromMeldetFehlendeInstallation(t *testing.T) {
+// Ein Projekt braucht kein Verzeichnis k-playbook/: Die Config allein macht es
+// zum Projekt. Die Umgebung meldet weder, ob das Verzeichnis liegt, noch
+// seinen Pfad (Task 157) — auch dann nicht, wenn ein alter Clone daliegt.
+func TestDetectFromOhnePlaybookVerzeichnis(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, ConfigPath(root), "schema_version: 2\n")
 
@@ -117,9 +117,22 @@ func TestDetectFromMeldetFehlendeInstallation(t *testing.T) {
 	if !environment.Installed {
 		t.Fatal("Installed = false, erwartet true")
 	}
-	if environment.PlaybookPresent {
-		t.Error("PlaybookPresent = true, erwartet false")
+	assertNoPlaybookField := func(environment Environment) {
+		t.Helper()
+		encoded, err := json.Marshal(environment)
+		if err != nil {
+			t.Fatalf("Environment kodieren: %v", err)
+		}
+		for _, gone := range []string{"playbookPresent", "playbookDir", PlaybookDir(resolved(t, root))} {
+			if strings.Contains(string(encoded), gone) {
+				t.Errorf("Environment trägt noch %s: %s", gone, encoded)
+			}
+		}
 	}
+	assertNoPlaybookField(environment)
+
+	newInstallation(t, root)
+	assertNoPlaybookField(DetectFrom(root))
 }
 
 func TestDetectFromOhneInstallation(t *testing.T) {
@@ -145,8 +158,9 @@ func TestDiscoverIgnoriertGleichnamigesVerzeichnis(t *testing.T) {
 	}
 }
 
-// Jede Installation trägt .k-playbook/ aus dem Quell-Repo. Das Verzeichnis
-// allein ist kein Anker, sonst endete die Suche in der Installation.
+// Ein liegengebliebener Clone k-playbook/ kann .k-playbook/ aus einem älteren
+// Stand des Quell-Repos tragen. Das Verzeichnis allein ist kein Anker, sonst
+// endete die Suche im Clone.
 func TestDiscoverUebergehtKPlaybookVerzeichnisOhneKonfiguration(t *testing.T) {
 	root := t.TempDir()
 	newInstallation(t, root)
@@ -156,7 +170,7 @@ func TestDiscoverUebergehtKPlaybookVerzeichnisOhneKonfiguration(t *testing.T) {
 
 	found, err := Discover(playbook)
 	if err != nil {
-		t.Fatalf("Discover aus der Installation heraus: %v", err)
+		t.Fatalf("Discover aus k-playbook/ heraus: %v", err)
 	}
 	if want := resolved(t, root); found != want {
 		t.Errorf("Discover = %q, erwartet %q", found, want)

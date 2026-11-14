@@ -6,9 +6,9 @@ k-playbook. It is also the **anchor**: the directory that holds
 
 ## Fundamental decision
 
-Every project carries its own installation. There is no central base
-installation and no fixed host path. The installation sits beside the
-configuration:
+The installation is the binary alone, one per machine. Nothing of the tool lies
+in the project, and no configuration names a path to it. A project carries its
+configuration and what it owns itself:
 
 ```text
 <project>/                 arbitrary name
@@ -16,17 +16,16 @@ configuration:
 │   ├── K-PLAYBOOK.yaml    the anchor
 │   ├── commands/          project-owned commands, committed (only when used)
 │   └── skills/            project-owned skills, committed (only when used)
-├── k-playbook/            the installation, fully replaceable
 └── k-playbook-local/      being phased out: never created any more, only read
 ```
 
-Because configuration is **beside**, rather than **in**, the installation,
-`k-playbook/` contains nothing project-owned. The directory can therefore be
-updated completely, both with `git pull` and with `rm -rf` followed by a fresh
-clone.
+Because nothing shipped lies in the project, an update of the program cannot
+touch anything the project owns. In the former model the installation was a
+clone of the k-playbook repository under `<project>/k-playbook/`, beside the
+configuration. The program no longer reads such a directory, and `/k-upgrade`
+deletes one that is left (conversion 3.8).
 
-The playbook directory is always named `k-playbook`. The name of the project
-directory above it is irrelevant.
+The name of the project directory is irrelevant.
 
 ## No paths in configuration
 
@@ -39,10 +38,8 @@ locations derive from the project root, the directory that holds
 | shipped commands | `~/.local/share/k-playbook/commands/`, linked through `.k-playbook/share` |
 | shipped skills | `~/.local/share/k-playbook/skills/`, linked through `.k-playbook/share` |
 | shipped review recipes | `<hub>:k-playbook/defaults/reviews/` (Kephalaion, since task 131) |
-| shipped checks | `k-playbook/checks/` |
 | shipped guidelines | `<hub>:k-playbook/defaults/guidelines/` (Kephalaion, since task 131) |
 | shipped instructions, assembled and on demand | `<hub>:k-playbook/defaults/instructions/always/`, `<hub>:k-playbook/defaults/instructions/on-demand/` (Kephalaion, since task 131) |
-| check runner | `k-playbook/bin/k-check` |
 | scripts | `~/.local/share/k-playbook/scripts/` |
 | security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
 | base tool matrix | `~/.local/share/k-playbook/scripts/base-tools.tsv` |
@@ -50,7 +47,7 @@ locations derive from the project root, the directory that holds
 | project-owned commands | `.k-playbook/commands/` — setup does not create it; it appears when the project puts a command there |
 | project-owned skills | `.k-playbook/skills/` — setup does not create it; it appears when the project puts a skill there |
 | project-owned review recipes | `keph:/k-playbook/reviews/` — in the project collection since task 143. Setup no longer creates `k-playbook-local/reviews/`; nothing reads it, `/k-upgrade` 3.4 removes it once it is empty and otherwise names every file with its target |
-| project-owned checks | none since task 134: `k-check` runs only the shipped checks from `k-playbook/checks/`; `/k-upgrade` 3.4 removes a leftover `k-playbook-local/checks/` |
+| checks | none since task 155, neither shipped nor project-owned; `/k-upgrade` 3.4 removes a leftover `k-playbook-local/checks/` |
 | review results | none at present: review runs are paused until their results get a new place (task 147). `k-playbook-local/results/` is not created any more, and `/k-upgrade` 3.4 deletes a leftover one |
 | results kept to present | `keph:/results/` — in the project collection, project-wide, `.md` only, names start with the date (`<YYYY-MM-DD>-<name>.md`); written only when the user asks or a command provides for it, never as a duty, and cleaned up by the user. The rules are `k-playbook:/instructions/on-demand/ergebnisse.md`. Not the same as `k-playbook-local/results/`, which `/k-review` and `/k-audit` still use |
 | project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. Setup no longer creates `k-playbook-local/docs/`; `/k-docs-code` writes to `keph:/docs/generated/code/` and `/k-docs-tools` to `keph:/docs/generated/libs/`, both through `k-playbook docs checkout|publish` |
@@ -146,7 +143,7 @@ switch for `priv/` any more. The program leaves what lies there untouched;
 `/k-upgrade` 3.4 deletes `priv/`, `material/` and the other former directories once
 they hold only their README and the managed `.gitignore`, and a leftover `results/`
 even with content. Where more lies in them, the managed `.gitignore` keeps working,
-and whether that content is versioned is decided by hand. As its last conversion,
+and whether that content is versioned is decided by hand. As one of its last conversions,
 `/k-upgrade` 3.7 deletes `k-playbook-local/` itself without asking once only a
 `.gitignore`, a `README.md` and empty subdirectories remain (task 150); otherwise it
 names what is left in one line.
@@ -158,19 +155,19 @@ The procedure applies equally to the tool and to an assistant:
 
 1. If a directory was passed, it applies; check `<arg>/.k-playbook/K-PLAYBOOK.yaml`.
 2. Otherwise search upwards from `realpath(CWD)`, one candidate per level: `<dir>/.k-playbook/K-PLAYBOOK.yaml`.
-3. On finding it: `PROJECT_DIR = <dir>`, `PLAYBOOK_DIR = <dir>/k-playbook`.
+3. On finding it: `PROJECT_DIR = <dir>`.
 4. `$HOME` and `/`, inclusive, are the boundary of the upward search.
-5. If nothing is found, report that no installation exists. Do not guess or create anything.
+5. If nothing is found, report that no project is set up there. Do not guess or create anything.
 
 The anchor is the **file** `.k-playbook/K-PLAYBOOK.yaml`, not the directory
 `.k-playbook/`. The link maintenance creates the directory even without a
 configuration (for the `share` link), so a `.k-playbook/` can exist where no
 project is. The k-playbook repository itself no longer versions anything under
 `.k-playbook/` — in its own checkout that directory belongs to a separate private
-development repository —, so after the release following v0.16.30 an installation
-`k-playbook/` carries a `.k-playbook/` only when the link maintenance creates it
-there. The conclusion stands: a search for the bare directory could find a project
-inside the installation.
+development repository. A clone `<project>/k-playbook/` left over from the former
+model can still carry a `.k-playbook/`, from an older state of the repository or
+from the link maintenance. The conclusion stands: a search for the bare directory
+could find a project where there is none.
 
 **Moving from the former place.** Until 2026-11 the anchor was `<project>/K-PLAYBOOK.yaml`,
 directly in the project root. The tool moves it before it checks a level: if
@@ -183,10 +180,10 @@ needs the new program. The environment check (`k-playbook health`, area `anchor`
 warns when the moved anchor is neither tracked nor ignored, or when the former
 place is still in the index.
 
-The upward search must **not** stop at the Git worktree root.
-`<project>/k-playbook/` is its own clone and therefore its own worktree; a
-search beginning there would otherwise never reach the configuration one level
-above.
+The upward search must **not** stop at the Git worktree root. The project
+repository can lie below the project root (`project.repo_root`) and is then its
+own worktree; a search beginning there would otherwise never reach the
+configuration one level above.
 
 ## Merge shipped and project-owned content
 
@@ -227,12 +224,10 @@ of the context output; the plain-text briefing shows it next to the origin
 The kind for rules is gone since task 135: nothing is shipped, read or listed for it, and
 `/k-upgrade` 3.4 removes a leftover local directory once it is empty.
 
-Checks have no project-owned side since task 134. The catalog `checks` lists the shipped
-checks from `k-playbook/checks/` (`*.sh`, top level only) and nothing else: `origin` is
-always `dist`, nothing is overlaid and nothing disabled, and a leftover
+Checks no longer exist since task 155: k-playbook ships none, there is no catalog `checks`
+and no runner `k-check`. Project-owned checks were gone before (task 134). A leftover
 `k-playbook-local/checks/` is not read; `/k-upgrade` 3.4 removes it once it is empty and
-otherwise notes that what lies there no longer runs. A new form for project-owned checks
-is still open.
+otherwise notes that what lies there no longer runs.
 
 `k-playbook-local/tmp/` was never created by the setup: sessions laid it out by hand as a
 scratch pad in the days of the knowledge store, with the managed `.gitignore` and a README
@@ -268,15 +263,13 @@ which lets the file record its own reason:
 ```
 
 A disabled review stays visible in the catalog, and its content says it is disabled.
-Checks cannot be disabled since they have no project-owned side.
 
 Disable a project-owned file by deleting it.
 
-`README.md` in one of these directories is never an entry, nor are dotfiles or
-anything under `checks/lib/`.
+`README.md` in one of these directories is never an entry, nor are dotfiles.
 
-The same applies to `scripts/lib/`: it contains shared code next to executable
-scripts, not a separate entry. Today it contains `install-common.sh`, which
+`scripts/lib/` is not an entry either: it contains shared code next to executable
+scripts. Today it contains `install-common.sh`, which
 `install-security-tools.sh` and `install-base-tools.sh` both source. Both use
 the same release path and apply the same guard to the installation destination.
 A second copy would undermine the promise that the security matrix asset
@@ -328,8 +321,10 @@ Project-owned guidelines live in `keph:/docs/guidelines/`; how a session is poin
 them is todo #40. From task 086 (2026-10-16) until task 148 the kind was a pair, merged
 by the same rule as `reviews/`.
 
-Nothing below `k-playbook/` may be written, including by commands that read
-recipes or checks there. An update replaces the directory completely.
+Nothing shipped may be changed. `~/.local/share/k-playbook/` belongs to the
+program and is replaced when the program is updated; the shipped texts on the
+hub are replaced by the next release. A clone `k-playbook/` left over from the
+former model is not written to either; `/k-upgrade` deletes it.
 
 ## The resolved working state
 
@@ -345,23 +340,22 @@ configuration and the filesystem:
 | `schemaVersion` | the validated configuration version |
 | `now` | invocation time: `date` as `YYYY-MM-DD`, `timestamp` as RFC 3339 |
 | `project` | project root, `repoRoot`, `vcs`, configuration location |
-| `playbook`, `local` | the two resolved directories |
+| `local` | the resolved directory of the project-owned content |
 | `remediation` | the policy, including a default when the block is missing |
 | `docs` | the `docs:` block: `exclude` is the list of valid patterns from `docs.exclude` (empty without the block), `problems` the rejected entries, each with `pattern` and `reason` |
 | `gh` | the GitHub CLI host finding for this machine |
 | `git` | the `git:` block: `switch` (`unknown`, `offer`, `off`), `allow`, `environments` as a list of `{name, branch}` in file order, and `configured`, which says whether the block was present |
 | `mcp` | the required MCP servers: `required` is the list from `tools.mcp.required`, `configured` says whether the block was present; an object so further MCP settings can join without renaming the field |
-| `catalogs` | `reviews`, merged with the project-owned side, and `checks`, shipped only (task 134); the shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131), the project-owned side from `keph:/k-playbook/reviews/` in the project collection (task 143) |
+| `catalogs` | `reviews`, merged with the project-owned side; the catalog `checks` is gone since task 155. The shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131), the project-owned side from `keph:/k-playbook/reviews/` in the project collection (task 143) |
 | `catalogsProblem` | only when a layer of `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty, the project collection not readable): why that list is empty -- it is never shown from one layer alone; the rest of the output stays, and `kephalaion` says more |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
 | `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
 Each catalog entry has `name` (the filename), `key` (the invocation name without
-extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`; for
-`checks` always `dist`), `location` for a project-owned recipe (its `keph:` reference
-under `keph:/k-playbook/reviews/`, also when it disables), and `disabled`, where applicable
-(never for `checks`). `path` is a file on disk only for a shipped check; for every recipe —
-shipped, project-owned or overriding — it is the effective reference
+extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`), `location` for a project-owned recipe
+(its `keph:` reference under `keph:/k-playbook/reviews/`, also when it disables), and
+`disabled`, where applicable. `path` for every recipe —
+shipped, project-owned or overriding — is the effective reference
 `k-playbook:/reviews/<name>`, read with `k_playbook_doc_read` or `k-playbook read`, because
 both layers lie in collections (tasks 131 and 143).
 
@@ -398,8 +392,8 @@ transition: each later step takes one field out and gives it its own place in th
 briefing -- the authority is the table "Context field → future place" in
 `knowledge-aktuell.md` in the repository
 --, and when it is empty, `k-playbook context` and `k_playbook_context` go. The first
-fields have gone that way (task 148): `instructions`, the list of the `k-playbook.md` files,
-no longer exists, because the reading order is `documents.always`, and `guidelines`, the
+fields have gone that way (task 148): `instructions` no longer exists, because the reading
+order is `documents.always`, and `guidelines`, the
 list of the files in `k-playbook-local/guidelines/`, no longer exists, because guidelines
 are `documents.guidelines`. Today the `AGENTS.md`
 block, `k-playbook context` and `catalogs` are unchanged; the switch comes step by step. Contract: [mcp.md](mcp.md#briefing-contract).
@@ -466,11 +460,7 @@ What an assistant must read before working comes with the briefing: the text of
 
 The shipped parts come first, the project-owned ones after them; a project-owned
 document of the same name replaces the shipped one, an empty one disables it (see
-"Merge shipped and project-owned content"). The former instruction file
-`k-playbook.md` — once shipped at the top of the installation, once in
-`k-playbook-local/` — is gone (task 148): the program reads neither, the shipped
-file is no longer part of the repository, and the context output has no field
-`instructions`.
+"Merge shipped and project-owned content").
 
 `AGENTS.md` receives only a **prompt**: a short block naming the one call of a
 session, `k-playbook briefing`, with the MCP tool `k_playbook_briefing` as its
@@ -489,10 +479,9 @@ behind the blocks stays, and a block without a boundary stays with a hint. This
 runs at setup, at the start of the interface and with `k-playbook upgrade`.
 
 `k-playbook upgrade` is the one catch-up in the terminal, the subcommand behind
-`/k-upgrade`: first the program — `git pull --ff-only` in the clone (a clone
-still on `git@github.com:kascada/k-playbook` is switched to HTTPS first), then the
-binary through `k-playbook/bin/install`, only when the running program is older
-than the clone's `VERSION` —, then the project: `AGENTS.md`, `CLAUDE.md` as the
+`/k-upgrade`: first Kephalaion, then the program — the release binary of the
+newest release, only when the running program is older than it; a clone
+`k-playbook/` is neither pulled nor read (task 156) —, then the project: `AGENTS.md`, `CLAUDE.md` as the
 include file, the linking of commands and skills, the MCP entries. After a
 binary change the newly installed program performs the project step, and the
 message ends with the hint to restart the session; `--check` writes nothing
@@ -511,9 +500,8 @@ This is what the tool creates when a new project is connected:
 ```yaml
 # k-playbook
 #
-# The location of this file determines the project's root directory.
-# The installation is beside it under k-playbook/ and can be fully
-# replaced; project-owned files do not belong in it.
+# The location of this file determines the project's root directory:
+# the directory above .k-playbook/.
 
 schema_version: 3
 
@@ -593,9 +581,10 @@ git:
 Required field. Current version: `3`.
 
 `3` describes the model documented here: an anchor `.k-playbook/K-PLAYBOOK.yaml`
-in the project root, `k-playbook/` and `k-playbook-local/` beside it, and no paths
-in configuration. The move of the anchor from `<project>/K-PLAYBOOK.yaml` into
-`.k-playbook/` did not change the number: the file and its fields stay the same.
+in the project root and no paths in configuration. Neither the move of the anchor
+from `<project>/K-PLAYBOOK.yaml` into `.k-playbook/` nor the end of the clone
+`k-playbook/` beside it (task 156) changed the number: the file and its fields
+stay the same.
 
 Older values belong to retired models and are no longer supported:
 
@@ -624,7 +613,7 @@ the directory that holds `.k-playbook/`, not the directory of the file itself.
 Typical values:
 
 - `.` when the project root itself is the repository.
-- `app` or another directory name when code is checked out alongside the installation, such as in a DevContainer.
+- `app` or another directory name when the code is checked out in a subdirectory of the project root, such as in a DevContainer.
 
 The repository is deliberately in configuration and is not derived from the
 filesystem. Commands may read and validate the value but may not search for Git
@@ -837,7 +826,7 @@ The file is versioned, so the change wants to be committed.
   written nowhere. The interface writes only the lines `hub:` and `collection:` of that block,
   after a passed check. The machine-local `k-playbook-local/K-PLAYBOOK.local.yaml` of earlier
   versions is no longer read; `k-playbook upgrade` moves it and `/k-upgrade` deletes it.
-- Nothing below `k-playbook/` may be written.
+- Nothing shipped is written: neither `~/.local/share/k-playbook/` nor a leftover clone `k-playbook/`.
 
 ## Filename
 

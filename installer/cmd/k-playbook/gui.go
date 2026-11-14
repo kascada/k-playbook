@@ -54,7 +54,6 @@ func careForHost() {
 	cleanUpLegacy()
 	cleanUpFormerHostInstall()
 	cleanUpLegacyWrapper()
-	protectProjectInstallation()
 	repairMCPRegistration()
 	repairRootInstructions()
 }
@@ -110,14 +109,16 @@ func cleanUpFormerHostInstall() {
 }
 
 // cleanUpLegacyWrapper entfernt die Wrapper-Datei des abgelösten Modells aus
-// der Installation. Das Quell-Repo kennt sie nicht mehr, und .gitignore deckt
-// sie nicht ab — sie bleibt sonst als zusätzliche Datei im Clone liegen.
+// dem früheren Clone k-playbook/ des Projekts. Das Quell-Repo kennt sie nicht
+// mehr, und .gitignore deckt sie nicht ab — sie bleibt sonst als zusätzliche
+// Datei liegen. Liegt weder das Verzeichnis noch die Datei, ist nichts zu tun
+// (RemoveLegacyWrapper).
 //
 // Ein Fehler hält den Start nicht auf: er wird sichtbar gemeldet, und der
 // nächste Start versucht es erneut.
 func cleanUpLegacyWrapper() {
 	environment := project.Detect()
-	if !environment.Installed || !environment.PlaybookPresent {
+	if !environment.Installed {
 		return
 	}
 
@@ -130,27 +131,14 @@ func cleanUpLegacyWrapper() {
 	}
 }
 
-// protectProjectInstallation setzt eine vorhandene Installation read-only.
-// Läuft bei jedem Aufruf und nicht im Server: der startet nur einmal.
-func protectProjectInstallation() {
-	environment := project.Detect()
-	if !environment.Installed || !environment.PlaybookPresent {
-		return
-	}
-	if err := project.SetInstallationReadOnly(environment.ProjectDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: Installation konnte nicht read-only gesetzt werden: %v\n", err)
-	}
-}
-
 // repairMCPRegistration zieht die MCP-Registrierung des Projekts nach — ein
 // selbsttätiger Weg neben „Aktualisieren“ in der Oberfläche und dem
 // Projektschritt von `k-playbook upgrade`, im selben Umfang wie dieser und
 // weiter als jenes.
 //
-// Er ist der Auffangweg für alles, was nicht über die Oberfläche aktualisiert
-// wurde: ein `git pull` von Hand oder `make -C k-playbook installer-update`
-// erreicht die Registrierung nicht, weil sie im Hauptverzeichnis liegt und
-// nicht im Clone. Ein Klick auf „Einrichten" ist dafür nicht nötig.
+// Er ist der Auffangweg für alles, was nicht über die Oberfläche oder
+// `k-playbook upgrade` nachgezogen wurde. Ein Klick auf „Einrichten" ist dafür
+// nicht nötig.
 //
 // Zwei Fälle, zwei Meldungen, dazu ein Hinweis je geschriebener Form. Ein
 // Eintrag, der auf den abgelösten Wrapper zeigt, wird korrigiert — unabhängig

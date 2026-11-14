@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -26,17 +27,17 @@ func newBriefingProject(t *testing.T) string {
 
 	root := newContextProject(t)
 	files := map[string]string{
-		"k-playbook/defaults/instructions/always/010-verweise.md":       "## Verweise\n\nText.\n",
-		"k-playbook/defaults/instructions/always/100-wissen.md":         "---\ntitle: Projektwissen zuerst\ndescription: Doku vor Code.\n---\n\n## Projektwissen\n",
-		"k-playbook/defaults/instructions/always/200-befunde.md":        "## Befunde festhalten\n",
-		"k-playbook/defaults/instructions/always/README.md":             "# Liesmich\n",
-		"k-playbook/defaults/instructions/on-demand/muster.md":          "---\ntitle: Muster\ndescription: Zeigt den Aufbau.\n---\n\n## Muster\n",
-		"k-playbook/defaults/instructions/on-demand/release.md":         "## Release fahren\n",
-		"k-playbook/defaults/reviews/review-code.md":                    "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
-		"k-playbook/defaults/reviews/review-tech.md":                    "# Tech-Review\n",
-		"k-playbook/defaults/reviews/notiz.md":                          "# kein Rezept\n",
-		"k-playbook/defaults/guidelines/betrieb.md":                     "# Betrieb: Ablageorte\n\nText.\n",
-		"k-playbook/defaults/guidelines/README.md":                      "# Guidelines\n",
+		"test-defaults/instructions/always/010-verweise.md":             "## Verweise\n\nText.\n",
+		"test-defaults/instructions/always/100-wissen.md":               "---\ntitle: Projektwissen zuerst\ndescription: Doku vor Code.\n---\n\n## Projektwissen\n",
+		"test-defaults/instructions/always/200-befunde.md":              "## Befunde festhalten\n",
+		"test-defaults/instructions/always/README.md":                   "# Liesmich\n",
+		"test-defaults/instructions/on-demand/muster.md":                "---\ntitle: Muster\ndescription: Zeigt den Aufbau.\n---\n\n## Muster\n",
+		"test-defaults/instructions/on-demand/release.md":               "## Release fahren\n",
+		"test-defaults/reviews/review-code.md":                          "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
+		"test-defaults/reviews/review-tech.md":                          "# Tech-Review\n",
+		"test-defaults/reviews/notiz.md":                                "# kein Rezept\n",
+		"test-defaults/guidelines/betrieb.md":                           "# Betrieb: Ablageorte\n\nText.\n",
+		"test-defaults/guidelines/README.md":                            "# Guidelines\n",
 		"test-collection/k-playbook/instructions/always/100-wissen.md":  "## Projektwissen lokal\n\nText.\n",
 		"test-collection/k-playbook/instructions/always/200-befunde.md": "# Abgeschaltet: keine Befunde.\n",
 		"test-collection/k-playbook/instructions/always/1000-eigen.md":  "## Eigene Anweisung\n\nText.\n",
@@ -396,17 +397,30 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 	for _, path := range briefingCoveredContextFields {
 		covered[path] = true
 	}
+	// catalogs fällt ganz weg, wenn jeder Katalog darin abgedeckt ist: Seit
+	// Task 155 gibt es nur noch reviews, und das steht unter documents.
+	catalogsLeft := false
+	for name := range context.Catalogs {
+		if !covered["catalogs."+name] {
+			catalogsLeft = true
+		}
+	}
 	for key := range topLevelKeys(t, context) {
 		_, present := rest.Field(key)
-		if covered[key] == present {
-			t.Errorf("Kontextfeld %q: im Rest %v, abgedeckt %v", key, present, covered[key])
+		expected := !covered[key]
+		if key == "catalogs" {
+			expected = catalogsLeft
+		}
+		if expected != present {
+			t.Errorf("Kontextfeld %q: im Rest %v, erwartet %v", key, present, expected)
 		}
 	}
 	for name, entries := range context.Catalogs {
-		raw, _ := rest.Field("catalogs")
 		var catalogs map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &catalogs); err != nil {
-			t.Fatalf("context.catalogs: %v", err)
+		if raw, ok := rest.Field("catalogs"); ok {
+			if err := json.Unmarshal(raw, &catalogs); err != nil {
+				t.Fatalf("context.catalogs: %v", err)
+			}
 		}
 		_, present := catalogs[name]
 		if covered["catalogs."+name] == present {
@@ -477,6 +491,56 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 
 // Lässt sich die Kontextausgabe nicht bauen, ist das ein Zustand im Abschnitt
 // context — wie bei work —, kein Fehler: das übrige Briefing bleibt.
+// Der Abschnitt context trägt kein Feld playbook mehr (Task 157, Fassung 7),
+// auch wenn ein liegengebliebener Clone k-playbook/ im Projekt liegt — weder
+// als Feld noch im JSON des Briefings.
+func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
+	root := newBriefingProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
+	if err := os.MkdirAll(filepath.Join(PlaybookDir(root), ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	briefing, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if briefing.SchemaVersion != "7" {
+		t.Errorf("schemaVersion %q, erwartet 7", briefing.SchemaVersion)
+	}
+	if !briefing.Context.Available {
+		t.Fatalf("context: %+v", briefing.Context)
+	}
+	if value, ok := briefing.Context.Field("playbook"); ok {
+		t.Errorf("context trägt playbook: %s", value)
+	}
+	for _, kept := range []string{"project", "local"} {
+		if _, ok := briefing.Context.Field(kept); !ok {
+			t.Errorf("context trägt %s nicht", kept)
+		}
+	}
+
+	encoded, err := json.Marshal(briefing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &raw); err != nil {
+		t.Fatal(err)
+	}
+	var section map[string]json.RawMessage
+	if err := json.Unmarshal(raw["context"], &section); err != nil {
+		t.Fatalf("context im JSON: %v\n%s", err, raw["context"])
+	}
+	if _, ok := section["playbook"]; ok {
+		t.Errorf("context im JSON trägt playbook: %s", raw["context"])
+	}
+	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(encoded), string(quoted)) {
+		t.Errorf("das Briefing nennt %s:\n%s", PlaybookDir(root), encoded)
+	}
+}
+
 func TestBriefingKontextNichtBaubar(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
@@ -576,9 +640,9 @@ func TestBriefingUmgebungsfehler(t *testing.T) {
 func TestBriefingSetztIncludesEinWieRead(t *testing.T) {
 	root := newContextProject(t)
 	for rel, content := range map[string]string{
-		"k-playbook/defaults/instructions/always/010-a.md":              "## A\n\ninclude: k-playbook:/instructions/on-demand/baustein.md\n",
-		"k-playbook/defaults/instructions/always/020-b.md":              "## B\n",
-		"k-playbook/defaults/instructions/on-demand/baustein.md":        "---\ntitle: Baustein\n---\n\nBaustein.\n",
+		"test-defaults/instructions/always/010-a.md":                    "## A\n\ninclude: k-playbook:/instructions/on-demand/baustein.md\n",
+		"test-defaults/instructions/always/020-b.md":                    "## B\n",
+		"test-defaults/instructions/on-demand/baustein.md":              "---\ntitle: Baustein\n---\n\nBaustein.\n",
 		"test-collection/k-playbook/instructions/always/1000-kaputt.md": "## Kaputt\n\ninclude: fehlt.md\n",
 		"test-collection/k-playbook/instructions/always/1100-eigen.md":  "## Eigen\n\ninclude: 020-b.md\n",
 	} {
@@ -648,8 +712,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "6" {
-		t.Errorf("schemaVersion %q, erwartet 6", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "7" {
+		t.Errorf("schemaVersion %q, erwartet 7", briefing.SchemaVersion)
 	}
 	if !briefing.Health.OK || len(briefing.Health.Problems) != 0 {
 		t.Errorf("health ohne Probleme: %+v", briefing.Health)

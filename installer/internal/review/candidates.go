@@ -106,7 +106,8 @@ var candidatePatterns = map[CandidateKind]map[string][]string{
 // Was bleibt, sind die beiden generischen Ausschlüsse, die jeder Job in
 // scanners.tsv mitführt.
 var candidateExcluded = map[string]bool{
-	// Die Installationskopie. Ihr ausgeliefertes Beispielmaterial ist kein Code
+	// Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem früheren
+	// Modell. Sein ausgeliefertes Beispielmaterial ist kein Code
 	// des Projekts.
 	"k-playbook": true,
 	// Die Ergebnisse früherer Läufe. Ohne den Ausschluss zählten die

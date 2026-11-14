@@ -236,7 +236,11 @@ func addUnique(list []string, value string) []string {
 
 // suggestRepoRoot sucht das Projekt-Repository. Liegt es im Hauptverzeichnis
 // selbst, ist der Wert "."; sonst kommen die Unterverzeichnisse in Frage, etwa
-// wenn das Repo parallel zur Installation ausgecheckt ist.
+// wenn das Repo eine Ebene unter dem Hauptverzeichnis ausgecheckt ist.
+//
+// PlaybookDirName wird dabei übersprungen: Ein liegengebliebener Clone
+// <projekt>/k-playbook/ aus der Zeit vor Task 156 hat ein .git und wäre sonst
+// Repo-Kandidat.
 func suggestRepoRoot(projectDir string) (string, []string) {
 	if pathExists(filepath.Join(projectDir, ".git")) {
 		return ".", []string{"."}
@@ -308,8 +312,7 @@ func renderConfig(repoRoot string, vcs string) string {
 	return fmt.Sprintf(`# k-playbook
 #
 # Der Ort dieser Datei bestimmt das Hauptverzeichnis des Projekts: das
-# Verzeichnis über .k-playbook/. Die Installation liegt dort unter %s/
-# und ist vollständig ersetzbar; projekteigene Dateien gehören nicht hinein.
+# Verzeichnis über .k-playbook/.
 
 schema_version: %s
 
@@ -319,7 +322,7 @@ project:
   vcs: %s
 
 %s
-%s`, PlaybookDirName, SchemaVersion, repoRoot, vcs,
+%s`, SchemaVersion, repoRoot, vcs,
 		remediationBlock(DefaultRemediationMode), docsBlockExample)
 }
 

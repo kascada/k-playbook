@@ -1,7 +1,16 @@
 # k-enforcement
 
-Prüft die laufende Änderung und berichtet das Ergebnis von `k-check --mode changed` und den
-Stand des Doku-Nachzugs. Das ist der ausdrückliche Prüfbericht. Den Doku-Nachzug selbst
+## Vorübergehend nicht verfügbar
+
+Dieser Command wird neu aufgebaut, seit k-playbook keine Checks mehr ausliefert, und steht
+bis dahin nicht zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen,
+nichts schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-enforcement`
+gerade neu aufgebaut wird und erst danach wieder geht. Den Doku-Nachzug leistet bis dahin
+jede Sitzung selbst, nach der Anweisung „Doku nachziehen“ im Briefing.
+
+Der Text darunter bleibt als Vorlage für den Neuaufbau stehen.
+
+Prüft die laufende Änderung und berichtet den Stand des Doku-Nachzugs. Das ist der ausdrückliche Prüfbericht. Den Doku-Nachzug selbst
 leistet jede Sitzung schon vor dem Abschluss einer Änderung (Anweisung „Doku nachziehen“ im
 Briefing, `k-playbook:/instructions/always/220-regeln-anwenden.md`); dieser Command macht die
 Prüfung sichtbar und liefert sie auf Abruf, etwa aus `/k-danke`.
@@ -21,12 +30,11 @@ include: _shared/erster-schritt.md
 Aus dem Briefing brauchst du:
 
 - `session` — die Kennung dieser Sitzung (Klartext: Zeile `Sitzung:`).
-- `context.project.dir`, `context.project.repoRoot`, `context.playbook.dir`.
+- `context.project.dir`, `context.project.repoRoot`.
 - `context.kephalaion` — `ok`, `address`, `message` — für den Doku-Nachzug.
 
 **Prüfumfang.** Geprüft werden die geänderten Dateien des Arbeitsbaums gegen `HEAD`, samt
-unverfolgten. Doku-Nachzug und `k-check` nehmen dieselbe Menge; deshalb bestimmst du sie
-einmal und gibst sie `k-check` als Datei mit:
+unverfolgten. Du bestimmst sie einmal und hältst sie in einer Datei fest:
 
 ```bash
 ROOT="<context.project.repoRoot>"
@@ -46,13 +54,12 @@ jeder Shell-Aufruf beginnt neu, die Variable überlebt ihn nicht. Die Pfade sind
 (etwa eine entfernte Funktion, die die Doku noch nennt).
 
 - `$ARGUMENTS` nennt ein Verzeichnis oder eine Datei innerhalb von `ROOT`: Dann gilt nur der
-  Teil der Menge darunter, für den Doku-Nachzug und für `k-check`; schreibe die gekürzte Liste in
-  dieselbe Datei. Liegt das Argument außerhalb von `ROOT`, abbrechen und es sagen.
+  Teil der Menge darunter; schreibe die gekürzte Liste in dieselbe Datei. Liegt das Argument außerhalb von `ROOT`, abbrechen und es sagen.
 - Ist `ROOT` kein Git-Repo, oder hat es noch keinen Commit (`git diff HEAD` scheitert), gibt
   es keine Menge aus dem Arbeitsbaum: Frag, welche Dateien geprüft werden sollen, und schreib
   die Antwort in die Datei.
-- Ist die Menge leer, sag „kein Diff“; der Doku-Nachzug wird dann nicht geprüft, `k-check`
-  läuft nicht, und der Bericht nennt nur den leeren Prüfumfang.
+- Ist die Menge leer, sag „kein Diff“; der Doku-Nachzug wird dann nicht geprüft, und der
+  Bericht nennt nur den leeren Prüfumfang.
 
 Command-specific policy:
 
@@ -84,7 +91,7 @@ Immer, wenn der Prüfumfang Code enthält. Maßstab ist der Absatz zum Doku-Nach
   2. Sonst suchst du mit `k_playbook_doc_grep`, `kind: docs`, Muster
      `^sitzung: <session>$`, einen offenen Auftrag dieser Sitzung, und prüfst für die Treffer
      `^erzeuger: code$` bzw. `^erzeuger: tools$`. Gibt es ihn: „eingereiht“, mit Verweis.
-  3. Sonst: „nachzuziehen“. Das Einreihen bietet Schritt 4 an.
+  3. Sonst: „nachzuziehen“. Das Einreihen bietet Schritt 3 an.
 
 Ein veraltetes Dokument unter `libs/`, `versions/` oder `manual/` meldest du nicht als Folge
 einer Codeänderung; die `README.md` eines Erzeuger-Verzeichnisses schreibt `publish`.
@@ -100,41 +107,22 @@ Ausgang je Teil, einer davon:
 - **fehlt** — die wahrscheinlich betroffene Handdoku, mit Pfad oder Thema.
 - **unklar** — Frage an den Nutzer: anpassen, anlegen oder bewusst auslassen.
 
-Keine Codeänderung geht ohne einen dieser Ausgänge durch.
+Keine Codeänderung geht ohne einen dieser Ausgänge durch. Die Datei `CHANGED_FILES` löschst
+du danach.
 
-## Schritt 3 — k-check ausführen
-
-Führe die Checks über dieselbe Dateimenge aus, mit dem Programm aus der Installation. Die
-Pfade in `CHANGED_FILES` sind relativ zu `ROOT`; deshalb bekommt `k-check` dieselbe Wurzel
-ausdrücklich als `--target-root`, die Konfiguration liest es weiter aus dem Projekt:
-
-```bash
-"<context.playbook.dir>/bin/k-check" --mode changed --config-root "<context.project.dir>" --target-root "<context.project.repoRoot>" --files-from "<CHANGED_FILES>"
-```
-
-`k-check` findet die wirksamen Checks selbst. Berichte je Check die Zeile seiner Ausgabe
-(`OK`, `FAIL`, `SKIP`, `ERROR` mit Grund) und den Exit-Code: `0` alles grün, `1` mindestens
-ein Check rot, `2` ein technischer Fehler. Ein Ergebnis, das du nicht gesehen hast, meldest du
-nicht. Fehlt `k-check` oder bricht es ab, nenne die Meldung; die Prüfung des Doku-Nachzugs
-bleibt gültig.
-Die Datei `CHANGED_FILES` löschst du danach.
-
-## Schritt 4 — Bericht
+## Schritt 3 — Bericht
 
 ```text
 Enforcement
 ─────────────────────────────
 Geprüfter Scope: <N> Dateien | kein Diff
 
-k-check:         grün | rot | Fehler (Exit <n>) | nicht gelaufen (<Grund>)
-- <check>: OK | FAIL | SKIP | ERROR — <Grund>
-
 Docs-Sync:       Handdoku angepasst | nicht nötig (<Grund>) | fehlt (<Pfad/Thema>) | unklar
                  code:  eingereiht (<verweis>) | nachzuziehen | noch keine erzeugte Doku | nicht betroffen
                  tools: eingereiht (<verweis>) | nachzuziehen | noch keine erzeugte Doku | nicht betroffen
 ```
 
-Ist etwas `unklar`, rot oder `fehlt`, nenne die konkrete nächste Aktion
+Ist etwas `unklar` oder `fehlt`, nenne die konkrete nächste Aktion
 und frag, bevor du etwas änderst.
 
 **Doku-Auftrag nach Freigabe.** Steht bei `code` oder `tools` „nachzuziehen“, frag, ob der
@@ -165,10 +153,7 @@ korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge ar
 
 ## Anti-Muster (nicht tun)
 
-- **Zwei Prüfumfänge.** Doku-Nachzug und `k-check` prüfen dieselbe Dateimenge; ohne `--files-from`
-  nähme `k-check` gegebenenfalls einen anderen Vergleichsstand.
 - **Erzeugte Doku von Hand nachziehen** oder den Erzeuger ungefragt starten. Der Normalfall
   ist der Auftrag, und der kommt nur nach Freigabe.
 - **Einen zweiten Auftrag anlegen**, wenn diese Sitzung schon einen für denselben Erzeuger
   hat.
-- **Ein Check-Ergebnis berichten, das nicht gelaufen ist.**

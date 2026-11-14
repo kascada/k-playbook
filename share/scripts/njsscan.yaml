@@ -12,7 +12,8 @@
 # `k-playbook/` trifft `k-playbook-local/` nicht: dort folgt auf den Namen ein
 # `-` und kein `/`. Beide Einträge stehen deshalb einzeln da.
 ignore-paths:
-  # Die Installationskopie. Ihr ausgeliefertes JavaScript unter
+  # Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem früheren Modell
+  # (/k-upgrade löscht ihn). Sein ausgeliefertes JavaScript unter
   # installer/internal/webui/static/ ist kein Code des Projekts.
   - k-playbook/
   # Die Ergebnisse früherer Läufe.

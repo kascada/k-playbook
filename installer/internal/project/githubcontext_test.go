@@ -13,6 +13,17 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
+// run führt ein Kommando in dir aus und bricht den Test ab, wenn es scheitert.
+func run(t *testing.T, dir string, name string, args ...string) {
+	t.Helper()
+
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%s %v: %v\n%s", name, args, err, output)
+	}
+}
+
 // stubSSHHostIsGitHub ersetzt den Blick über ssh -G: known sind die Aliase,
 // die nach github.com führen. Zurück kommt der Zähler der Aufrufe.
 func stubSSHHostIsGitHub(t *testing.T, known ...string) *int {

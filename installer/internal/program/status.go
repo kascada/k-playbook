@@ -10,7 +10,7 @@ import (
 
 // Status ist der Vergleich des laufenden Programms mit dem neuesten
 // Release-Tag — die gemeinsame Auskunft für die Oberfläche (GET /api/update,
-// POST /api/update, POST /api/update/program), den Start der Oberfläche und
+// POST /api/update/program), den Start der Oberfläche und
 // `k-playbook upgrade`.
 type Status struct {
 	// Running ist die Version dieses Programms, Latest der neueste Release-Tag
@@ -41,8 +41,8 @@ type Lookup int
 const (
 	// Fresh fragt sofort (release.LatestTag) und schreibt das Ergebnis in
 	// den Cache — für alles, was installiert oder ausdrücklich prüft:
-	// `k-playbook upgrade` samt `--check`, POST /api/update und
-	// /api/update/program, GET /api/update mit fresh=1.
+	// `k-playbook upgrade` samt `--check`, POST /api/update/program,
+	// GET /api/update mit fresh=1.
 	Fresh Lookup = iota
 	// Cached nimmt einen frischen Eintrag aus dem Cache und fragt nur sonst
 	// (release.CachedLatestTag) — für die reinen Hinweise: den Start der

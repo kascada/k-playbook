@@ -28,8 +28,8 @@ const serviceElements = {
 };
 
 // updateMode steuert, was ein Klick auf den Button tut: "" prüft erneut,
-// "pull" holt den neuen Stand des Clones, "program" installiert das
-// Release-Programm des neuesten Tags und startet den Dienst daraus neu.
+// "program" installiert das Release-Programm des neuesten Tags und startet den
+// Dienst daraus neu.
 let updateMode = "";
 
 serviceElements.closedReconnect.addEventListener("click", onReconnectClick);
@@ -39,7 +39,7 @@ if (serviceElements.shutdown) {
 if (serviceElements.update) {
   serviceElements.update.addEventListener("click", onUpdateClick);
   // Die Update-Prüfung braucht das Netz. Sie läuft nebenher, damit die Seite
-  // nicht auf einen langsamen Remote wartet.
+  // nicht auf eine langsame Antwort wartet.
   checkUpdate();
 }
 
@@ -72,7 +72,7 @@ function updateNotice(data) {
       `Das laufende Programm (${program.running}) ist älter als das neueste Release (${program.latest}).`;
     return program.installable ? text : `${text} ${program.hint}`;
   }
-  return data.available ? "" : data.message;
+  return data.message || "";
 }
 
 async function onUpdateClick() {
@@ -80,31 +80,7 @@ async function onUpdateClick() {
     await updateProgram(false);
     return;
   }
-  if (updateMode !== "pull") {
-    await checkUpdate(true);
-    return;
-  }
-
-  serviceElements.update.disabled = true;
-  serviceElements.update.textContent = "Aktualisiere...";
-  try {
-    const response = await fetch("/api/update", { method: "POST" });
-    const data = await response.json();
-    if (data.restarted) {
-      await followRestart(data);
-      return;
-    }
-    renderUpdate(data);
-    // Ein gescheitertes Aktualisieren verbirgt den Knopf; ohne Meldung wäre
-    // es wortlos verschwunden. Ist das Programm älter als das neueste Release
-    // und wurde es nicht installiert, steht der Grund in der Meldung.
-    if (!response.ok || data.installFailed || (data.program && data.program.outdated)) {
-      showUpdateMessage(withOutput(data.message, data.installOutput));
-    }
-  } catch {
-    resetUpdateButton();
-    showUpdateMessage("Das Update hat keine Antwort bekommen.");
-  }
+  await checkUpdate(true);
 }
 
 // updateProgram installiert das Release-Programm des neuesten Tags und startet
@@ -194,13 +170,11 @@ async function followRestart(data) {
   );
 }
 
-// Drei Zustände kommen an: etwas zu tun (älteres Programm oder Update des
-// Clones), geprüft und gleich, und nicht prüfbar (data.message). Sichtbar ist
-// der Knopf nur im ersten; der dritte geht als Meldung in die Statuskarte,
-// siehe showUpdateMessage.
+// Drei Zustände kommen an: etwas zu tun (älteres Programm), geprüft und
+// gleich, und nicht prüfbar (program.latestError). Sichtbar ist der Knopf nur
+// im ersten; ein älteres Programm ohne Knopf geht als Meldung in die
+// Statuskarte, siehe showUpdateMessage.
 //
-// Ein älteres Programm hat Vorrang vor einem Update des Clones: ein Pull allein
-// hilft dann nicht, das Programm kommt aus dem Release, nicht aus dem Clone.
 // Zeigt der PATH auf ein anderes Programm, gibt es dafür keinen Knopf, nur den
 // Hinweis — ein installiertes Programm, das der nächste Aufruf nicht startet,
 // brächte den Fehler zurück.
@@ -217,18 +191,8 @@ function renderUpdate(data) {
     return;
   }
 
-  if (data.available) {
-    updateMode = "pull";
-    // Hervorgehoben, solange etwas anliegt.
-    serviceElements.update.className = "primary attention-highlight";
-    serviceElements.update.textContent = "Update verfügbar";
-    serviceElements.update.title = `${data.local} -> ${data.remote} (${data.branch})`;
-    serviceElements.update.disabled = false;
-    return;
-  }
-
   resetUpdateButton();
-  serviceElements.update.title = data.message || `Stand ${data.local || "unbekannt"} (${data.branch || "?"})`;
+  serviceElements.update.title = data.message || program.latestError || "";
 }
 
 function resetUpdateButton() {

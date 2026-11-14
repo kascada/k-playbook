@@ -8,7 +8,7 @@ This note documents the local SSH/GitHub configuration on the Kleist development
 
 ## k-playbook
 
-The development repository at `~/dev/k-playbook` uses this remote. The same alias applies to every clone into a target project because every project clones the same repository:
+The development repository at `~/dev/k-playbook` uses this remote. A target project needs no checkout of this repository any more -- the installation is the binary alone --, so the alias matters only for a checkout of the source repository:
 
 ```text
 git@github-kamranbycloud:kascada/k-playbook.git

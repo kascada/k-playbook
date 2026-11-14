@@ -15,8 +15,10 @@ resolve and nothing to search for: the binary finds `K-PLAYBOOK.yaml` by walking
 the working directory, so it does not matter where the binary itself lives.
 
 If the command is not found, k-playbook is not installed in this environment. Stop and
-report it; the bootstrap is `make -C k-playbook install` (without make:
-`k-playbook/bin/install`). Do not look for a project-local copy.
+report it; the bootstrap is
+`curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`
+(without curl: `wget -qO- https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`).
+Do not look for a project-local copy.
 
 It writes JSON to stdout and exits non-zero if there is no installation — in that case,
 stop and report it. Do not guess paths and do not create anything.
@@ -50,9 +52,8 @@ fields from two loads.
 | `project.dir` | The main directory — where `K-PLAYBOOK.yaml` sits. |
 | `project.repoRoot`, `project.vcs` | The code repository for Git operations, and whether it is under version control. |
 | `project.languages` | The languages this project needs tools for. Always filled — a missing entry falls back to the default, so there is nothing to interpret. |
-| `playbook.dir` | The installation. Read-only; replaced on every update. |
 | `local.dir` | Everything the project owns. |
-| `catalogs` | Effective `reviews` and `checks` — reviews shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`; checks are shipped only, `origin` always `dist`. |
+| `catalogs` | Effective `reviews` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. There are no checks any more. |
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether the GitHub CLI is installed and logged in on this machine (a host finding). |
 | `versionSources` | State of the version-inventory source configuration `keph:/k-playbook/inventory.md`: whether it is there and readable, which extra sources it configures, which areas it excludes from the default scan and which Helm values it names explicitly. Read it from here — never read that document yourself. |
@@ -63,9 +64,9 @@ says where it lives — always `keph:/k-playbook/inventory.md`, even when it is 
 version it declares (only `3` is read), `sources` the configured extra sources (`path`,
 `kind`, `env`, `note`, `optional` per entry), `exclude` the patterns the default scan skips
 and `helmValues` the configured Helm values (`path`, `key`, `item` per entry). Every path is
-relative to the project root; nothing outside it is read. The default scan does not search the
-installation `<playbook.dir>`, and it is not part of `exclude` — that rule comes from the
-contract, not from the document.
+relative to the project root; nothing outside it is read. The default scan does not search a
+directory `k-playbook/` in the project — a leftover clone from the former model —, and it is
+not part of `exclude`: that rule comes from the contract, not from the document.
 
 `state` is one of four values:
 
@@ -91,8 +92,10 @@ gh's own configuration, not verified against the server, so a token can still be
 
 ## Where the rest lives
 
-The layout is fixed. Everything below is derived from `local.dir`, `playbook.dir` and
-`project.dir` from the output above — never from configuration, and never by searching.
+The layout is fixed. Everything below is derived from `local.dir` and `project.dir` from
+the output above — never from configuration, and never by searching. What k-playbook ships
+is not in the project: the texts come through `k-playbook:` references, commands, skills
+and scripts lie under `~/.local/share/k-playbook/`.
 
 | Artifact | Path |
 |---|---|
@@ -112,7 +115,6 @@ The layout is fixed. Everything below is derived from `local.dir`, `playbook.dir
 | unversioned working files | `<local.dir>/priv/` |
 | project-local commands | `<project.dir>/.k-playbook/commands/` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command |
 | project-local skills | `<project.dir>/.k-playbook/skills/` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill |
-| the check runner, project-local by contract | `<playbook.dir>/bin/k-check` |
 | scripts | `~/.local/share/k-playbook/scripts/` |
 | security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
 
@@ -131,16 +133,18 @@ before they moved to `keph:/queue/findings/`; nothing writes there any more. Eve
 
 The project-local side of `catalogs.reviews` lives in the project collection under
 `keph:/k-playbook/reviews/`. Do not read it directly — `catalogs` already contains the
-merged result. Guidelines and checks have no project-local side. Guidelines are shipped
+merged result. Guidelines have no project-local side. They are shipped
 only: this output does not list them, the briefing names them under `documents.guidelines`,
 and they are read as `k-playbook:/guidelines/<name>.md`. A leftover `<local.dir>/guidelines/`
-or `<local.dir>/checks/` is not read, and `/k-upgrade` removes it.
+is not read, and `/k-upgrade` removes it. Checks no longer exist at all; a leftover
+`<local.dir>/checks/` is not read either, and `/k-upgrade` removes it too.
 
 `<project.dir>/.k-playbook/commands/` and `skills/` overlay the shipped ones by the same
 rule, but they are not in `catalogs`: the assistant loaded them at startup, so by the time a
 command runs, the effective set is already in place. They matter only when you **write**
-one — put it there, never into `playbook.dir` and no longer into `<local.dir>/commands/` or
-`<local.dir>/skills/`, which nothing reads since task 129, and note that it takes effect
+one — put it there, never into `~/.local/share/k-playbook/` and no longer into
+`<local.dir>/commands/` or `<local.dir>/skills/`, which nothing reads since task 129, and
+note that it takes effect
 after the next `k-playbook briefing` or `/k-gui` has linked it and the assistant has been
 restarted.
 
@@ -165,8 +169,10 @@ run, and the producing command creates its own directory without asking.
 - Use the catalogs as given. Shipped and project-local are already merged — do not list
   directories yourself and do not re-derive which entry wins.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.
-- Never write into `playbook.dir`. It is replaced on every update. Everything a command
-  produces goes into `local.dir`.
+- Never write into `~/.local/share/k-playbook/`. It belongs to the program and is replaced
+  when the program is updated. Everything a command produces goes into `local.dir`. A
+  directory `k-playbook/` in the project is a leftover clone from the former model: never
+  write into it either; `/k-upgrade` deletes it.
 - **Before the first call to GitHub — `gh`, or a network command of git — read
   `k-playbook:/commands/_shared/gh.md` with `k_playbook_doc_read` (without MCP:
   `k-playbook read k-playbook:/commands/_shared/gh.md`) and follow it.** It alone decides

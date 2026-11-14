@@ -120,7 +120,7 @@ ein, wenden den Scope aber nicht an — das Inventar liest seine Quellen nach se
 Vertrag, der Overlay-Skill die Repos, die er analysiert.
 
 Aus dem Briefing brauchst du dafür `context.project.dir`, `context.project.repoRoot`,
-`context.local.dir`, `context.playbook.dir`, dazu `context.docs.exclude` und
+`context.local.dir`, dazu `context.docs.exclude` und
 `context.docs.problems` — die dauerhaften Ausschlüsse des Projekts aus `K-PLAYBOOK.yaml` und
 die Einträge, die dort verworfen wurden. Der Scope ergibt sich aus Briefing und Argument,
 nicht geraten:
@@ -137,10 +137,12 @@ nicht geraten:
   `context.project.dir`. Fehlt er oder liegt er außerhalb, abbrechen und den Pfad nennen —
   ein anderes Projekt wird dort dokumentiert, nicht von hier. `EXTRA_PATH` ist dieser Pfad,
   sonst leer.
-- **Immer ausgeschlossen**, auch wenn das Argument hineinzeigt: `context.playbook.dir`
-  (`k-playbook/`), `context.local.dir` (`k-playbook-local/`) und
-  `<context.project.dir>/.k-playbook/`. Zeigt `$ARGUMENTS` in einen davon, abbrechen und
-  sagen, dass diese Verzeichnisse nie zum Scan gehören.
+- **Immer ausgeschlossen**, auch wenn das Argument hineinzeigt: `context.local.dir`
+  (`k-playbook-local/`), `<context.project.dir>/.k-playbook/` und
+  `<context.project.dir>/k-playbook/` — Altbestand: ein liegengebliebener Clone von
+  k-playbook aus dem früheren Modell, den `/k-upgrade` löscht; er ist Werkzeug, kein Code
+  des Projekts, und wird nicht dokumentiert. Zeigt `$ARGUMENTS` in einen davon, abbrechen
+  und sagen, dass diese Verzeichnisse nie zum Scan gehören.
 - **Versteckte Pfade** sind ausgeschlossen, ohne Rückfrage: jede Datei und jedes
   Verzeichnis, dessen Name mit `.` beginnt, auf jeder Ebene — etwa `.git/`, `.github/`,
   `.claude/`, `.opencode/`, `.devcontainer/`, `.venv/`, `.env`. Ein versteckter Pfad kommt

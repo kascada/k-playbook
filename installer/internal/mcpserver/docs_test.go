@@ -18,7 +18,7 @@ import (
 )
 
 // newDocProject legt ein Projekt mit beiden Ebenen unter instructions/ an:
-// mitgeliefert in k-playbook/, lokal in k-playbook-local/.
+// mitgeliefert in test-defaults/, projekteigen in test-collection/k-playbook/.
 func newDocProject(t *testing.T) string {
 	t.Helper()
 
@@ -27,12 +27,12 @@ func newDocProject(t *testing.T) string {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 	files := map[string]string{
-		"k-playbook/defaults/instructions/always/010-a.md":            "---\ntitle: A\n---\n\n## A\n",
-		"k-playbook/defaults/instructions/always/100-b.md":            "## B mitgeliefert\n",
-		"k-playbook/defaults/instructions/always/200-c.md":            "## C\n",
-		"k-playbook/defaults/instructions/always/README.md":           "# Liesmich\n\nText.\n",
-		"k-playbook/defaults/instructions/on-demand/thema.md":         "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
-		"k-playbook/defaults/instructions/on-demand/aus.md":           "## Aus\n",
+		"test-defaults/instructions/always/010-a.md":                  "---\ntitle: A\n---\n\n## A\n",
+		"test-defaults/instructions/always/100-b.md":                  "## B mitgeliefert\n",
+		"test-defaults/instructions/always/200-c.md":                  "## C\n",
+		"test-defaults/instructions/always/README.md":                 "# Liesmich\n\nText.\n",
+		"test-defaults/instructions/on-demand/thema.md":               "---\ntitle: Thema\ndescription: D\n---\n\n## Thema\n",
+		"test-defaults/instructions/on-demand/aus.md":                 "## Aus\n",
 		"test-collection/k-playbook/instructions/always/100-b.md":     "## B lokal\n\nText.\n",
 		"test-collection/k-playbook/instructions/always/200-c.md":     "# Abgeschaltet\n",
 		"test-collection/k-playbook/instructions/always/notiz.md":     "## Notiz\n\nText.\n",
@@ -511,10 +511,10 @@ func TestDocKindSchemaAusDerTabelle(t *testing.T) {
 func TestDocReadIncludes(t *testing.T) {
 	root := newDocProject(t)
 	for rel, content := range map[string]string{
-		"k-playbook/defaults/includes/context.md":          "## Kontext\n\nBaustein.\n",
-		"k-playbook/defaults/commands/k-danke.md":          "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
-		"k-playbook/defaults/commands/zyklus.md":           "include: zyklus.md\n",
-		"k-playbook/defaults/instructions/always/300-d.md": "## D\n\ninclude: k-playbook:/includes/context.md\n",
+		"test-defaults/includes/context.md":          "## Kontext\n\nBaustein.\n",
+		"test-defaults/commands/k-danke.md":          "# k-danke\n\ninclude: k-playbook:/includes/context.md\n",
+		"test-defaults/commands/zyklus.md":           "include: zyklus.md\n",
+		"test-defaults/instructions/always/300-d.md": "## D\n\ninclude: k-playbook:/includes/context.md\n",
 	} {
 		full := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
