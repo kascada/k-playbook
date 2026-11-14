@@ -411,6 +411,11 @@ installer/
 │   └── install.go               Version einer Datei über `k-playbook version` lesen,
 │                                bin/install des Clones anstoßen, Ergebnis gegen
 │                                SHA256SUMS prüfen
+├── internal/procgroup/
+│   ├── procgroup.go             externer Prozess in eigener Prozessgruppe: Frist oder
+│   │                            Abbruch beenden die ganze Gruppe (SIGKILL an -pid)
+│   └── signal.go                SIGINT/SIGTERM: erst die laufenden Gruppen, dann das
+│                                Programm durch dasselbe Signal
 ├── internal/vscodeext/
 │   ├── vscodeext.go             die eingebettete VSIX (go:embed), ihre Version
 │   ├── detect.go                Installationen aus extensions.json, Nachzug nötig?
@@ -1719,7 +1724,10 @@ Node, und ein Neustart des Nodes ist so einmal am Anfang erledigt. Drei Wege
 `install.sh` des neuesten Kephalaion-Releases (`release.KephalaionInstallURL`, über
 `release.Fetch()` erst ganz geladen, dann mit `sh` ausgeführt) — auch ohne Clone; Erfolg
 heißt, dass `kephalaion.FindBinary()` das Binary danach findet. Scheitert es, nennt die
-Meldung die Installation von Hand (`kephalaion.InstallCommand`). Liegt es da, ruft der Schritt `kephalaion upgrade --auto --json`
+Meldung die Installation von Hand (`kephalaion.InstallCommand`). Das `install.sh` läuft in
+einer eigenen Prozessgruppe (`internal/procgroup`, unten): Läuft `InstallTimeout` ab,
+endet die ganze Gruppe samt dem Download des Skripts, und der Schritt kehrt mit der Frist
+zurück. Liegt es da, ruft der Schritt `kephalaion upgrade --auto --json`
 (`program.KephalaionAutoUpgrade()`) und meldet allein nach dessen Antwort (`outcome`,
 `reason`, `from`, `to`, `restarted`, `rolled_back`, `warnings`, `error`, `hint`): Ob ein
 Upgrade gefahrlos ist — Hub, globale config, dev build, Hub noch nicht so neu, DevContainer —,
@@ -1748,6 +1756,33 @@ Kephalaion folgt erst im zweiten `/k-upgrade`, den der Programmwechsel ohnehin v
 `healthKephalaion()` nennt die
 Installation als Abhilfe, solange `kephalaion` fehlt und die Anbindung nicht ok ist; bei ok
 schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein.
+
+**Kindprozesse enden mit dem Aufruf** (Task 152, `internal/procgroup`). `exec.CommandContext`
+beendet bei Fristablauf nur den direkten Kindprozess; was der startet — beim `install.sh` von
+Kephalaion der Download —, liefe weiter, und `WaitDelay` gäbe nur die Pipe frei.
+`procgroup.Command()` startet deshalb in einer eigenen Prozessgruppe (`Setpgid`), und endet
+der Kontext, bekommt die ganze Gruppe SIGKILL (`cmd.Cancel` an `-pid`); der Aufruf kehrt mit
+der Frist zurück, nicht erst nach Frist plus `WaitDelay`. Die eigene Gruppe nimmt den
+Prozess aus der Vordergrundgruppe des Terminals, ein Strg-C erreicht ihn also nicht mehr
+selbst. Darum installieren die Aufrufer im CLI — `upgrade` (samt `--check`),
+`version --all`, `health`, `briefing` — und der MCP-Server (`k-playbook mcp`, der Kontext
+reicht bis in die Werkzeugaufrufe) `procgroup.NotifyContext()`: Ein SIGINT oder SIGTERM
+beendet zuerst jede laufende Gruppe aus `procgroup.Run()` und danach das Programm durch
+dasselbe Signal (eine Shell sieht 130 bzw. 143). Es gibt kein Weiterlaufen mit
+Ersatzmeldung: `Run()` kehrt nach dem Signal nicht mehr zurück, und `main` endet nicht mit
+eigenem Code, solange das Signal das Programm beendet (`procgroup.HoldIfEnding()`). Läuft
+keine Gruppe, endet das Programm sofort wie ohne Handler; der Kontext wird dann nicht erst
+abgebrochen, damit kein Aufrufer in der Zwischenzeit einen Fehler meldet. Heute nutzt nur
+`runKephalaionInstall()` den Weg; `LatestTag()` fragt seit Task 151 über HTTPS im eigenen
+Prozess und startet kein git mehr. Der Dienst der Oberfläche installiert den Handler nicht:
+Er fährt bei SIGINT und SIGTERM selbst geordnet herunter (`server.Shutdown`, 5 s), startet
+keine Gruppe, und seine Abrufe laufen im eigenen Prozess und enden mit ihm. Endet beim
+MCP-Server stdin, bricht das Go-SDK (v1.7.0, `internal/jsonrpc2/conn.go`) die Kontexte
+laufender Werkzeugaufrufe selbst ab. Nicht abgedeckt ist SIGKILL an den Aufrufer —
+dagegen hülfe nur `Pdeathsig`, nur unter Linux und nur für das direkte Kind. `kephalaion
+upgrade` behält seinen eigenen Weg (SIGTERM, dann nach `KephalaionStopGrace` SIGKILL), und
+die übrigen `exec`-Stellen — etwa `ReadVersion()`, der Aufruf des neuen Programms für den
+Projektschritt, `vscodeext.Install()` — starten weiter ohne eigene Gruppe.
 
 `bin/install` ist die Erstinstallation und eigenständig: über
 `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`

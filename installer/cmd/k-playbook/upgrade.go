@@ -14,6 +14,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/release"
@@ -274,7 +275,12 @@ func runUpgrade(args []string) error {
 			project.ConfigFileName, project.DisplayPath(environment.SearchedFrom))
 	}
 
-	report := upgrade(environment, options, os.Stdout)
+	// Ein SIGINT oder SIGTERM beendet erst die Prozessgruppe eines laufenden
+	// install.sh von Kephalaion und dann das Programm; ohne laufende Gruppe
+	// endet das Programm sofort, wie ohne Handler (Task 152).
+	ctx, stop := procgroup.NotifyContext(context.Background())
+	defer stop()
+	report := upgrade(ctx, environment, options, os.Stdout)
 	if options.asJSON {
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
@@ -287,7 +293,7 @@ func runUpgrade(args []string) error {
 // nach out — so steht Schritt (1) schon da, bevor das neue Programm für Schritt
 // (2) seine eigenen Zeilen schreibt. Im JSON-Modus sammelt der Bericht alles
 // und wird am Ende ausgegeben.
-func upgrade(environment project.Environment, options upgradeOptions, out io.Writer) upgradeReport {
+func upgrade(ctx context.Context, environment project.Environment, options upgradeOptions, out io.Writer) upgradeReport {
 	report := upgradeReport{SchemaVersion: upgradeSchemaVersion, Check: options.check, Messages: []string{}}
 	emit := func(lines []string) {
 		if options.asJSON {
@@ -312,7 +318,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 		report.Messages = append(report.Messages, lines...)
 		emit(lines)
 
-		programReport, lines := checkUpgradeProgram(environment)
+		programReport, lines := checkUpgradeProgram(ctx, environment)
 		report.Program = &programReport
 		report.Messages = append(report.Messages, lines...)
 		emit(lines)
@@ -333,12 +339,12 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 	// Kephalaion zuerst: k-playbook hängt von Kephalaion ab, nicht umgekehrt,
 	// und Programm- wie Projektschritt brauchen den Node. Ein Neustart des
 	// Nodes ist so am Anfang erledigt und von --auto selbst geprüft.
-	kephalaionReport, lines := upgradeKephalaion()
+	kephalaionReport, lines := upgradeKephalaion(ctx)
 	report.Kephalaion = &kephalaionReport
 	report.Messages = append(report.Messages, lines...)
 	emit(lines)
 
-	programReport, lines, target := upgradeProgram(environment)
+	programReport, lines, target := upgradeProgram(ctx, environment)
 	report.Program = &programReport
 	report.Messages = append(report.Messages, lines...)
 	emit(lines)
@@ -395,7 +401,7 @@ func upgrade(environment project.Environment, options upgradeOptions, out io.Wri
 // gescheiterten Pull gibt es eine Meldung und keinen Abbruch: Vergleich und
 // Installation laufen trotzdem, und das Projekt wird nachgezogen. Scheitert
 // Download oder Install, ist das eine eigene Meldung mit dem Weg im Terminal.
-func upgradeProgram(environment project.Environment) (upgradeProgramReport, []string, string) {
+func upgradeProgram(ctx context.Context, environment project.Environment) (upgradeProgramReport, []string, string) {
 	report := upgradeProgramReport{}
 	lines := []string{}
 	running := guiproc.OwnVersion()
@@ -424,7 +430,7 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 		}
 	}
 
-	status := program.CheckStatus(context.Background(), running, program.Fresh)
+	status := program.CheckStatus(ctx, running, program.Fresh)
 	report.Status = status
 	lines = append(lines, releaseSourceLines()...)
 	switch {
@@ -440,7 +446,7 @@ func upgradeProgram(environment project.Environment) (upgradeProgramReport, []st
 		report.Error = status.Hint
 		lines = append(lines, "Programm: "+status.Hint)
 	default:
-		result, err := upgradeInstall(context.Background(), status.Latest)
+		result, err := upgradeInstall(ctx, status.Latest)
 		report.InstallOutput = result.Output
 		if err != nil {
 			report.Error = err.Error()
@@ -482,7 +488,7 @@ func releaseSourceLines() []string {
 // checkUpgradeProgram meldet den Programm-Stand ohne zu schreiben: der
 // Remote-Stand des Clones und der Vergleich der laufenden Version mit dem
 // neuesten Release-Tag. Der Vergleich läuft auch ohne Clone.
-func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport, []string) {
+func checkUpgradeProgram(ctx context.Context, environment project.Environment) (upgradeProgramReport, []string) {
 	report := upgradeProgramReport{}
 	lines := []string{}
 	if !environment.PlaybookPresent {
@@ -508,7 +514,7 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 	}
 
 	running := guiproc.OwnVersion()
-	status := program.CheckStatus(context.Background(), running, program.Fresh)
+	status := program.CheckStatus(ctx, running, program.Fresh)
 	report.Status = status
 	lines = append(lines, releaseSourceLines()...)
 	switch {
@@ -540,10 +546,10 @@ func checkUpgradeProgram(environment project.Environment) (upgradeProgramReport,
 //     die Meldung, ob ein neueres Release da ist.
 //
 // Kein Weg braucht den Clone, und keiner hält den Lauf auf.
-func upgradeKephalaion() (upgradeKephalaionReport, []string) {
+func upgradeKephalaion(ctx context.Context) (upgradeKephalaionReport, []string) {
 	path, ok := upgradeFindKephalaion()
 	if !ok {
-		return installKephalaion()
+		return installKephalaion(ctx)
 	}
 
 	report := upgradeKephalaionReport{Present: true, Path: path}
@@ -568,9 +574,9 @@ func upgradeKephalaion() (upgradeKephalaionReport, []string) {
 // installKephalaion ist Weg 1: das install.sh des neuesten
 // Kephalaion-Releases. Scheitert es, nennt die Meldung die Installation von
 // Hand (kephalaion.InstallCommand) — dasselbe Skript ohne k-playbook.
-func installKephalaion() (upgradeKephalaionReport, []string) {
+func installKephalaion(ctx context.Context) (upgradeKephalaionReport, []string) {
 	report := upgradeKephalaionReport{}
-	result, err := upgradeInstallKephalaion(context.Background())
+	result, err := upgradeInstallKephalaion(ctx)
 	report.Path, report.Installed, report.Output = result.Path, result.Installed, result.Output
 	report.Present = result.Path != ""
 	switch {

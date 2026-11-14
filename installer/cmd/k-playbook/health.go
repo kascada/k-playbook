@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/health"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 )
 
 // Exit-Codes von `k-playbook health`: 0 ohne Fehler — Warnungen zählen nicht —,
@@ -43,7 +44,9 @@ func runHealth(args []string) error {
 	if err != nil {
 		return exitError{code: healthExitUsage, err: err}
 	}
-	report := health.Check(context.Background(), projectDir)
+	ctx, stop := procgroup.NotifyContext(context.Background())
+	defer stop()
+	report := health.Check(ctx, projectDir)
 
 	if asJSON {
 		encoder := json.NewEncoder(os.Stdout)

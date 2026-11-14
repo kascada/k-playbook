@@ -19,6 +19,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/project/defaultstest"
 	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
@@ -72,7 +73,9 @@ func TestMain(m *testing.M) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		if err := run(args); err != nil {
+		err := run(args)
+		procgroup.HoldIfEnding()
+		if err != nil {
 			if err.Error() != "" {
 				fmt.Fprintf(os.Stderr, "Fehler: %v\n", err)
 			}

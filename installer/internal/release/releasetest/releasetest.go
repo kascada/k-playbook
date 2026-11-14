@@ -106,7 +106,9 @@ type Source struct {
 	// kephalaion ist der Ersatz für das install.sh von Kephalaion; nil heißt:
 	// die Quelle hat keines (404).
 	kephalaion *string
-	requests   []string
+	// stalled: Anfragen nach Assets werden angenommen und nie beantwortet.
+	stalled  bool
+	requests []string
 }
 
 // Serve startet eine Ersatzquelle und setzt release.EnvSource für diesen Test
@@ -217,6 +219,16 @@ func (s *Source) SetKephalaionInstall(script string) {
 	s.kephalaion = &script
 }
 
+// StallDownloads lässt jede folgende Anfrage nach einem Asset hängen: Die
+// Quelle nimmt sie an und antwortet nie — bis der Aufrufer aufgibt oder der
+// Test endet. Tag, Prüfsummen und install.sh antworten weiter. So lässt sich
+// der Fristablauf eines Downloads prüfen.
+func (s *Source) StallDownloads() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stalled = true
+}
+
 // Requests sind die Pfade aller Anfragen bisher, in ihrer Reihenfolge.
 func (s *Source) Requests() []string {
 	s.mu.Lock()
@@ -230,6 +242,13 @@ func (s *Source) handle(w http.ResponseWriter, r *http.Request) {
 	s.requests = append(s.requests, r.URL.Path)
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
+	if s.stalled && strings.HasPrefix(path, "download/") {
+		// Ohne die Sperre warten: Andere Anfragen laufen weiter.
+		s.mu.Unlock()
+		<-r.Context().Done()
+		s.mu.Lock()
+		return
+	}
 	switch {
 	case path == "releases/latest":
 		// Wie GitHub: eine Weiterleitung mit absolutem Ziel.

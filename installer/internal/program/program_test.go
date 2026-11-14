@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/release"
@@ -397,4 +398,40 @@ func TestCheckPath(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Liefert die Quelle das Asset nie aus, endet der Download mit InstallTimeout:
+// die Meldung nennt Adresse und Frist, der Aufruf kehrt mit der Frist zurück,
+// und die Datei am Ziel bleibt, wie sie war.
+func TestInstallFristAbgelaufen(t *testing.T) {
+	_, target := isolate(t)
+	old := programScript("v0.9.3")
+	writeExecutable(t, target, old)
+	source := releasetest.Serve(t)
+	source.AddRelease("v0.9.4", []byte(programScript("v0.9.4")))
+	source.StallDownloads()
+	shortenInstallTimeout(t, 400*time.Millisecond)
+
+	start := time.Now()
+	result, err := Install(context.Background(), "v0.9.4")
+	elapsed := time.Since(start)
+	want := "der Download von " + source.URL() + "/download/v0.9.4/" + AssetName() + " hat nach 400ms nicht geendet"
+	if err == nil || err.Error() != want {
+		t.Fatalf("Fehler = %v, erwartet %q", err, want)
+	}
+	if result.Installed {
+		t.Errorf("Ergebnis = %+v", result)
+	}
+	if elapsed > 400*time.Millisecond+time.Second {
+		t.Errorf("Install kehrte erst nach %s zurück", elapsed)
+	}
+	if content, _ := os.ReadFile(target); string(content) != old {
+		t.Error("die Datei am Ziel wurde ersetzt")
+	}
+	entries, _ := os.ReadDir(filepath.Dir(target))
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".k-playbook.") {
+			t.Errorf("die temporäre Datei blieb liegen: %s", entry.Name())
+		}
+	}
 }

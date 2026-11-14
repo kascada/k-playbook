@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/release"
 )
 
@@ -93,15 +94,20 @@ const kephalaionInstallLabel = "das install.sh von Kephalaion"
 // runKephalaionInstall führt das geladene install.sh mit sh aus — so, wie
 // kephalaion.InstallCommand es einem Nutzer sagt (curl … | sh). Ohne stdin:
 // Das Skript fragt nichts.
+//
+// Das Skript läuft in einer eigenen Prozessgruppe (procgroup): Läuft die
+// Frist ab oder endet ctx, endet die ganze Gruppe — auch die Kindprozesse
+// des Skripts, etwa sein Download —, und der Aufruf kehrt mit der Frist
+// zurück. Ein SIGINT oder SIGTERM an k-playbook beendet erst die Gruppe und
+// dann das Programm (procgroup.NotifyContext, installiert von `upgrade`).
 func runKephalaionInstall(ctx context.Context, script string) (string, error) {
-	cmd := exec.CommandContext(ctx, "sh", script)
+	cmd := procgroup.Command(ctx, "sh", script)
 	cmd.Dir = filepath.Dir(script)
 	cmd.Env = withoutServeMarker(os.Environ())
-	// Ohne WaitDelay hielte ein Enkelprozess — curl — die Pipe nach dem
-	// Abbruch offen, und CombinedOutput kehrte erst mit ihm zurück.
-	cmd.WaitDelay = 5 * time.Second
-	output, err := cmd.CombinedOutput()
-	text := strings.TrimSpace(string(output))
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err := procgroup.Run(cmd)
+	text := strings.TrimSpace(output.String())
 
 	if ctx.Err() == context.DeadlineExceeded {
 		return text, fmt.Errorf("%s hat nach %s nicht geendet", kephalaionInstallLabel, InstallTimeout)

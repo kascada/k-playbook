@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/release"
 	"github.com/kascada/k-playbook/installer/internal/release/releasetest"
 )
@@ -153,4 +157,73 @@ func TestInstallKephalaionRaeumtAufUndNenntDieselbeAdresse(t *testing.T) {
 		t.Errorf("kephalaion.InstallCommand (%q) nennt nicht release.KephalaionInstallURL (%q)",
 			kephalaion.InstallCommand, release.KephalaionInstallURL)
 	}
+}
+
+// Läuft InstallTimeout ab, endet das install.sh mit seiner ganzen
+// Prozessgruppe — auch ein Enkel, der wie ein Download weiterliefe und die
+// Ausgabe offen hielte —, und der Aufruf kehrt mit der Frist zurück, nicht
+// erst nach procgroup.WaitDelay.
+func TestInstallKephalaionFristBeendetAuchDenEnkel(t *testing.T) {
+	isolate(t)
+	shortenInstallTimeout(t, 400*time.Millisecond)
+	before := procgroup.WaitDelay
+	procgroup.WaitDelay = 10 * time.Second
+	t.Cleanup(func() { procgroup.WaitDelay = before })
+	grandchildFile := filepath.Join(t.TempDir(), "enkel")
+	releasetest.Serve(t).SetKephalaionInstall(fmt.Sprintf(
+		"echo \"Ersatz-install.sh lädt\"\nsleep 300 &\necho $! > %q.tmp && mv %q.tmp %q\nwait\n",
+		grandchildFile, grandchildFile, grandchildFile))
+
+	start := time.Now()
+	result, err := InstallKephalaion(context.Background())
+	elapsed := time.Since(start)
+	if err == nil || err.Error() != "das install.sh von Kephalaion hat nach 400ms nicht geendet" {
+		t.Fatalf("Fehler = %v", err)
+	}
+	if !result.Installed || !strings.Contains(result.Output, "Ersatz-install.sh lädt") {
+		t.Errorf("Ergebnis = %+v", result)
+	}
+	if elapsed > 400*time.Millisecond+time.Second {
+		t.Errorf("InstallKephalaion kehrte erst nach %s zurück", elapsed)
+	}
+	data, readErr := os.ReadFile(grandchildFile)
+	if readErr != nil {
+		t.Fatalf("der Enkel hat sich nicht gemeldet: %v", readErr)
+	}
+	grandchild, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+	assertProcessGone(t, grandchild)
+}
+
+// shortenInstallTimeout setzt InstallTimeout für einen Test herab.
+func shortenInstallTimeout(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	before := InstallTimeout
+	InstallTimeout = timeout
+	t.Cleanup(func() { InstallTimeout = before })
+}
+
+// assertProcessGone prüft, dass pid binnen zwei Sekunden nicht mehr läuft —
+// ein Zombie, den init noch einsammeln muss, zählt nicht —, und beendet ihn
+// sonst selbst.
+func assertProcessGone(t *testing.T, pid int) {
+	t.Helper()
+	if pid <= 0 {
+		t.Fatalf("keine PID: %d", pid)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := syscall.Kill(pid, 0); errors.Is(err, syscall.ESRCH) {
+			return
+		}
+		if data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid)); err == nil {
+			if end := strings.LastIndexByte(string(data), ')'); end >= 0 {
+				if fields := strings.Fields(string(data)[end+1:]); len(fields) > 0 && fields[0] == "Z" {
+					return
+				}
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Errorf("der Enkel (PID %d) läuft nach dem Fristablauf weiter", pid)
+	_ = syscall.Kill(pid, syscall.SIGKILL)
 }

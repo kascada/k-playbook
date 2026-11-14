@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
@@ -48,7 +49,9 @@ func runBriefing(args []string) error {
 	if err != nil {
 		return err
 	}
-	briefing, err := project.BuildBriefingFrom(context.Background(), projectDir, workdir)
+	ctx, stop := procgroup.NotifyContext(context.Background())
+	defer stop()
+	briefing, err := project.BuildBriefingFrom(ctx, projectDir, workdir)
 	if err != nil {
 		return err
 	}

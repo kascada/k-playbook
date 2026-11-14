@@ -30,6 +30,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
+	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/release"
 	"github.com/kascada/k-playbook/installer/internal/vscodeext"
@@ -38,7 +39,11 @@ import (
 
 func main() {
 	ensureShare(os.Args[1:])
-	if err := run(os.Args[1:]); err != nil {
+	err := run(os.Args[1:])
+	// Beendet gerade ein Signal das Programm (procgroup.NotifyContext), endet
+	// es durch das Signal: kein eigener Fehler, kein eigener Exit-Code.
+	procgroup.HoldIfEnding()
+	if err != nil {
 		// Ein exitError ohne Text hat schon alles ausgegeben und setzt nur
 		// den Code; alles andere endet mit 1.
 		if err.Error() != "" {
@@ -80,7 +85,12 @@ func run(args []string) error {
 	case "mcp":
 		// Ohne Wirt-Pflege: stdout trägt den JSON-RPC-Strom, und eine einzige
 		// fremde Zeile daneben macht die Verbindung unbrauchbar.
-		return mcpserver.Run(context.Background())
+		// Mit Signal-Handler: Ein SIGINT oder SIGTERM beendet erst die
+		// Prozessgruppen, die ein Werkzeugaufruf gestartet hat, dann den
+		// Server (Task 152). Der Kontext reicht bis in die Werkzeugaufrufe.
+		ctx, stop := procgroup.NotifyContext(context.Background())
+		defer stop()
+		return mcpserver.Run(ctx)
 	case "scan":
 		// Ohne Wirt-Pflege: ein Scan liest nur und soll den Host nicht nebenbei
 		// anfassen, während er läuft. Zurzeit gesperrt (review.Paused).
@@ -240,7 +250,9 @@ func runVersion(out io.Writer, args []string) error {
 		return err
 	}
 
-	latest, tagErr := release.LatestTag(context.Background())
+	ctx, stop := procgroup.NotifyContext(context.Background())
+	defer stop()
+	latest, tagErr := release.LatestTag(ctx)
 	switch note := release.CurrentSource().Note(); {
 	case tagErr != nil:
 		_, err = fmt.Fprintf(out, "Neuestes Release: unbekannt — %s\n", strings.TrimSuffix(tagErr.Error(), "."))
