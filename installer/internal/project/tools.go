@@ -41,10 +41,9 @@ type Tool struct {
 
 // ToolPreflight ist die Antwort des Skripts.
 type ToolPreflight struct {
-	PlaybookDir string `json:"playbookDir"`
-	ToolMatrix  string `json:"toolMatrix"`
-	BinDir      string `json:"binDir"`
-	VenvRoot    string `json:"venvRoot"`
+	ToolMatrix string `json:"toolMatrix"`
+	BinDir     string `json:"binDir"`
+	VenvRoot   string `json:"venvRoot"`
 	// ToolScope benennt, ob der Status den Host-/User-PATH oder ein aktives
 	// Projekt-venv gemessen hat.
 	ToolScope        string `json:"toolScope"`
@@ -122,15 +121,16 @@ func ReadToolLanguages(projectDir string) ([]string, error) {
 // describePreflightError übersetzt die Skriptmeldung, wo sie für sich genommen
 // in die Irre führt.
 //
-// Binary und Skript können auseinanderlaufen: aufgerufen wird das Skript der
-// Installation des aktuellen Projekts, das Binary liegt dagegen einmal je Host
-// unter ~/.local/bin und bedient alle Projekte. Ist die Installation älter,
-// kennt ihr Skript ein neueres Argument nicht — und "Unknown argument" sagt
-// niemandem, dass ein Update fehlt.
-func describePreflightError(message string, playbookDir string) error {
+// Binary und Skript können auseinanderlaufen: aufgerufen wird das Skript aus
+// SharedDir(), das Binary liegt unter ~/.local/bin. Sind die Skripte älter,
+// kennt das Preflight-Skript ein neueres Argument nicht — und "Unknown
+// argument" sagt niemandem, dass ein Update fehlt. Nachgezogen werden beide
+// mit k-playbook upgrade; einen Clone, in dem ein Pull etwas holte, gibt es
+// dafür nicht mehr (Task 154).
+func describePreflightError(message string, scriptsDir string) error {
 	if strings.Contains(message, "Unknown argument:") {
-		return fmt.Errorf("die Installation unter %s ist älter als dieses Werkzeug: ihr Preflight-Skript meldet %q. Ziehe sie nach — in der Oberfläche über \"Update prüfen\", sonst mit git pull in diesem Verzeichnis",
-			DisplayPath(playbookDir), message)
+		return fmt.Errorf("die Skripte unter %s sind älter als dieses Werkzeug: ihr Preflight-Skript meldet %q. Ziehe sie nach mit k-playbook upgrade",
+			DisplayPath(scriptsDir), message)
 	}
 	return fmt.Errorf("%s", message)
 }
@@ -170,7 +170,7 @@ func CheckTools(projectDir string, languages []string) (ToolPreflight, error) {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
 			message, _, _ := strings.Cut(strings.TrimSpace(string(exitErr.Stderr)), "\n")
-			return ToolPreflight{}, describePreflightError(message, PlaybookDir(projectDir))
+			return ToolPreflight{}, describePreflightError(message, SharedDir())
 		}
 		return ToolPreflight{}, fmt.Errorf("Preflight fehlgeschlagen: %w", err)
 	}

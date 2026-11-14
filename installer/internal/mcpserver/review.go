@@ -154,7 +154,6 @@ func (m aiRecipeMetadata) auditContract() review.AuditContract {
 type reviewProjectEnvelope struct {
 	InputDir      string   `json:"inputDir"`
 	Root          string   `json:"root,omitempty"`
-	PlaybookDir   string   `json:"playbookDir,omitempty"`
 	LocalDir      string   `json:"localDir,omitempty"`
 	ReviewRunsDir string   `json:"reviewRunsDir,omitempty"`
 	Languages     []string `json:"languages,omitempty"`
@@ -184,12 +183,11 @@ type reviewToolError struct {
 func (e reviewToolError) Error() string { return e.Message }
 
 type reviewEnvironment struct {
-	InputDir    string
-	Root        string
-	PlaybookDir string
-	LocalDir    string
-	TargetDir   string
-	Languages   []string
+	InputDir  string
+	Root      string
+	LocalDir  string
+	TargetDir string
+	Languages []string
 }
 
 const (
@@ -2150,13 +2148,6 @@ func resolveReviewEnvironment(inputDir string) (reviewEnvironment, reviewToolErr
 			Details: map[string]any{"searchedFrom": inputDir, "config": project.ConfigFileName},
 		}
 	}
-	if !environment.PlaybookPresent {
-		return reviewEnvironment{}, reviewToolError{
-			Code:    "project_not_found",
-			Message: "k-playbook-Installation fehlt.",
-			Details: map[string]any{"playbookDir": environment.PlaybookDir},
-		}
-	}
 
 	config, err := project.ReadConfig(environment.ProjectDir)
 	if err != nil {
@@ -2184,12 +2175,11 @@ func resolveReviewEnvironment(inputDir string) (reviewEnvironment, reviewToolErr
 
 	root := environment.ProjectDir
 	return reviewEnvironment{
-		InputDir:    inputDir,
-		Root:        root,
-		PlaybookDir: environment.PlaybookDir,
-		LocalDir:    project.LocalDir(root),
-		TargetDir:   project.RepoRootDir(root, config),
-		Languages:   languages,
+		InputDir:  inputDir,
+		Root:      root,
+		LocalDir:  project.LocalDir(root),
+		TargetDir: project.RepoRootDir(root, config),
+		Languages: languages,
 	}, reviewToolError{}
 }
 
@@ -2197,7 +2187,6 @@ func (env reviewEnvironment) projectEnvelope() reviewProjectEnvelope {
 	return reviewProjectEnvelope{
 		InputDir:      env.InputDir,
 		Root:          env.Root,
-		PlaybookDir:   env.PlaybookDir,
 		LocalDir:      env.LocalDir,
 		ReviewRunsDir: review.ResultsDir(env.LocalDir),
 		Languages:     append([]string{}, env.Languages...),

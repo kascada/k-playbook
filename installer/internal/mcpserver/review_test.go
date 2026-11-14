@@ -714,7 +714,6 @@ func preflightScript(t *testing.T) string {
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cat <<JSON
 {
-  "playbookDir": "$root/k-playbook",
   "languages": "go",
   "tools": [
     {"name":"mockscan","languages":"go","status":"ok","path":"$root/mockscan","role":"Mock-Scanner"},
@@ -730,7 +729,7 @@ func multiPreflightScript(root string, names ...string) string {
 	for _, name := range names {
 		tools = append(tools, `    {"name":"`+name+`","languages":"go","status":"ok","path":"`+filepath.ToSlash(filepath.Join(root, name))+`","role":"Mock-Scanner"}`)
 	}
-	return "#!/usr/bin/env bash\ncat <<JSON\n{\n  \"playbookDir\": \"" + filepath.ToSlash(filepath.Join(root, "k-playbook")) + "\",\n  \"languages\": \"go\",\n  \"tools\": [\n" + strings.Join(tools, ",\n") + "\n  ]\n}\nJSON\n"
+	return "#!/usr/bin/env bash\ncat <<JSON\n{\n  \"languages\": \"go\",\n  \"tools\": [\n" + strings.Join(tools, ",\n") + "\n  ]\n}\nJSON\n"
 }
 
 func mustWriteScanner(t *testing.T, root string, name string, delay time.Duration) {

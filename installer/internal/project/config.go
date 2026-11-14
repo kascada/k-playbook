@@ -95,8 +95,8 @@ func CheckSchema(config Config) error {
 			ConfigFileName, config.SchemaVersion, LegacyModels[config.SchemaVersion],
 			SchemaVersion, resetHint)
 	default:
-		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation älter als die Konfiguration; hilft `git pull` im %s-Verzeichnis nicht weiter, gehört die Datei zu einem anderen Projekt",
-			ConfigFileName, config.SchemaVersion, SchemaVersion, PlaybookDirName)
+		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation älter als die Konfiguration; hilft `k-playbook upgrade` nicht weiter, gehört die Datei zu einem anderen Projekt",
+			ConfigFileName, config.SchemaVersion, SchemaVersion)
 	}
 }
 

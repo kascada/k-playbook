@@ -292,7 +292,8 @@ function renderOutdatedConfig(data) {
 
 // Der umgekehrte Fall: die Datei ist neuer als das Werkzeug. Zurücksetzen wäre
 // hier genau falsch — es würde die neuere Konfiguration wegwerfen. Was hilft,
-// ist ein Update der Installation, und das steht im Block darüber.
+// ist k-playbook upgrade; einen Clone, in dem ein git pull etwas holte, gibt es
+// dafür nicht mehr (Task 154).
 function renderNewerConfig(data) {
   elements.configCard.classList.remove("hidden");
   elements.configForm.classList.add("hidden");
@@ -302,7 +303,7 @@ function renderNewerConfig(data) {
     "schema_version",
     `${data.schemaVersion || "?"} — neuer als diese Installation`,
   );
-  addFact(elements.configFacts, "Was hilft", `git pull in ${data.playbookDir || "k-playbook/"}`);
+  addFact(elements.configFacts, "Was hilft", "k-playbook upgrade");
   setBlockState(elements.configPill, elements.configCreate, "blocked", CONFIG_LABELS);
   elements.configPill.textContent = "Installation zu alt";
 }
@@ -464,10 +465,10 @@ function renderMCP(data) {
   elements.mcpWorkdir.classList.toggle("hidden", !data.workdirMismatch);
   elements.mcpWorkdir.classList.toggle("warn", Boolean(data.workdirMismatch));
 
-  // Ohne Installation gibt es nichts einzurichten, der Button bleibt grau —
-  // ohne k-playbook/ ebenso: der Server hätte dann keine Inhalte auszuliefern.
+  // Ohne Projektkonfiguration gibt es nichts einzurichten, der Button bleibt
+  // grau. Den Clone k-playbook/ braucht der Server nicht (Task 154).
   const environment = data.environment || {};
-  const usable = environment.installed && environment.playbookPresent;
+  const usable = Boolean(environment.installed);
   const state = !usable ? "blocked" : data.ok ? "ok" : "todo";
   setBlockState(elements.mcpPill, elements.mcpApply, state, MCP_LABELS);
 }

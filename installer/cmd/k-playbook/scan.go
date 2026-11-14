@@ -26,6 +26,15 @@ func runScan(args []string) error {
 	if err := review.Paused(); err != nil {
 		return err
 	}
+	return scanRun(args)
+}
+
+// scanRun ist der Teil von runScan hinter der Pause. Eigene Funktion, damit
+// ein Test ihn erreicht, solange review.Paused sperrt.
+//
+// Den Clone <projekt>/k-playbook/ verlangt er nicht: Scan-Katalog und Skripte
+// kommen aus SharedDir(), der Lauf aus k-playbook-local/ (Task 154).
+func scanRun(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("kein Lauf angegeben: k-playbook scan <lauf> [eintrag …]")
 	}
@@ -36,9 +45,6 @@ func runScan(args []string) error {
 	if !environment.Installed {
 		return fmt.Errorf("keine %s gefunden — gesucht ab %s aufwärts",
 			project.ConfigFileName, project.DisplayPath(environment.SearchedFrom))
-	}
-	if !environment.PlaybookPresent {
-		return fmt.Errorf("die Installation unter %s fehlt", project.DisplayPath(environment.PlaybookDir))
 	}
 
 	config, err := project.ReadConfig(environment.ProjectDir)

@@ -148,12 +148,6 @@ func assistantState(message string) assistantResponse {
 				project.DisplayPath(environment.SearchedFrom) + " aufwärts)."
 		}
 
-	case !environment.PlaybookPresent:
-		if response.Message == "" {
-			response.Message = "Installationsverzeichnis " + project.PlaybookDirName +
-				"/ fehlt. Typisch nach einem frischen Clone des Projekts."
-		}
-
 	default:
 		response.Entries = project.CheckLinks(environment.ProjectDir)
 		response.Root = project.CheckRootInstructions(environment.ProjectDir)

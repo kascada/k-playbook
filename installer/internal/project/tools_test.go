@@ -26,7 +26,7 @@ func newInstallationWithScript(t *testing.T, body string) string {
 
 func TestCheckToolsLiestPreflight(t *testing.T) {
 	root := newInstallationWithScript(t, `cat <<'JSON'
-{"playbookDir":"/x","toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
+{"toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
  "venvRoot":"/x/venv","toolScope":"host","toolScopeMessage":"Host-/User-PATH","languages":"go","missingRequired":1,"installCommand":"bash x --install missing","installCommandVenv":"bash x --install missing --method venv",
  "tools":[{"name":"gitleaks","languages":"*","required":true,"installMethod":"github","status":"ok","version":"8.30.1","path":"/x/gitleaks","role":"Secret-Scanning","dockerImage":"img"},
           {"name":"gosec","languages":"go","required":true,"installMethod":"go","status":"missing","version":"","path":"","role":"Go-Security","dockerImage":""}]}
@@ -71,7 +71,7 @@ JSON
 
 func TestCheckToolsErlaubtReadOnlyPreflightMitAktivemVenv(t *testing.T) {
 	root := newInstallationWithScript(t, `cat <<'JSON'
-{"playbookDir":"/x","toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
+{"toolMatrix":"/x/scripts/security-tools.tsv","binDir":"/x/bin",
  "venvRoot":"/x/venv","toolScope":"project-venv","toolScopePath":"/tmp/projekt/.venv","toolScopeMessage":"Aktives Projekt-venv: /tmp/projekt/.venv","languages":"python","missingRequired":0,"installCommand":"bash x --install missing","installCommandVenv":"bash x --install missing --method venv",
  "tools":[{"name":"ruff","languages":"python","required":true,"installMethod":"pipx","status":"ok","version":"ruff 0.1.0","path":"/tmp/projekt/.venv/bin/ruff","role":"Python","dockerImage":""}]}
 JSON
@@ -131,9 +131,11 @@ func TestCheckToolsReichtFehlermeldungDurch(t *testing.T) {
 	}
 }
 
-// Binary und Skript können auseinanderlaufen, wenn das Binary aus der
-// host-weiten Kopie stammt und die Installation des Projekts älter ist. "Unknown
-// argument" allein sagt nicht, dass ein Update fehlt.
+// Binary und Skript können auseinanderlaufen, wenn die Skripte unter
+// SharedDir() älter sind als das Binary. "Unknown argument" allein sagt nicht,
+// dass ein Update fehlt. Die Abhilfe ist k-playbook upgrade — kein Knopf
+// „Update prüfen“ und kein git pull im Clone, der ohne Clone nichts holt
+// (Task 154).
 func TestCheckToolsErklaertVeralteteInstallation(t *testing.T) {
 	root := newInstallationWithScript(t, "echo 'ERROR: Unknown argument: --languages' >&2\nexit 1\n")
 
@@ -142,9 +144,14 @@ func TestCheckToolsErklaertVeralteteInstallation(t *testing.T) {
 		t.Fatal("Abbruch wurde nicht gemeldet")
 	}
 	got := err.Error()
-	for _, want := range []string{"älter als dieses Werkzeug", "Update prüfen", "--languages"} {
+	for _, want := range []string{"älter als dieses Werkzeug", "k-playbook upgrade", "--languages", DisplayPath(SharedDir())} {
 		if !strings.Contains(got, want) {
 			t.Errorf("Fehler = %q, erwartet einen Hinweis auf %q", got, want)
+		}
+	}
+	for _, unwanted := range []string{"Update prüfen", "git pull", PlaybookDirName + "/"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("Fehler = %q, enthält noch %q", got, unwanted)
 		}
 	}
 }

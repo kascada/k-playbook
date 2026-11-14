@@ -65,8 +65,9 @@ func applyMCPHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, mcpState(message))
 }
 
-// mcpState liest den aktuellen Zustand. Wie beim Assistenten-Block wird ein
-// fehlendes k-playbook/ vorab abgefangen, statt in die Messung zu laufen.
+// mcpState liest den aktuellen Zustand. Den Clone k-playbook/ verlangt er
+// nicht: Der Server liefert seine Inhalte vom Hub und aus SharedDir()
+// (Task 154).
 func mcpState(message string) mcpResponse {
 	environment := project.Detect()
 
@@ -84,12 +85,6 @@ func mcpState(message string) mcpResponse {
 		if response.Message == "" {
 			response.Message = "Keine " + project.ConfigFileName + " gefunden (gesucht ab " +
 				project.DisplayPath(environment.SearchedFrom) + " aufwärts)."
-		}
-
-	case !environment.PlaybookPresent:
-		if response.Message == "" {
-			response.Message = "Installationsverzeichnis " + project.PlaybookDirName +
-				"/ fehlt. Ohne die Inhalte darin hätte der Server nichts auszuliefern."
 		}
 
 	case err != nil:

@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PLAYBOOK_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 # Der Release-Weg und der Guard auf das Installationsziel liegen in einer
 # gemeinsamen Bibliothek: install-base-tools.sh geht denselben Weg, und
 # doppelter Code driftet nach der ersten einseitigen Änderung auseinander.
@@ -393,7 +392,7 @@ print_preflight() {
 
   printf 'Security-Tools - Preflight\n'
   printf '%s\n' '--------------------------'
-  printf 'Installation: %s\n' "$PLAYBOOK_DIR"
+  printf 'Skripte:    %s\n' "$SCRIPT_DIR"
   printf 'Toolliste:  %s\n' "$TOOL_MATRIX_FILE"
   printf 'Bin dir:    %s\n' "$BIN_DIR"
   printf 'Tool-venvs: %s (dediziert, nie ein Projekt-venv)\n' "$VENV_ROOT"
@@ -490,7 +489,6 @@ print_preflight_json() {
   fi
 
   printf '{\n'
-  printf '  "playbookDir": "%s",\n' "$(json_escape "$PLAYBOOK_DIR")"
   printf '  "toolMatrix": "%s",\n' "$(json_escape "$TOOL_MATRIX_FILE")"
   printf '  "binDir": "%s",\n' "$(json_escape "$BIN_DIR")"
   printf '  "venvRoot": "%s",\n' "$(json_escape "$VENV_ROOT")"

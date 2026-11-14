@@ -5,12 +5,12 @@
 # Zwei Repos über derselben Wurzel: Dieses Verzeichnis ist Arbeitsverzeichnis
 # des Quell-Repos (kascada/k-playbook) und des privaten Dev-Repos
 # (kascada/k-playbook-dev; Git-Verzeichnis priv/.git, core.worktree = ../..).
-# Das Dev-Repo versioniert .k-playbook/, priv/ und für den Übergang
-# k-playbook-local/, das Quell-Repo alles andere. Eine versionierte
+# Das Dev-Repo versioniert .k-playbook/ und priv/, das Quell-Repo alles
+# andere außer k-playbook-local/, das es nur zum Schutz ausblendet. Eine versionierte
 # .k-playbook/K-PLAYBOOK.yaml im Quell-Repo läge in jedem Clone, auch in der
 # Installation, und die Suche nach dem Projekt bliebe dort hängen.
 #
-# Die Ausnahmen der drei Verzeichnisse stehen nicht hier, sondern im
+# Die Ausnahmen dieser Verzeichnisse stehen nicht hier, sondern im
 # info/exclude beider Repos, versioniert in priv/quell-exclude und
 # priv/dev-exclude (siehe priv/README.md). Diese .gitignore darf sie nicht
 # ausblenden: Sie gilt auch im Dev-Repo und geht dort dessen info/exclude vor —
@@ -20,7 +20,7 @@
 #
 # Die Installation unter k-playbook/ entsteht lokal beim ersten Start und gehört
 # in keins der beiden Repos. In einem echten Zielprojekt gilt das Gegenteil:
-# dort werden .k-playbook/K-PLAYBOOK.yaml und k-playbook-local/ committet.
+# dort wird .k-playbook/K-PLAYBOOK.yaml committet.
 #
 # /K-PLAYBOOK.yaml ist der frühere Ort. Bis das neue Programm installiert ist,
 # liegt dort ein Link auf die neue Datei, damit das alte das Projekt findet;

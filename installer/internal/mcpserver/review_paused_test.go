@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -216,4 +217,54 @@ func TestReviewWerkzeuglisteNenntDieSperre(t *testing.T) {
 		}
 	}
 	assertSameTree(t, "status ohne "+project.LocalDirName, before, treeSnapshot(t, root))
+}
+
+// Ohne den Clone <projekt>/k-playbook/ antwortet k_playbook_review_status
+// wie sonst, statt mit „k-playbook-Installation fehlt“; der Umschlag trägt
+// kein playbookDir mehr. Die vier gesperrten Werkzeuge antworten auch dort
+// weiter mit reviews_paused (Task 154).
+func TestReviewWerkzeugeOhneClone(t *testing.T) {
+	root := newReviewProject(t)
+	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
+		t.Fatalf("%s entfernen: %v", project.PlaybookDirName, err)
+	}
+	session := reviewSession(t)
+
+	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      reviewToolStatus,
+		Arguments: reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"},
+	})
+	if err != nil {
+		t.Fatalf("%s: CallTool: %v", reviewToolStatus, err)
+	}
+	envelope := decodeReviewEnvelope(t, result)
+	if !envelope.OK {
+		t.Fatalf("%s ohne Clone: %+v", reviewToolStatus, envelope.Error)
+	}
+	if envelope.Project.Root != root {
+		t.Errorf("Projekt = %+v, erwartet root %s", envelope.Project, root)
+	}
+	for _, content := range result.Content {
+		text, ok := content.(*mcp.TextContent)
+		if !ok {
+			continue
+		}
+		var raw struct {
+			Project map[string]any `json:"project"`
+		}
+		if err := json.Unmarshal([]byte(text.Text), &raw); err != nil {
+			t.Fatalf("Antwort nicht lesbar: %v", err)
+		}
+		if _, found := raw.Project["playbookDir"]; found {
+			t.Errorf("Umschlag trägt noch playbookDir: %v", raw.Project)
+		}
+	}
+
+	for _, params := range pausedReviewCalls(root) {
+		result, err := session.CallTool(context.Background(), params)
+		if err != nil {
+			t.Fatalf("%s: CallTool: %v", params.Name, err)
+		}
+		assertToolErrorCode(t, result, review.PausedCode)
+	}
 }

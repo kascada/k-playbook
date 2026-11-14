@@ -264,6 +264,24 @@ func TestCheckSchema(t *testing.T) {
 	}
 }
 
+// Ist die Datei neuer als das Werkzeug, nennt die Meldung k-playbook upgrade
+// als Abhilfe, nicht mehr git pull im Clone (Task 154).
+func TestCheckSchemaNeuereFassungNenntUpgrade(t *testing.T) {
+	err := CheckSchema(Config{SchemaVersion: "9"})
+	if err == nil {
+		t.Fatal("neuere Fassung wurde akzeptiert")
+	}
+	got := err.Error()
+	if !strings.Contains(got, "k-playbook upgrade") {
+		t.Errorf("Fehler = %q, erwartet den Hinweis auf k-playbook upgrade", got)
+	}
+	for _, unwanted := range []string{"git pull", PlaybookDirName + "-Verzeichnis"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("Fehler = %q, enthält noch %q", got, unwanted)
+		}
+	}
+}
+
 // Eine neu erzeugte Konfiguration muss die eigene Prüfung bestehen.
 func TestCreateConfigSchreibtGueltigesSchema(t *testing.T) {
 	root := t.TempDir()

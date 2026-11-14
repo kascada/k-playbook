@@ -14,13 +14,12 @@ type configResponse struct {
 	// Installed meldet, ob mit diesem Projekt gearbeitet werden kann. Eine
 	// Konfiguration aus einem abgelösten Modell zählt nicht dazu: sie ist da,
 	// aber unbrauchbar, und alles Weitere bliebe Anzeige ohne Grundlage.
-	Installed   bool                `json:"installed"`
-	ProjectDir  string              `json:"projectDir"`
-	ConfigPath  string              `json:"configPath"`
-	PlaybookDir string              `json:"playbookDir"`
-	RepoRoot    string              `json:"repoRoot"`
-	VCS         string              `json:"vcs"`
-	Suggestion  *project.Suggestion `json:"suggestion,omitempty"`
+	Installed  bool                `json:"installed"`
+	ProjectDir string              `json:"projectDir"`
+	ConfigPath string              `json:"configPath"`
+	RepoRoot   string              `json:"repoRoot"`
+	VCS        string              `json:"vcs"`
+	Suggestion *project.Suggestion `json:"suggestion,omitempty"`
 	// Schema ist die Einordnung der gefundenen schema_version. Die Oberfläche
 	// braucht den Fall, nicht nur den Fehlertext: nur bei einer zu alten Datei
 	// steht das Zurücksetzen zur Wahl.
@@ -130,7 +129,6 @@ func configState(message string) configResponse {
 
 	response.ProjectDir = environment.ProjectDir
 	response.ConfigPath = project.ConfigPath(environment.ProjectDir)
-	response.PlaybookDir = environment.PlaybookDir
 
 	config, err := project.ReadConfig(environment.ProjectDir)
 	if err != nil {

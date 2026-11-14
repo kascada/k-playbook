@@ -98,7 +98,7 @@ function renderRegistration(data) {
   }
 
   const environment = data.environment || {};
-  if (!environment.installed || !environment.playbookPresent) {
+  if (!environment.installed) {
     elements.registrationPill.className = "pill muted";
     elements.registrationPill.textContent = "Nicht anwendbar";
     return;

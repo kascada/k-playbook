@@ -866,7 +866,7 @@ func newMCPReviewProject(t *testing.T) string {
 	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), `#!/usr/bin/env bash
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cat <<JSON
-{"playbookDir":"$root/k-playbook","languages":"go","tools":[{"name":"mockscan","languages":"go","status":"ok","path":"$root/mockscan","role":"Mock-Scanner"}]}
+{"languages":"go","tools":[{"name":"mockscan","languages":"go","status":"ok","path":"$root/mockscan","role":"Mock-Scanner"}]}
 JSON
 `)
 	if err := os.Chmod(filepath.Join(sharetest.Dir(t), "scripts", "install-security-tools.sh"), 0o755); err != nil {

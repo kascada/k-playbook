@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Gemeinsame Bausteine der beiden Installationsskripte unter scripts/.
 #
-# Diese Datei wird gesourct, nicht ausgeführt. Sie liegt neben den Skripten und
-# wird mit dem Clone in jedes Zielprojekt ausgeliefert; gefunden wird sie über
-# den Ort des aufrufenden Skripts (BASH_SOURCE), nie über das
-# Arbeitsverzeichnis — die Skripte werden aus der Installation heraus und aus
-# beliebigen Verzeichnissen aufgerufen.
+# Diese Datei wird gesourct, nicht ausgeführt. Sie liegt neben den Skripten
+# unter ~/.local/share/k-playbook/scripts/; gefunden wird sie über den Ort des
+# aufrufenden Skripts (BASH_SOURCE), nie über das Arbeitsverzeichnis — die
+# Skripte werden aus beliebigen Verzeichnissen aufgerufen.
 #
 # Warum gemeinsam: install-security-tools.sh und install-base-tools.sh gehen
 # denselben Release-Weg und führen denselben Guard auf das Installationsziel.

@@ -414,7 +414,6 @@ All review tools return the same envelope. Success:
   "project": {
     "inputDir": "/provided/path",
     "root": "/project",
-    "playbookDir": "/project/k-playbook",
     "localDir": "/project/k-playbook-local",
     "reviewRunsDir": "/project/k-playbook-local/results",
     "languages": ["go"]

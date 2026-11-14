@@ -2,11 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PLAYBOOK_DIR="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 # Der Release-Weg und der Guard auf das Installationsziel liegen in einer
 # gemeinsamen Bibliothek, die auch install-security-tools.sh sourct. Gesucht
 # wird relativ zum Ort dieses Skripts, nicht zum Arbeitsverzeichnis: die
-# Skripte laufen aus der Installation heraus und aus beliebigen Verzeichnissen.
+# Skripte liegen unter ~/.local/share/k-playbook/scripts/ und werden aus
+# beliebigen Verzeichnissen aufgerufen.
 # shellcheck source=lib/install-common.sh
 source "$SCRIPT_DIR/lib/install-common.sh"
 # Die Matrix liegt neben diesem Skript, damit beide zusammen verschoben werden
@@ -328,7 +328,7 @@ print_preflight() {
 
   printf 'Basis-Werkzeuge - Preflight\n'
   printf '%s\n' '---------------------------'
-  printf 'Installation: %s\n' "$PLAYBOOK_DIR"
+  printf 'Skripte:       %s\n' "$SCRIPT_DIR"
   printf 'Werkzeugliste: %s\n' "$TOOL_MATRIX_FILE"
   printf 'Bin dir:       %s\n' "$BIN_DIR"
   if scope_path="$(active_project_venv_path)"; then
@@ -390,7 +390,6 @@ print_preflight_json() {
   fi
 
   printf '{\n'
-  printf '  "playbookDir": "%s",\n' "$(json_escape "$PLAYBOOK_DIR")"
   printf '  "toolMatrix": "%s",\n' "$(json_escape "$TOOL_MATRIX_FILE")"
   printf '  "binDir": "%s",\n' "$(json_escape "$BIN_DIR")"
   printf '  "toolScope": "%s",\n' "$(json_escape "$tool_scope")"

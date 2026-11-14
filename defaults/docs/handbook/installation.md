@@ -729,7 +729,7 @@ The final item checks all preceding items at once: the command stops if configur
 
 **Skills are not triggered.** Every skill directory must contain `SKILL.md`; without it, the directory does not count as a skill and is not linked. Then restart the assistant.
 
-**`schema_version` does not match.** If the number is below `3` or missing, configuration is older than the tool. The interface resets it; see [A configuration from a retired model](#a-configuration-from-a-retired-model). If it is higher, the reverse is true: the installation is behind. Then `git pull` in `k-playbook/` helps, not a reset, which would discard the newer file.
+**`schema_version` does not match.** If the number is below `3` or missing, configuration is older than the tool. The interface resets it; see [A configuration from a retired model](#a-configuration-from-a-retired-model). If it is higher, the reverse is true: the installation is behind. Then `k-playbook upgrade` helps, not a reset, which would discard the newer file.
 
 **The tool finds no project.** Then `.k-playbook/K-PLAYBOOK.yaml` is missing above the invocation location. Starting at the working directory, the search goes upwards to `$HOME` or `/` and deliberately does not guess. The interface then proposes a location. One more cause: a program older than the move of the anchor into `.k-playbook/` (2026-11) does not find a project whose anchor has already moved. After the first call of the new program, every environment of the project -- a second machine, a DevContainer, a colleague's checkout -- needs the new program; `k-playbook upgrade` installs it.
 

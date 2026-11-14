@@ -121,3 +121,36 @@ func TestDescribeSetupNenntNachzugAnAgents(t *testing.T) {
 		t.Errorf("der abgelöste Aufruf steht in der Meldung: %s", text)
 	}
 }
+
+// Ohne den Clone k-playbook/ zeigen die Seiten „Assistenten“ und „MCP“ ihren
+// Zustand, statt mit „Installationsverzeichnis … fehlt“ abzubrechen (Task 154).
+func TestAssistentUndMCPOhneClone(t *testing.T) {
+	root := assistantProject(t)
+	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
+		t.Fatalf("%s entfernen: %v", project.PlaybookDirName, err)
+	}
+
+	assistant := getAssistant(t)
+	if assistant.Environment.PlaybookPresent {
+		t.Fatalf("%s/ ist noch da", project.PlaybookDirName)
+	}
+	if strings.Contains(assistant.Message, "Installationsverzeichnis") {
+		t.Errorf("Assistenten: Message = %q, erwartet keine Sperre", assistant.Message)
+	}
+	if len(assistant.Entries) == 0 || assistant.Root.Path == "" {
+		t.Errorf("Assistenten: kein Zustand gemessen: %+v", assistant)
+	}
+
+	recorder := httptest.NewRecorder()
+	mcpHandler(recorder, httptest.NewRequest(http.MethodGet, "/api/mcp", nil))
+	var mcp mcpResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &mcp); err != nil {
+		t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
+	}
+	if strings.Contains(mcp.Message, "Installationsverzeichnis") {
+		t.Errorf("MCP: Message = %q, erwartet keine Sperre", mcp.Message)
+	}
+	if len(mcp.Entries) == 0 {
+		t.Errorf("MCP: kein Zustand gemessen: %+v", mcp)
+	}
+}

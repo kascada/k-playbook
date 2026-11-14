@@ -1,9 +1,13 @@
 package main
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
@@ -54,5 +58,38 @@ func TestDescribeJobUebersprungen(t *testing.T) {
 	got := describeJob(review.JobStatus{State: review.StateSkipped, Reason: "Sprache nicht gewählt"})
 	if !strings.Contains(got, "Sprache nicht gewählt") {
 		t.Errorf("Grund fehlt: %q", got)
+	}
+}
+
+// Ohne den Clone <projekt>/k-playbook/ verweigert scan nicht mehr mit „die
+// Installation … fehlt“ (Task 154). Geprüft wird der Teil hinter der Pause:
+// runScan als Ganzes endet zurzeit immer an review.Paused und bestünde auch
+// mit der Sperre.
+func TestScanRunOhneCloneVerlangtKeineInstallation(t *testing.T) {
+	root := t.TempDir()
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
+	if _, err := os.Stat(filepath.Join(root, project.PlaybookDirName)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("%s/ darf es im Testprojekt nicht geben: %v", project.PlaybookDirName, err)
+	}
+	t.Chdir(root)
+
+	err := scanRun([]string{"kein-lauf"})
+	if err == nil {
+		t.Fatal("ein fehlender Lauf wurde nicht gemeldet")
+	}
+	got := err.Error()
+	if strings.Contains(got, "Installation unter") {
+		t.Errorf("Fehler = %q, erwartet keine Sperre wegen der Installation", got)
+	}
+	if !strings.Contains(got, "kein-lauf ist nicht lesbar") {
+		t.Errorf("Fehler = %q, erwartet, dass scan bis zum Lesen des Laufs kommt", got)
+	}
+}
+
+// Die Pause aus Task 147 bleibt: scan als Ganzes antwortet mit der Sperre.
+func TestRunScanBleibtPausiert(t *testing.T) {
+	err := runScan([]string{"kein-lauf"})
+	if !errors.Is(err, review.ErrPaused) {
+		t.Errorf("Fehler = %v, erwartet die Pause der Review-Wege", err)
 	}
 }

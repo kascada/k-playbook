@@ -794,7 +794,8 @@ Werkzeug nicht kennt.
 `SchemaState()` ordnet die gefundene Fassung ein — `ok`, `missing`, `outdated`, `newer`.
 Die Oberfläche braucht den Fall und nicht nur den Fehlertext von `CheckSchema()`: nur
 bei `outdated`/`missing` steht das Zurücksetzen zur Wahl. Bei `newer` wäre es genau
-falsch, dort ist die Installation hinterher.
+falsch, dort ist die Installation hinterher; Meldung und Seite nennen dann
+`k-playbook upgrade`.
 
 `ResetConfig()` in `project/reset.go` ist der einzige Weg, der eine vorhandene
 Konfiguration ersetzt. Der Ablauf: Fassung prüfen, `LegacyContent()` prüfen, alte Datei
@@ -1886,6 +1887,21 @@ Skills und `scripts/` (Skripte, Tool-Matrizen, Scanner- und Severity-Katalog) ko
 Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist nicht an einen
 bestimmten Projekt-Clone gebunden. Es leitet den Projektinhalt ausschließlich aus dem
 Arbeitsverzeichnis und dem Anker ab.
+
+**Wer den Clone noch verlangt.** Auf `Environment.PlaybookPresent` prüfen nur noch die
+Wege, die im Clone selbst etwas tun: der Pull in `k-playbook upgrade` (`upgrade.go`) und in
+`POST /api/update` (`webui/update.go`), dazu Aufräumen und Schreibschutz im Clone beim
+Start der Oberfläche (`gui.go`). `k-playbook scan` (`scanRun`, hinter der Pause aus
+Task 147), die MCP-Review-Werkzeuge (`resolveReviewEnvironment`) und die Seiten
+„Assistenten“ und „MCP“ (`assistantState`, `mcpState`, in der Seite `app.js` und `mcp.js`)
+verweigern ohne `k-playbook/` nicht mehr mit „Installation fehlt“ (Task 154): Rezepte und
+Instruktionen kommen vom Hub, Skripte und Scan-Katalog aus `SharedDir()`. Mit den Sperren
+fiel `playbookDir` aus dem Review-Umschlag, aus der Antwort von `GET /api/config` und aus
+dem JSON der beiden Preflight-Skripte; die Skripte nennen ihr Verzeichnis in der Ausgabe
+`Skripte:`. Meldungen, die ein Nachziehen verlangen — `describePreflightError` bei
+„Unknown argument“, `CheckSchema` bei neuerer `schema_version`, `renderNewerConfig` —,
+nennen `k-playbook upgrade` statt `git pull` im Clone. Ohne Clone bleibt allein der Katalog
+`checks` leer, weil `resolveCatalog` ihn noch aus `PlaybookDir` liest.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
