@@ -18,7 +18,7 @@
 // Fragen des aktuellen Laufs. Der Vertrag von `review-input.json` hängt an der
 // eingefrorenen Fassung und bleibt davon unberührt. Wer hier etwas verbessert,
 // entscheidet in einem zweiten, ausdrücklichen Schritt, ob `stablePath`
-// mitziehen soll; siehe `docs/review-runs.md`.
+// mitziehen soll; siehe `defaults/docs/handbook/review-runs.md`.
 package pathnorm
 
 import "strings"

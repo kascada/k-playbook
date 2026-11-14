@@ -17,7 +17,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/ghconfig"
 )
 
-// Der Test gegen GitHub (docs/github-access.md, Abschnitt Testing an access):
+// Der Test gegen GitHub (defaults/docs/handbook/github-access.md, Abschnitt Testing an access):
 // Er fragt GitHub, ob ein Zugang wirklich funktioniert — Identität, lesen,
 // schreiben, Ablauf. Er ist das Einzige in diesem Paket, das das Netz nutzt,
 // und läuft nur auf ausdrücklichen Aufruf: der Befehl `k-playbook github

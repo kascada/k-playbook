@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Die weiteren Manifesttypen aus docs/version-inventory.md („Other manifest
+// Die weiteren Manifesttypen aus defaults/docs/handbook/version-inventory.md („Other manifest
 // types“), die früher /k-docs-tools selbst erkannte. Die Semantik ist überall
 // dieselbe: Manifest und Lockfile beide, nur direkte Abhängigkeiten, Scope aus
 // dem Abschnitt.

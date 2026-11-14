@@ -30,7 +30,7 @@ Versionen, die `sources` nennt. Weicht das Inventar später ab, gibt das **Inven
 Auskunft; ein Steckbrief wird deswegen nicht aus dem Inventar umgeschrieben, sondern über
 diesen Command nachgezogen, wenn sein Inhalt — nicht nur seine Versionszahl — veraltet ist.
 Beide sprechen dieselbe Pin-Taxonomie: die aus dem Vertrag des Inventars,
-`docs/version-inventory.md` der Installation, Abschnitt „Pin taxonomy“. Dieser Text
+`k-playbook:/docs/handbook/version-inventory.md`, Abschnitt „Pin taxonomy“. Dieser Text
 definiert keine eigene.
 
 ## Schritt 1 — Briefing, Inventar und Scope

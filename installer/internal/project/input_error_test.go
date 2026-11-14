@@ -28,11 +28,10 @@ func TestInputErrorIstErkennbar(t *testing.T) {
 	}
 }
 
-// docFilePath meldet ungültige Pfade als Eingabefehler.
-func TestDocFilePathMeldetEingabefehler(t *testing.T) {
-	root := t.TempDir()
+// handbookPath meldet ungültige Pfade als Eingabefehler.
+func TestHandbookPathMeldetEingabefehler(t *testing.T) {
 	for _, rel := range []string{"", "/etc/passwd", "../x.md", "notiz.txt"} {
-		_, err := docFilePath(root, rel)
+		_, err := handbookPath(rel)
 		var input *InputError
 		if !errors.As(err, &input) {
 			t.Errorf("%q: kein Eingabefehler: %v", rel, err)

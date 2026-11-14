@@ -6,7 +6,7 @@ description: Working document for moving k-playbook onto Kephalaion — the goal
 # Knowledge — Current Direction
 
 Working document for the duration of the switch, in the manner of
-[`migration.md`](./migration.md): it records what has been discussed and decided, the open
+[`migration.md`](../defaults/docs/handbook/migration.md): it records what has been discussed and decided, the open
 questions and the work still to do. What has been implemented moves into the regular
 documentation and leaves this file; the file is deleted when nothing remains open.
 
@@ -74,7 +74,7 @@ machine, with that person's account.
 machine-local in `k-playbook-local/K-PLAYBOOK.local.yaml`; the check runs over MCP (`whoami`
 with the token from Kephalaion's token file); `k-playbook context` carries the result; the
 interface shows it and offers the setup step that tests and then writes. Described in
-[`installation.md`](./installation.md#kephalaion-collection) and
+[`installation.md`](../defaults/docs/handbook/installation.md#kephalaion-collection) and
 [`../installer/docs/architecture.md`](../installer/docs/architecture.md#kephalaion-anbindung).
 Changed 2026-11-10 by task 138: hub alias and collection are versioned in the block
 `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`; account, token file and node address come from
@@ -152,7 +152,7 @@ an assembled directory) and `keph:/…` (the project's collection, read over Kep
 layer `k-playbook-local/`; `keph:` names neither hub nor collection, because both are
 machine-local. The public collection `<hub>:k-playbook` is no reference target: its
 `defaults/` is the shipped layer behind `k-playbook:`. Defined in
-[`verweisschema.md`](./verweisschema.md); the version for sessions is
+[`verweisschema.md`](../defaults/docs/handbook/verweisschema.md); the version for sessions is
 `instructions/always/010-verweise.md`.
 
 **A new kind `instructions/`** (2026-10-14, task 087). `instructions/always/` holds numbered
@@ -183,12 +183,12 @@ single file comes with frontmatter; an empty local file disables a `k-playbook:`
 an error; a directory is assembled without frontmatter; an unknown reference is `not_found`
 with no fallback; `kephalaion_unavailable` when the binding is not ready. `unsupported` is
 left for `k-playbook:` outside its kinds. The `ref` in the prefix scheme is the lasting
-contract of the tool; see [`mcp.md`](./mcp.md#doc-read-contract) and
-[`verweisschema.md`](./verweisschema.md#access-route-per-prefix). **Put to use later:**
+contract of the tool; see [`mcp.md`](../defaults/docs/handbook/mcp.md#doc-read-contract) and
+[`verweisschema.md`](../defaults/docs/handbook/verweisschema.md#access-route-per-prefix). **Put to use later:**
 `instructions/always/010-verweise.md` still says "`keph:` you read directly with Kephalaion
 `read`" — that stays true and is extended by `k_playbook_doc_read` in the follow-up task that
 moves the commands; that task also decides which of the two routes is the default for
-`keph:`. Until then [`verweisschema.md`](./verweisschema.md) documents both.
+`keph:`. Until then [`verweisschema.md`](../defaults/docs/handbook/verweisschema.md) documents both.
 
 **Includes** (2026-10-18, task 093). An include is a reference at a particular place in a
 document; `ResolveDocRef` replaces the line by the body of the target, so that commands,
@@ -212,7 +212,7 @@ every hub carries after the release; neither appears in a catalog, the briefing 
 `disabled`. Nothing shipped carries an include line yet ("build first, then put to use").
 **Note for the follow-up task:** `keph:` includes are allowed by the mechanism, but they
 make a document depend on the network and on `kephalaion.ok` — in always-instructions and
-briefing texts only with care. Details: [`verweisschema.md`](./verweisschema.md#includes).
+briefing texts only with care. Details: [`verweisschema.md`](../defaults/docs/handbook/verweisschema.md#includes).
 
 **Commands as a hull with a reference** (2026-10-18, task 092 — built, measured in the
 assistants after the next release). A command consists of two parts: a **hull** with the
@@ -302,8 +302,8 @@ should writing ever be limited to one's own area, instead of one scope per kind.
 Kephalaion **user** (`kephalaion.user`), not the account: the account belongs to one machine,
 so the same person on two machines would otherwise get two directories. In shipped text the
 segment `~` stands for the own user (`keph:/user/~/tasks/`); see
-[`verweisschema.md`](./verweisschema.md#placeholder--for-the-own-user). The tools that create,
-list and move documents there: [`mcp.md`](./mcp.md#document-tools-in-the-collection).
+[`verweisschema.md`](../defaults/docs/handbook/verweisschema.md#placeholder--for-the-own-user). The tools that create,
+list and move documents there: [`mcp.md`](../defaults/docs/handbook/mcp.md#document-tools-in-the-collection).
 
 **Findings go to `queue/findings/`** (2026-10-14; creating and listing built 2026-10-15 in
 task 088, the scheduled run and the switch of the findings rule not built). What sessions find no longer
@@ -386,8 +386,8 @@ would not collide with the task files on disk — counting those files along was
 files move into the collection under the same name and number (see "Tasks go to the
 collection" below).
 Moving into `done/` and back is `rename` through the hub. Contract:
-[`mcp.md`](./mcp.md#document-tools-in-the-collection); what k-playbook expects of Kephalaion:
-[`kephalaion-client.md`](./kephalaion-client.md).
+[`mcp.md`](../defaults/docs/handbook/mcp.md#document-tools-in-the-collection); what k-playbook expects of Kephalaion:
+[`kephalaion-client.md`](../defaults/docs/handbook/kephalaion-client.md).
 
 | Kind | Stored in | Counting range | Start |
 |---|---|---|---|
@@ -471,7 +471,7 @@ client, the kind `todos` in the kind table (kept out of the `doc` tools), the fo
 `k_playbook_todo_*` tools and `k-playbook todo` on the collection with a `search`, the GUI with
 creation, ticking off, reopening and a search (todo #14), and `k-playbook todo migrate`, which
 took over the 28 entries of this repo with their ids. Without a usable Kephalaion there are no
-todos, in the GUI as well. Contract: `docs/mcp.md`, "Todo Contract and Migration". Still to
+todos, in the GUI as well. Contract: [`defaults/docs/handbook/mcp.md`](../defaults/docs/handbook/mcp.md), "Todo Contract and Migration". Still to
 follow: `commands/k-todo.md` (`kephalaion_unavailable`, `todos_not_migrated`, no `migrated`,
 `search`), `docs/knowledge-layout.md` and the other descriptions of the old store; taking over a
 not yet migrated `data/todos.json` in `k-playbook upgrade`; the MCP tools at an open session
@@ -504,7 +504,7 @@ local-only as the one named exception until the context output is switched. The 
 `knowledge-gate.md` ("Querying the surface") merges into this one: the
 document list exists now; the counts per kind, state and origin and the freshness come with the
 knowledge store later (overtaken: both the store and `knowledge-gate.md` are gone since task
-123). Contract: [`mcp.md`](./mcp.md#briefing-contract); what moves where:
+123). Contract: [`mcp.md`](../defaults/docs/handbook/mcp.md#briefing-contract); what moves where:
 "The briefing replaces the context output" below.
 
 **`/k-docs-*` write single documents** (2026-10-09). The generators write directly, document
@@ -587,9 +587,9 @@ removed on 2026-11-14; its rows were done or obsolete. What was still needed sta
 write into the installation and the three roots in `always/030-briefing.md`, tasks in
 `always/300-arbeiten-in-tasks.md`, the `AGENTS.md` blocks in the briefing version of the
 `anstoss` block (task 096) and in `always/100-…` and `always/200-…`, the overview of the
-commands in [`commands.md`](./commands.md), the remediation modes in
+commands in [`commands.md`](../defaults/docs/handbook/commands.md), the remediation modes in
 `defaults/commands/k-remediation.md` (redone with the review rebuild), the overlay rule in
-[`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
+[`k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md#merge-shipped-and-project-owned-content).
 
 **Context field → future place** (task 091, 2026-10-17). This table is the authority for the
 place of every field of the context output; where the table above still names one of these
@@ -622,8 +622,8 @@ the commands and skills that name the field today (`grep -rn <field> commands sk
 | `catalogs.checks` (`name`, `key`, `path`, `origin`, `disabled`) | `checks`: own list beside `documents`, entries with `key`, `origin` and `disabled` — checks are run through `bin/k-check`, not read, so they are no `documents` entry and keep no `ref`; whether `path` stays is decided when the field moves | `_shared/context.md`, `/k-enforcement` | in the rest |
 | `catalogs.rules` | `documents.rules` — `ref`, `title`, `description`, `origin` instead of `path`; readers switch from the path to `k_playbook_doc_read` | `_shared/context.md`, `/k-danke`, `/k-enforcement`, `/k-review`; `ks-befunde`, `ks-enforcement` (`SKILL.md`, `PLAYBOOK.md`) | in the briefing |
 | `catalogs.reviews` (with `audit`/`review` modes per recipe) | `documents.reviews` — but the briefing entry carries no `audit`/`review` block (`parseReviewModes`); `/k-audit` and `/k-review` choose recipes by these modes, so before `catalogs` goes the review entries in the briefing get the modes, or the readers take them from the recipe's frontmatter — rework to decide at the switch | `_shared/context.md`, `_audit/review-scan-triage.md`, `/k-audit`, `/k-review`, `/k-task-run` | in the briefing |
-| `guidelines` (files of `k-playbook-local/guidelines/` only) | `documents.guidelines` — a different meaning: the context field names only the local files, `documents.guidelines` the overlay of shipped (`k-playbook/guidelines/`, today `betrieb.md`) and local ([mcp.md](mcp.md#briefing-contract), `guidelinesKind` in `context.go`); readers see more after the switch — that is rework and belongs to this row | `_shared/context.md` (the field); `/k-danke` and `ks-befunde` no longer write to the directory (they write `keph:/queue/findings/`) | dropped from the context output (task 148); `documents.guidelines` in the briefing |
-| `versionSources` (`path`, `present`, `schemaVersion`, `roots`, `sources`, `exclude`, `helmValues`, `error`) | `versionSources`, same shape — the contract says no command reads the file itself ([version-inventory.md](version-inventory.md)) | `_shared/context.md`, `_docs/inventory.md`, `/k-docs` | in the rest |
+| `guidelines` (files of `k-playbook-local/guidelines/` only) | `documents.guidelines` — a different meaning: the context field names only the local files, `documents.guidelines` the overlay of shipped (`k-playbook/guidelines/`, today `betrieb.md`) and local ([mcp.md](../defaults/docs/handbook/mcp.md#briefing-contract), `guidelinesKind` in `context.go`); readers see more after the switch — that is rework and belongs to this row | `_shared/context.md` (the field); `/k-danke` and `ks-befunde` no longer write to the directory (they write `keph:/queue/findings/`) | dropped from the context output (task 148); `documents.guidelines` in the briefing |
+| `versionSources` (`path`, `present`, `schemaVersion`, `roots`, `sources`, `exclude`, `helmValues`, `error`) | `versionSources`, same shape — the contract says no command reads the file itself ([version-inventory.md](../defaults/docs/handbook/version-inventory.md)) | `_shared/context.md`, `_docs/inventory.md`, `/k-docs` | in the rest |
 | `kephalaion` (`configured`, `hub`, `collection`, `account`, `address`, `state`, `ok`, `message`, `rights`, `scopes`, `user`, `node`, `nodeVersion`, `sync`) | `work`: `work.user` is there, `work.available`/`work.message` stand for `ok`/`message`; `address` gets `work.collection` so that `keph:` references can be read; the rest of the status (hub, account, state, rights, node, sync) drops — the interface shows it | no command; `instructions/always/010-verweise.md` names `kephalaion.address`, `kephalaion.ok` and `kephalaion.user` (in the briefing under `context`, reworded to `work` at the switch) | in the rest |
 | `links` (`healed`, `open`, `note`; only when there is something to report) | `links`, same shape and only when there is something to report. The healing itself (`HealLinks`) runs in `ContextForDir` today; the briefing heals because its rest comes through that function. Before `context` goes, the healing has to sit in `BuildBriefing` itself — otherwise the briefing would stop healing the moment the rest is removed | no command reads it; the `note` addresses the session | in the rest |
 | `github` (`file`, `present`, `problems`, `remote`, `repo`, `projectServices`, `services`; task 119) | proposal: `github`, same shape, its own section beside `work` — which service of the personal access file belongs to this repository and what `k-playbook github run` chooses; the plain-text line `GitHub: …` after `Projektdoku:` already stands outside the rest. Filled in `ContextForDir` like `kephalaion`, so when the rest goes, `BuildBriefing` has to build it itself. `context.gh` goes once its readers are switched to this field | `always/400-github-ueber-run.md` and `on-demand/github.md`, the instruction "GitHub über run" (task 122): the plain-text line first, `context.github.projectServices` only beside it; `on-demand/briefing-felder.md` describes it; `_shared/gh.md` reads it since task 125, for `/k-task-run` (PR) and `review-dependabot-alerts` | in the rest |
@@ -692,7 +692,7 @@ is rebuilt by task 091 — "build first, then put to use".
   review tools (`mcpserver/review.go`) and the interface (`webui/context.go`) use
   `BuildContext` directly and are not affected. **To rebuild:** both go when the rest is
   empty; the healing of the assistant links moves into `BuildBriefing` first (row `links`
-  above); `docs/mcp.md` (intro, tool table, "Briefing Contract"), `docs/k-playbook-format.md`
+  above); [`defaults/docs/handbook/mcp.md`](../defaults/docs/handbook/mcp.md) (intro, tool table, "Briefing Contract"), [`defaults/docs/handbook/k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md)
   ("The resolved working state") and `keph:/docs/manual/assistenten-verlinkung.md`
   ("Wo die Rechnung ausgelöst wird") follow.
 
@@ -720,10 +720,10 @@ project names `k-playbook context` any more (checked: `rootInstructionsTemplate(
 | `installer/docs/architecture.md` other hits (`:144`, `:342`, `:1100`, `:1342`, `:1359`, `:1846`, `:2101`, `:2657`, `:3246`, `:3338-3345`, `:3726`, `:3732`) | describe the context output, the MCP tool and measurements | stays on purpose |
 | `README.md` ("What applies", "An existing CLAUDE.md", "Updating") | entry of a project: briefing instead of context | switched in 096 |
 | `installer/README.md` | call list and the paragraph on `context` | switched in 096 (briefing and upgrade added, context marked as being taken apart) |
-| `docs/k-playbook-format.md` (the `AGENTS.md` block) | the prompt | switched in 096 |
-| `docs/k-playbook-format.md` (`:210`, `:249` "The resolved working state", `:296-309`, `:521-524`) | the context output and the rest section | stays until the switch of the context output |
-| `docs/installation.md:166/191/311`, `docs/faq.md:103/115`, `docs/manual.md:119`, `docs/commands.md:21` | the prompt and "the call at the start of every session" | switched in 096 |
-| `docs/installation.md:265/408/527/601`, `docs/faq.md:85`, `docs/manual.md:88`, `docs/commands.md:105`, `docs/overview.md`, `docs/version-inventory.md`, `docs/verweisschema.md`, `docs/kephalaion-client.md`, `docs/mcp.md` | describe fields of the context output | stays until the switch of the context output |
+| [`defaults/docs/handbook/k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md) (the `AGENTS.md` block) | the prompt | switched in 096 |
+| [`defaults/docs/handbook/k-playbook-format.md`](../defaults/docs/handbook/k-playbook-format.md) (`:210`, `:249` "The resolved working state", `:296-309`, `:521-524`) | the context output and the rest section | stays until the switch of the context output |
+| `defaults/docs/handbook/installation.md:166/191/311`, `defaults/docs/handbook/faq.md:103/115`, `defaults/docs/handbook/manual.md:119`, `defaults/docs/handbook/commands.md:21` | the prompt and "the call at the start of every session" | switched in 096 |
+| `defaults/docs/handbook/installation.md:265/408/527/601`, `defaults/docs/handbook/faq.md:85`, `defaults/docs/handbook/manual.md:88`, `defaults/docs/handbook/commands.md:105`, [`defaults/docs/handbook/overview.md`](../defaults/docs/handbook/overview.md), [`defaults/docs/handbook/version-inventory.md`](../defaults/docs/handbook/version-inventory.md), [`defaults/docs/handbook/verweisschema.md`](../defaults/docs/handbook/verweisschema.md), [`defaults/docs/handbook/kephalaion-client.md`](../defaults/docs/handbook/kephalaion-client.md), [`defaults/docs/handbook/mcp.md`](../defaults/docs/handbook/mcp.md) | describe fields of the context output | stays until the switch of the context output |
 | `commands/*.md` (21 files), `skills/*/SKILL.md` and `PLAYBOOK.md` (5), `commands/_shared/context.md` | the old entry module and the commands' standard header | stays until its reader moves (work list 16) |
 | `rules/command-authoring.md:101` (= `defaults/rules/`), `guidelines/betrieb.md:15` (= `defaults/guidelines/`) | "sonst rufe `k-playbook context` auf", "Pfade aus `k-playbook context` ableiten" | stays until its reader moves (work list 15; `betrieb.md` when `playbook`/`local` leave the rest) |
 | `defaults/instructions/always/010-verweise.md:14` | names the `kephalaion.*` fields in the rest | stays until its reader moves (row `kephalaion` above) |
@@ -852,7 +852,7 @@ until the last step.
    (`documents.always.content`, from `joinDocDirParts`, the one function behind `k-playbook read`
    for the directory; plain text starts with it, without the list of parts; schema `"3"`). The
    contract's "no contents" now has this one named exception
-   ([mcp.md](mcp.md#briefing-contract)); a session that calls the briefing needs no second call
+   ([mcp.md](../defaults/docs/handbook/mcp.md#briefing-contract)); a session that calls the briefing needs no second call
    for the always-instructions.
 10. **User area and findings queue** — built 2026-10-15 (task 088, in the working tree):
     `k_playbook_doc_create`, `_list`, `_done`, `_reopen` and `k-playbook doc`, measured at hub

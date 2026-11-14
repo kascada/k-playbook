@@ -21,7 +21,7 @@ eingesetzt.
   Verweis erreichbar; ein relativer Pfad zählt ab dem Verzeichnis des einbindenden
   Dokuments und führt nicht aus dessen Sorte heraus. Syntax, Rekursion (Tiefe 10),
   Zyklusprüfung, Fehlercodes und der Parameter zum Abschalten (`k-playbook read --raw`,
-  `k_playbook_doc_read` mit `includes: false`): `docs/verweisschema.md`, Abschnitt „Includes“.
+  `k_playbook_doc_read` mit `includes: false`): `k-playbook:/docs/handbook/verweisschema.md`, Abschnitt „Includes“.
 - Das Verzeichnis liegt in `defaults/`, damit es mit dem Release gepackt wird und auf jedem
   Hub unter `<hub>:k-playbook/defaults/includes/` ankommt. Einen Baustein trägt es weiterhin
   nicht: Module, die nur Commands einbinden, liegen als relative Includes in

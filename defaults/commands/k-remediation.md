@@ -180,7 +180,7 @@ Wenn `KNOWN_DECISIONS` existiert:
 
 Wenn die Datei nicht existiert:
 
-- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird von Hand angelegt; ihr Format steht in `docs/review-runs.md`."
+- Warnen: „Keine `known-decisions.md` unter `<Pfad>`. Bewusste Entscheidungen können deshalb erneut als Befund auftauchen. Die Datei wird von Hand angelegt; ihr Format steht in `k-playbook:/docs/handbook/review-runs.md`."
 - Weiter — kein automatisches Anlegen an dieser Stelle.
 
 ---

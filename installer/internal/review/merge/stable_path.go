@@ -25,7 +25,7 @@ import "strings"
 // jede Stable-ID, deren Pfad davon berührt wird, und entwertet damit alle
 // known-decisions-Einträge, die auf `stableId` matchen. Wer sie ändert, trifft
 // dieselbe Entscheidung wie dieser Task noch einmal, dokumentiert sie in
-// docs/review-runs.md und zieht commands/_review-run/review-input-contract.md
+// defaults/docs/handbook/review-runs.md und zieht commands/_review-run/review-input-contract.md
 // nach. TestStablePathIstEingefroren hält den Stand fest.
 //
 // Alle vier Stellen, an denen ein Pfad in Schlüssel oder Klasse einer Gruppe

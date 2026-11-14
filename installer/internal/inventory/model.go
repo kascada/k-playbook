@@ -2,7 +2,7 @@
 // deklarativen Quellen, liest sie, normalisiert die Funde, bündelt
 // Abweichungen und rendert die lesbare Inventardatei.
 //
-// Der Vertrag steht in docs/version-inventory.md und ist verbindlich. Was hier
+// Der Vertrag steht in defaults/docs/handbook/version-inventory.md und ist verbindlich. Was hier
 // steht, formuliert ihn nicht neu, sondern setzt ihn um; wo dieser Code und der
 // Vertrag auseinandergingen, gilt der Vertrag.
 //
@@ -17,7 +17,7 @@
 //     gelesen werden konnte, steht als Ablehnung oder Hinweis im Ergebnis.
 package inventory
 
-// Pin ist die Pin-Art. Die Taxonomie steht allein in docs/version-inventory.md
+// Pin ist die Pin-Art. Die Taxonomie steht allein in defaults/docs/handbook/version-inventory.md
 // („Pin taxonomy“): die ersten drei Werte sind die ursprünglichen der
 // Steckbriefe von /k-docs-tools, die letzten drei die Erweiterung des
 // Inventars. Eine zweite Taxonomie entsteht nicht.

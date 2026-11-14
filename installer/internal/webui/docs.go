@@ -2,6 +2,7 @@ package webui
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 
 	"github.com/kascada/k-playbook/installer/internal/inventory"
@@ -14,48 +15,92 @@ import (
 // einer Stelle.
 var markdown = mdconfig.New()
 
-// docsResponse ist die Liste der verfügbaren Dateien.
+// Die Oberfläche zeigt zwei Handbücher über dieselbe Anzeige (Task 153):
+// „Docs“ das Handbuch von k-playbook aus der mitgelieferten Ebene
+// (/api/docs), „Handbuch“ das des Projekts aus keph:/docs/manual/handbook/
+// (/api/handbook). Beide liest project.Handbook; welches, wählt der Handler.
+
+// docsResponse ist die Liste der verfügbaren Seiten. Kann das Handbuch nicht
+// gezeigt werden, steht statt der Liste eine Meldung da, und Code sagt,
+// warum: kephalaion_unavailable oder handbook_missing.
 type docsResponse struct {
 	Available bool          `json:"available"`
 	Docs      []project.Doc `json:"docs"`
 	Message   string        `json:"message"`
+	Code      string        `json:"code,omitempty"`
 }
 
-// docResponse ist eine einzelne Datei, fertig gerendert.
+// docResponse ist eine einzelne Seite, fertig gerendert.
 type docResponse struct {
 	Available bool   `json:"available"`
 	Path      string `json:"path"`
 	Title     string `json:"title"`
 	HTML      string `json:"html"`
 	Message   string `json:"message"`
+	Code      string `json:"code,omitempty"`
 }
 
+// handbookOpener wählt das Handbuch eines Projekts.
+type handbookOpener func(projectDir string) project.Handbook
+
+// openKPlaybookHandbook und openProjectHandbook sind austauschbar, damit
+// Tests den Node nicht fragen.
+var (
+	openKPlaybookHandbook handbookOpener = project.KPlaybookHandbook
+	openProjectHandbook   handbookOpener = project.ProjectHandbook
+)
+
 func docsHandler(w http.ResponseWriter, r *http.Request) {
+	handbookListHandler(w, openKPlaybookHandbook)
+}
+
+func docFileHandler(w http.ResponseWriter, r *http.Request) {
+	handbookFileHandler(w, r, openKPlaybookHandbook)
+}
+
+func projectHandbookHandler(w http.ResponseWriter, r *http.Request) {
+	handbookListHandler(w, openProjectHandbook)
+}
+
+func projectHandbookFileHandler(w http.ResponseWriter, r *http.Request) {
+	handbookFileHandler(w, r, openProjectHandbook)
+}
+
+// handbookCode ist der Code eines Fehlers, wenn er ein HandbookError ist.
+func handbookCode(err error) string {
+	var handbookErr *project.HandbookError
+	if errors.As(err, &handbookErr) {
+		return handbookErr.Code
+	}
+	return ""
+}
+
+func handbookListHandler(w http.ResponseWriter, open handbookOpener) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, docsResponse{})
 		return
 	}
 
-	docs, err := project.ListDocs(environment.ProjectDir)
+	docs, err := open(environment.ProjectDir).List()
 	if err != nil {
-		writeJSON(w, http.StatusOK, docsResponse{Available: true, Message: err.Error()})
+		writeJSON(w, http.StatusOK, docsResponse{Available: true, Message: err.Error(), Code: handbookCode(err)})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, docsResponse{Available: true, Docs: docs})
 }
 
-func docFileHandler(w http.ResponseWriter, r *http.Request) {
+func handbookFileHandler(w http.ResponseWriter, r *http.Request, open handbookOpener) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, docResponse{})
 		return
 	}
 
-	doc, content, err := project.ReadDoc(environment.ProjectDir, r.URL.Query().Get("path"))
+	doc, content, err := open(environment.ProjectDir).Read(r.URL.Query().Get("path"))
 	if err != nil {
-		writeJSON(w, http.StatusOK, docResponse{Available: true, Message: err.Error()})
+		writeJSON(w, http.StatusOK, docResponse{Available: true, Message: err.Error(), Code: handbookCode(err)})
 		return
 	}
 

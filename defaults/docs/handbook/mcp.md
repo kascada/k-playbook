@@ -43,7 +43,7 @@ violations -- another required field missing, a wrong type, also together with a
 `projectDir` -- are still rejected by the SDK with its bare text.
 
 The internal view -- protocol versions, the stdout rule, session termination -- is in
-[`../installer/docs/architecture.md`](../installer/docs/architecture.md#der-mcp-server).
+[`../installer/docs/architecture.md`](../../../installer/docs/architecture.md#der-mcp-server).
 
 ## Registering
 
@@ -1187,7 +1187,7 @@ briefing's own sections do not cover, built from the same function (`ContextForD
 rebuilt. So one call is enough for the start of a session, and the rest shows what is left of
 `k_playbook_context`; each later step takes one field out of it and gives it a place of its own
 (the authority is the table "Context field → future place" in
-[knowledge-aktuell.md](knowledge-aktuell.md#the-briefing-replaces-the-context-output-task-086)),
+`knowledge-aktuell.md` in the repository),
 and when the rest is empty, `k_playbook_context` and `k-playbook context` go. Until then both
 work unchanged. A test (`TestBriefingTraegtKeinFeldDerKontextausgabe`) keeps the top-level
 fields of the two outputs disjoint (`schemaVersion` excepted, which describes each output

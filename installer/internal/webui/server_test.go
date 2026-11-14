@@ -106,6 +106,9 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// /branches ist ein eigener Bereich neben GitHub und ohne gh erreichbar.
 		{path: "/branches", markiert: `<a class="area-nav-item active" href="/branches" aria-current="page">`},
 		{path: "/docs", markiert: `<a class="area-nav-item active" href="/docs" aria-current="page">`, fileIndex: true},
+		// /handbook ist das Handbuch des Projekts: eigener Bereich neben
+		// Docs, dieselbe Anzeige mit Dateiindex.
+		{path: "/handbook", markiert: `<a class="area-nav-item active" href="/handbook" aria-current="page">`, fileIndex: true},
 		// /inventory ist ein eigener Bereich neben Docs, mit kartenbasiertem
 		// Blockmenü wie die Setup-Seite.
 		{path: "/inventory", markiert: `<a class="area-nav-item active" href="/inventory" aria-current="page">`},
@@ -218,7 +221,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/docs", "/inventory", "/mcp", "/mcp-servers"} {
+	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/docs", "/handbook", "/inventory", "/mcp", "/mcp-servers"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)
@@ -254,7 +257,7 @@ func TestUmschalterOhneInstallation(t *testing.T) {
 	if count := strings.Count(body, `class="area-nav-item`); count != 1 {
 		t.Errorf("Einträge im Umschalter = %d, erwartet genau 1", count)
 	}
-	for _, ziel := range []string{"/workflows", "/chat", "/docs", "/inventory"} {
+	for _, ziel := range []string{"/workflows", "/chat", "/docs", "/handbook", "/inventory"} {
 		if strings.Contains(body, `href="`+ziel+`"`) {
 			t.Errorf("der Umschalter führt nach %s, obwohl nichts eingerichtet ist", ziel)
 		}

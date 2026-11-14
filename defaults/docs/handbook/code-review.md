@@ -647,5 +647,5 @@ bash ~/.local/share/k-playbook/scripts/install-security-tools.sh --install missi
 ```
 
 The required tools are canonically listed in
-[`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv). The script, interface, and review
+[`../share/scripts/security-tools.tsv`](../../../share/scripts/security-tools.tsv). The script, interface, and review
 recipes read the same matrix.

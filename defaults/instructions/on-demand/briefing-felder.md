@@ -7,7 +7,7 @@ description: Jedes Feld des Briefings und wozu es dient — die eigenen Abschnit
 
 Das Briefing ist die Antwort von `k_playbook_briefing` (ersatzweise `k-playbook briefing
 --json`). Was jede Sitzung daraus **tun** muss, steht in den immer geltenden Anweisungen; hier
-steht, was jedes Feld bedeutet. Der Vertrag für Entwickler ist `docs/mcp.md`, „Briefing
+steht, was jedes Feld bedeutet. Der Vertrag für Entwickler ist `k-playbook:/docs/handbook/mcp.md`, „Briefing
 Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollständigkeit.
 
 ### Die eigenen Abschnitte
@@ -74,7 +74,7 @@ Vertrag, nicht aus dem Dokument.
 Die alte Datei `<local.dir>/version-sources.yaml` liest kein Programmteil mehr. Liegt sie noch,
 meldet die Umgebungsprüfung sie als Altbestand; `/k-upgrade` zieht ihren Inhalt um. Auf einer
 Installation, die älter ist als das Feld, fehlt es. Der vollständige Vertrag steht in
-`<playbook.dir>/docs/version-inventory.md`.
+`k-playbook:/docs/handbook/version-inventory.md`.
 
 ### `health`
 

@@ -265,7 +265,7 @@ type mcpCommandForm struct {
 //     dem jeweils anderen HOME gilt deshalb ausdrücklich als aktuell; sonst
 //     erklärten sich beide Umgebungen in derselben Datei wechselseitig für
 //     veraltet und spielten bei jedem Wechsel Ping-Pong. Der Preis steht in
-//     docs/mcp.md: bei geteiltem Repo und getrennten HOMEs bleibt MCP in der
+//     defaults/docs/handbook/mcp.md: bei geteiltem Repo und getrennten HOMEs bleibt MCP in der
 //     anderen Umgebung tot, ohne dass die Auto-Korrektur greift — nur der
 //     Selbsttest schlägt an.
 //   - Eine eingecheckte Registrierung kann keinen absoluten Home-Pfad tragen.
@@ -290,7 +290,7 @@ func acceptedMCPCommandForms() []mcpCommandForm {
 // absoluter Pfad trägt ein `$HOME` und ist damit an eine Umgebung gebunden,
 // der Name ist es nicht. Host und DevContainer lösen ihn über ihre je eigene
 // PATH auf ihr je eigenes Binary auf — genau der DevContainer-Vertrag aus
-// docs/mcp.md, ohne dass eine der beiden Umgebungen die Datei umschreibt.
+// defaults/docs/handbook/mcp.md, ohne dass eine der beiden Umgebungen die Datei umschreibt.
 //
 // Geschrieben wird sie an genau einer Stelle: wenn die selbsttätige Korrektur
 // einen veralteten Eintrag in einer erfassten Datei ersetzt oder die
@@ -299,7 +299,7 @@ func acceptedMCPCommandForms() []mcpCommandForm {
 // ein absoluter Pfad wäre es nicht. Überall sonst liefert MCPCommand() den
 // aufgelösten absoluten Pfad.
 //
-// Ihr Preis steht in docs/mcp.md: ein aus Dock oder Finder gestarteter Client
+// Ihr Preis steht in defaults/docs/handbook/mcp.md: ein aus Dock oder Finder gestarteter Client
 // erbt die Shell-PATH nicht und findet unter diesem Namen nichts. Einrichten
 // hilft dagegen im Regelfall nicht, denn der Name ist akzeptiert und wird nicht
 // überschrieben — nur bei OpenCode ohne Memory-Block schreibt Einrichten den

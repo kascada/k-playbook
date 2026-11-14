@@ -14,7 +14,7 @@ import (
 const Template = `# GitHub-Zugänge für k-playbook — eine Datei je Person, für alle Projekte
 # dieses Rechners. Hier stehen keine Geheimnisse, nur wo ein Zugang liegt:
 # ein gh-Login, der Pfad einer Token-Datei, ein SSH-Schlüssel oder ein
-# Host-Alias. Der Vertrag: docs/github-access.md in der k-playbook-Installation.
+# Host-Alias. Der Vertrag: k-playbook:/docs/handbook/github-access.md.
 #
 # Ein Dienst ist der kurze Name, den Skripte und KI-Sitzungen nennen; er
 # zeigt auf ein Repository und auf die Zugänge in der Reihenfolge, in der
@@ -100,7 +100,7 @@ func Init(path string) InitResult {
 // nennt, der auf dem Host anzulegen ist. Ist die Datei inzwischen da (ein
 // anderer Aufruf war schneller), sind beide leer: Sie bleibt, wie sie ist.
 func createTemplate(path string) (created bool, problem *Problem) {
-	hint := "Auf dem Host anlegen: " + path + " mit dem Inhalt services: {} (Verzeichnis 0700, Datei 0600), etwa mit k-playbook github init dort; das Format steht in docs/github-access.md."
+	hint := "Auf dem Host anlegen: " + path + " mit dem Inhalt services: {} (Verzeichnis 0700, Datei 0600), etwa mit k-playbook github init dort; das Format steht in k-playbook:/docs/handbook/github-access.md."
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return false, &Problem{Level: LevelError, Path: PathFile,
 			Message: "Die Datei lässt sich nicht anlegen, denn das Verzeichnis " + filepath.Dir(path) + " lässt sich nicht anlegen: " + describeReadError(err) + ".",

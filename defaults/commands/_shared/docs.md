@@ -46,7 +46,8 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
   `k_playbook_docs_exclude_add` (`k-playbook docs exclude add`) nach Bestätigung durch den
   Nutzer. Die Datei selbst liest und bearbeitet kein Docs-Command. Wie sie wirken, steht im
   Abschnitt „Scope“ unten.
-- `docs/manual/` ist von Hand gepflegt; `docs/sources/` verlinkt Quellen außerhalb von
+- `docs/manual/` ist von Hand gepflegt, samt `docs/manual/handbook/`, dem Handbuch des
+  Projekts, das die Oberfläche zeigt; `docs/sources/` verlinkt Quellen außerhalb von
   Kephalaion. Beides fasst ein Erzeuger nicht an.
 - `README.md` und `index.md` schreibt kein Command-Text: Die `README.md` eines Verzeichnisses
   unter `docs/` kommt aus ihrer Vorlage `k-playbook:/docs/<pfad>/README.md`, nicht aus einer

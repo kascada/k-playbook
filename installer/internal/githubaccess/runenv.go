@@ -12,7 +12,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/ghconfig"
 )
 
-// Die Einrichtung für `k-playbook github run` (docs/github-access.md, What is
+// Die Einrichtung für `k-playbook github run` (defaults/docs/handbook/github-access.md, What is
 // set up): alles nur in der Umgebung des Befehls. Keine Datei, keine
 // git-Konfiguration außerhalb, kein gh auth switch. git bekommt seine
 // Einträge über GIT_CONFIG_COUNT/GIT_CONFIG_KEY_n/GIT_CONFIG_VALUE_n hinter

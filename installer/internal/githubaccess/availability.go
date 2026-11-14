@@ -14,7 +14,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/ghconfig"
 )
 
-// Die Verfügbarkeit eines Zugangs (docs/github-access.md, Abschnitt
+// Die Verfügbarkeit eines Zugangs (defaults/docs/handbook/github-access.md, Abschnitt
 // Availability): ob er auf diesem Rechner versucht werden kann, beurteilt ohne
 // Netz und deutlich unter einer Sekunde. Sie ist ein eigener Schritt nach
 // Load — Load liest nur die Datei und startet keinen Subprozess —, und sie

@@ -65,7 +65,7 @@ func TestVorlageLiestSichOhneProbleme(t *testing.T) {
 	if len(result.Problems) != 0 || len(result.Services) != 0 || !result.Present {
 		t.Errorf("Vorlage: %+v", result)
 	}
-	for _, want := range []string{"services: {}", "type: gh", "type: token", "type: ssh", "key: ", "host: ", "type: public", "disabled: true", "docs/github-access.md"} {
+	for _, want := range []string{"services: {}", "type: gh", "type: token", "type: ssh", "key: ", "host: ", "type: public", "disabled: true", "k-playbook:/docs/handbook/github-access.md"} {
 		if !strings.Contains(Template, want) {
 			t.Errorf("Vorlage ohne %q", want)
 		}

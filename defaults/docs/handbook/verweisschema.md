@@ -62,7 +62,7 @@ how it is changed stands once, for sessions, in
 3.3 and every later check follow it. `checks/check_verweise.sh` reports the part that is
 recognizable in the text of the shipped and project-own commands, instructions,
 guidelines and skills; it does not correct anything, and deliberate exceptions are listed in
-`checks/verweis-exceptions.tsv` (see [checks/README.md](../checks/README.md#verweise-ohne-präfix)).
+`checks/verweis-exceptions.tsv` (see [checks/README.md](../../../checks/README.md#verweise-ohne-präfix)).
 
 ## Placeholder `~` for the Own User
 
@@ -238,7 +238,7 @@ with `includes: false`. `parts` remains what it is: the parts of a directory.
 **`keph:` includes** are allowed by the mechanism. That they make a document depend on the
 network and on `kephalaion.ok` is a question of use, not of the mechanism: in
 always-instructions and briefing texts only with care (note for the follow-up task in
-[knowledge-aktuell.md](knowledge-aktuell.md)).
+`knowledge-aktuell.md` in the repository).
 
 **Test cases.** `defaults/testdata/includes/` holds fixed cases -- simple, nested, relative,
 cycle, too deep, dead target, code block -- with a README; the Go tests read them from disk

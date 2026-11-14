@@ -204,12 +204,12 @@ func healthVersionSources(ctx context.Context, projectDir string) []health.Probl
 		Area:    health.AreaVersionSources,
 		Message: "Die Quellenkonfiguration des Versionsinventars " + versionsources.DocRef + " ist nicht lesbar, von unbekannter Fassung oder trägt roots.",
 		Hint: "Das Frontmatter des Dokuments korrigieren oder das Dokument entfernen; die Einzelheiten nennt k-playbook context " +
-			"unter versionSources.error, den Vertrag docs/version-inventory.md der Installation.",
+			"unter versionSources.error, den Vertrag k-playbook:/docs/handbook/version-inventory.md.",
 	})
 }
 
 // healthGitHub trägt die Probleme der persönlichen GitHub-Zugangsdatei
-// (docs/github-access.md) ein: jedes Problem des Lesers als Eintrag mit
+// (defaults/docs/handbook/github-access.md) ein: jedes Problem des Lesers als Eintrag mit
 // seiner Stufe, der Pfad in der Datei (file, services.<name>,
 // services.<name>.access[<i>]) vorn im Satz, weil ein health.Problem kein
 // eigenes Feld dafür hat. Eine fehlende Datei ergibt nichts — sie ist

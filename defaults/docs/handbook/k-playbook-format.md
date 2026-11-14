@@ -312,10 +312,10 @@ Everything else has no counterpart on the other side:
 
 `docs/`, `tasks/`, `data/`, `cache/`, `material/` and `results/` were project-owned only as well;
 setup no longer creates them (see [What setup no longer creates](#what-setup-no-longer-creates)).
-A `k-playbook-local/docs/` that a producer still writes is not a pair with
-`k-playbook/docs/` either: `k-playbook/docs/` documents k-playbook itself, the
-other the project. They are two different objects with the same name and nothing
-to merge.
+A `k-playbook-local/docs/` that a producer still writes is not a pair with the
+shipped handbook either: the handbook (`k-playbook:/docs/handbook/`, in the source
+repository `defaults/docs/handbook/`) documents k-playbook itself, the other the
+project. They are two different objects and nothing to merge.
 
 `guidelines/` is not a pair either (task 148): the kind exists shipped only, in
 `<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`).
@@ -396,7 +396,7 @@ links too (`context.links`). If the context output cannot be built, that is a st
 (`context.available: false` with `context.message`), not an error. The rest is a
 transition: each later step takes one field out and gives it its own place in the
 briefing -- the authority is the table "Context field → future place" in
-[knowledge-aktuell.md](knowledge-aktuell.md#the-briefing-replaces-the-context-output-task-086)
+`knowledge-aktuell.md` in the repository
 --, and when it is empty, `k-playbook context` and `k_playbook_context` go. The first
 fields have gone that way (task 148): `instructions`, the list of the `k-playbook.md` files,
 no longer exists, because the reading order is `documents.always`, and `guidelines`, the
@@ -438,7 +438,7 @@ is the only field that ages: it identifies invocation time, not write time.
 `loggedIn`, `account`, `accounts`, and `tokenFromEnv`. `ready` summarizes what a
 command needs to know: gh exists and an account is configured. There is no
 project decision about gh: whether gh is used follows from the personal GitHub
-access file (`docs/github-access.md`) and, without a service for the repository,
+access file (`k-playbook:/docs/handbook/github-access.md`) and, without a service for the repository,
 from `ready`.
 
 The finding is read from gh configuration, not checked against the server: a

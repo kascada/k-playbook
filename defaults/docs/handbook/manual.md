@@ -304,7 +304,7 @@ k-playbook/bin/k-check --mode changed
 k-playbook/bin/k-check --mode baseline
 ```
 
-Details are in [`../checks/README.md`](../checks/README.md).
+Details are in [`../checks/README.md`](../../../checks/README.md).
 
 ## Operating rules
 
@@ -322,7 +322,7 @@ Details are in [`../checks/README.md`](../checks/README.md).
 
 | Topic | Document |
 |---|---|
-| Documentation index | [`README.md`](./README.md) |
+| Start page | [`overview.md`](./overview.md) |
 | Installation | [`installation.md`](./installation.md) |
 | Commands | [`commands.md`](./commands.md) |
 | Project configuration | [`k-playbook-format.md`](./k-playbook-format.md) |

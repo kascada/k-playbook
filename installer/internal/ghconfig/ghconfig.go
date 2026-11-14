@@ -6,7 +6,7 @@
 //
 // Das Paket steht bewusst unter project und githubaccess: project braucht den
 // Befund für die Kontextausgabe (DetectGH), githubaccess für die Verfügbarkeit
-// eines gh-Zugangs (docs/github-access.md, Abschnitt Availability). project
+// eines gh-Zugangs (defaults/docs/handbook/github-access.md, Abschnitt Availability). project
 // importiert githubaccess für die Umgebungsprüfung; läge das Lesen in project,
 // könnte githubaccess es nur über einen Importzyklus erreichen. Eine zweite
 // Fassung der Logik wollte niemand — deshalb ein gemeinsames Paket, das nur

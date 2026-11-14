@@ -133,7 +133,7 @@ beschreiben ihn.
 sie durch sind. Das Kommando sammelt nur zusammen, was der Lauf braucht — Installation,
 Preflight, Konfiguration — und reicht es an `internal/review` weiter; dort steht die
 Ausführung selbst, ohne eigene Suche nach Pfaden oder Binaries. Wie der Lauf aussieht,
-den es ausführt, steht in [`../../docs/review-runs.md`](../../docs/review-runs.md).
+den es ausführt, steht in [`../../defaults/docs/handbook/review-runs.md`](../../defaults/docs/handbook/review-runs.md).
 
 `merge <lauf>` fasst einen bereits gelaufenen Review-Lauf zu den Review-Input-Artefakten
 zusammen: `review-input.json` und `review-triage.md` im Laufverzeichnis. Auch hier löst
@@ -165,12 +165,12 @@ steht der Schreibweg: Bestand lesen, bis auf `generated.at` vergleichen, fehlt e
 sonst `write` mit der gelesenen Revision als `base_revision` (`stale_revision` ist ein
 sichtbarer Fehler). Ein Lauf ohne inhaltliche Änderung lässt das Dokument byte-identisch
 stehen, Revision eingeschlossen. Der Vertrag steht in
-[`../../docs/version-inventory.md`](../../docs/version-inventory.md); denselben Lauf stoßen
+[`../../defaults/docs/handbook/version-inventory.md`](../../defaults/docs/handbook/version-inventory.md); denselben Lauf stoßen
 der Command `/k-doc-inventory` und der Bereich „Inventar" der Oberfläche über
 `POST /api/inventory` an (siehe „Das Versionsinventar in der Oberfläche").
 
 `read <verweis> [--raw] [--json]` löst einen Verweis im Präfixschema auf
-([`../../docs/verweisschema.md`](../../docs/verweisschema.md)) und gibt aus, was dahinter
+([`../../defaults/docs/handbook/verweisschema.md`](../../defaults/docs/handbook/verweisschema.md)) und gibt aus, was dahinter
 steht — `project:` eine Datei des Projekts ab seiner Wurzel (`os.DirFS`, eine Ebene), `keph:`
 ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zugang wie
 `OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
@@ -229,7 +229,7 @@ context — wird abgebaut“. Die Listen kommen aus den vorhandenen Funktionen
 (`overlayDocDir`/`assembleDocDir` in `project/docref.go`, `UserDocs.List` hinter
 `k_playbook_doc_list`), zusammengesetzt in `project.BuildBriefing` (`project/briefing.go`); das
 MCP-Werkzeug `k_playbook_briefing` ist die Hülle darum. Ohne `--json` ein Klartext zum Lesen
-beim Testen. Vertrag: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Briefing Contract“.
+beim Testen. Vertrag: [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Briefing Contract“.
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
@@ -243,8 +243,8 @@ an, die `kephalaion.Client` (`internal/kephalaion/docs.go`: `list` und `read` au
 `create`, `write` und `rename` über den Hub) erfüllt. Die MCP-Werkzeuge `k_playbook_doc_create`, `_list`,
 `_done` und `_reopen` sind die Hüllen darum; `done` und `reopen` nennen mit `--json` die
 Revision nach dem Verschieben. Vertrag:
-[`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Document Tools in the Collection“;
-was k-playbook von Kephalaion erwartet: [`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
+[`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Document Tools in the Collection“;
+was k-playbook von Kephalaion erwartet: [`../../defaults/docs/handbook/kephalaion-client.md`](../../defaults/docs/handbook/kephalaion-client.md).
 
 `doc append|replace|set [--since N] [--json]` ändert ein Dokument der Sorten ohne eigene
 Werkzeuge (`tasks`, `workbench`, `findings`, `docs`, offen oder unter `done/`, bei Userbereich nur
@@ -268,7 +268,7 @@ ohne Includes (`project.GrepDocRef` über dieselben Ebenen wie `read`, `UserDocs
 Liste von `doc list`; `project/docgrep.go`), höchstens 200 Treffer, `--count` nennt je
 Dokument die Zahl und bei `keph:` die Revision. Die MCP-Werkzeuge `k_playbook_doc_append`,
 `_replace`, `_set_field` und `_grep` sind die Hüllen darum (`mcpserver/docedit.go`). Vertrag:
-[`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Changing and Searching Documents“.
+[`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Changing and Searching Documents“.
 
 `docs checkout|publish <erzeuger> [--discard|--allow-hints] [--json]` holt erzeugte Doku mit
 mehreren Dokumenten in ein Arbeitsverzeichnis und gleicht sie zurück ab (Task 109);
@@ -284,7 +284,7 @@ mit demselben Schlüssel genau einmal in neuer Sitzung mit eigener Zeitgrenze; `
 als Erfolg. Was danach offen bleibt, ist `outcome_unknown` — auch in den doc-Werkzeugen, die
 dann nicht weiterzählen. `node_unreachable` bzw. `kephalaion_unavailable` heißt nur noch:
 beim Hub ist nichts angekommen (nichts abgeschickt, oder der Node meldet `unreachable`,
-`unsupported`, `internal`). Abgrenzung im Einzelnen: `docs/kephalaion-client.md`, Abschnitt
+`unsupported`, `internal`). Abgrenzung im Einzelnen: [`defaults/docs/handbook/kephalaion-client.md`](../../defaults/docs/handbook/kephalaion-client.md), Abschnitt
 „Request key, retry and the codes“.
 
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
@@ -349,7 +349,7 @@ installer/
 │                                githubaccess, weil githubaccess project nicht importieren darf
 ├── internal/githubaccess/
 │   ├── path.go                  Ort der persönlichen GitHub-Zugangsdatei (Task 099,
-│   │                            docs/github-access.md): Override K_PLAYBOOK_GITHUB_CONFIG,
+│   │                            defaults/docs/handbook/github-access.md): Override K_PLAYBOOK_GITHUB_CONFIG,
 │   │                            XDG_CONFIG_HOME, ~/.config/k-playbook/github.yaml
 │   ├── load.go                  Load: die Datei lesen und vollständig prüfen — Dienste,
 │   │                            repo, Zugänge je Typ, Pfade, disabled, doppelte Namen;
@@ -473,7 +473,9 @@ installer/
 │   ├── git_settings.go          Abschnitt git: lesen und prüfen, git.allow-Muster,
 │   │                            Branch-Namen prüfen
 │   ├── update.go                Remote-Stand prüfen, Fast-Forward
-│   ├── docs.go                  mitgelieferte Doku auflisten und lesen
+│   ├── docs.go                  Handbook: die Handbücher der Oberfläche (k-playbook aus
+│   │                            docs/handbook/ der mitgelieferten Ebene, Projekt aus
+│   │                            keph:/docs/manual/handbook/) auflisten und lesen
 │   ├── defaultsdocs.go          die mitgelieferte Ebene hinter k-playbook: aus
 │   │                            <hub>:k-playbook/defaults/ (Task 131): OpenDefaultsStore,
 │   │                            NewKephDefaultsSource — ein rekursives list, Vorauslesen,
@@ -533,7 +535,8 @@ installer/
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
 │   ├── browser.go               Browser öffnen (Container-Erkennung aus hostenv)
-│   ├── docs.go                  Doku-Endpunkte, Markdown nach HTML
+│   ├── docs.go                  Endpunkte der beiden Handbücher (/api/docs, /api/handbook),
+│   │                            Markdown nach HTML
 │   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Dokument aus der Collection
 │   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte: offen, erledigt, Suche; anlegen,
@@ -700,7 +703,7 @@ Projekts liegen, steht in keiner Konfiguration — `go.mod` ist die Tatsache im
 Dateisystem. `FindModules()` nimmt das gesuchte Manifest als Parameter, damit `pip-audit`
 denselben Mechanismus benutzen kann; angewandt wird er bisher nur auf Go. Aus dem
 Ergebnis macht `execute.go` die Jobs: einer je Modul, bei genau einem Modul mit
-unverändertem Namen ([`docs/review-runs.md`](../../docs/review-runs.md)).
+unverändertem Namen ([`defaults/docs/handbook/review-runs.md`](../../defaults/docs/handbook/review-runs.md)).
 
 `internal/inventory` folgt derselben Trennung: Projektwurzel, Quellenkonfiguration und
 Zielpfad stehen in `inventory.Options`, gesucht wird nichts selbst. Geöffnet wird jede
@@ -1131,7 +1134,7 @@ Reihe nach einrichtet.
   ein existierendes fremdes Ziel stehen zu lassen (im Container fehlt der Host-Pfad, solange
   nicht auch dorthin entpackt wird, und ein Link auf einen älteren Stand bliebe still
   stehen). `sharetest` entfernt die Variable, damit Tests im Container nicht das echte
-  Verzeichnis lesen. Beispiel für `devcontainer.json`: `docs/installation.md`, „Host and
+  Verzeichnis lesen. Beispiel für `devcontainer.json`: [`defaults/docs/handbook/installation.md`](../../defaults/docs/handbook/installation.md), „Host and
   DevContainer sharing the project“.
 - **Nicht global:** Mit gleichem Namen global und im Projekt nimmt Claude Code (2.1.310) die
   globale Fassung, OpenCode (1.18.35) die des Projekts — gemessen 2026-10-25. Global
@@ -1310,7 +1313,7 @@ Assistenten aus dem Binary kommt (Task 092), die Include-Sorten `includes` und `
 (Task 093) und `reviews`, `guidelines`. Aus der Installation `k-playbook/` liest
 keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg.
 Regeln und Zugriffswege:
-[`../../docs/verweisschema.md`](../../docs/verweisschema.md).
+[`../../defaults/docs/handbook/verweisschema.md`](../../defaults/docs/handbook/verweisschema.md).
 
 `ApplyRootInstructions()` legt `AGENTS.md` an, falls sie fehlt, und hängt sonst einen
 kurzen Anstoß an: den einen Aufruf einer Sitzung, `k-playbook briefing`, eingerückt als
@@ -2482,7 +2485,7 @@ echtes VS Code — die Remote-CLI ignoriert `--extensions-dir` und schriebe in d
 Umgebung. Dasselbe gilt auf der Go-Seite: `vscodeext.LookPath` ist eine Variable, damit
 Tests einen eigenen PATH vorgeben können.
 
-Der Nutzerweg und das Hinzufügen weiterer Aktionen stehen in `docs/vscode.md`.
+Der Nutzerweg und das Hinzufügen weiterer Aktionen stehen in [`defaults/docs/handbook/vscode.md`](../../defaults/docs/handbook/vscode.md).
 
 ## Kephalaion-Anbindung
 
@@ -2735,9 +2738,9 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   `SetRemediationMode` ihn nicht mitnimmt, gehören Kommentare ohne Einrückung am Ende eines
   ersetzten Blocks seit Task 116 zum Folgenden.
 
-Vertrag der Werkzeuge: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt „Generated Docs:
+Vertrag der Werkzeuge: [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Generated Docs:
 Checkout and Publish“; welche Kephalaion-Aufrufe dahinter stehen:
-[`../../docs/kephalaion-client.md`](../../docs/kephalaion-client.md).
+[`../../defaults/docs/handbook/kephalaion-client.md`](../../defaults/docs/handbook/kephalaion-client.md).
 
 ## README aus Vorlagen
 
@@ -2831,7 +2834,7 @@ startet: aus dem Weg (unten) und dem netzfreien Host-Befund. Eine Projektentsche
 sie nicht mehr (Task 128); die Zustände `disabled` und `undecided` gibt es nicht mehr.
 
 **Über den Dienst der Zugangsdatei (Task 126).** Nennt ein Dienst der persönlichen
-Zugangsdatei das Repo (Vertrag `docs/github-access.md`, Abschnitt *In the interface*), läuft
+Zugangsdatei das Repo (Vertrag [`defaults/docs/handbook/github-access.md`](../../defaults/docs/handbook/github-access.md), Abschnitt *In the interface*), läuft
 `gh` mit dessen Kindumgebung, gewählt wie bei `k-playbook github run` und mit demselben Code.
 `project.ResolveGitHubRoute` bestimmt den Dienst aus dem Remote wie `context.github`
 (`projectRemoteURL`, `githubRemoteRepo`), beurteilt nur ihn (`Judge`), wählt mit `Choose` ohne
@@ -2950,7 +2953,7 @@ Seite (`.pr-branches`, `.pr-meta`, `.run-ref`, `.run-meta`, `.failure-count`) st
 ## GitHub-Zugänge in der Oberfläche
 
 Die Seite `/github-access` („GitHub-Zugänge“) zeigt die persönliche GitHub-Zugangsdatei
-`~/.config/k-playbook/github.yaml` nach dem Vertrag `docs/github-access.md` (Abschnitt
+`~/.config/k-playbook/github.yaml` nach dem Vertrag [`defaults/docs/handbook/github-access.md`](../../defaults/docs/handbook/github-access.md) (Abschnitt
 *Interface page*): den Pfad, den Stand von `check` (Probleme oder eine Zeile), je Dienst
 einen Block mit Repository und den Zugängen in Vorrangreihenfolge samt ihrer Verfügbarkeit,
 und auf Knopfdruck den Test gegen GitHub. Sie ist der Unterpunkt des Bereichs GitHub —
@@ -3002,7 +3005,7 @@ die Liste der Umgebungsprüfung (`.environment-list`).
 
 ## Befehl unter einem Dienst (github run)
 
-`k-playbook github run <dienst> -- <befehl>` (Task 110, Vertrag `docs/github-access.md`,
+`k-playbook github run <dienst> -- <befehl>` (Task 110, Vertrag [`defaults/docs/handbook/github-access.md`](../../defaults/docs/handbook/github-access.md),
 Abschnitt *Running a command under a service*) startet einen Befehl mit dem Zugang eines
 Dienstes. Die Teile:
 
@@ -3417,7 +3420,7 @@ außerhalb des Index führen kann — dann gehört gar kein Eintrag markiert.
 
 Unter 1080px entfällt das Blockmenü, **solange es ein Sprungmenü ist** — für die Karten
 bliebe daneben zu wenig übrig, und seine Ziele stehen ohnehin als Karten gleich darunter.
-Trägt es dagegen den Dateiindex von `/docs`, bleibt es stehen: dort führt sonst kein Weg
+Trägt es dagegen den Dateiindex von `/docs` oder `/handbook`, bleibt es stehen: dort führt sonst kein Weg
 mehr zu den übrigen Dateien. Es steht dann als eigener Kasten über dem Text, nicht
 mitlaufend, und begrenzt sich auf einen Anteil der Fensterhöhe — die eine Stelle, an der
 eine Höhe geschätzt wird, weil es ohne sticky Spalte kein Gitter gibt, aus dem sich
@@ -3426,7 +3429,7 @@ rechnen ließe.
 Welcher der beiden Fälle vorliegt, sagt der Modifier `file-index` am `#block-nav`.
 `sidebar.html` setzt ihn serverseitig aus `.Area`, zusammen mit der Beschriftung des
 Menüs — nicht `docs.js` beim Füllen: schmal bliebe der Index sonst so lange ausgeblendet,
-bis `/api/docs` antwortet.
+bis `/api/docs` bzw. `/api/handbook` antwortet.
 
 Der Umschalter bleibt in beiden Fällen und legt sich waagerecht über die Karten: ohne ihn
 wären die anderen Bereiche von dort aus nicht mehr erreichbar.
@@ -3538,9 +3541,45 @@ passieren. Die übrigen Pfade kürzt die Oberfläche gegen das Projektverzeichni
 
 ## Doku in der Oberfläche
 
-Der Bereich **Docs** zeigt die mitgelieferte Doku aus `k-playbook/docs`. Das Menü links
-listet alle Markdown-Dateien, auch die aus Unterverzeichnissen wie `libs/`; ein Klick
-zeigt die Datei in der Karte daneben. Ohne Auswahl steht dort die `README.md`.
+Die Oberfläche zeigt zwei Handbücher, jedes unter einem eigenen Menüpunkt und mit derselben
+Anzeige (Task 153):
+
+- **Docs** (`/docs`, `GET /api/docs`, `GET /api/docs/file`) zeigt das Handbuch von
+  k-playbook. Es liegt im Quell-Repo unter `defaults/docs/handbook/`, reist mit dem Release
+  in die öffentliche Collection `<hub>:k-playbook/defaults/docs/handbook/` und wird über die
+  mitgelieferte Ebene gelesen (`project.KPlaybookHandbook`, darunter
+  `NewProjectDefaultsSource`) — dieselbe Ebene wie hinter `k-playbook:`, die Seiten sind als
+  `k-playbook:/docs/handbook/<seite>.md` auch für Sitzungen lesbar. Startseite ist
+  `overview.md`. Eine `README.md` gibt es dort bewusst nicht: `ListDocsTemplates` hielte sie
+  für eine Vorlage und schriebe eine `keph:/docs/handbook/README.md` in jedes Projekt.
+- **Handbuch** (`/handbook`, `GET /api/handbook`, `GET /api/handbook/file`) zeigt das
+  Handbuch des Projekts aus seiner Collection unter `keph:/docs/manual/handbook/`, einem
+  Unterverzeichnis der Handdoku (`project.ProjectHandbook`, Zugang über
+  `OpenProjectLayerStore`). Startseite ist die `README.md` aus der Vorlage
+  `k-playbook:/docs/manual/handbook/README.md`; sie steht vorn und wird immer gezeigt, auch
+  wenn sie noch der unveränderten Vorlage entspricht.
+
+Beide gehen durch `project.Handbook` über eine `DocSource`: `List()` sammelt alle
+Markdown-Dateien rekursiv, auch aus Unterverzeichnissen, und nimmt als Titel die erste
+Überschrift nach dem Frontmatter, ersatzweise den Dateinamen; die Startseite steht vorn,
+der Rest alphabetisch. `Read()` liefert den Rohtext einer Seite. Welches Handbuch ein
+Handler liest, wählt er über `openKPlaybookHandbook` bzw. `openProjectHandbook`; die Seite
+bekommt die API über `data-docs-api` am `body` (aus dem Bereich, `/api/docs` oder
+`/api/handbook`), `docs.js` ist für beide dasselbe.
+
+Nichts davon ist ins Binary eingebettet, und es gibt keinen Rückfall auf die Platte — auch
+nicht auf einen Clone der Installation. Ist ein Handbuch nicht lesbar, antwortet die API
+mit einer Meldung statt einer Liste, und das Feld `code` sagt, warum:
+
+- `kephalaion_unavailable` — Kephalaion ist nicht erreichbar. Die Meldung nennt den Ort und
+  die Abhilfe.
+- `handbook_missing` — Kephalaion ist erreichbar, aber das Handbuch fehlt. Bei Docs trägt
+  der Lieferumfang auf dem Hub ein Release vor dem Handbuch: Der Hub holt ein Release nur
+  beim Anlegen, von Hand oder auf Anforderung, ein neues Binary trifft also oft einen
+  älteren Lieferumfang. Die Abhilfe ist, dass der Hub das Release nachholt (Kephalaion
+  `fetch_release` für `<hub>:k-playbook`). Beim Handbuch des Projekts fehlt
+  `keph:/docs/manual/handbook/`; `k-playbook docs readme manual/handbook` schreibt die
+  Startseite.
 
 Eine andere Seite kann eine bestimmte Datei anfordern: **`/docs?file=<datei>`**, wahlweise
 mit Anker dahinter. Mehr braucht der Verweis nicht — kein Endpunkt, kein Skript auf der
@@ -3548,41 +3587,30 @@ verweisenden Seite, keine zweite Ansicht: die Datei geht dort auf, wo Doku ohneh
 gelesen wird, mit Index, Querverweisen und Diagrammen. Das ist der Weg, auf dem die
 Hilfe-Verweise der Workflows-Seiten arbeiten (`.doc-link` im Kopf ihres Hilfe-Blocks,
 siehe „Workflows"). Steht die angeforderte Datei nicht im Index, wird sie trotzdem
-geöffnet und die Antwort des Servers sagt, dass es sie nicht gibt: die Installation kann
-einen anderen Stand tragen als das Binary, das den Verweis geschrieben hat, und
-ersatzweise die `README.md` zu zeigen wäre dann eine falsche Auskunft.
+geöffnet und die Antwort des Servers sagt, dass es sie nicht gibt: der Lieferumfang auf
+dem Hub kann einen anderen Stand tragen als das Binary, das den Verweis geschrieben hat,
+und ersatzweise die Startseite zu zeigen wäre dann eine falsche Auskunft.
 
-Das bleibt so, ausdrücklich: „Doku in der Oberfläche" zeigt **weiterhin nur die
-mitgelieferte** Doku der Installation. `project.DocsDir()`, `project.ListDocs()`,
-`GET /api/docs`, `GET /api/docs/file` und die Seite `/docs` kennen `k-playbook-local/docs`
-nicht und werden für das Versionsinventar nicht erweitert — das Inventar ist ein eigener
-Bereich mit eigener API (siehe „Das Versionsinventar in der Oberfläche") und davon
-getrennt. Eine zweite Docs-Wurzel in Werkzeug, API und Oberfläche wäre teurer als der
-eigene Bereich gewesen und hätte eine bewusst getroffene Entscheidung rückgängig gemacht.
-
-Die Projektdoku liegt inzwischen in der Projekt-Collection unter `keph:/docs/` und wird über
-Kephalaion gelesen, nicht über diese Seite. Das Wissenstor über `k-playbook-local/knowledge/`,
-das hier früher als eigener Zugriffsweg stand, hat Task 123 samt Seite `/knowledge` entfernt.
-
-`project.ListDocs()` sammelt die Dateien und nimmt als Titel die erste Überschrift,
-ersatzweise den Dateinamen. Die `README.md` steht vorn, sie ist der Einstieg. Fehlt das
-Verzeichnis, ist das ein Befund und keine leere Liste: die Antwort trägt dann eine
-Meldung mit dem erwarteten Pfad.
+Das Versionsinventar gehört in keinen der beiden Bereiche: Es ist ein erzeugtes Dokument
+des Projekts mit eigenem Bereich und eigener API (siehe „Das Versionsinventar in der
+Oberfläche"). Die übrige Projektdoku unter `keph:/docs/` wird über Kephalaion gelesen,
+nicht über diese Seiten. Das Wissenstor über `k-playbook-local/knowledge/`, das hier früher
+als eigener Zugriffsweg stand, hat Task 123 samt Seite `/knowledge` entfernt.
 
 **Frontmatter wird abgetrennt.** Die meisten Dateien der Doku tragen `title` und
 `description` für den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt
-Überschrift, und die Datei begänne mit ihren eigenen Kopfdaten. `docFileHandler` rendert
+Überschrift, und die Datei begänne mit ihren eigenen Kopfdaten. `handbookFileHandler` rendert
 deshalb `inventory.Body(content)` — dieselbe Abtrennung wie beim Inventar, ohne Frontmatter
 ist der Rumpf die ganze Datei. Der Titel kommt weiterhin aus der ersten Überschrift.
 
-`project.ReadDoc()` liefert den Rohtext, gerendert wird erst in `webui/docs.go` mit
+`Handbook.Read()` liefert den Rohtext, gerendert wird erst in `webui/docs.go` mit
 Goldmark (GFM, `WithAutoHeadingID`). Rohes HTML aus der Quelle bleibt abgeschaltet — das
 ist die Voreinstellung von Goldmark und genau richtig für Text, der ungeprüft im
 Browser landet.
 
-Der angefragte Pfad kommt aus dem Browser und wird in `docFilePath()` geprüft: relativ,
-innerhalb des Doku-Verzeichnisses, Endung `.md`. Ohne diese Prüfung wäre der Endpunkt
-ein Weg, beliebige Dateien des Rechners zu lesen.
+Der angefragte Pfad kommt aus dem Browser und wird in `handbookPath()` geprüft: relativ,
+ohne `..`, Endung `.md`. Ohne diese Prüfung wäre der Endpunkt ein Weg, anderes aus der
+Collection zu lesen als das Handbuch.
 
 Verweise innerhalb der Doku fängt die Oberfläche ab: `.md`-Ziele öffnet sie im selben
 Fenster, Anker springen innerhalb der Datei, Ziele mit Schema gehen in einen neuen Tab.
@@ -3592,12 +3620,12 @@ Pfad, den der Server nicht kennt, statt in die gerenderte Datei, und das Menü s
 mitziehen. Führt ein Verweis in eine andere Datei, zieht es mit; steht die Datei nicht im
 Index, bleibt gar kein Eintrag markiert statt der vorige.
 
-**Ein Verweis kann aus der Doku herausführen, und das ist kein Fehler.** 31 Verweise der
-mitgelieferten Doku zeigen mit `../` auf `.md`-Dateien neben `docs/` — auf
-`installer/docs/architecture.md`, `checks/README.md`, Skill-Playbooks; allein der
-Stichwortindex der `README.md` trägt 22 davon. Im Repository und auf GitHub führen sie
-richtig, nur dieser Bereich reicht nicht so weit: `docFilePath()` lässt nichts außerhalb
-von `k-playbook/docs` zu, und das bleibt so. Deshalb erkennt `resolveDocPath()` den Fall
+**Ein Verweis kann aus dem Handbuch herausführen, und das ist kein Fehler.** Seiten des
+Handbuchs von k-playbook zeigen mit relativen Repo-Links (`../../../…`) auf Dateien außerhalb
+von `defaults/docs/handbook/` — auf `installer/docs/architecture.md`, `checks/README.md`,
+`share/scripts/*.tsv`, `defaults/reviews/`. Im Repository und auf GitHub führen sie
+richtig, nur dieser Bereich reicht nicht so weit: ausgeliefert ist allein das Handbuch, und
+`handbookPath()` lässt nichts außerhalb zu. Das bleibt so. Deshalb erkennt `resolveDocPath()` den Fall
 selbst und gibt `null` zurück, statt den Server danach zu fragen. Sichtbar wird das an
 einer Meldung, die sagt, wo die Datei liegt — vorher stand dort die Antwort des Servers,
 „no such file or directory", und die liest sich wie ein Fehler der Doku. Erkannt wird der
@@ -3607,8 +3635,8 @@ liegt das Ziel innerhalb; ist es weg, hat ein `../` hinausgeführt. Ohne diesen 
 nicht mehr zu unterscheiden.
 
 Die Verweise selbst umzuschreiben wäre die andere Möglichkeit gewesen und ist verworfen:
-sie sind außerhalb der Oberfläche richtig, und 31 Stellen umzubiegen tauschte einen
-sichtbaren Hinweis gegen 31 schlechtere Verweise.
+sie sind außerhalb der Oberfläche richtig, und sie umzubiegen tauschte einen sichtbaren
+Hinweis gegen schlechtere Verweise.
 
 Der Text steht in einer Karte und ist kein eigener Scroll-Container. Ohne Anker scrollt
 deshalb das **Fenster** nach oben, nicht das Element — sonst bliebe die Ansicht dort
@@ -3622,7 +3650,7 @@ Codeblock stehen, die Datei ist also weiterhin lesbar.
 
 Der Bereich **Inventar** unter `/inventory` zeigt das Versionsinventar des Projekts und
 stößt seine Erhebung an. Der Vertrag steht in
-[`../../docs/version-inventory.md`](../../docs/version-inventory.md); die Oberfläche
+[`../../defaults/docs/handbook/version-inventory.md`](../../defaults/docs/handbook/version-inventory.md); die Oberfläche
 formuliert nichts davon neu.
 
 Die Seite hat vier Karten. **Stand** zeigt, ob das Inventar in der Collection da ist, wann
@@ -4280,7 +4308,7 @@ Arbeit, nichts still beheben, die Abhilfe aus `hint` anbieten. Exit-Codes des Su
 0 ohne Fehler, 1 mit mindestens einem Fehler, 2 bei Aufruffehlern — über `exitError` in
 `main.go`, das ohne Text schweigt und nur den Code setzt, weil die Liste schon auf stdout
 steht. `k-playbook briefing` endet auch mit Fehlern in `health` mit 0: Das Briefing meldet,
-es urteilt nicht. Der Vertrag steht in [`../../docs/mcp.md`](../../docs/mcp.md#health-contract).
+es urteilt nicht. Der Vertrag steht in [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md#health-contract).
 
 **In der Oberfläche.** Die Statusseite zeigt denselben Report in der Karte „Umgebung“
 (`static/status.html`, `loadEnvironment()` in `status.js`), geholt von `GET /api/environment`
@@ -4340,7 +4368,7 @@ lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und 
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall; den gemeinsamen Fehlerteil trägt `errorEnvelope` (`error_envelope.go`).
 Tool-Tabelle und Verträge stehen in
-[`../../docs/mcp.md`](../../docs/mcp.md).
+[`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md).
 
 `projectDir` ist in allen Familien Pflicht, im abgeleiteten Schema aber optional
 (`omitempty` an `todoBaseInput`, `reviewBaseInput` und den übrigen Eingaben). Sonst wiese die
@@ -4538,7 +4566,7 @@ das Einzige, was ein Bestandsprojekt noch von ihr weg migriert. Sie werden erst
 entfernt, wenn kein Projekt mehr aus dem Wrapper-Modell aktualisiert.
 
 Der fremde `$HOME` ist eine Entscheidung mit Preis, und der steht in
-[`docs/mcp.md`](../../docs/mcp.md): teilen sich Host und Container ein Repository bei
+[`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md): teilen sich Host und Container ein Repository bei
 getrennten HOMEs, bleibt MCP in der jeweils anderen Umgebung tot, ohne dass die
 Auto-Korrektur greift. Die Alternative wäre schlechter — beide Umgebungen erklärten sich
 in derselben Datei wechselseitig für veraltet.
@@ -4672,7 +4700,7 @@ Bereits migrierte und committete Projekte bleiben, wie sie sind: ein absoluter P
 fremdem `$HOME` gilt als akzeptiert und wird nicht mehr ersetzt. Ebenso bleibt eine per
 Bind-Mount geteilte, aber nicht erfasste Datei beim absoluten Pfad der Umgebung, in der
 die Korrektur lief — „erfasst" heißt committet, nicht geteilt. Beides steht als Grenze in
-`docs/mcp.md`.
+[`defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md).
 
 Die Enge ist die Idempotenz-Zusage: der zweite Lauf schreibt nichts mehr — auch nicht in
 einer zweiten Umgebung, denn beide geschriebenen Formen sind akzeptiert —, und keine von
@@ -5119,7 +5147,7 @@ eine fehlende ist eine Auskunft und kein Fehler.
 `k_playbook_gui_status` dieselbe Antwort im Umschlag `{ok, tool, projectDir, …}`. Vorher
 verriet jeder Weg die Adresse nur als Nebenwirkung: der argumentlose Aufruf öffnet einen
 Browser und startet notfalls einen Dienst, `stop` beendet ihn, über MCP gab es gar keinen
-Weg. Vertrag und Feldtabelle: [`../../docs/mcp.md`](../../docs/mcp.md), Abschnitt
+Weg. Vertrag und Feldtabelle: [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt
 „GUI Status Contract".
 
 **Eine Mitte, zwei Wege.** `guiproc.StatusForDir(dir)` (`status.go`) liefert zu einem

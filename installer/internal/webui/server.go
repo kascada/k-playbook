@@ -250,7 +250,7 @@ func routes(state *serverState) http.Handler {
 	// einem eigenen Endpunkt: geholt wird es erst beim Aufklappen eines roten
 	// Laufs, nie für alle Läufe beim Laden der Seite.
 	mux.HandleFunc("GET /api/github/runs/{id}/failure", githubRunFailureHandler)
-	// Die persönliche GitHub-Zugangsdatei (docs/github-access.md): lesend
+	// Die persönliche GitHub-Zugangsdatei (defaults/docs/handbook/github-access.md): lesend
 	// das Objekt von check --json samt Verfügbarkeit ohne Netz; angelegt nur
 	// per POST auf den Knopf „Anlegen“ hin (wie github init); der Test gegen
 	// GitHub nur per POST auf den Knopf hin, je Dienst ein Aufruf.
@@ -281,9 +281,13 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/context", contextHandler)
 	mux.HandleFunc("GET /api/docs", docsHandler)
 	mux.HandleFunc("GET /api/docs/file", docFileHandler)
-	// Das Versionsinventar hat eine eigene API neben der Doku: die zeigt die
-	// mitgelieferte Doku der Installation, das Inventar ist eine Datei des
-	// Projekts. Hinter dem POST steht ausschließlich inventory.Run.
+	// Das Handbuch des Projekts (keph:/docs/manual/handbook/) hat dieselbe
+	// Anzeige wie Docs, aber eine eigene API und einen eigenen Menüpunkt.
+	mux.HandleFunc("GET /api/handbook", projectHandbookHandler)
+	mux.HandleFunc("GET /api/handbook/file", projectHandbookFileHandler)
+	// Das Versionsinventar hat eine eigene API neben der Doku: die zeigt das
+	// Handbuch von k-playbook aus der mitgelieferten Ebene, das Inventar ist
+	// eine Datei des Projekts. Hinter dem POST steht ausschließlich inventory.Run.
 	mux.HandleFunc("GET /api/inventory", inventoryHandler)
 	mux.HandleFunc("POST /api/inventory", runInventoryHandler)
 	mux.HandleFunc("GET /api/inventory/file", inventoryFileHandler)
@@ -344,6 +348,7 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /github-access", githubAccessPageHandler)
 	mux.HandleFunc("GET /branches", branchesPageHandler)
 	mux.HandleFunc("GET /docs", docsPageHandler)
+	mux.HandleFunc("GET /handbook", handbookPageHandler)
 	mux.HandleFunc("GET /inventory", inventoryPageHandler)
 	mux.HandleFunc("GET /mcp", mcpPageHandler)
 	mux.HandleFunc("GET /mcp-servers", mcpServersPageHandler)
@@ -428,10 +433,14 @@ const (
 	// Bereich neben GitHub: die Seite braucht gh nicht, und sie ist die einzige,
 	// die im Code-Repo etwas verändern kann — nach Vorprüfung und Bestätigung.
 	areaBranches = "branches"
+	// areaDocs ist das Handbuch von k-playbook, areaHandbook das des
+	// Projekts. Der Name des Bereichs ist zugleich der Pfad seiner API
+	// (/api/docs, /api/handbook), den docs.html der Seite mitgibt.
 	areaDocs     = "docs"
+	areaHandbook = "handbook"
 	// areaInventory ist der Bereich des Versionsinventars. Er steht neben
-	// Docs, nicht darin: Docs zeigt die mitgelieferte Doku der Installation,
-	// das Inventar ist eine erzeugte Datei des Projekts.
+	// Docs, nicht darin: Docs zeigt das Handbuch von k-playbook aus der
+	// mitgelieferten Ebene, das Inventar ist eine erzeugte Datei des Projekts.
 	areaInventory = "inventory"
 )
 
@@ -575,6 +584,12 @@ var docsTemplate = pageTemplate("docs.html")
 
 func docsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, docsTemplate, areaDocs, "/docs", "Docs")
+}
+
+// handbookPageHandler zeigt das Handbuch des Projekts mit derselben Seite wie
+// Docs; welche API sie fragt, sagt der Bereich.
+func handbookPageHandler(w http.ResponseWriter, r *http.Request) {
+	renderPage(w, docsTemplate, areaHandbook, "/handbook", "Handbuch")
 }
 
 // inventoryTemplate ist die Seite des Versionsinventars: Stand, Anstoß der

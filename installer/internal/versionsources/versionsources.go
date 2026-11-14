@@ -16,7 +16,7 @@
 // benutzen. Es hängt deshalb von nichts ab außer `yamllite` und dem Typ der
 // Leseantwort aus `kephalaion`; den Zugang zur Collection öffnet der Aufrufer.
 //
-// Der Vertrag steht in docs/version-inventory.md, Abschnitt
+// Der Vertrag steht in defaults/docs/handbook/version-inventory.md, Abschnitt
 // „Source Configuration".
 package versionsources
 

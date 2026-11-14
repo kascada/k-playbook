@@ -80,7 +80,7 @@ contract, not from the document.
 The old file `<local.dir>/version-sources.yaml` is no longer read by anything. If it is still
 there, the health check reports it as a leftover; `/k-upgrade` moves its content. The field is
 absent on an installation older than it. The full contract is in
-`<playbook.dir>/docs/version-inventory.md`.
+`k-playbook:/docs/handbook/version-inventory.md`.
 
 `gh` is a host finding for this machine only: `gh.installed`, `gh.loggedIn`, `gh.account`,
 `gh.accounts` and `gh.ready`. There is no project decision about gh. Whether gh is in play is

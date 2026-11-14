@@ -17,7 +17,7 @@ func parseGo(c *collector) {
 
 // goIndirectNote ist die Notiz einer `require`-Zeile mit `// indirect`. Der
 // Text ist das Erkennungsmerkmal, an dem /k-docs-tools rein indirekte
-// Kandidaten erkennt; Vertrag (docs/version-inventory.md) und Command nennen
+// Kandidaten erkennt; Vertrag (defaults/docs/handbook/version-inventory.md) und Command nennen
 // ihn wörtlich.
 const goIndirectNote = "indirekt (// indirect in go.mod)"
 

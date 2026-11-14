@@ -12,7 +12,7 @@ import (
 )
 
 // Die Seite „GitHub-Zugänge“ (/github-access) zeigt die persönliche
-// GitHub-Zugangsdatei nach dem Vertrag docs/github-access.md, Abschnitt
+// GitHub-Zugangsdatei nach dem Vertrag defaults/docs/handbook/github-access.md, Abschnitt
 // Interface page: den Pfad, den Stand von check (Probleme oder eine Zeile),
 // je Dienst einen Block mit Repository und den Zugängen in Vorrangreihenfolge
 // samt Verfügbarkeit, und auf Knopfdruck den Test gegen GitHub. Sie steht

@@ -121,11 +121,11 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
 - **Review subagent.** A separate subagent, not the one that wrote the code, compares the
   state after the task with the snapshot, including newly created files. It follows the
   module `k-playbook:/commands/_task-run/diff-review.md`
-  ([`defaults/commands/_task-run/diff-review.md`](../defaults/commands/_task-run/diff-review.md)),
+  ([`defaults/commands/_task-run/diff-review.md`](../../../defaults/commands/_task-run/diff-review.md)),
   which it reads itself, and appends `### Diff: Geänderte Dateien`, `### Diff: Code-Änderungen`,
   and `### Review: Befunde` to the task with `k_playbook_doc_append` and `since_revision`.
   Criteria and the classification into critical, important, and note are defined only in the
-  recipe [`reviews/review-code.md`](../defaults/reviews/review-code.md), section
+  recipe [`reviews/review-code.md`](../../../defaults/reviews/review-code.md), section
   `## Ergebnisform für den Diff eines Tasks`; this page does not repeat them. The recipe is
   the entry `k-playbook:/reviews/review-code.md` under `documents.reviews` of the briefing, so
   a project-owned overlay under `keph:/k-playbook/reviews/` in the project collection takes
@@ -136,7 +136,7 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
   context sends a desktop notification through `k_playbook_notify` (title
   `<project>: <task> – fertig|Rückfrage: …|abgebrochen`, body what happened, with sound), as
   the module `k-playbook:/commands/_task/fertig-meldung.md`
-  ([`defaults/commands/_task/fertig-meldung.md`](../defaults/commands/_task/fertig-meldung.md))
+  ([`defaults/commands/_task/fertig-meldung.md`](../../../defaults/commands/_task/fertig-meldung.md))
   describes; `/k-task-refine` includes the same module. `<task>` is the file stem of the task
   document. A `no_channel` answer, for example in a devcontainer, changes nothing: the
   question and the summary stay in the chat.

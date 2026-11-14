@@ -11,7 +11,7 @@ import (
 
 // k_playbook_github_test ist die Hülle über githubaccess.Tester.Test, denselben
 // Test, den `k-playbook github test` ausgibt und den die Oberfläche auf
-// Knopfdruck ruft (docs/github-access.md, Abschnitte Testing an access und
+// Knopfdruck ruft (defaults/docs/handbook/github-access.md, Abschnitte Testing an access und
 // MCP tool). Es ist das einzige Werkzeug dieses Servers, das GitHub fragt:
 // mehrere Anfragen je Zugang, zehn Sekunden Frist je Anfrage. Es läuft nur
 // auf diesen Aufruf hin — eine Sitzung, der gerade ein Push misslungen ist,

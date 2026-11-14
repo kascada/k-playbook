@@ -231,7 +231,7 @@ adjusted: it appears in the selection basis under `unavailableCandidates` with
 A perspective runs **after** the merge and is not a scanner of its own. It reads the merge
 output `review-input.json` and writes exactly one Markdown file directly into the run
 directory, for example `review-secret-scanning.md`. The complete example of this contract
-is in the [`review-secret-scanning.md`](../defaults/reviews/review-secret-scanning.md) recipe.
+is in the [`review-secret-scanning.md`](../../../defaults/reviews/review-secret-scanning.md) recipe.
 
 Frontmatter contract:
 
@@ -271,9 +271,9 @@ Scope semantics for `mode: perspective`:
 An evidence source runs **before** the merge. It reads code in the frozen path scope and
 supplies part of `review-input.json` rather than reading it. Its required artifact is SARIF
 under `raw/<entry>.sarif`; no Markdown result is created. The two converted examples are
-[`review-tech.md`](../defaults/reviews/review-tech.md) and
-[`review-python-comment-hardspots.md`](../defaults/reviews/review-python-comment-hardspots.md);
-[`review-code.md`](../defaults/reviews/review-code.md) was written as an evidence source from the start.
+[`review-tech.md`](../../../defaults/reviews/review-tech.md) and
+[`review-python-comment-hardspots.md`](../../../defaults/reviews/review-python-comment-hardspots.md);
+[`review-code.md`](../../../defaults/reviews/review-code.md) was written as an evidence source from the start.
 
 Frontmatter contract:
 
@@ -465,7 +465,7 @@ the command reports this on stderr and leaves it as is.
 ### The Entry Is the Tool, the Job Is the Invocation
 
 An entry is a tool from the matrix. How that tool is invoked is specified in
-[`share/scripts/scanners.tsv`](../share/scripts/scanners.tsv): one row per **job**, with languages,
+[`share/scripts/scanners.tsv`](../../../share/scripts/scanners.tsv): one row per **job**, with languages,
 time limit, and invocation including placeholders. A tool can have multiple jobs, one, or
 none:
 
@@ -569,7 +569,7 @@ project-wide, while `govulncheck` runs on one module.
 `candidates` is the number of files that could have been subjects under the job's
 **reference point**: the module for `workdir: module`, otherwise the run target. Which
 files count is specified by the `candidates` column in
-[`share/scripts/scanners.tsv`](../share/scripts/scanners.tsv):
+[`share/scripts/scanners.tsv`](../../../share/scripts/scanners.tsv):
 
 | Kind | Candidate is | For |
 |---|---|---|
@@ -591,7 +591,7 @@ kind. It skips directories that no job sees anyway: `k-playbook/` and
 with a leading dot. The anchoring is not a detail: `installer/cmd/k-playbook/` is code in
 this project, and excluding by name alone would consume it too, the same error as in Task
 004, where an unanchored pattern matched the entire project root. The list is in code
-([`installer/internal/review/candidates.go`](../installer/internal/review/candidates.go)),
+([`installer/internal/review/candidates.go`](../../../installer/internal/review/candidates.go)),
 for the same reason as the module-search list, and it is not the same: module search asks
 where a project module resides, while counting asks what a tool could have seen. Therefore,
 `vendor/`, `node_modules/`, and `testdata/` are included in the count.

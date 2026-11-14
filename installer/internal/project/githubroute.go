@@ -9,7 +9,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 )
 
-// Der Weg der Oberfläche zu GitHub (Task 126, docs/github-access.md, Abschnitt
+// Der Weg der Oberfläche zu GitHub (Task 126, defaults/docs/handbook/github-access.md, Abschnitt
 // In the interface): Hat das Repo einen Dienst in der persönlichen
 // Zugangsdatei, laufen gh und git fetch über dessen Zugang — gewählt wie bei
 // `k-playbook github run` und mit demselben Code: Load, Judge, Choose,

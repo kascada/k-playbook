@@ -152,7 +152,7 @@ const (
 )
 
 // KephalaionCheck ist die Antwort von `kephalaion upgrade --check --json` —
-// und das Feld check der Antwort von --auto. Vertrag: docs/installation.md
+// und das Feld check der Antwort von --auto. Vertrag: defaults/docs/handbook/installation.md
 // von Kephalaion, „Upgrade: was Kephalaion meldet".
 type KephalaionCheck struct {
 	State           string `json:"state"`

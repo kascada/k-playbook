@@ -176,7 +176,7 @@ der Gruppierung: Backslashes zu `/`, `file://` samt Authority weg, `.`- und
 `..`-Segmente sowie doppelte Slashes aufgelöst, führendes `/` weg, Kleinschreibung. Die
 Trennung ist Absicht: die Dedupe-Normierung darf besser werden, ohne die IDs zu bewegen.
 Ändert sich dagegen die eingefrorene Fassung, verschieben sich Stable-IDs — Begründung
-und Folgen für `known-decisions.md` stehen in `docs/review-runs.md`.
+und Folgen für `known-decisions.md` stehen in `k-playbook:/docs/handbook/review-runs.md`.
 
 Die Einengung auf die enge Menge gilt für Präfix und Digest gemeinsam und ist Absicht:
 über die breite Menge bestimmte eine beiläufig im Advisory-Text genannte Fremd-Kennung
@@ -280,4 +280,4 @@ Was daraus folgt:
   was **in** die enge Menge fällt, ist damit aber nicht festgeschrieben: eine zusätzlich
   erkannte Kennungsform — zuletzt `GO-…` — erweitert genau diese Menge und verschiebt die
   ID. Was ebenfalls weiterhin verschiebt — eine geänderte Gruppenzusammensetzung —,
-  steht in `docs/review-runs.md`, dort auch die Begründung der Entscheidung.
+  steht in `k-playbook:/docs/handbook/review-runs.md`, dort auch die Begründung der Entscheidung.

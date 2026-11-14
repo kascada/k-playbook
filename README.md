@@ -109,7 +109,7 @@ a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. With
 set up, the extension also binds the public collection `k-playbook` and the project's own
 collection into the workspace whenever a window starts, opening or creating the project's
 `.code-workspace` file if only the folder is open. Whoever never starts the interface
-installs it with `k-playbook vscode install`. See [`docs/vscode.md`](./docs/vscode.md).
+installs it with `k-playbook vscode install`. See [`defaults/docs/handbook/vscode.md`](./defaults/docs/handbook/vscode.md).
 
 ## Directory structure
 
@@ -309,7 +309,7 @@ make release-publish VERSION=v0.2.0  # brings the same commit onto main
 ```
 
 The pushes and `gh` calls of `make release` and `make release-publish` run through
-`k-playbook github run k-playbook` (see [`docs/github-access.md`](./docs/github-access.md)); the
+`k-playbook github run k-playbook` (see [`defaults/docs/handbook/github-access.md`](./defaults/docs/handbook/github-access.md)); the
 service name can be overridden with `GITHUB_SERVICE=…`.
 
 ## Core principles
@@ -326,9 +326,9 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 ## Documentation
 
 - [`docs/README.md`](./docs/README.md) - the complete documentation index.
-- [`docs/manual.md`](./docs/manual.md) - purpose, core model and standard workflows.
-- [`docs/k-playbook-format.md`](./docs/k-playbook-format.md) - the contract: `K-PLAYBOOK.yaml`, structure, overlay.
-- [`docs/installation.md`](./docs/installation.md) - clone, setup steps, security tools.
-- [`docs/commands.md`](./docs/commands.md) - index of the slash commands.
-- [`docs/vscode.md`](./docs/vscode.md) - the VS Code extension: commands, settings, installation, build.
-- [`docs/migration.md`](./docs/migration.md) - state of the migration, decisions and open points.
+- [`defaults/docs/handbook/manual.md`](./defaults/docs/handbook/manual.md) - purpose, core model and standard workflows.
+- [`defaults/docs/handbook/k-playbook-format.md`](./defaults/docs/handbook/k-playbook-format.md) - the contract: `K-PLAYBOOK.yaml`, structure, overlay.
+- [`defaults/docs/handbook/installation.md`](./defaults/docs/handbook/installation.md) - clone, setup steps, security tools.
+- [`defaults/docs/handbook/commands.md`](./defaults/docs/handbook/commands.md) - index of the slash commands.
+- [`defaults/docs/handbook/vscode.md`](./defaults/docs/handbook/vscode.md) - the VS Code extension: commands, settings, installation, build.
+- [`defaults/docs/handbook/migration.md`](./defaults/docs/handbook/migration.md) - state of the migration, decisions and open points.

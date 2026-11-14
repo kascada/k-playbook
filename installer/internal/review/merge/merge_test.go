@@ -1185,7 +1185,7 @@ func TestApplyRepresentativeOhnePaketKeineUnion(t *testing.T) {
 // auf KeyIDs überhaupt lösbar. Nennt ein Werkzeug die zusätzliche Kennung in
 // einem benannten Alias-Feld, zählt sie zur engen Menge und die ID verschiebt
 // sich weiterhin; das ist eine bewusst offene Restinstabilität, siehe
-// docs/review-runs.md.
+// defaults/docs/handbook/review-runs.md.
 func TestStableIDHaeltBeiBreitererAliasmenge(t *testing.T) {
 	schmal := Dependency{
 		Package:  "requests",

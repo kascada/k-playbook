@@ -212,7 +212,7 @@ func TestDocRefLeerLokalSchaltetAb(t *testing.T) {
 }
 
 // Eine Datei nur aus Überschriften gilt wie bei isEmptyFile als leer und
-// schaltet ab — die Folge steht in docs/verweisschema.md.
+// schaltet ab — die Folge steht in defaults/docs/handbook/verweisschema.md.
 func TestDocRefNurUeberschriftenSchaltetAb(t *testing.T) {
 	layers, _, _ := docTree(t, map[string]string{
 		"instructions/always/100-b.md": "## B\n",

@@ -44,7 +44,8 @@ func docsReadmeDocName(dir string) string {
 // mitgelieferte Ebene dist eine Vorlage trägt, relativ zu docs/ und sortiert,
 // etwa generated, generated/code, manual. Eine README.md unmittelbar unter
 // docs/ zählt nicht: docs/README.md ist Kephalaions. Andere Dateien als
-// README.md sind keine Vorlagen und werden übergangen. Fehlt docs/ in der
+// README.md sind keine Vorlagen und werden übergangen — so die Seiten des
+// Handbuchs unter docs/handbook/, das deshalb keine README.md trägt. Fehlt docs/ in der
 // mitgelieferten Ebene, ist die Liste leer, kein Fehler — der Hub trägt dann
 // einen Lieferumfang ohne Vorlagen (Versatz Binary/Hub, Task 133). Ein Fehler
 // der Ebene selbst, etwa kephalaion_unavailable, kommt zurück.

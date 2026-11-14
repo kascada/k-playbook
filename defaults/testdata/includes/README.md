@@ -1,7 +1,7 @@
 # testdata/includes
 
 Feste Testfälle für den Include-Mechanismus der Verweisauflösung
-(`docs/verweisschema.md`, Abschnitt „Includes“). Dieselben Dateien dienen zwei
+(`k-playbook:/docs/handbook/verweisschema.md`, Abschnitt „Includes“). Dieselben Dateien dienen zwei
 Zwecken:
 
 - Die Go-Tests in `installer/internal/project/docref_test.go` lesen sie von der

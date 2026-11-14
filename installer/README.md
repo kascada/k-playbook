@@ -144,4 +144,4 @@ make vscode-vsix     # VSIX neu bauen; die Datei gehört in denselben Commit
 
 Node braucht nur diese beiden Ziele. `make dist`, `make test` und die Release-CI kommen
 ohne aus, weil die VSIX eingecheckt ist; `TestVSIXPasstZurQuelle` macht `make test` rot,
-wenn sie nicht zur Quelle passt. Einzelheiten in [`../docs/vscode.md`](../docs/vscode.md).
+wenn sie nicht zur Quelle passt. Einzelheiten in [`../defaults/docs/handbook/vscode.md`](../defaults/docs/handbook/vscode.md).

@@ -13,7 +13,7 @@ import (
 )
 
 // Nummerierte Dokumente in der Collection des Projekts: anlegen, auflisten,
-// erledigen und wiederöffnen (docs/mcp.md, „doc-Werkzeuge“).
+// erledigen und wiederöffnen (defaults/docs/handbook/mcp.md, „doc-Werkzeuge“).
 //
 // Was eine Sorte ist — wo ihre Dokumente liegen, ob sie einen Userbereich hat,
 // woraus die nächste Nummer gezählt wird, ob es done/ gibt und mit welcher

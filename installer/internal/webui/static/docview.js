@@ -71,7 +71,8 @@ const DOC_ROOT = "/wurzel/";
 // bekäme ein „no such file or directory" — das liest sich wie ein Fehler der
 // Doku, dabei ist die Datei bloß nicht Teil dessen, was dieser Bereich zeigt.
 // Solche Verweise sind Absicht und keine Nachlässigkeit: im Repository und auf
-// GitHub führen sie richtig, nur `k-playbook/docs` reicht nicht so weit.
+// GitHub führen sie richtig, nur das Handbuch (`defaults/docs/handbook/` im
+// Quell-Repo, ausgeliefert über Kephalaion) reicht nicht so weit.
 function resolveDocPath(base, href) {
   const resolved = new URL(href, `https://docs.invalid${DOC_ROOT}${base}`);
   const path = decodeURIComponent(resolved.pathname);

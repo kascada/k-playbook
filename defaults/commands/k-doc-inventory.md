@@ -7,7 +7,7 @@ ist Go-Fachlogik: dieser Command klärt die Quellenlage, stößt das Subkommando
 `k-playbook inventory` an und berichtet dessen Ergebnis. Er baut keine eigene Parserlogik
 nach und nimmt kein Argument.
 
-Der verbindliche Vertrag steht in `docs/version-inventory.md` der Installation: Datenmodell,
+Der verbindliche Vertrag steht in `k-playbook:/docs/handbook/version-inventory.md`: Datenmodell,
 Pin-Taxonomie, Quellenarten, Abweichungen, Vertrauensgrenze, Quellenkonfiguration und die
 Regel zu Zeitstempel und Byte-Stabilität. Dieser Text formuliert nichts davon neu.
 

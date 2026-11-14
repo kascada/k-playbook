@@ -65,13 +65,13 @@ die Oberfläche. Wer sie selbst öffnet, führt eine zweite Auslegung des Format
 in keine Prüfung eingeht. Ein `data/todos.json` von früher übernimmt
 `k-playbook todo migrate`; eine ältere `TODO.md` wird nur noch gemeldet.
 
-Die Projektdoku ist nach Herkunft geteilt, nicht nach Thema — in `keph:/docs/` wie in
-dem, was unter `docs/` noch auf der Platte liegt. Das Unterverzeichnis sagt, wer die
-Datei erzeugt hat und was sie veralten lässt: `code/` folgt dem Code, `libs/` den
-Libraries (beide noch auf der Platte, bis ihre Erzeuger umgestellt sind),
-`generated/versions/` den deklarierten Versionen, `manual/` folgt niemandem außer der
-Hand, die sie schreibt (beide in der Collection). Ein `versions/`, `manual/` oder
-`extracted/` auf der Platte ist ein Stand von damals; `/k-upgrade` (3.2) bringt ihn nach
+Die Projektdoku ist nach Herkunft geteilt, nicht nach Thema. Das Unterverzeichnis von
+`keph:/docs/` sagt, wer die Datei erzeugt hat und was sie veralten lässt:
+`generated/code/` folgt dem Code, `generated/libs/` den Libraries, `generated/versions/`
+den deklarierten Versionen, `manual/` folgt niemandem außer der Hand, die sie schreibt —
+auch `manual/handbook/`, das Handbuch des Projekts, das die Oberfläche unter einem eigenen
+Menüpunkt zeigt. Alle liegen in der Collection. Ein `versions/`, `manual/` oder
+`extracted/` unter `docs/` auf der Platte ist ein Stand von damals; `/k-upgrade` (3.2) bringt ihn nach
 Kephalaion oder räumt ihn ab. Wer eine Datei in die falsche Herkunft legt, hängt sie an
 den falschen Nachzug.
 

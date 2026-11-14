@@ -141,7 +141,10 @@ func TestCleanDocsDir(t *testing.T) {
 // Die Vorlagen im Repo (Task 137): unter defaults/docs/ liegen nur README.md,
 // keine oben unter docs/; jede trägt title und description und kein
 // generated (daran erkennt Kephalaion seine Mahnung). Lesbar über
-// k-playbook:/docs/<pfad>/README.md mit dem Inhalt der Datei.
+// k-playbook:/docs/<pfad>/README.md mit dem Inhalt der Datei. Ausnahme ist
+// defaults/docs/handbook/ (Task 153), das Handbuch von k-playbook: Dort liegen
+// nur Seiten *.md und keine README.md, sonst schriebe ListDocsTemplates eine
+// keph:/docs/handbook/README.md in jedes Projekt.
 func TestDefaultsDocsVorlagen(t *testing.T) {
 	repo, err := filepath.Abs(filepath.Join("..", "..", "..", "defaults", "docs"))
 	if err != nil {
@@ -154,8 +157,18 @@ func TestDefaultsDocsVorlagen(t *testing.T) {
 		if err != nil || entry.IsDir() {
 			return err
 		}
+		rel, err := filepath.Rel(repo, file)
+		if err != nil {
+			return err
+		}
+		if strings.HasPrefix(filepath.ToSlash(rel), "handbook/") {
+			if entry.Name() == "README.md" || filepath.Ext(entry.Name()) != ".md" {
+				t.Errorf("%s: unter defaults/docs/handbook/ liegen nur Seiten *.md, keine README.md", file)
+			}
+			return nil
+		}
 		if entry.Name() != "README.md" {
-			t.Errorf("%s: unter defaults/docs/ liegen nur Vorlagen README.md", file)
+			t.Errorf("%s: unter defaults/docs/ liegen nur Vorlagen README.md (außer in handbook/)", file)
 		}
 		return nil
 	})
@@ -168,7 +181,7 @@ func TestDefaultsDocsVorlagen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"generated", "generated/code", "generated/libs", "generated/versions", "guidelines", "manual", "sources"}
+	want := []string{"generated", "generated/code", "generated/libs", "generated/versions", "guidelines", "manual", "manual/handbook", "sources"}
 	if !reflect.DeepEqual(dirs, want) {
 		t.Errorf("Vorlagen: %v, erwartet %v", dirs, want)
 	}
@@ -247,7 +260,8 @@ func TestDocsReadmesAlle(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]string{"generated": DocsCreated, "generated/code": DocsUnchanged, "generated/libs": DocsCreated,
-		"generated/versions": DocsCreated, "guidelines": DocsCreated, "manual": DocsWritten, "sources": DocsWritten}
+		"generated/versions": DocsCreated, "guidelines": DocsCreated, "manual": DocsWritten, "manual/handbook": DocsCreated,
+		"sources": DocsWritten}
 	if got := statusesOf(result); !reflect.DeepEqual(got, want) {
 		t.Errorf("Zustände: %v", got)
 	}
@@ -257,6 +271,7 @@ func TestDocsReadmesAlle(t *testing.T) {
 		"create docs/generated/versions/README.md",
 		"create docs/guidelines/README.md",
 		fmt.Sprintf("write docs/manual/README.md @%d", manualRev),
+		"create docs/manual/handbook/README.md",
 		fmt.Sprintf("write docs/sources/README.md @%d", sourcesRev),
 	}) {
 		t.Errorf("Aufrufe: %v", got)
@@ -309,7 +324,8 @@ func TestDocsReadmesCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]string{"generated": DocsReadmeMissing, "generated/code": DocsUnchanged, "generated/libs": DocsReadmeMissing,
-		"generated/versions": DocsReadmeMissing, "guidelines": DocsReadmeMissing, "manual": DocsReadmeDiffers, "sources": DocsReadmeMissing}
+		"generated/versions": DocsReadmeMissing, "guidelines": DocsReadmeMissing, "manual": DocsReadmeDiffers,
+		"manual/handbook": DocsReadmeMissing, "sources": DocsReadmeMissing}
 	if got := statusesOf(result); !reflect.DeepEqual(got, want) || !result.Check {
 		t.Errorf("Zustände: %v (check %v)", got, result.Check)
 	}
@@ -378,7 +394,7 @@ func TestDocsReadmesOhneVorlagenUndFehler(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := statusesOf(result)
-	if got["manual"] != DocsWritten || got["generated"] != DocsFailed || result.Failed() != 6 {
+	if got["manual"] != DocsWritten || got["generated"] != DocsFailed || result.Failed() != 7 {
 		t.Errorf("Zustände: %v, failed %d", got, result.Failed())
 	}
 	for _, item := range result.Readmes {
@@ -426,10 +442,10 @@ func TestApplyAssistantSetupSchreibtReadmes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyAssistantSetup: %v", err)
 	}
-	if len(setup.Readmes.Readmes) != 7 || !setup.Readmes.Changed() || setup.Readmes.Hint != "" {
+	if len(setup.Readmes.Readmes) != 8 || !setup.Readmes.Changed() || setup.Readmes.Hint != "" {
 		t.Fatalf("Readmes: %+v", setup.Readmes)
 	}
-	if text := DescribeSetupReadmes(setup.Readmes); text != "README unter keph:/docs/: 7 angelegt." {
+	if text := DescribeSetupReadmes(setup.Readmes); text != "README unter keph:/docs/: 8 angelegt." {
 		t.Errorf("Satz: %q", text)
 	}
 	for _, dir := range []string{"manual", "sources"} {
@@ -443,7 +459,7 @@ func TestApplyAssistantSetupSchreibtReadmes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if text := DescribeSetupReadmes(setup.Readmes); text != "README unter keph:/docs/: 1 aus der Vorlage überschrieben, 6 unverändert." {
+	if text := DescribeSetupReadmes(setup.Readmes); text != "README unter keph:/docs/: 1 aus der Vorlage überschrieben, 7 unverändert." {
 		t.Errorf("Satz: %q", text)
 	}
 }

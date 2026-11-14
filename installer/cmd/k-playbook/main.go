@@ -323,7 +323,7 @@ Unterkommandos:
             Ein Lauf ohne inhaltliche Änderung lässt das Dokument
             unangetastet. Ohne bereite Kephalaion-Anbindung bricht der Lauf
             ab (kephalaion_unavailable); einen Rückfall auf die Platte gibt
-            es nicht. Vertrag: k-playbook/docs/version-inventory.md.
+            es nicht. Vertrag: k-playbook:/docs/handbook/version-inventory.md.
   todo      Verwaltet die Todos des Projekts in der Projekt-Collection
             (todos/): k-playbook todo list|add|update|delete|import. Die
             Ausgabe ist JSON auf stdout. Ohne Unterbefehl
@@ -381,7 +381,7 @@ Unterkommandos:
             Fehlt die Datei, nennen sie den Hinweis auf init und enden mit 0.
             Exit-Code 0 ohne Problem, 1 mit error (test: mit failed; init:
             nicht anlegbar), 2 bei Aufruffehlern.
-            Vertrag: docs/github-access.md.
+            Vertrag: k-playbook:/docs/handbook/github-access.md.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
             Projekts: k-playbook doc create|list|done|reopen [--json].
             Legt an, listet und verschiebt nach done/ und zurück; den

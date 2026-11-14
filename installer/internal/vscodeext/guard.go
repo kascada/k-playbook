@@ -28,7 +28,7 @@ import (
 // im Testlauf gebautes Programm.
 //
 // Die Variable ist zugleich der ausdrückliche Weg für einen Benutzer, der den
-// selbsttätigen Nachzug nicht will; `docs/vscode.md` nennt sie.
+// selbsttätigen Nachzug nicht will; `defaults/docs/handbook/vscode.md` nennt sie.
 const EnvNoInstall = "K_PLAYBOOK_NO_VSCODE_INSTALL"
 
 // ErrNoInstall ist die Antwort von Install, solange die Marke steht. Sie

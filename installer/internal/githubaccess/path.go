@@ -1,5 +1,5 @@
 // Package githubaccess liest und prüft die persönliche GitHub-Zugangsdatei
-// ~/.config/k-playbook/github.yaml nach dem Vertrag docs/github-access.md
+// ~/.config/k-playbook/github.yaml nach dem Vertrag defaults/docs/handbook/github-access.md
 // (Workbench 002, Schritt 1). Die Datei nennt je Dienst ein Repository und
 // die Zugänge in Vorrangreihenfolge — ein gh-Login, eine Token-Datei, ein
 // SSH-Schlüssel oder -Alias, oder gar keinen —, aber nie ein Geheimnis: Sie

@@ -234,7 +234,7 @@ func parse(result Result, data []byte, err error) Result {
 		result.Problems = append(result.Problems, Problem{
 			Level: LevelError, Path: PathFile,
 			Message: "Die Datei ist kein YAML, das k-playbook liest" + describeYAMLError(err) + ".",
-			Hint:    "Einrückung und Schreibweise in " + path + " prüfen; das Muster steht in docs/github-access.md.",
+			Hint:    "Einrückung und Schreibweise in " + path + " prüfen; das Muster steht in k-playbook:/docs/handbook/github-access.md.",
 		})
 		return finish(result)
 	}
@@ -271,7 +271,7 @@ func occupiedPathProblem(path string) Problem {
 		}
 		return Problem{Level: LevelError, Path: PathFile,
 			Message: "Die Datei ist nicht lesbar: Der Pfad ist ein symbolischer Link, dessen Ziel " + target + " es nicht gibt.",
-			Hint:    "Den Link " + path + " entfernen (danach legt k-playbook github init die Vorlage an) oder sein Ziel als Datei mit dem Inhalt services: {} anlegen (Modus 0600); das Format steht in docs/github-access.md."}
+			Hint:    "Den Link " + path + " entfernen (danach legt k-playbook github init die Vorlage an) oder sein Ziel als Datei mit dem Inhalt services: {} anlegen (Modus 0600); das Format steht in k-playbook:/docs/handbook/github-access.md."}
 	}
 	return Problem{Level: LevelError, Path: PathFile,
 		Message: "Die Datei ist nicht lesbar: Der Pfad ist belegt, aber nicht als Datei.",
@@ -346,7 +346,7 @@ func validate(root *yamllite.Node) (Services, []Problem) {
 	}
 	if root.Kind != yamllite.Mapping {
 		fileProblem(root.At(), "Die Datei ist auf oberster Ebene keine Abbildung mit dem Schlüssel services.",
-			"Die Datei mit services: beginnen; das Muster steht in docs/github-access.md.")
+			"Die Datei mit services: beginnen; das Muster steht in k-playbook:/docs/handbook/github-access.md.")
 		return nil, problems
 	}
 	for _, key := range root.MapKeys() {

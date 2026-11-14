@@ -373,7 +373,7 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     k-playbook:/instructions/always/, zusammengebaut wie bei k-playbook read
     (lokal und mitgeliefert aufgelöst, in der festgelegten Reihenfolge) — der
     einzige Inhalt im Briefing, alles Weitere sind Verweise im Präfixschema
-    (docs/verweisschema.md), keine Pfade;
+    (k-playbook:/docs/handbook/verweisschema.md), keine Pfade;
   - gleich danach die Umgebungsprüfung: Fehler und Warnungen über die
     Umgebung des Projekts (Kephalaion-Anbindung, gh, Basis-Werkzeuge,
     Quellenkonfiguration), je Eintrag Stufe, Bereich, Satz und Abhilfe —

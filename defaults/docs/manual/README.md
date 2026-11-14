@@ -14,5 +14,9 @@ Existing documents are changed with the document operations of k-playbook,
 `k_playbook_doc_replace` and `k_playbook_doc_append` (`k-playbook doc replace|append`); new
 ones are created with Kephalaion `create`. No producer writes here.
 
+The subdirectory `handbook/` is the handbook of the project: pages written for people, which
+the k-playbook interface shows under a menu entry of their own. Its `README.md` says what
+belongs there.
+
 k-playbook writes this README from the template `k-playbook:/docs/manual/README.md`; changes
 made here by hand are overwritten.

@@ -18,7 +18,7 @@ The migration to the project-local model is complete and incorporated into the d
 | Commands, `context` once per session | [`commands.md`](./commands.md) |
 | Recipes, results, remediation policy | [`code-review.md`](./code-review.md), [`k-playbook-format.md`](./k-playbook-format.md#remediation) |
 | Removed: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
-| Tool: find anchors, linking, update, direct installation, legacy artifacts, web API | [`../installer/docs/architecture.md`](../installer/docs/architecture.md) |
+| Tool: find anchors, linking, update, direct installation, legacy artifacts, web API | [`../installer/docs/architecture.md`](../../../installer/docs/architecture.md) |
 | Command names and review handoff: `/k-audit`, `/k-review`, `/k-task-refine`, consistent `review-triage.md` | [`commands.md`](./commands.md), [`code-review.md`](./code-review.md), [`review-runs.md`](./review-runs.md) |
 
 ## Division Of Work: Development Repository Vs. Installation
@@ -183,7 +183,7 @@ pattern in stderr or stdout match, the runner executes the job as `skipped` with
 line as the reason; `failed` remains reserved for technical errors. Precedence remains clear:
 readable SARIF wins and remains `done`, broken non-empty SARIF remains `failed`, as do timeouts
 and runner cancellation. Details are in [`review-runs.md`](./review-runs.md#states) and the
-header line of [`share/scripts/scanners.tsv`](../share/scripts/scanners.tsv).
+header line of [`share/scripts/scanners.tsv`](../../../share/scripts/scanners.tsv).
 
 **Completed: alternative 2, command orchestrated through MCP.** From Task 018
 (`k-playbook-local/tasks/done/018-review-run-und-triage.md`). `/k-audit` is now enabled: the

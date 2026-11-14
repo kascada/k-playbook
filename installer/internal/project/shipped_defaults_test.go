@@ -568,7 +568,7 @@ func TestDefaultsKDocsToolsIstHuelleUndText(t *testing.T) {
 		"begrenzt nur dieses Zählen, nicht die Liste", "generated: { by: k-docs-tools", "`k-tools-scan`",
 		"Abschnitt „Scope“", "Abschnitt „Der Kopf“", "<die Scope-Zeilen aus dem Abschnitt „Scope“>",
 		"resource: keph:/docs/generated/versions/inventory.md", "item: <gegenstand>", "version: <version>",
-		"go-github.com-yuin-goldmark", "`docs/version-inventory.md`", "Known-Pitfall-Liste", "**höchstens drei**",
+		"go-github.com-yuin-goldmark", "`k-playbook:/docs/handbook/version-inventory.md`", "Known-Pitfall-Liste", "**höchstens drei**",
 		"vorhanden", "nicht\nvorausgewählt", "discard: true", "allow_hints", "kephalaion_unavailable", "outcome_unknown",
 		"unverändert liegen",
 	} {

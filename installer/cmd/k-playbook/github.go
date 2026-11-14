@@ -26,7 +26,7 @@ const (
 )
 
 // runGitHub liest und prüft die persönliche GitHub-Zugangsdatei nach dem
-// Vertrag docs/github-access.md: `check` nennt die Probleme, `show` die
+// Vertrag defaults/docs/handbook/github-access.md: `check` nennt die Probleme, `show` die
 // Konfiguration, wie sie gelesen wurde, beide mit der Verfügbarkeit jedes
 // Zugangs ohne Netz; `test` fragt GitHub, ob die verfügbaren Zugänge
 // funktionieren — der einzige Unterbefehl mit Netz, und er läuft nur auf
@@ -46,7 +46,7 @@ func runGitHub(args []string) error {
 		return nil
 	case "run":
 		// Eigene Zerlegung: alles nach -- gehört dem Befehl, und eigene
-		// Fehler enden mit 125 statt 2 (docs/github-access.md).
+		// Fehler enden mit 125 statt 2 (defaults/docs/handbook/github-access.md).
 		return runGitHubRun(rest)
 	case "init":
 		return runGitHubInit(rest)
@@ -315,7 +315,7 @@ func githubInitText(result githubaccess.InitResult) string {
 		return b.String()
 	}
 	if result.Created {
-		return result.File + ": angelegt (Verzeichnis 0700, Datei 0600) — trage deine Dienste ein; das Format steht in docs/github-access.md\n"
+		return result.File + ": angelegt (Verzeichnis 0700, Datei 0600) — trage deine Dienste ein; das Format steht in k-playbook:/docs/handbook/github-access.md\n"
 	}
 	return result.File + ": schon vorhanden, nichts geändert\n"
 }
@@ -482,7 +482,7 @@ github.yaml, Override K_PLAYBOOK_GITHUB_CONFIG) nennt je Dienst ein Repository
 <owner>/<repo> und die Zugänge in Vorrangreihenfolge: gh (login), token
 (file), ssh (key oder host), public. Sie enthält keine Geheimnisse, nur wo
 ein Zugang liegt; die Dateien, auf die sie zeigt, werden nicht gelesen.
-Vertrag: docs/github-access.md.
+Vertrag: k-playbook:/docs/handbook/github-access.md.
 
   init    Legt die Datei als Vorlage an: Verzeichnis 0700, Datei 0600,
           services: {} und ein auskommentiertes Beispiel je Zugangsart — der

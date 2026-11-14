@@ -16,7 +16,7 @@ import (
 
 // Exit-Codes von `k-playbook github run` außer dem des Befehls: dieselben
 // wie bei env, damit sie nicht mit denen des Befehls zusammenfallen
-// (docs/github-access.md, Output and exit codes).
+// (defaults/docs/handbook/github-access.md, Output and exit codes).
 const (
 	githubRunExitFailed        = 125 // run selbst ist gescheitert
 	githubRunExitCannotExecute = 126 // gefunden, aber nicht ausführbar
@@ -54,7 +54,7 @@ func runGitHubRun(args []string) error {
 	}
 	result := githubaccess.Load(path)
 	if !result.Present {
-		return runFailed("%s (%s); danach den Dienst %s dort eintragen (Format in docs/github-access.md)", githubaccess.MissingHint, path, parsed.service)
+		return runFailed("%s (%s); danach den Dienst %s dort eintragen (Format in k-playbook:/docs/handbook/github-access.md)", githubaccess.MissingHint, path, parsed.service)
 	}
 	if result.HasErrors() {
 		first := result.Problems[0]
@@ -262,7 +262,7 @@ stdout gehört dem Befehl. Exit-Code: der des Befehls; endet er durch ein
 Signal, endet run ebenso (die Shell meldet 128 + Signal); 125, wenn run
 selbst scheitert (Aufruf, unbekannter Dienst,
 fehlerhafte Datei, kein Zugang, Token nicht lesbar), 126 nicht ausführbar,
-127 nicht gefunden. Vertrag: docs/github-access.md, Abschnitt „Running a
+127 nicht gefunden. Vertrag: k-playbook:/docs/handbook/github-access.md, Abschnitt „Running a
 command under a service“.
 `)
 }

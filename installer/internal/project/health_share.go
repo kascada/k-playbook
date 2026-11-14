@@ -19,7 +19,7 @@ import (
 // jede Umgebung den Link bei jedem Aufruf auf ihr eigenes Verzeichnis, und in
 // der anderen fehlen die mitgelieferten Commands — ohne Fehlermeldung, weil
 // Claude Code Links ohne Ziel still weglässt. Abhilfe ist sharedir.EnvDir im
-// Container (sharelink.go, docs/installation.md).
+// Container (sharelink.go, defaults/docs/handbook/installation.md).
 //
 // Geprüft wird ohne Zustand, aus dem, was der Container selbst sieht: läuft
 // k-playbook in einem Container, fehlt die Variable, und ist der Projektordner
@@ -69,7 +69,7 @@ func healthShare(_ context.Context, projectDir string) []health.Problem {
 			", und auf dem Host fehlen danach die mitgelieferten Commands und Skills.",
 		Hint: "In .devcontainer/devcontainer.json unter containerEnv " + sharedir.EnvDir +
 			" auf \"${localEnv:HOME}/.local/share/k-playbook\" setzen, mit eigenem Volume an diesem Pfad und " +
-			"einem chown in postCreateCommand (k-playbook-Doku docs/installation.md, „Host and DevContainer sharing the project“). " +
+			"einem chown in postCreateCommand (k-playbook:/docs/handbook/installation.md, „Host and DevContainer sharing the project“). " +
 			"Ruft auf dem Host niemand k-playbook in diesem Projekt auf, die Variable auf " + own + " setzen.",
 	}}
 }

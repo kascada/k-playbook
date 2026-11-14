@@ -20,7 +20,7 @@ import (
 
 // Die Auskunft für Clients (Task 138): k-playbook sucht config, Node-Adresse
 // und Account nicht selbst, sondern fragt kephalaion node client. Dessen
-// Vertrag steht in kephalaion node client --help und in docs/installation.md
+// Vertrag steht in kephalaion node client --help und in defaults/docs/handbook/installation.md
 // von Kephalaion; hier wird Format 1 gelesen, unbekannte Felder werden
 // übergangen. Die Auskunft enthält nie ein Token, nur den Pfad der
 // Token-Datei; gelesen wird sie hier nur, wenn sie genau dort liegt, wo

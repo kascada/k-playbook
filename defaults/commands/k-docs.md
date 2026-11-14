@@ -31,7 +31,7 @@ Die Erzeuger und ihre Verzeichnisse:
 | Inventar | `keph:/docs/generated/versions/` | `k-doc-inventory` | `/k-doc-inventory` |
 | Code | `keph:/docs/generated/code/` | `k-docs-code`, Altwert `k-code2docs`; `ks-overlay-repo-analyse` | `/k-docs-code` |
 | Libs | `keph:/docs/generated/libs/` | `k-docs-tools`, Altwert `k-tools-scan` | `/k-docs-tools` |
-| Handdoku | `keph:/docs/manual/` | keiner — von Hand | — |
+| Handdoku | `keph:/docs/manual/`, darin `handbook/` als Handbuch des Projekts, das die Oberfläche zeigt | keiner — von Hand | — |
 | Quellen | `keph:/docs/sources/` | keiner — Verweise auf Quellen außerhalb | — |
 
 ## Schritt 2 — Bestand

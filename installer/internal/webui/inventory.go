@@ -12,7 +12,8 @@ import (
 )
 
 // Der Inventarbereich der Oberfläche: eigene Seite, eigene API, getrennt vom
-// Docs-Bereich. Der zeigt die mitgelieferte Doku aus k-playbook/docs und
+// Docs-Bereich. Der zeigt das Handbuch von k-playbook aus der mitgelieferten
+// Ebene (defaults/docs/handbook/ im Quell-Repo) und
 // kennt das Inventar nicht — so hat es Task 037 festgelegt, und das bleibt
 // so. Das Inventar ist ein erzeugtes Dokument des Projekts in seiner
 // Collection (inventory.DocRef), keine Datei der Installation, und bekommt

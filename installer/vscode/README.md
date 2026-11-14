@@ -7,7 +7,7 @@ der Kephalaion-Collections wird nur tätig, wenn die Kephalaion-Erweiterung inst
 
 Installiert wird sie von k-playbook selbst: die VSIX reist im Programm-Binary mit und
 wird beim Start der Oberfläche eingespielt und nachgezogen. Wer die Oberfläche nie
-startet, ruft `k-playbook vscode install`. Einzelheiten in `docs/vscode.md` im Repo.
+startet, ruft `k-playbook vscode install`. Einzelheiten in `defaults/docs/handbook/vscode.md` im Repo.
 
 ## Befehle
 

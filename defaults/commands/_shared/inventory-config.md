@@ -29,7 +29,7 @@ Projektwurzel; jeder Pfad steht relativ zu ihr. Ohne Einträge gelten die Standa
 
 Dieses Dokument ist handgepflegt. `/k-doc-inventory` ergänzt es nur nach ausdrücklicher
 Bestätigung; bestehende Einträge, Kommentare und Reihenfolge bleiben erhalten. Den Vertrag
-beschreibt `docs/version-inventory.md` der Installation, Abschnitt „Source Configuration“.
+beschreibt `k-playbook:/docs/handbook/version-inventory.md`, Abschnitt „Source Configuration“.
 ```
 
 Eine Liste mit Einträgen steht als Block (`exclude:` und darunter `  - "<muster>"`), nicht als

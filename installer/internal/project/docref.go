@@ -18,7 +18,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
-// Verweise im Präfixschema (docs/verweisschema.md) und ihre Auflösung.
+// Verweise im Präfixschema (defaults/docs/handbook/verweisschema.md) und ihre Auflösung.
 //
 // Ein Verweis ist ein einziger Pfad mit Präfix: project:/…, k-playbook:/… oder
 // keph:/…. ResolveDocRef löst alle drei auf — die eine Funktion hinter
@@ -86,8 +86,11 @@ const docGuidelinesRoot = "guidelines"
 
 // docDocsRoot ist die Sorte docs/: die Vorlagen der README.md unter
 // keph:/docs/ der Projekt-Collection (Task 137) — k-playbook:/docs/<pfad>/README.md
-// ist die Vorlage für keph:/docs/<pfad>/README.md (docsreadme.go). Sie gibt es
-// nur mitgeliefert: keine lokale Ebene darüber, auch kein Abschalten durch eine
+// ist die Vorlage für keph:/docs/<pfad>/README.md (docsreadme.go) — und das
+// Handbuch von k-playbook unter docs/handbook/ (Task 153), dessen Seiten als
+// k-playbook:/docs/handbook/<seite>.md lesbar sind und das die Oberfläche
+// unter „Docs“ zeigt; es trägt keine README.md, ist also keine Vorlage. Die
+// Sorte gibt es nur mitgeliefert: keine lokale Ebene darüber, auch kein Abschalten durch eine
 // leere Datei, weil die README in jedem Projekt gleich ist und aus einer
 // Quelle kommt. Wie includes/ in keinem Katalog und keinem Briefing.
 const docDocsRoot = "docs"
@@ -109,7 +112,7 @@ var docDistOnlyKinds = []string{docDocsRoot, docGuidelinesRoot}
 // Ende. Jedes andere Verzeichnis wird nur einzeln mit Dateinamen gelesen; ein
 // Verweis darauf mit „/" am Ende ist unvollständig (invalid_input). Die Liste
 // ist ein Wert im Code, keine Konfiguration: ein neuer Eintrag ist eine
-// Vertragsänderung (docs/verweisschema.md).
+// Vertragsänderung (defaults/docs/handbook/verweisschema.md).
 var docAssembledDirs = []string{
 	docInstructionsRoot + "/always",
 }

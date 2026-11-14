@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Die Auswahl für `k-playbook github run` (docs/github-access.md, Abschnitt
+// Die Auswahl für `k-playbook github run` (defaults/docs/handbook/github-access.md, Abschnitt
 // Running a command under a service, Choosing the accesses): zu einem Dienst
 // je ein Zugang für die beiden Kanäle git und api, ohne Netz, aus der
 // Verfügbarkeit (Judge) und in der Reihenfolge der Datei. Es gibt keinen
@@ -131,7 +131,7 @@ func NoAccessMessage(service Service, options ChooseOptions) string {
 }
 
 // Selection ist die Wahl von run für einen Dienst als Indizes in seinem
-// access (docs/github-access.md, Abschnitt JSON, Feld selected): Read ist
+// access (defaults/docs/handbook/github-access.md, Abschnitt JSON, Feld selected): Read ist
 // run ohne Optionen, Write ist run --write. Sie kommt aus Choose und aus
 // nichts sonst; Kombinationen mit --use und --skip nennt sie nicht.
 type Selection struct {

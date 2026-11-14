@@ -70,7 +70,7 @@ const (
 )
 
 // VersionSources ist der Zustand der Quellenkonfiguration in der
-// Kontextausgabe. Der Vertrag dazu steht in docs/version-inventory.md,
+// Kontextausgabe. Der Vertrag dazu steht in defaults/docs/handbook/version-inventory.md,
 // Abschnitt „Source Configuration"; die Feldnamen sind die YAML-Schlüssel
 // des Frontmatters, in camelCase wie überall sonst in dieser Ausgabe.
 //

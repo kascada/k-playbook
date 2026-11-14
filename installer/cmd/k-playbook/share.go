@@ -31,7 +31,7 @@ func ensureShare(args []string) {
 			return
 		case "github":
 			// github run richtet nur die Umgebung eines Befehls ein und
-			// schreibt sonst nichts (docs/github-access.md, What is set up);
+			// schreibt sonst nichts (defaults/docs/handbook/github-access.md, What is set up);
 			// die mitgelieferten Dateien braucht es nicht.
 			if len(args) > 1 && args[1] == "run" {
 				return

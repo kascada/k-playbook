@@ -1,14 +1,19 @@
 "use strict";
 
-// Seite "Docs": die mitgelieferte Doku aus k-playbook/docs.
+// Seiten "Docs" und "Handbuch": ein Handbuch, gelesen über Kephalaion.
+// "Docs" zeigt das Handbuch von k-playbook aus der mitgelieferten Ebene
+// (defaults/docs/handbook/ im Quell-Repo, /api/docs), "Handbuch" das des
+// Projekts aus keph:/docs/manual/handbook/ (/api/handbook). Welche API die
+// Seite fragt, steht in data-docs-api am body; die Anzeige ist dieselbe.
 //
 // Der Index steht links im Menü, der gerenderte Text rechts. Anders als auf
 // den übrigen Seiten entsteht das Menü nicht aus den Karten daneben, sondern
 // aus der geladenen Dateiliste — dieser Bereich hat genau einen Inhalt.
 //
-// Quelle ist /api/docs; gelesen wird nur. Das Anzeigen selbst — Anker,
-// Querverweise, Mermaid — steht in docview.js; hier steht, welche Datei
-// geöffnet wird.
+// Gelesen wird nur. Das Anzeigen selbst — Anker, Querverweise, Mermaid —
+// steht in docview.js; hier steht, welche Datei geöffnet wird.
+
+const docsApi = document.body.dataset.docsApi || "/api/docs";
 
 const elements = {
   blockNav: document.getElementById("block-nav"),
@@ -33,7 +38,7 @@ startSession((message) => {
 setUpDocLinks(elements.docViewer, (target, anchor) => {
   const path = resolveDocPath(currentDocPath, target);
   if (!path) {
-    elements.docsMessage.textContent = `${target} gehört nicht zur mitgelieferten Doku und kann hier nicht geöffnet werden; im Repository liegt die Datei neben k-playbook/docs.`;
+    elements.docsMessage.textContent = `${target} gehört nicht zu diesem Handbuch und kann hier nicht geöffnet werden; im Repository von k-playbook liegt die Datei außerhalb von defaults/docs/handbook/.`;
     return;
   }
   elements.docsMessage.textContent = "";
@@ -46,7 +51,7 @@ async function loadDocs() {
   elements.docViewer.textContent = "Wird geladen...";
 
   try {
-    const response = await fetch("/api/docs", { cache: "no-store" });
+    const response = await fetch(docsApi, { cache: "no-store" });
     renderDocs(await response.json());
   } catch {
     elements.docViewer.textContent = "";
@@ -64,8 +69,9 @@ function renderDocs(data) {
     return;
   }
 
-  // Fehlt das Verzeichnis, steht der Grund in der Meldung; eine leere Liste
-  // wäre dafür die falsche Auskunft.
+  // Ist das Handbuch nicht lesbar — Kephalaion nicht erreichbar, oder das
+  // Handbuch fehlt (data.code) —, steht der Grund samt Abhilfe in der
+  // Meldung; eine leere Liste wäre dafür die falsche Auskunft.
   if (data.message) {
     elements.docViewer.textContent = "";
     return;
@@ -89,8 +95,9 @@ function renderDocs(data) {
   //
   // Steht die angeforderte Datei nicht im Index, wird sie trotzdem geöffnet:
   // die Antwort des Servers sagt dann, dass es sie nicht gibt. Ersatzweise die
-  // README zu zeigen wäre die falsche Auskunft — die Installation daneben kann
-  // einen anderen Stand tragen, und ein Verweis geht dort ins Leere.
+  // Startseite zu zeigen wäre die falsche Auskunft — der Lieferumfang auf dem
+  // Hub kann einen anderen Stand tragen als das Binary, und ein Verweis geht
+  // dort ins Leere.
   const requested = new URLSearchParams(window.location.search).get("file");
   if (requested) {
     const doc = docs.find((entry) => entry.path === requested);
@@ -98,9 +105,10 @@ function renderDocs(data) {
     return;
   }
 
-  // Ohne Auswahl steht die README da: sie ist der Einstieg und steht deshalb
-  // auch in der Liste vorn.
-  const start = docs.find((doc) => doc.path === "README.md") || docs[0];
+  // Ohne Auswahl steht die Startseite da: Der Server stellt sie in der Liste
+  // vorn hin — overview.md im Handbuch von k-playbook, README.md in dem des
+  // Projekts.
+  const start = docs[0];
   openDoc(start.path, start.title || start.path);
 }
 
@@ -131,7 +139,7 @@ async function openDoc(path, title, anchor = "") {
   elements.docViewer.textContent = "Wird geladen...";
 
   try {
-    const response = await fetch(`/api/docs/file?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+    const response = await fetch(`${docsApi}/file?path=${encodeURIComponent(path)}`, { cache: "no-store" });
     const data = await response.json();
     // Wurde inzwischen etwas anderes geöffnet, gehört diese Antwort nicht
     // mehr in die Karte.

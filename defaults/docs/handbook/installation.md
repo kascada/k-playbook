@@ -288,9 +288,13 @@ This section is read-only. Tasks are created and executed through `/k-task-creat
 
 ## Read documentation
 
-The **Docs** section shows all Markdown files from `k-playbook/docs`, the same documentation you are reading now, at the version installed in the project. The index is on the left in the menu and the open file on the right; without a selection, it shows `README.md`. Links in the text lead to the next file, and anchors jump within the open file.
+The **Docs** section shows the handbook of k-playbook, the same documentation you are reading now. It comes from the shipped layer: in the source repository it lives in `defaults/docs/handbook/`, and with every release the hub carries it in the public collection under `<hub>:k-playbook/defaults/docs/handbook/`; it is read through Kephalaion, not from disk and not from the binary. The index is on the left in the menu and the open file on the right; without a selection, it shows the start page `overview.md`. Links in the text lead to the next file, and anchors jump within the open file.
 
-Another page can request a specific file: `/docs?file=task-flow.md`, optionally followed by an anchor. That is how the help links of the Workflows pages work. If the requested file is not in the index, the answer says so rather than falling back to `README.md` — the installation can carry a different state than the binary that wrote the link.
+The **Handbuch** section shows the handbook of the project in the same view: the pages under `keph:/docs/manual/handbook/` in the project collection, a subdirectory of the manual documentation. Its start page `README.md` comes from a template and is always shown first; a project adds pages by creating Markdown files there.
+
+Neither section has a fallback. Without Kephalaion both show a message instead of pages. Docs also says when the shipped content on the hub predates the handbook — the hub fetches a new release only when the collection is created, by hand or on request — and names the remedy: the hub fetches the k-playbook release again (Kephalaion `fetch_release` for `<hub>:k-playbook`). Handbuch says when `keph:/docs/manual/handbook/` does not exist; `k-playbook docs readme manual/handbook` writes its start page.
+
+Another page can request a specific file: `/docs?file=task-flow.md`, optionally followed by an anchor. That is how the help links of the Workflows pages work. If the requested file is not in the index, the answer says so rather than falling back to the start page — the shipped content on the hub can carry a different state than the binary that wrote the link.
 
 Mermaid diagrams are rendered if the machine has network access: the library is loaded when needed. Without network access, the diagram source remains visible and the text is still fully readable.
 
@@ -543,7 +547,7 @@ place.
 
 ## GitHub CLI
 
-The **GitHub CLI** card shows the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and context output, never in configuration, because it differs on the next machine. There is nothing to decide on the card: whether `gh` is used follows from the personal GitHub access file (`docs/github-access.md`) — with a service for the repository its selected access, without one this finding. Commands without a service stop when `gh` is missing or not logged in and name the access file as the remedy.
+The **GitHub CLI** card shows the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and context output, never in configuration, because it differs on the next machine. There is nothing to decide on the card: whether `gh` is used follows from the personal GitHub access file (`k-playbook:/docs/handbook/github-access.md`) — with a service for the repository its selected access, without one this finding. Commands without a service stop when `gh` is missing or not logged in and name the access file as the remedy.
 
 Install and sign in through the terminal, just as with security tools: both change the host, and `gh auth login` needs a browser. The card shows the appropriate command.
 
@@ -568,7 +572,7 @@ Only `github.com`. Enterprise instances would have their own accounts per host a
 
 Projects may work with their own `.venv`. Security tools are installed separately at host or user scope, never in a project venv. They are one of two deliberate exceptions to project locality: a scanner belongs to the work environment, not the project. Base tools are the second exception; see below.
 
-The canonical matrix is in [`../share/scripts/security-tools.tsv`](../share/scripts/security-tools.tsv). The installation script and interface read it; the list is not duplicated in Go code.
+The canonical matrix is in [`../share/scripts/security-tools.tsv`](../../../share/scripts/security-tools.tsv). The installation script and interface read it; the list is not duplicated in Go code.
 
 Required tools:
 
@@ -631,7 +635,7 @@ This also does not install into `<project>/.venv`, but into dedicated k-playbook
 
 The second deliberate exception to project locality, and a different type from security tools: base tools are not scanners but the ground on which commands stand: `bash`, `git`, `curl` or `wget`, `tar`, `python3`, and `rg`. Either `curl` or `wget` is sufficient.
 
-The matrix is in [`../share/scripts/base-tools.tsv`](../share/scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
+The matrix is in [`../share/scripts/base-tools.tsv`](../../../share/scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
 
 **A missing base tool warns; it does not block.** `k-playbook context` reports the state under `baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence stops a command that needs it.
 

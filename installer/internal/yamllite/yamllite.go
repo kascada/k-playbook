@@ -5,7 +5,7 @@
 // Warum kein YAML-Paket: das Werkzeug kommt bisher ohne YAML-Abhängigkeit aus —
 // die K-PLAYBOOK.yaml wird zeilenweise gelesen —, und für das Versionsinventar
 // ist die Zeilennummer jedes Fundes Pflicht: sie ist Teil der Herkunft
-// (docs/version-inventory.md, „Data Model for an Inventory Row"). Die üblichen
+// (defaults/docs/handbook/version-inventory.md, „Data Model for an Inventory Row"). Die üblichen
 // Pakete geben sie nur über Umwege heraus.
 //
 // Zwei Leser benutzen dieses Paket: der Sammler des Versionsinventars und der

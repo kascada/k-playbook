@@ -106,7 +106,7 @@ func printReadUsage(out io.Writer) {
 Aufruf:
   k-playbook read <verweis> [--raw] [--lines <von-bis>|--section <überschrift>] [--json]
 
-Löst einen Verweis im Präfixschema auf (docs/verweisschema.md) — dieselbe
+Löst einen Verweis im Präfixschema auf (k-playbook:/docs/handbook/verweisschema.md) — dieselbe
 Fachlogik wie das MCP-Werkzeug k_playbook_doc_read. Gesucht wird das Projekt
 ab dem Arbeitsverzeichnis aufwärts.
 
@@ -137,6 +137,9 @@ ab dem Arbeitsverzeichnis aufwärts.
             Die Vorlage für keph:/docs/<pfad>/README.md (k-playbook docs
             readme). Nur mitgeliefert: eine lokale Fassung gibt es nicht,
             auch kein Abschalten durch eine leere Datei.
+  k-playbook:/docs/handbook/<seite>.md
+            Eine Seite des Handbuchs von k-playbook, das die Oberfläche
+            unter „Docs“ zeigt. Nur mitgeliefert, wie die Vorlagen.
   k-playbook:/instructions/always/
             Ein Verzeichnis (mit / am Ende): alle Teile mit Ziffer vorn aus
             beiden Ebenen, numerisch sortiert, ohne Frontmatter zu einem Text

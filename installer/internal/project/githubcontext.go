@@ -10,7 +10,7 @@ import (
 )
 
 // ContextGitHub ist das Feld github der Kontextausgabe (Task 119): welcher
-// Dienst der persönlichen Zugangsdatei (docs/github-access.md) zum Repo des
+// Dienst der persönlichen Zugangsdatei (defaults/docs/handbook/github-access.md) zum Repo des
 // Arbeitsstands gehört und welche Zugänge `k-playbook github run` dafür
 // wählt, dazu die übrigen Dienste. Dieselbe Quelle und dieselbe Auswahl wie
 // `github show`: Path, Load, Judge mit selected.
