@@ -396,7 +396,7 @@ links too (`context.links`). If the context output cannot be built, that is a st
 (`context.available: false` with `context.message`), not an error. The rest is a
 transition: each later step takes one field out and gives it its own place in the
 briefing -- the authority is the table "Context field → future place" in
-[knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
+[knowledge-aktuell.md](knowledge-aktuell.md#the-briefing-replaces-the-context-output-task-086)
 --, and when it is empty, `k-playbook context` and `k_playbook_context` go. The first
 fields have gone that way (task 148): `instructions`, the list of the `k-playbook.md` files,
 no longer exists, because the reading order is `documents.always`, and `guidelines`, the

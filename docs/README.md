@@ -96,7 +96,7 @@ questions and the ordered work list.
 - `overview` / `what is it for` / `three kinds of work` / `big picture` -> [`overview.md`](./overview.md)
 - `paths` / `why no paths` -> [`faq.md`](./faq.md), [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)
 - `reference` / `Verweis` / `project:` / `k-playbook:` / `keph:` / `instructions/` / `k-playbook read` / `k_playbook_doc_read` -> [`verweisschema.md`](./verweisschema.md)
-- `briefing` / `k-playbook briefing` / `k_playbook_briefing` / `what applies` / `session start` -> [`mcp.md`](./mcp.md#briefing-contract), [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`knowledge-aktuell.md`](./knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)
+- `briefing` / `k-playbook briefing` / `k_playbook_briefing` / `what applies` / `session start` -> [`mcp.md`](./mcp.md#briefing-contract), [`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state), [`knowledge-aktuell.md`](./knowledge-aktuell.md#the-briefing-replaces-the-context-output-task-086)
 - `remediation` -> [`code-review.md`](./code-review.md#k-remediation), [`k-playbook-format.md`](./k-playbook-format.md#remediation)
 - `results` -> [`code-review.md`](./code-review.md)
 - `keph:/results/` / `keeping results` / `presenting results` -> [`k-playbook-format.md`](./k-playbook-format.md#no-paths-in-configuration)

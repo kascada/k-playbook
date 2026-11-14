@@ -1187,7 +1187,7 @@ briefing's own sections do not cover, built from the same function (`ContextForD
 rebuilt. So one call is enough for the start of a session, and the rest shows what is left of
 `k_playbook_context`; each later step takes one field out of it and gives it a place of its own
 (the authority is the table "Context field → future place" in
-[knowledge-aktuell.md](knowledge-aktuell.md#target-for-k-playbookmd-and-agentsmd-task-086)),
+[knowledge-aktuell.md](knowledge-aktuell.md#the-briefing-replaces-the-context-output-task-086)),
 and when the rest is empty, `k_playbook_context` and `k-playbook context` go. Until then both
 work unchanged. A test (`TestBriefingTraegtKeinFeldDerKontextausgabe`) keeps the top-level
 fields of the two outputs disjoint (`schemaVersion` excepted, which describes each output
