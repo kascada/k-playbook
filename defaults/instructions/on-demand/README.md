@@ -3,6 +3,9 @@
 Anweisungen für bestimmte Aufgaben. Sie werden nicht in jeder Sitzung geliefert, sondern nur,
 wenn ein Verweis auf sie zeigt, etwa `k-playbook:/instructions/on-demand/<thema>.md`.
 
+Für Sitzungen fasst `k-playbook.md` in diesem Verzeichnis den Mechanismus zusammen; ändert
+sich hier etwas, ist sie nachzuziehen.
+
 - Die Dateien sind nicht nummeriert. Der Dateiname ist der Name, über den sie erreichbar sind.
 - Zuerst gilt die lokale Fassung, sonst die mitgelieferte. Die lokale Fassung liegt in der
   Collection des Projekts unter `keph:/k-playbook/instructions/on-demand/`, mit demselben

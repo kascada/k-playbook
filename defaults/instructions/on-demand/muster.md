@@ -12,5 +12,5 @@ wenn ein Verweis auf sie zeigt — hier `k-playbook:/instructions/on-demand/must
   Übersicht beschreiben, ohne ihren Inhalt zu laden.
 - Darunter steht die Anweisung als gewöhnliches Markdown. Gelesen wird die Datei unverändert,
   das Frontmatter eingeschlossen.
-- Ein gleichnamiger Eintrag unter `k-playbook-local/instructions/on-demand/` ersetzt sie; ein
+- Ein gleichnamiger Eintrag unter `keph:/k-playbook/instructions/on-demand/` ersetzt sie; ein
   leerer schaltet sie ab.

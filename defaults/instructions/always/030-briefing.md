@@ -38,6 +38,10 @@ sieht. Wer einen startet, schreibt an den Anfang seines Auftrags: Führe zuerst 
 aus und lies die Ausgabe. Das entfällt nur, wenn der Auftrag reines Nachschlagen ist und nichts
 schreibt, bewertet oder ablegt.
 
+k-playbook selbst: Wie es aufgebaut ist, wie Anweisungen funktionieren und wie eine `AGENTS.md`
+aufgeteilt wird, steht in `k-playbook:/instructions/on-demand/k-playbook.md`. Lies es, bevor du
+dazu Auskunft gibst oder eine Projektregel anlegst, änderst, verschiebst oder abschaltest.
+
 Der Abschnitt `context` ist der Rest von `k-playbook context` unter denselben Namen. Alles Übrige
 zu den Feldern: `k-playbook:/instructions/on-demand/briefing-felder.md`.
 

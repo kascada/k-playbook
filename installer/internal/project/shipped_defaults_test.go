@@ -64,6 +64,7 @@ func TestDefaultsAlwaysTraegtBriefingTeil(t *testing.T) {
 		"`context.now.date`",
 		"`k-playbook:/instructions/on-demand/briefing-felder.md`",
 		"`k-playbook:/guidelines/betrieb.md`",
+		"`k-playbook:/instructions/on-demand/k-playbook.md`",
 	} {
 		if !strings.Contains(always.Content, want) {
 			t.Errorf("Teil nennt nicht %s", want)
@@ -73,6 +74,82 @@ func TestDefaultsAlwaysTraegtBriefingTeil(t *testing.T) {
 	lines := func(rel string) int { return strings.Count(readRepoDefault(t, rel), "\n") }
 	if got, max := lines("instructions/always/030-briefing.md"), lines("instructions/always/010-verweise.md"); got >= max {
 		t.Errorf("030-briefing.md hat %d Zeilen, Obergrenze sind weniger als die %d von 010-verweise.md", got, max)
+	}
+}
+
+// Die Einstiegsdatei on-demand/k-playbook.md (Task 158) steht in der Liste
+// „Auf Abruf“, wie das Briefing sie aus dem Arbeitsstand baut: mitgeliefert,
+// mit Titel und Beschreibung aus dem Frontmatter. Geprüft wird über den Leser
+// des Briefings (briefingEntries, darin docTitleAndDescription), nicht am
+// Rohtext: Ein unquotierter Wert mit „: “ macht das Frontmatter unlesbar,
+// „ #“ schneidet ihn ab — die Beschreibung fiele still weg oder bräche ab,
+// der Titel käme aus der Überschrift. Die Nadeln der Beschreibung stehen an
+// ihrem Anfang, in der Mitte und am Ende. Dazu: Die Datei trägt ihre fünf
+// Abschnitte, und jeder Verweis, auf den sie baut, löst im Arbeitsstand auf.
+func TestDefaultsEinstiegsdateiKPlaybook(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const name = "k-playbook.md"
+	const ref = "k-playbook:/instructions/on-demand/" + name
+
+	entries, err := briefingEntries(layers, catalogKind{name: "on-demand", dirName: briefingOnDemandDir, suffix: ".md"})
+	if err != nil {
+		t.Fatalf("Auf Abruf listen: %v", err)
+	}
+	index := slices.IndexFunc(entries, func(entry BriefingEntry) bool { return entry.Ref == ref })
+	if index < 0 {
+		t.Fatalf("%s fehlt unter „Auf Abruf“: %+v", ref, entries)
+	}
+	entry := entries[index]
+	if entry.Origin != DocOriginDist {
+		t.Errorf("%s: Herkunft %q, erwartet %q", ref, entry.Origin, DocOriginDist)
+	}
+	if entry.Title != "Wie k-playbook aufgebaut ist" {
+		t.Errorf("%s: Titel %q", ref, entry.Title)
+	}
+	if entry.Description == "" {
+		t.Fatalf("%s: Beschreibung leer — das Frontmatter ist für den Leser des Briefings nicht lesbar", ref)
+	}
+	if !strings.HasPrefix(entry.Description, "Was wo liegt") || !strings.Contains(entry.Description, "AGENTS.md") ||
+		!strings.HasSuffix(entry.Description, "ins Handbuch.") {
+		t.Errorf("%s: Beschreibung unvollständig gelesen: %q", ref, entry.Description)
+	}
+
+	doc := mustResolveDoc(t, layers, ref)
+	if doc.Disabled || len(doc.Problems) != 0 || doc.Content != readRepoDefault(t, "instructions/on-demand/"+name) {
+		t.Errorf("%s: %+v", ref, doc)
+	}
+	// Das Frontmatter selbst trägt den Titel: Mit einem unlesbaren Kopf käme
+	// derselbe Text ersatzweise aus der Überschrift.
+	head, ok := frontmatterOf(doc.Content)
+	if !ok {
+		t.Fatalf("%s ohne Frontmatter:\n%.120s", ref, doc.Content)
+	}
+	if title, description := docTitleAndDescription(name, []byte("---\n"+head+"\n---\n")); title != entry.Title || description != entry.Description {
+		t.Errorf("%s: Frontmatter allein liefert %q/%q", ref, title, description)
+	}
+	for _, heading := range []string{"### Aufbau", "### Wie Anweisungen funktionieren", "### Eine `AGENTS.md` aufteilen",
+		"### Was in die Queue kommt", "### Weiterlesen"} {
+		if !strings.Contains(doc.Content, "\n"+heading+"\n") {
+			t.Errorf("%s: Abschnitt %q fehlt", ref, heading)
+		}
+	}
+	for _, target := range []string{
+		"k-playbook:/guidelines/betrieb.md",
+		"k-playbook:/instructions/on-demand/befunde.md",
+		"k-playbook:/instructions/on-demand/doku-auftraege.md",
+		"k-playbook:/docs/handbook/overview.md",
+		"k-playbook:/docs/handbook/manual.md",
+		"k-playbook:/docs/handbook/k-playbook-format.md",
+		"k-playbook:/docs/handbook/verweisschema.md",
+		"k-playbook:/docs/handbook/commands.md",
+		"k-playbook:/docs/handbook/task-flow.md",
+		"k-playbook:/docs/handbook/installation.md",
+		"k-playbook:/docs/handbook/faq.md",
+	} {
+		if !strings.Contains(doc.Content, "`"+target+"`") {
+			t.Errorf("%s nennt nicht %s", ref, target)
+		}
+		mustResolveDoc(t, layers, target)
 	}
 }
 

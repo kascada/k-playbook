@@ -462,6 +462,12 @@ The shipped parts come first, the project-owned ones after them; a project-owned
 document of the same name replaces the shipped one, an empty one disables it (see
 "Merge shipped and project-owned content").
 
+The entry point for a session is `k-playbook:/instructions/on-demand/k-playbook.md`: it
+sums up the layout, how instructions are assembled, overridden and disabled, and how an
+`AGENTS.md` is split up. The always part `030-briefing.md` tells a session to read it
+before it answers questions about k-playbook or creates, changes, moves or disables a
+project rule.
+
 `AGENTS.md` receives only a **prompt**: a short block naming the one call of a
 session, `k-playbook briefing`, with the MCP tool `k_playbook_briefing` as its
 equivalent — exactly the `AGENTS.md` of the source repository. If the file does
