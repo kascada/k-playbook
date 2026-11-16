@@ -63,10 +63,8 @@ Remote-Stands und der Schreibschutz sind entfallen, ein Verzeichnis `k-playbook/
 nicht an und nennt es nicht — weder mit `upgrade` noch mit `--check` oder `--json`. Einen
 alten Clone löscht /k-upgrade (Umstellung 3.8).
 
-Der Projektschritt: zuerst der Umzug der Anbindung aus einer alten
-`k-playbook-local/K-PLAYBOOK.local.yaml` in den Block `kephalaion:` von `K-PLAYBOOK.yaml`
-(`project.MigrateKephalaionBinding()`, Abschnitt „Altbestand `K-PLAYBOOK.local.yaml`“), dann
-`ApplyAssistantSetup()`, dann immer die MCP-Einträge: `project.RepairMCPReport()` mit der
+Der Projektschritt: `ApplyAssistantSetup()`, dann immer die MCP-Einträge:
+`project.RepairMCPReport()` mit der
 Schreibregel des Starts (`MCPWriteOutdatedAndUnversioned`), auch unter `--project-only`.
 Ein Lauf ersetzt einen veralteten Eintrag und ergänzt auch einen fehlenden Eintrag bzw. eine
 fehlende Datei, wenn die
@@ -95,8 +93,7 @@ Hülle und Ersatzaufruf von /k-upgrade tun: eine Variable statt eines Schalters,
 Binary einen unbekannten Schalter abwiese und die Einbettung scheitern ließe. `--check` schreibt nichts: `kephalaion upgrade --check --json` für
 Kephalaion (nie `--auto`),
 `CheckStatus()` für den Programm-Stand, `CheckRootInstructions()`, `CheckLinks()` mit
-`PendingLinkChanges()`, `CheckMCP()` und `MigrateKephalaionBinding()` mit `check` für das,
-was ein Lauf am Projekt täte — kein
+`PendingLinkChanges()` und `CheckMCP()` für das, was ein Lauf am Projekt täte — kein
 Trockenlauf-Schalter in `ApplyAssistantSetup()`; die README unter `keph:/docs/`, die ein
 Lauf über `ApplyAssistantSetup()` aus den Vorlagen schreibt (Task 137), übergeht `--check`
 — die meldet `/k-docs`. Ihr Ergebnis steht im Lauf als eigene Zeile `Projekt: README unter
@@ -125,8 +122,9 @@ Grund: sie arbeiten auf dem Projekt und sollen den Host nicht nebenbei anfassen.
 `scan` und `merge` sind zurzeit gesperrt (Task 147): Die Ablage der Review-Ergebnisse wird
 umgebaut, und bis dahin enden beide vor jedem Lesen mit der Sperre aus `review.Paused()`
 (`review/paused.go`) und Exit-Code 1 — derselbe Satz, mit dem die MCP-Werkzeuge antworten
-(§„Der MCP-Server"). Der Code darunter bleibt, wie er ist; die beiden folgenden Absätze
-beschreiben ihn.
+(§„Die Review-Wege pausieren"). Der Code darunter bleibt, wie er ist; die beiden folgenden
+Absätze beschreiben ihn. Das Verzeichnis, unter dem die Läufe liegen, bekommt er von
+`review.ResultsDir()`.
 
 `scan <lauf> [eintrag …]` führt die Werkzeug-Einträge eines Laufs aus und blockiert, bis
 sie durch sind. Das Kommando sammelt nur zusammen, was der Lauf braucht — Installation,
@@ -176,7 +174,7 @@ ein Dokument der Projekt-Collection über den Node (`kephalaion.Client.Read`, Zu
 `OpenUserDocs`, `~` durch den User ersetzt), `k-playbook:` die Sorten `instructions/`,
 `reviews/`, `guidelines/` und `commands/` (`docReaderKinds`; dazu als
 Include-Ziele `includes/` und `testdata/` und die README-Vorlagen `docs/`, zusammen
-`docRefKinds`), lokal vor mitgeliefert — `docs/` und seit Task 148 `guidelines/` nur
+`docRefKinds`), projekteigen vor mitgeliefert — `docs/`, `guidelines/` und `testdata/` nur
 mitgeliefert (`docDistOnlyKinds`) —
 mitgeliefert heißt seit Task 131 aus `<hub>:k-playbook/defaults/` über den Node (siehe „Die
 mitgelieferte Ebene aus `<hub>:k-playbook`“),
@@ -289,7 +287,7 @@ beim Hub ist nichts angekommen (nichts abgeschickt, oder der Node meldet `unreac
 
 Entfallen sind die Einrichtungs- und Lebenszyklus-Kommandos des alten Stands: `init`,
 `update`, `restore`, `migrate`, `status`, `smoke` und `projects …`, samt der lokalen
-Projektliste unter `.k-playbook-local/projects.json`. Das alte `status` über den ganzen
+Projektliste. Das alte `status` über den ganzen
 Stand kommt nicht zurück; die Frage nach dem **Dienst** dagegen hat seit 2026-10-16 eine
 eigene Antwort: `k-playbook gui status` nennt Zustand und Adresse, ohne etwas zu verändern
 (§„Zustand erfragen: `gui status`"). Wer die Oberfläche offen haben will, ruft weiter
@@ -316,8 +314,7 @@ installer/
 │   ├── merge.go                 Subkommando merge: Lauf als Review-Input zusammenfassen
 │   │                            (zurzeit gesperrt, review.Paused)
 │   ├── inventory.go             Subkommando inventory: Erhebung anstoßen, Bericht ausgeben
-│   ├── todo.go                  Subkommando todo: list (--search), add, update, delete,
-│   │                            migrate
+│   ├── todo.go                  Subkommando todo: list (--search), add, update, delete
 │   ├── doc.go                   Subkommando doc: create, list, done, reopen in der
 │   │                            Kephalaion-Collection
 │   ├── docs.go                  Subkommando docs: checkout und publish eines Erzeugers
@@ -441,8 +438,6 @@ installer/
 │   ├── discover.go              Anker finden
 │   ├── environment.go           was liegt hier vor
 │   ├── config.go                Config lesen, Ort vorschlagen, anlegen
-│   ├── local.go                 LocalDirName und LocalDir(): der Ort des Altbestands
-│   │                            k-playbook-local/; angelegt wird dort nichts mehr
 │   ├── gitrun.go                git-Aufrufe mit Timeout und Exit-Code (runGit,
 │   │                            runGitUntranslated)
 │   ├── registry.go              Commands und Skills aus beiden Quellen auflösen
@@ -463,8 +458,6 @@ installer/
 │   │                            ProjectBinding (Hub, Collection aus K-PLAYBOOK.yaml)
 │   ├── kephalaion_block.go      Block kephalaion: zeilenweise lesen und schreiben
 │   │                            (SetKephalaionBinding, nie ein Account)
-│   ├── kephalaion_legacy.go     Umzug aus der alten K-PLAYBOOK.local.yaml für
-│   │                            k-playbook upgrade (MigrateKephalaionBinding)
 │   ├── githubcontext.go         context.github für ContextForDir (Task 119): Load, Judge,
 │   │                            das Remote ab dem Startverzeichnis (publicremote.go:
 │   │                            projectRemoteURL), githubRemoteRepo mit github.SSHAliasOf
@@ -492,7 +485,7 @@ installer/
 │   │                            k-playbook:/ instructions/…, reviews/…,
 │   │                            guidelines/… (nur mitgeliefert), commands/… (der Text,
 │   │                            die Hülle liegt beim Assistenten), includes/…,
-│   │                            testdata/…, docs/… (nur mitgeliefert) — und der
+│   │                            testdata/… und docs/… (beide nur mitgeliefert) — und der
 │   │                            docIncluder, der Include-Zeilen
 │   │                            einsetzt (Task 093)
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente;
@@ -526,11 +519,9 @@ installer/
 │   │                            Anker .k-playbook/K-PLAYBOOK.yaml im Worktree weder
 │   │                            versioniert noch ignoriert ist oder K-PLAYBOOK.yaml
 │   │                            am früheren Ort noch im Index steht (Task 106)
-│   ├── tasks.go                 offene und erledigte Tasks auflisten und lesen
 │   ├── todos.go                 Todos als Dokumente unter todos/ der Collection
 │   │                            (Task 097): List/Add/Update/Delete/Search über TodoStore
 │   ├── todo_doc.go              Dokumentformat eines Todos: Frontmatter, Rumpf = Text
-│   ├── todo_migrate.go          k-playbook todo migrate: data/todos.json übernehmen
 │   └── tools.go                 Security-Tool-Preflight über das Skript
 ├── internal/webui/
 │   ├── server.go                Routen, Servermodus, Leerlaufwächter, Herkunftsprüfung
@@ -538,7 +529,6 @@ installer/
 │   ├── docs.go                  Endpunkte der beiden Handbücher (/api/docs, /api/handbook),
 │   │                            Markdown nach HTML
 │   ├── inventory.go             Versionsinventar: Stand, Anstoß der Erhebung, Dokument aus der Collection
-│   ├── tasks.go                 Task-Endpunkte, Liste und einzelne Datei
 │   ├── todos.go                 Todo-Endpunkte: offen, erledigt, Suche; anlegen,
 │   │                            abhaken, wieder öffnen
 │   ├── chat.go                  Chat: Weiterleitung an den OpenCode-Dienst samt
@@ -568,7 +558,7 @@ installer/
 │   │                            (init --json, Knopf „Anlegen“) und POST
 │   │                            /api/github-access/test (test --json, optional service)
 │   │                            für die Seite /github-access
-│   └── static/                  status.html, setup.html, workflows.html, tasks.html, reviews.html,
+│   └── static/                  status.html, setup.html, workflows.html, reviews.html,
 │                                todos.html, chat.html, chat-session.html, docs.html,
 │                                inventory.html, branches.html, github-access.html, mcp.html, mcp-servers.html,
 │                                mcp-server.html; sidebar.html, hero.html,
@@ -579,7 +569,7 @@ installer/
 │                                disclosure.js, docview.js (Markdown-Betrachter
 │                                der Docs-Seite), status.js, app.js,
 │                                workflows.js (Zählung der Workflow-Karten),
-│                                workflows-page.js, tasks.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
+│                                workflows-page.js, reviews.js, todos.js, chat-common.js, chat.js, chat-session.js,
 │                                docs.js, inventory.js, branches.js, github-access.js, mcp.js,
 │                                mcp-servers.js, mcp-server.js, styles.css
 │                                (Gestaltungswerte in :root, siehe „Gestaltung
@@ -597,8 +587,8 @@ installer/
 │                                (RunEnv: mit eigener Umgebung)
 ├── internal/mcpserver/
 │   ├── server.go                MCP-Server über stdio, Werkzeug k_playbook_context
-│   ├── review.go                Werkzeuge k_playbook_review_*; create, scan, merge und
-│   │                            write_ai_entry zurzeit hinter pausedReviewTool gesperrt
+│   ├── review.go                Werkzeuge k_playbook_review_*; alle fünf zurzeit hinter
+│   │                            pausedReviewTool gesperrt
 │   ├── todos.go                 Werkzeuge k_playbook_todo_list/add/update/delete,
 │   │                            dünne Hüllen über internal/project
 │   ├── docs.go                  Werkzeuge k_playbook_doc_read (Hülle über
@@ -626,7 +616,8 @@ installer/
 │   │                            Bezugspunkt und Sorte einmal im Lauf
 │   ├── entries.go               entries/<name>.json, Zustandsableitung, atomares Schreiben
 │   ├── paused.go                die Sperre der Review-Wege: Paused(), PausedCode,
-│   │                            PausedMessage (Task 147)
+│   │                            PausedMessage (Task 147); ResultsDir(), die eine Stelle
+│   │                            für das Ergebnisverzeichnis
 │   └── execute.go               Jobs starten, je Modul auffächern, SARIF zählen,
 │                                Fortschritt fortschreiben
 ├── internal/inventory/
@@ -659,8 +650,6 @@ installer/
 │   ├── clientinfo.go            Auskunft kephalaion node client (Format 1) lesen: Account,
 │   │                            Herkunft, Token-Datei, Loopback-Adresse; Zustände samt Abhilfe
 │   ├── token.go                 Token aus der Token-Datei lesen (Form keph_ + 43 Zeichen)
-│   ├── legacy.go                alte k-playbook-local/K-PLAYBOOK.local.yaml lesen, nur als
-│   │                            Altbestand (Warnung, Umzug)
 │   ├── client.go                minimaler Streamable-HTTP-Client: Sitzung, tools/call,
 │   │                            whoami
 │   ├── docs.go                  Client für die Collection: list, read, create, write,
@@ -817,109 +806,56 @@ reicht: der `paths.`-Block der alten Datei nennt die Orte genau, und der Zustand
 Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projekt, mit
 `.git` ist es das Untracked. Gemeldet wird die Vereinigung; verschoben wird nichts.
 
-## `k-playbook-local/` läuft aus
+## Die Review-Wege pausieren
 
-`k-playbook-local/` war das Verzeichnis für alles, was dem Projekt gehört. Es läuft aus:
-**Kein Weg im Programm legt es oder etwas darin noch an** (Task 147) — weder der Start der
-Oberfläche noch ein Knopf noch ein Werkzeug als Nebenwirkung. Was dort noch liegt, bleibt
-unberührt; ein Projekt ohne das Verzeichnis bleibt nach Start der Oberfläche, `briefing`,
-`setup` und `upgrade` ohne es.
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
 
-`project/local.go` trägt deshalb nur noch den Namen und den Pfad (`LocalDirName`,
-`LocalDir()`), für die Leser von Altbestand: die Gesundheitsprüfung, den Umzug in
-`k-playbook upgrade` und `/k-upgrade`, die lokale
-Ebene von `testdata/`, die Liste der bisherigen Review-Läufe
-und die Vorprüfung beim Branchwechsel. Die lokale Ebene `k-playbook-local/guidelines/` liest
-seit Task 148 nichts mehr. Mit Task 147 entfallen
-sind:
-
-- Die Liste der Einträge in `project/local.go` samt ihren Funktionen zum Prüfen und
-  Anlegen, dazu die Vorlagen der READMEs.
-- Der selbsttätige Weg in der Startpflege (`careForHost()` in `cmd/k-playbook/gui.go`), der
-  das ganz fehlende Verzeichnis anlegte.
-- Die Karte „Projekteigene Struktur" der Setup-Seite mit dem Knopf „Anlegen"
-  (`GET`/`POST /api/local`).
-- Die Karte „Lokale Einstellungen" mit dem Schalter, ob der Inhalt von `priv/` aus der
-  Versionskontrolle bleibt (`GET`/`POST /api/local/private`, `project/local_private.go`,
-  `webui/local_private.go`). Eine vorhandene verwaltete `.gitignore` bleibt liegen und
-  wirkt weiter; umgeschaltet wird sie nur noch von Hand.
-
-Die git-Helfer, die die Schaltung mit anderen teilte (`runGit()`, `runGitUntranslated()`,
-`gitCallTimeout`), liegen in `project/gitrun.go`.
-
-Was früher in der Liste stand und wohin es gegangen ist:
-
-- `docs/`, `tasks/`, `tasks/done/`, `data/` und `material/` (Task 107): Ihr Inhalt liegt in
-  der Projekt-Collection — Tasks (`keph:/user/<user>/tasks/`), Todos (`todos/`), die
-  Projektdoku (`keph:/docs/`), Befunde (`queue/findings/`).
-- `commands/` und `skills/` (Task 129): Projekteigene Commands und Skills liegen in
-  `.k-playbook/commands/` und `.k-playbook/skills/` (`ProjectAssetDir()` in
-  `project/registry.go`), versioniert neben der Konfiguration; das Einrichten legt beide
-  nicht an. Den alten Ort liest nichts mehr, auch nicht als Übergang: weder die Registry
-  (`registryDirs()`) noch die lokale Ebene von `k-playbook:/commands/`
-  (`NewProjectLocalDocSource()` in `project/docref.go`).
-- `reviews/` (Task 143): Projekteigene Instructions, Includes und Review-Rezepte liegen in
-  der Projekt-Collection unter `keph:/k-playbook/<sorte>/` (`NewKephProjectLayerSource()` in
-  `project/projectlayer.go`, unten unter „Kataloge auflösen“);
-  `k-playbook-local/instructions/`, `includes/` und `reviews/` liest nichts mehr.
-- `checks/` (Task 134): Projekteigene Checks gab es danach nicht mehr; seit Task 155 gibt es
-  auch keine mitgelieferten, keinen Runner `bin/k-check` und keinen Katalog `checks`.
-- Die Quellenkonfiguration des Versionsinventars (Task 144): Sie ist das Dokument
-  `keph:/k-playbook/inventory.md` in der Projekt-Collection (`versionsources.DocName`),
-  angelegt von `/k-doc-inventory` bei der ersten bestätigten Ergänzung. Liegt die alte
-  `version-sources.yaml` noch, erkennt `project/versionsources.go` sie nur als Altbestand
-  (`LegacyVersionSources`) — die Gesundheitsprüfung warnt, `k-playbook inventory` nennt sie,
-  `/k-upgrade` 3.6 zieht um.
-- `results/` (Task 146): Review-Ergebnisse sind aus dem Code wiederholbar und ein Stand von
-  einem Rechner. `/k-upgrade` 3.4 löscht ein vorhandenes `results/` ohne Rückfrage, auch mit
-  Inhalt, und nennt jede gelöschte Datei — der Inhalt war in der Regel nicht versioniert
-  und ist danach nicht aus Git zurückzuholen. Die Review-Wege pausieren, bis der
-  Review-Umbau ihnen eine neue Ablage gibt (unten).
-- Die frühere Wissensablage auf der Platte samt Suchindex (Task 123): Nichts im Programm
-  schreibt oder liest dort noch.
-
-**Aufräumen im Bestandsprojekt.** `/k-upgrade` 3.4 löscht ein solches Verzeichnis ohne
-Rückfrage (Task 117), wenn darin nur `README.md` und die verwaltete `.gitignore` liegen,
-und nennt sonst jeden Eintrag mit seinem Ziel; `/k-upgrade` 3.0 räumt die Reste der
-Wissensablage ab, Abgeleitetes und Rohmaterial ohne Rückfrage, jede Wissensdatei nach
-Vorlage. Die Liste steht dort ausgeschrieben, nicht aus dem Programm; der Schritt läuft nur
-bei aktuellem Programm, denn ein älteres legte die Verzeichnisse wieder an.
-
-`project.ListTasks()` nimmt ein fehlendes `tasks/` als „keine Tasks"; die Seite Tasks der
-Oberfläche zeigt bis zu ihrer Umstellung nur, was noch auf der Platte liegt. Die
-Todo-Migration prüft nur, ob `data/todos.json` noch liegt.
-
-### Die Review-Wege pausieren
-
-Mit dem Anlegen ist auch das Schreiben nach `k-playbook-local/results/` gesperrt (Task 147):
-Die Ablage der Review-Ergebnisse wird umgebaut, und bis dahin antworten alle schreibenden
-Review-Wege mit einer sichtbaren Sperre, ohne etwas zu lesen, aufzulösen oder zu schreiben.
-Ein Termin steht nicht darin; die Sperre gilt, bis die neue Ablage steht.
+Solange antwortet jeder Review-Weg mit einer sichtbaren Sperre (Task 147), ohne etwas zu
+lesen, aufzulösen oder zu schreiben. Ein Termin steht nicht darin; die Sperre gilt, bis die
+neue Ablage steht.
 
 | Weg | Antwort |
 |---|---|
-| MCP `k_playbook_review_create`, `_scan`, `_merge`, `_write_ai_entry` | Umschlag mit `error.code` `reviews_paused` und dem Satz mit dem Grund, als Fehler markiert; die Beschreibung in der Werkzeugliste beginnt mit „Vorübergehend nicht verfügbar“ |
+| MCP `k_playbook_review_status`, `_create`, `_scan`, `_merge`, `_write_ai_entry` | Umschlag mit `error.code` `reviews_paused` und dem Satz mit dem Grund, als Fehler markiert; die Beschreibung in der Werkzeugliste beginnt mit „Vorübergehend nicht verfügbar“ |
 | `k-playbook scan`, `k-playbook merge` | derselbe Satz als Fehler, Exit-Code 1 |
+| `GET /api/reviews`, die Seite Reviews, die Karte „Reviews“ | keine Läufe, sondern `{available, paused: true, message}` mit demselben Satz; Seite und Karte zeigen „Pausiert“ und den Satz |
 | `/k-review`, `/k-audit`, `/k-remediation` | der Hinweis „Vorübergehend nicht verfügbar“ in der Hülle; der Command führt nichts aus |
 
 Die Sperre hat eine Quelle: `review.Paused()` in `review/paused.go` mit `PausedCode` und
-`PausedMessage`. Die Subkommandos fragen dort als Erstes nach; die vier MCP-Werkzeuge sind
+`PausedMessage`. Die Subkommandos fragen dort als Erstes nach; die fünf MCP-Werkzeuge sind
 in `addReviewTools()` über `pausedReviewTool()` angemeldet, das vor dem Handler antwortet —
 vor jeder Prüfung der Eingabe und vor dem Auflösen des Projekts, damit auch kein Umzug des
-Ankers geschieht. Namen und Schema der Werkzeuge bleiben in der Werkzeugliste. Der
-Review-Code darunter (`internal/review`, die Handler in `mcpserver/review.go`) ist
-unverändert und weiter unter Test; fällt die Sperre, fallen `paused.go`, die Hülle und die
-beiden Abfragen.
+Ankers geschieht; sein Umschlag nennt nur das übergebene `projectDir`. Namen und Schema der
+Werkzeuge bleiben in der Werkzeugliste, ein offenes Statuswerkzeug gibt es nicht.
+`reviewsHandler()` in `webui/reviews.go` liest ebenfalls nichts und setzt `PausedMessage`
+ein. Der Review-Code darunter (`internal/review`, die Handler in `mcpserver/review.go`)
+bleibt stehen und ist weiter unter Test.
 
-`k_playbook_review_status` bleibt offen: Es liest Läufe, Eintragszustände und die
-Auswahlbasis und legt nichts an. Ebenso `GET /api/reviews`, die Liste der bisherigen Läufe
-in der Oberfläche. `known-decisions.md` hat mit `merge` seinen einzigen Leser verloren.
+**Der Ort hinter der Sperre.** `review.ResultsDir()` in `review/paused.go` ist die eine
+Stelle, von der dieser Code das Ergebnisverzeichnis bekommt: das Verzeichnis, unter dem die
+Läufe (`<ergebnisort>/<lauf>/`) und die `known-decisions.md`
+(`<ergebnisort>/known-decisions.md`) liegen. Bis zur Entscheidung liefert sie immer
+`ErrResultsDirUndecided`. Nur `scanRun()`, `runMerge()` und `resolveReviewEnvironment()`
+fragen sie; das letzte antwortet dann mit dem Fehlercode `results_dir_undecided`.
+`ResultsDirOverride` ist eine exportierte Naht, die nur Tests setzen. Alles darunter nimmt
+das Verzeichnis als Parameter: `RunDir(resultsDir, name)`, `ListRuns(resultsDir)`,
+`CreateRun(resultsDir, …)`, `merge.Options.DecisionsDir` und `knowndecisions.Load(dir)`.
+Der Umschlag der Review-Werkzeuge (`reviewProjectEnvelope`) trägt `inputDir`, `root` und
+`languages` und keinen Ort der Ergebnisse.
+
+Wer die Sperre aufhebt, braucht zusätzlich zwei Dinge: den Ort und einen Ausschluss dieses
+Orts für die Scanner, damit sie Rohausgaben früherer Läufe nicht lesen. Heute schließt die
+Kandidatenzählung (`candidateExcluded` in `review/candidates.go`) über den Pfad nur
+`k-playbook` aus, die Modulsuche (`moduleSearchExcluded` in `review/modules.go`)
+`k-playbook`, `vendor`, `node_modules` und `testdata`.
 
 ## Commands und Skills auflösen
 
 `project/registry.go` führt zusammen, was mitgeliefert wird — seit Stufe 2 von Punkt 20
 der Arbeitsliste aus `~/.local/share/k-playbook/`, nicht mehr aus dem Clone `k-playbook/`
-— und was unter `k-playbook-local/` dazukommt. Es ist dieselbe Overlay-Regel wie bei
+— und was das Projekt unter `.k-playbook/commands/` und `.k-playbook/skills/` dazulegt
+(`ProjectAssetDir()`, versioniert neben der Konfiguration; das Einrichten legt beide nicht
+an). Es ist dieselbe Overlay-Regel wie bei
 reviews: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
 
 | Sorte | Einheit | Schlüssel | Abschalten durch |
@@ -1171,11 +1107,11 @@ das er nicht einlöst, ist schlechter als ein Hinweis.
 
 Die Gegenrichtung — `stale` — braucht ein Kriterium dafür, welche Links von uns stammen.
 `ownedLinks()` löst jeden Symlink auf und nimmt nur die, die nach `.k-playbook/share`,
-`.k-playbook/commands/`, `.k-playbook/skills/`, `k-playbook-local/` oder in den früheren
-Clone `k-playbook/` zeigen. Clone und `k-playbook-local/` stehen dabei, damit die Links aus der Zeit
-vor Stufe 2 und vor Task 129 als unsere gelten: was noch im Katalog steht, ist `wrong` und
-wird umgesetzt, was nicht, ist `stale` und verschwindet. Alles andere im Verzeichnis gehört dem Projekt und wird
-weder bewertet noch angefasst.
+`.k-playbook/commands/`, `.k-playbook/skills/` oder in den früheren Clone `k-playbook/`
+zeigen. Der Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere gelten:
+was noch im Katalog steht, ist `wrong` und wird umgesetzt, was nicht, ist `stale` und
+verschwindet. Alles andere im Verzeichnis gehört dem Projekt und wird weder bewertet noch
+angefasst.
 
 `ApplyLinks()` räumt erst die verwaisten Links weg und setzt dann die des Katalogs. Die
 Reihenfolge zählt: ein abgeschalteter Eintrag muss verschwinden, bevor ein gleichnamiger
@@ -1246,17 +1182,17 @@ wie unter `k-playbook:` — `k-playbook:/guidelines/betrieb.md` ist
 
 ## Die projekteigene Ebene aus der Collection des Projekts
 
-Seit Task 143 liest das Binary die projekteigene Ebene von `instructions/`, `includes/` und
-`reviews/` hinter `k-playbook:` aus der Collection des Projekts unter `k-playbook/`, nicht
-mehr aus `k-playbook-local/`. Darunter gilt derselbe Baum wie unter `k-playbook:` —
+Das Binary liest die projekteigene Ebene von `instructions/`, `includes/` und
+`reviews/` hinter `k-playbook:` aus der Collection des Projekts unter `k-playbook/` (Task
+143). Darunter gilt derselbe Baum wie unter `k-playbook:` —
 `k-playbook:/reviews/review-x.md` wird von `keph:/k-playbook/reviews/review-x.md` ersetzt
-oder, leer, abgeschaltet. `commands/` bleibt in `.k-playbook/commands/` (die Assistenten
-brauchen die Hüllen auf der Platte), `testdata/` bleibt vorerst in `k-playbook-local/`.
-`guidelines/` hat seit Task 148 keine projekteigene Ebene mehr: Die Sorte steht in
-`docDistOnlyKinds`, `k-playbook-local/guidelines/` liest nichts, projekteigene Guidelines
-liegen unter `keph:/docs/guidelines/` (Todo #40). Die Weiche ist
-`projectLocalDocSource.pick()` in `project/docref.go`; für eine Sorte ohne lokale Ebene gibt
-sie eine leere Quelle zurück (`noDocSource`).
+oder, leer, abgeschaltet. `commands/` liegt in `.k-playbook/commands/` (die Assistenten
+brauchen die Hüllen auf der Platte). `guidelines/`, `testdata/` und `docs/` haben keine
+projekteigene Ebene: Die Sorten stehen in `docDistOnlyKinds`; projekteigene Guidelines
+liegen unter `keph:/docs/guidelines/` (Todo #40), `testdata/` ist Prüfmaterial des
+Programms. Die Weiche ist `projectLocalDocSource.pick()` in `project/docref.go`: `commands/`
+von der Platte, `instructions/`, `includes/` und `reviews/` aus der Collection, für jede
+andere Sorte eine leere Quelle (`noDocSource`).
 
 - **Zugang.** `OpenProjectLayerStore` (`project/projectlayer.go`) geht denselben Weg wie
   `OpenKephDocs` und gibt wie `OpenDefaultsStore` einen `kephalaion.ReaderPool` zurück.
@@ -1336,7 +1272,7 @@ Installation und im Entwicklungsrepo — ein Verweis auf eine Ebene wäre an zwe
 Orte falsch. Wo die Instruktionen liegen, beantwortet der Aufruf. Aufgerufen wird das
 einmal je Host oder DevContainer installierte `k-playbook` unter seinem Namen.
 
-### Ein veralteter Anstoß wird ersetzt, abgelöste Zusatzblöcke werden entfernt
+### Ein veralteter Anstoß wird ersetzt
 
 Der Marker allein war zu wenig. Ein Bestandsprojekt trug den Anstoß des abgelösten
 Wrapper-Modells (`k-playbook/bin/k-playbook context`); weil der Marker dastand, tat
@@ -1354,60 +1290,37 @@ mehr. Das ist dieselbe enge Definition von „veraltet" wie bei der MCP-Registri
 aus demselben Grund: die neue Fassung enthält keines der Muster, der Lauf ist damit
 idempotent. Jede andere Fassung gehört dem Projekt und bleibt stehen.
 
-Die zwei Zusatzblöcke, die die Vorlage bis zum Briefing hinter den Anstoß hängte —
-`<!-- k-playbook:session-memory -->` („Projektwissen zuerst") und
-`<!-- k-playbook:befunde -->` („Befunde festhalten") —, werden nicht mehr geschrieben und
-in Bestandsdateien entfernt (`removeObsoleteRootBlocks()`, `obsoleteRootBlocks`): ihr Inhalt
-kommt als `instructions/always/100-…` und `200-…` mit dem Briefing, und doppelt gelesen wäre
-er nur Rauschen. Entfernt wird der Block samt Marker und den Leerzeilen davor, so dass kein
-doppelter Absatz bleibt. `sessionMemoryBlock()` und `findingsBlock()` bleiben im Code als
-die ausgelieferte Gestalt, nur noch zur Erkennung.
+`instructionsBlockEnd()` grenzt den Block ab, zwei Wege in dieser Reihenfolge: die
+bekannte Gestalt einer abgelösten Fassung Zeile für Zeile (`knownInstructionsBlockEnd()`
+über `knownBlockEnd()`; die Aufrufzeile darf variieren), sonst die nächste Überschrift oder
+der nächste HTML-Kommentar, abzüglich der Leerzeilen davor — nie das Dateiende. Der Block
+trägt genau einen Marker und genau eine Überschrift; was ein Projekt davor oder dahinter
+geschrieben hat, bleibt dadurch stehen. Lässt sich keine Grenze bestimmen, wird nichts
+ersetzt: der Aufrufer bekommt einen Hinweis (`errAnstossEndeUnbestimmt`), der den neuen
+Aufruf nennt, und `RootInstructionsState.Hint` trägt ihn in die Karte. Eine vorhandene Datei
+zieht `refreshRootInstructions()` nach: Steht der Marker, wird ein veralteter Anstoß ersetzt;
+steht er nicht, wird der Anstoß angehängt.
 
-`markedBlockEnd()` grenzt jeden dieser Blöcke ab, zwei Wege in dieser Reihenfolge: die
-bekannte Gestalt Zeile für Zeile (`knownBlockEnd()`; beim Anstoß die abgelösten Fassungen,
-bei den Zusatzblöcken ihre ausgelieferte Gestalt, die Aufrufzeile darf variieren), sonst
-die nächste Überschrift oder der nächste HTML-Kommentar, abzüglich der Leerzeilen davor —
-nie das Dateiende. Jeder Block trägt genau einen Marker und genau eine Überschrift; was
-ein Projekt davor, dazwischen oder dahinter geschrieben hat, bleibt dadurch stehen. Lässt
-sich keine Grenze bestimmen, wird nichts ersetzt und nichts entfernt: der Aufrufer bekommt
-einen Hinweis (`errAnstossEndeUnbestimmt`, `obsoleteRootBlock.errEndeUnbestimmt()`), der
-den neuen Aufruf nennt, und `RootInstructionsState.Hint` trägt ihn in die Karte. Beide
-Wege laufen über `refreshRootInstructions()`: erst wird ein veralteter Anstoß ersetzt, dann
-werden die Zusatzblöcke entfernt, und erst danach wird ein fehlender Anstoß angehängt. Jede
-Grenze wird so auf dem Inhalt bestimmt, den die Datei trägt — nie auf einem Marker, den
-derselbe Lauf anhängt; sonst wäre der Anstoßmarker die Grenze eines abgewandelten
-Zusatzblocks, und Prosa ohne Überschrift dahinter ginge mit ihm verloren. Eine Datei, die
-nur die Zusatzblöcke trägt, bekommt so beim Einrichten den Anstoß und verliert die Blöcke
-in einem Lauf; ein abgewandelter Block bleibt samt Prosa stehen, mit Hinweis, und der
-Anstoß kommt trotzdem dazu — genau das, was `CheckRootInstructions()` vorher meldet. Damit
-das in jedem späteren Lauf so bleibt, ist der Anstoßmarker für die Zusatzblöcke auch auf
-der Platte keine Grenze (`markedBlockEnd()`, Parameter `wall`): In keiner ausgelieferten
-Vorlage stand der Anstoß hinter einem Zusatzblock; steht er dort, hat k-playbook ihn
-angehängt, und die Suche nach der Blockgrenze endet an ihm als unbestimmt.
-
-`RootInstructionsState` meldet den Bestand ohne zu schreiben: `HasOutdatedAnstoss`,
-`ObsoleteBlocks` (die Namen der noch vorhandenen Zusatzblöcke, ein eigenes Feld, damit die
-Karte beides getrennt zeigt) und `Hint`; `NeedsRefresh()` fasst zusammen, ob ein Lauf
-etwas nachzöge — oder es versuchte und am Hinweis scheiterte. Was ein Lauf wirklich täte,
-sagen `AnstossRefreshable` und `RemovableBlocks`: der Bestand abzüglich der Blöcke, deren
-Ende sich nicht bestimmen ließ. `upgrade --check` meldet nur aus diesen beiden „würde
-ersetzt/entfernt" und für den Rest allein den Hinweis. `AssistantSetup` sagt nach dem Lauf, was geschah: `RootRefreshed` deckt
-beide Fälle, `RootAnstossRefreshed` und `RootBlocksRemoved` sagen, welcher.
+`RootInstructionsState` meldet den Bestand ohne zu schreiben: `HasOutdatedAnstoss` und
+`Hint`; `NeedsRefresh()` sagt, ob ein Lauf etwas nachzöge — oder es versuchte und am Hinweis
+scheiterte —, und ist gleich `HasOutdatedAnstoss`. Was ein Lauf wirklich täte, sagt
+`AnstossRefreshable`: der veraltete Anstoß, dessen Ende bestimmt ist. `upgrade --check`
+meldet nur daraus „würde … gebracht" und für den Rest allein den Hinweis. `AssistantSetup`
+sagt nach dem Lauf mit `RootRefreshed`, dass der Anstoß ersetzt wurde.
 
 Drei Einstiege, wie bei MCP:
 
 | Weg | Einstieg | Tut |
 |---|---|---|
-| ausdrücklich | `ApplyRootInstructions()`, Einrichten und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, Zusatzblöcke entfernen, `opencode.json` registrieren |
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, `opencode.json` registrieren |
 | ausdrücklich, im Terminal | `k-playbook upgrade` (`cmd/k-playbook/upgrade.go`), über `ApplyAssistantSetup()` | dasselbe, nach dem Programm-Update; `--check` meldet aus `CheckRootInstructions()`, was ein Lauf täte |
-| selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen, Zusatzblöcke entfernen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
+| selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
 
 Der Auffangweg kennt genau zwei Fälle, und `RootInstructionsRepair` sagt, welcher
-eingetreten ist (`Refreshed` und `RemovedBlocks`, oder `Created`), damit `runGUI()` alle
-eigens meldet; eine Datei ohne Anstoßmarker fasst er nicht an und meldet nur, wenn sie die
-Zusatzblöcke trägt (`BlocksWithoutAnstoss`). Das Ersetzen des veralteten Blocks und das
-Entfernen der Zusatzblöcke sind Reparaturen an Inhalt, den k-playbook selbst
-geschrieben hat, und laufen deshalb unabhängig davon, ob die Datei versioniert ist. Das
+eingetreten ist (`Refreshed` oder `Created`; `Changed()` fasst beide zusammen), damit
+`runGUI()` jeden eigens meldet; eine Datei ohne Anstoßmarker fasst er nicht an. Das Ersetzen
+des veralteten Blocks ist eine Reparatur an Inhalt, den k-playbook selbst
+geschrieben hat, und läuft deshalb unabhängig davon, ob die Datei versioniert ist. Das
 Anlegen (`createRootInstructions()`) greift nur, wenn `AGENTS.md` ganz fehlt und die
 Fallmatrix aus `instructions_layout.go` nichts anderes vorsieht: kein Konflikt, keine
 Blockade, keine Umbenennung einer echten `CLAUDE.md`, kein zu entfernender Symlink. Dann
@@ -1439,12 +1352,11 @@ eines Verzeichnisses übereinander, und `resolveCatalog()`, `ResolveDocRef()` un
 rufen sie — dieselbe Sorte kommt über jeden Weg gleich heraus (Test
 `TestDocRefUndKatalogeStimmenUeberein`). Die Sorte `guidelines` hängt bewusst nicht in
 `catalogKinds()` (`guidelinesKind`): Die Kontextausgabe nennt keine Guidelines, das Briefing
-liefert sie unter `documents.guidelines`. Seit Task 148 gibt es sie nur mitgeliefert
-(`docDistOnlyKinds`): `ResolveDocRef()` und `overlayDocDir()` fragen die lokale Ebene für
-diese Sorte nicht, eine Datei unter `k-playbook-local/guidelines/` gewinnt nicht und schaltet
-nichts ab, und das Feld `guidelines` der Kontextausgabe ist entfernt. Das Einrichten legt das
-Verzeichnis nicht an, `/k-upgrade` löscht es; projekteigene Guidelines liegen unter
-`keph:/docs/guidelines/`, wie sie von dort gelesen werden, ist Todo #40.
+liefert sie unter `documents.guidelines`. Es gibt sie nur mitgeliefert
+(`docDistOnlyKinds`): `ResolveDocRef()` und `overlayDocDir()` fragen die projekteigene Ebene
+für diese Sorte nicht, und ein Feld `guidelines` hat die Kontextausgabe nicht. Projekteigene
+Guidelines liegen unter `keph:/docs/guidelines/`; wie sie von dort gelesen werden, ist
+Todo #40.
 
 Eine Sorte, definiert in `catalogKinds()`; die Sorte für Regeln ist seit Task 135 entfallen,
 die für Checks seit Task 155:
@@ -1459,7 +1371,7 @@ Task 143 in der Collection des Projekts unter `k-playbook/reviews/`:
 (`NewProjectDefaultsSource`, `NewProjectLocalDocSource`).
 `path` eines Eintrags ist darum kein Plattenpfad, sondern immer der wirksame Verweis
 `k-playbook:/reviews/<name>`, gleich ob `dist`, `local` oder `override`. Ein
-liegengebliebenes `k-playbook/checks/` oder `k-playbook-local/checks/` wird nicht mehr gelesen.
+liegengebliebenes `k-playbook/checks/` wird nicht mehr gelesen.
 Im Briefing fehlt `catalogs` darum ganz: `catalogs.reviews` steht unter `documents.reviews`,
 und `dropOrderedField()` lässt ein Objekt fallen, das dabei leer wird. Den Ort eines projekteigenen Rezepts in der
 Collection nennt das Feld `location` (`keph:/k-playbook/reviews/<name>`), nie `path`. Wer den Inhalt braucht,
@@ -1546,8 +1458,8 @@ Konfiguration —, keine Zeile dazu in `k-playbook upgrade`, `upgrade --check` u
 und kein Feld `playbookPresent` in `Environment`. Ein Projekt ohne `k-playbook/` ist
 vollständig. Liegt ein alter Clone noch da, bleibt er unberührt, auch mit dem Schreibschutz
 früherer Versionen; gelöscht wird er von /k-upgrade, Umstellung 3.8
-(`defaults/commands/k-upgrade.md`), die danach auch die Zeilen für `k-playbook/` und
-`k-playbook-local/` aus den `.gitignore`-Dateien streicht. Sie verlangt ein Programm ab
+(`defaults/commands/k-upgrade.md`), die danach auch die Zeilen für `k-playbook/` aus den
+`.gitignore`-Dateien streicht. Sie verlangt ein Programm ab
 v0.16.39, erkannt an `neuestes Release` in der Zeile `Programm-Stand: nichts zu tun — …`:
 Ein Binary bis v0.16.38 braucht den Clone noch für sein eigenes Upgrade.
 
@@ -1681,7 +1593,7 @@ Die Oberfläche hat dafür keinen eigenen Schritt mehr: `POST /api/update` samt
   also beim nächsten Lesezugriff nach einer Programmaktualisierung;
 - über den Knopf *Einrichten* der Assistenten-Karte: `setupMessage()` in
   `webui/assistant.go` ruft `ApplyAssistantSetup()` und formuliert den Antworttext
-  (`describeSetup()`) — Anstoß, veralteter Anstoß, abgelöste Zusatzblöcke, eine erstmals
+  (`describeSetup()`) — Anstoß, veralteter Anstoß, eine erstmals
   angelegte `AGENTS.md`, Umbenennung und Konflikt;
 - im Terminal mit `k-playbook upgrade` (§„Acht Einstiege").
 
@@ -1902,8 +1814,11 @@ letzten Felder gefallen, die den Ort nannten: `playbook` in der Kontextausgabe
 `context` des Briefings, Fassung `"7"`), `playbook` in `display` von `GET /api/context` und
 `playbookDir` in `Environment` (damit in den Antworten mit `environment`). `PlaybookDir()`
 und `PlaybookDirName` bleiben für den Code, der Altbestand erkennt: `links.go` (alte Links),
-`legacywrapper.go`, `reset.go`, `config.go` (`LegacyModels`, `suggestRepoRoot`) und
-`instructions.go` (abgelöster Befunde-Block).
+`legacywrapper.go`, `reset.go` und `config.go` (`LegacyModels`, `suggestRepoRoot`).
+
+Die Fassungen des Briefings (`BriefingSchemaVersion` in `project/briefing.go`) dazu: Fassung
+7 trug noch `context.local`, Fassung 8 trägt es nicht mehr. Die heutige Fassung ist `"8"`;
+die einzige Wurzel im Abschnitt `context` ist `context.project.dir`.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
@@ -2579,22 +2494,6 @@ MCP-Servers fest. Tests ersetzen das Binary über `kephalaion.LookupBinary` (`ke
 und `TestMain` der Pakete `project`, `webui`, `mcpserver` und `cmd/k-playbook` lässt die Suche
 nichts finden, damit kein Test das echte Token-Verzeichnis oder den echten Node erreicht.
 
-### Altbestand `K-PLAYBOOK.local.yaml`
-
-Bis Task 138 stand die Anbindung rechnerlokal in `k-playbook-local/K-PLAYBOOK.local.yaml`.
-Als Anbindung liest sie kein Programmteil mehr; `kephalaion.ReadLegacyBinding` liest sie nur
-als Altbestand. Liegt sie mit Block `kephalaion:`, warnt die Gesundheitsprüfung mit Hinweis auf
-`/k-upgrade`. Der Projektschritt von `k-playbook upgrade` zieht Hub und Collection um
-(`project.MigrateKephalaionBinding`), nicht der Text von `/k-upgrade`: den liefert Kephalaion,
-und ohne Block ist er nicht lesbar. Fehlt der Block in `K-PLAYBOOK.yaml`, schreibt der Schritt
-beide ohne Rückfrage zeilenweise hinein; ein vorhandener Block bleibt, eine Abweichung nennt
-beide Werte; `--check` schreibt nichts. Den Account der alten Datei schreibt er nirgends hin;
-wählt die Auskunft für den Hub keinen oder einen anderen, nennt er ihn samt
-`kephalaion node account default <hub> <account>`. Die alte Datei löscht `/k-upgrade` (3.5)
-nach Bestätigung, aber nur nach einer Zeile „Anbindung umgezogen“ bzw. „Anbindung — der Block
-kephalaion: … steht“ aus diesem Schritt: Der MCP-Server einer laufenden Sitzung behält nach dem
-Binärwechsel das alte Programm und liefert den Text auch ohne Block.
-
 ### Sicherheitsvertrag
 
 Hub und Collection kommen aus `K-PLAYBOOK.yaml` oder aus einer Anfrage; der Hub wird ein
@@ -2629,9 +2528,9 @@ ersetzt (ein Kommentar dahinter bleibt) oder, wenn eine fehlt, hinter der letzte
 Zeile des Blocks eingefügt. Jede andere Zeile — andere Blöcke, Kommentare, ein `account:` —
 bleibt byte-gleich; ohne Änderung wird nicht geschrieben. Ein Account wird nie geschrieben.
 Block mehrfach, ein Wert in der Kopfzeile oder `hub:`/`collection:` mehrfach werden nicht
-umgeschrieben. Geschrieben wird nur nach bestandenem Test (Oberfläche) bzw. beim Umzug aus der
-alten Datei (`k-playbook upgrade`); die Datei ist versioniert, die Antwort sagt, dass die
-Änderung committet werden will (`KephalaionCommitHint`).
+umgeschrieben. Geschrieben wird nur nach bestandenem Test in der Oberfläche; die Datei ist
+versioniert, die Antwort sagt, dass die Änderung committet werden will
+(`KephalaionCommitHint`).
 
 ### In der Oberfläche
 
@@ -2657,8 +2556,8 @@ Einrichtungstoken, `kephalaion node account setup` und bei mehreren Accounts
 Hub, statt dessen den Hinweis, Kephalaion zu starten. Bei bestehender Anbindung öffnet
 „Collection ändern“ den Schritt erneut, mit „Abbrechen“.
 
-Sobald Task 082 die Abwahl liefert (Negativeintrag in `k-playbook-local/mcp-required.yaml`),
-entfällt für ein Projekt, das kephalaion abgewählt hat, die Führung zum Einrichtungsschritt.
+Sobald Task 082 die Abwahl liefert, entfällt für ein Projekt, das kephalaion abgewählt hat,
+die Führung zum Einrichtungsschritt.
 
 ## Erzeugte Doku: checkout und publish
 
@@ -2751,9 +2650,9 @@ von Kephalaion fragt mit `porter`) und tragen `title` und `description`, nie `ge
 daran erkennt Kephalaion seine Mahnung, die es nur in ein Verzeichnis ohne `README.md` legt.
 
 - **Lesen.** `docs/` ist in `docRefKinds`, nicht in `docReaderKinds`: auflösbar, aber in keinem
-  Katalog und keinem Briefing. Als einzige Sorte steht es in `docDistOnlyKinds` —
-  `resolveDocFile` liest dort keine lokale Ebene, eine Datei unter `k-playbook-local/docs/`
-  gewinnt nicht und eine leere schaltet nichts ab. `ListDocsTemplates` (`project/docsreadme.go`)
+  Katalog und keinem Briefing. Die Sorte steht in `docDistOnlyKinds` — `resolveDocFile`
+  liest dort keine projekteigene Ebene, nichts ersetzt eine Vorlage und nichts schaltet sie
+  ab. `ListDocsTemplates` (`project/docsreadme.go`)
   listet die Vorlagen aus dem Baum der mitgelieferten Ebene; eine zweite Liste im Code gibt es
   nicht, `docs/README.md` oben zählt nie.
 - **Schreiben.** `DocsReadmes.One` ist die eine Stelle: Vorlage über `ResolveDocRefWith` lesen
@@ -3201,7 +3100,7 @@ ist er `nicht-pruefbar` und verhindert das Angebot wie `blockiert`. Hinweis-Punk
 | `ungepushte-commits` | Hinweis | Commits des aktuellen Stands auf keinem Remote-Tracking-Branch |
 | `ziel-hinter-upstream` | Hinweis | das Ziel liegt hinter seinem Upstream oder dieser ist `gone` |
 | `nur-remote` | Hinweis | das Ziel entsteht als Tracking-Branch |
-| `konfiguration-im-ziel` | Hinweis | `K-PLAYBOOK.yaml` oder `k-playbook-local/` liegen im Repo und unterscheiden sich im Ziel |
+| `konfiguration-im-ziel` | Hinweis | `K-PLAYBOOK.yaml` liegt im Repo und unterscheidet sich im Ziel |
 | `stash` | Hinweis | Stash-Einträge liegen vor |
 
 **Ignorierte Dateien.** `git switch` ersetzt eine ignorierte, unversionierte Datei still,
@@ -3293,20 +3192,21 @@ Umleitung.
 
 Nichts auf der Statusseite ist eine Abschrift. Die drei Workflow-Karten sind das Fragment
 `static/workflow-cards.html` (`{{define "workflow-cards"}}`), das auch `/workflows`
-einbindet; ihre Zahlen holt `loadWorkflowCounts()` aus `workflows.js`, siehe „Workflows:
+einbindet; ihren Stand holt `loadWorkflowCounts()` aus `workflows.js`, siehe „Workflows:
 Tasks, Reviews und Todos".
 
 GitHub ist ein eigener Bereich und keine Karte der Statusseite. Der Grund steht unter
 „Die GitHub-Ansicht": seine Karten fragen als einzige der Oberfläche über das Netz, und
 das darf weder ein Aufruf von `/` noch das Menü auslösen.
 
-Ein Bereich ist nicht dasselbe wie eine Seite. Workflows hat vier: die Übersicht unter
-`/workflows` und je eine für **Tasks**, **Reviews** und **Todos** darunter. Sie sind
+Ein Bereich ist nicht dasselbe wie eine Seite. Workflows hat drei: die Übersicht unter
+`/workflows` und je eine für **Reviews** und **Todos** darunter; Tasks haben in der
+Oberfläche keine Seite. Die Seiten sind
 gleichrangig — keine ist die Detailseite einer anderen —, deshalb stehen sie als
 Unterpunkte im Umschalter und nicht hinter einem Klick auf der Übersicht, und zwar in
-jedem Bereich: wer von Setup aus zu den Tasks will, soll nicht erst die Übersicht laden
+jedem Bereich: wer von Setup aus zu den Todos will, soll nicht erst die Übersicht laden
 müssen. Der Unterschied zu `/mcp` ist genau das: `/mcp` vertieft eine Karte der
-Setup-Seite, die drei Workflows-Seiten teilen einen Bereich unter sich auf.
+Setup-Seite, die Workflows-Seiten teilen einen Bereich unter sich auf.
 
 Setup hat seit der MCP-Server-Übersicht ebenfalls einen Unterpunkt, **MCP-Server** unter
 `/mcp-servers`. Die Seite vertieft keine Karte, sondern ist eine eigene Sicht auf das
@@ -3374,7 +3274,7 @@ und offene Seite vom Handler. Beides ist nicht dasselbe, sobald ein Bereich mehr
 Seite hat — deshalb führt `aria-current="page"` nur der Verweis auf die offene Seite,
 während ein aktiver Bereich mit anderem Ziel `aria-current="true"` bekommt: der Fall auf
 `/mcp`, wo Setup aktiv ist, `/setup` darunter aber nicht offen, und der Fall auf
-den drei Workflows-Seiten, wo der Bereich aktiv ist und der markierte Unterpunkt die
+den Workflows-Seiten, wo der Bereich aktiv ist und der markierte Unterpunkt die
 offene Seite nennt. Die Unterpunkte tragen dafür eine eigene Klasse, `area-nav-subitem`:
 sie sehen aus wie ein Eintrag des Umschalters, sind eingerückt und leiser, und die
 Prüfung „genau ein aktiver Bereich" zählt sie nicht mit. Ob es Workflows und
@@ -3405,7 +3305,7 @@ Das Blockmenü ist **generiert** und steht in `static/nav.js`: `buildBlockNav()`
 `#block-nav`. Statuspunkt und Beschriftung spiegeln Pill und Überschrift der Karte, je ein
 `MutationObserver` zieht das nach — eine neue Karte braucht deshalb nichts weiter als Id
 und Überschrift, und ein Eintrag folgt seiner Karte auch dann noch, wenn sie ihre
-Überschrift zur Laufzeit austauscht: `#task-card` trägt den Titel des geöffneten Tasks.
+Überschrift zur Laufzeit austauscht, etwa gegen den Titel eines geöffneten Dokuments.
 Der Aufruf muss **vor** den Ladefunktionen einer Seite stehen: die blenden Karten ein,
 und das Menü zieht das nur mit, wenn es sie schon beobachtet.
 
@@ -3538,8 +3438,8 @@ Anzeigeform — die Kürzung auf `~` braucht das Home-Verzeichnis und kann nur s
 passieren. Die übrigen Pfade kürzt die Oberfläche gegen das Projektverzeichnis.
 
 Ein Feld `playbook` trägt weder der Kontext noch `display` mehr (Task 157): Die
-Kontextangaben nennen Projekt, Repository, VCS, Konfiguration und das projekteigene
-Verzeichnis, aber keine „Installation“, und der Kopf der Seiten (`hero.html`) zeigt neben
+Kontextangaben nennen Projekt, Repository, VCS und Konfiguration, aber keine
+„Installation“, und der Kopf der Seiten (`hero.html`) zeigt neben
 Projekt und Repository keinen Eintrag „Installation:“ mehr. `Environment` trägt dafür kein
 `playbookDir` mehr. Der Wächter ist `TestKopfUndKontextNennenKeineInstallation`.
 
@@ -3598,8 +3498,7 @@ und ersatzweise die Startseite zu zeigen wäre dann eine falsche Auskunft.
 Das Versionsinventar gehört in keinen der beiden Bereiche: Es ist ein erzeugtes Dokument
 des Projekts mit eigenem Bereich und eigener API (siehe „Das Versionsinventar in der
 Oberfläche"). Die übrige Projektdoku unter `keph:/docs/` wird über Kephalaion gelesen,
-nicht über diese Seiten. Das Wissenstor über `k-playbook-local/knowledge/`, das hier früher
-als eigener Zugriffsweg stand, hat Task 123 samt Seite `/knowledge` entfernt.
+nicht über diese Seiten.
 
 **Frontmatter wird abgetrennt.** Die meisten Dateien der Doku tragen `title` und
 `description` für den Doku-Index; ungetrennt läse Goldmark den Block als Trennlinie samt
@@ -3670,8 +3569,8 @@ ob geschrieben wurde oder das Dokument unverändert blieb, die Zahlen des Laufs 
 die `k-playbook inventory` ausgibt —, und jede Ablehnung, jeder greifende Ausschluss, jede
 nicht auswertbare Quelle und jeder Hinweis im Wortlaut. **Quellenkonfiguration** zeigt
 `keph:/k-playbook/inventory.md`: vorhanden, fehlend, defekt oder nicht erreichbar, die Zahl
-der Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte und, wenn die alte Datei
-unter `k-playbook-local/` noch liegt, den Hinweis auf `/k-upgrade`. **Inventar** zeigt das erzeugte Dokument gerendert, ohne seinen
+der Zusatzquellen, Ausschlussmuster und konfigurierten Helm-Werte. **Inventar** zeigt das
+erzeugte Dokument gerendert, ohne seinen
 Frontmatter-Block — der steht als Stand darüber.
 
 Der Status kommt aus `inventory.ReadStatus`, also aus dem Frontmatter des Dokuments in der
@@ -3714,22 +3613,22 @@ den Karten; unter 1080px entfällt es wie dort.
 
 ## Workflows: Tasks, Reviews und Todos
 
-Drei Arbeitsvorräte, ein Bereich — und je eine Seite: `/workflows/tasks` mit den offenen
-und erledigten Tasks samt gelesenem Inhalt, `/workflows/reviews` mit den bisherigen
-Läufen, `/workflows/todos` mit den offenen und abgehakten Punkten. Zuerst die Tasks: sie
-sind die Umsetzung und damit das, was am häufigsten gesucht wird.
+Drei Arbeitsvorräte, ein Bereich — und zwei Seiten darunter: `/workflows/reviews` und
+`/workflows/todos` mit den offenen und abgehakten Punkten. Tasks haben in der Oberfläche
+keine Seite: Sie liegen in der Projekt-Collection unter `keph:/user/<user>/tasks/` und
+werden im Assistenten angelegt, geprüft und ausgeführt.
 
-Untereinander auf einer Seite standen sie vorher, und das war eine Strecke, auf der man
-scrollte statt zu lesen: drei Beschreibungsblöcke, fünf Listen und die gelesene Task in
-einer Spalte. Der Schnitt verläuft entlang der drei Sorten, weil das die Grenze ist, an
-der sie sich auch sonst trennen — eigene Commands, eigene Verzeichnisse, eigene
-Endpunkte.
+Der Schnitt verläuft entlang der Sorten, weil das die Grenze ist, an der sie sich auch
+sonst trennen — eigene Commands, eigene Ablage, eigene Endpunkte.
 
-`/workflows` bleibt als **Übersicht** des Bereichs: was die drei Sorten sind, wann man
-welche nimmt, wie viel gerade in jeder liegt und je ein Verweis auf ihre Seite. Die Zahl
-holt `workflows.js` aus derselben Antwort, aus der die jeweilige Seite ihre Liste baut.
+`/workflows` bleibt als **Übersicht** des Bereichs: was die drei Sorten sind und wann man
+welche nimmt, je eine Karte. Die Karte „Todos“ trägt die Zahl der offenen Todos und den
+Verweis auf ihre Seite, die Karte „Reviews“ den Verweis auf ihre Seite und, solange die
+Review-Wege pausieren, „Pausiert“ mit dem Satz der Sperre statt einer Zahl (§„Die Review-Wege
+pausieren"); die Karte „Tasks“ trägt weder Zähler noch Verweis. Den Stand holt `workflows.js`
+aus derselben Antwort, aus der die jeweilige Seite sich baut (`/api/reviews`, `/api/todos`).
 
-Die drei Karten mit ihren Zahlen stehen auch auf der Statusseite. Sie sind deshalb das
+Die drei Karten stehen auch auf der Statusseite. Sie sind deshalb das
 Fragment `static/workflow-cards.html`, das beide Seiten einbinden; die Einführung „Was
 Workflows sind" bleibt auf `/workflows`. `workflows.js` tut beim Laden nichts: die Zählung
 ist die Funktion `loadWorkflowCounts(message)`, die jede Seite selbst aufruft —
@@ -3739,84 +3638,50 @@ liefen zwei Lebenszeichen. Das Meldungsziel wird übergeben, weil es nicht zu de
 gehört: `/workflows` schreibt nach `#workflows-message`, die Statusseite nach
 `#status-workflows-message`.
 Einen Aggregat-Endpunkt daneben gibt es weiterhin nicht: er wäre die Doppelung dieser
-drei Zahlen. Ein Hinweis in der Antwort schlägt dabei die Zahl — wo nicht gelesen werden
-konnte, steht „Nicht lesbar" und keine Ziffer, die nichts belegt.
+Zahlen. Ein Hinweis in der Antwort schlägt dabei die Zahl — wo nicht gelesen werden
+konnte, steht „Nicht lesbar" und keine Ziffer, die nichts belegt. Die Sperre der Reviews
+ist dagegen kein Fehler: Ihr Satz steht in der Karte, nicht im Meldungsziel der Seite.
 
-Jede Liste trägt ihre eigene Pill mit ihrer Zahl, auf ihrer Seite wie auf der Übersicht.
+Jede Karte mit einem Stand trägt ihre eigene Pill, auf ihrer Seite wie auf der Übersicht:
+bei den Todos die Zahl, bei den Reviews die Sperre.
 
-Jede der vier Seiten beginnt mit einem **Hilfe-Block**: ein paar Sätze dazu, wie die
+Jede der drei Seiten beginnt mit einem **Hilfe-Block**: ein paar Sätze dazu, wie die
 Sorte angelegt und ausgeführt wird. In dessen Kopf steht rechts ein `.doc-link` — dort,
 wo eine Liste ihre Pill trägt — und führt in die mitgelieferte Doku: die Übersicht und
-die Todos nach `commands.md`, die Tasks nach `task-flow.md`, die Reviews nach
+die Todos nach `commands.md`, die Reviews nach
 `code-review.md` und `review-runs.md` — der Ablauf eines Reviews und der Aufbau eines
 Laufs sind zwei Fragen, und die Seite beantwortet keine davon selbst. Es ist ein reines `<a>` auf `/docs?file=<datei>`; die Datei geht im
 Bereich Docs auf, mit Index und Querverweisen. Ein eigener Betrachter auf diesen Seiten
 wäre die zweite Ansicht derselben Sache gewesen, samt Verweisauflösung und Mermaid.
 Derselbe Verweis passt in jede Karte, die eine mitgelieferte Datei erklärt.
 
-Offen heißt bei Tasks: Markdown unmittelbar in `k-playbook-local/tasks/`. Erledigte
-liegen in `done/`, und eine `README.md` von früher beschreibt das Verzeichnis — beides ist
-keine Aufgabe und steht nicht in der Liste der offenen. Seit Task 107 legt das Einrichten
-`tasks/` nicht mehr an: Tasks liegen in der Projekt-Collection, die Seite zeigt bis zu ihrer
-Umstellung nur, was noch auf der Platte liegt, und nach dem Aufräumen durch `/k-upgrade`
-nichts mehr (`ListTasks` nimmt ein fehlendes Verzeichnis als leer).
+Die Seite Reviews zeigt unter dem Hilfe-Block die Karte „Läufe“. Solange die Review-Wege
+pausieren, liefert `GET /api/reviews` keine Läufe, sondern `{available, paused: true,
+message}`; `reviews.js` setzt die Pill auf „Pausiert“ und schreibt den Satz in die Karte.
+Gestartet wird ein Lauf ohnehin nicht über die Oberfläche, sondern im Assistenten mit
+`/k-audit` oder `/k-review`.
 
-Die Todo-Seite liest und schreibt seit Task 097 die Kephalaion-Collection über dieselbe
+Die Todo-Seite liest und schreibt die Kephalaion-Collection über dieselbe
 Fachlogik wie `k-playbook todo` (`project/todos.go`): Eingabefeld zum Anlegen
 (`POST /api/todos`), je Eintrag ein Knopf zum Abhaken bzw. Wiederöffnen
 (`POST /api/todos/{id}/done|reopen`) und eine eigene Karte „Suchen“
 (`GET /api/todos/search`), die offene und erledigte Treffer in einer Liste zeigt. Den
 Zustand sagt `code`: bei `kephalaion_unavailable` steht „Kephalaion nicht erreichbar“
-statt einer leeren Liste, und das Eingabefeld ist gesperrt; eine Ablehnung wie
-`todos_not_migrated` erscheint unter dem Eingabefeld, `hint` über der Liste. Nach jeder
+statt einer leeren Liste, und das Eingabefeld ist gesperrt; eine Ablehnung erscheint unter
+dem Eingabefeld. Nach jeder
 Änderung lädt die Seite die offenen, die schon geholten erledigten und eine laufende
 Suche neu.
 
-Jede Seite hat wieder ihr eigenes Skript: `tasks.js`, `reviews.js`, `todos.js`. Solange
-die drei Herkünfte eine Seite teilten, mussten sie sich `elements`, `load` und `render`
-gegenseitig aus dem Weg halten — jede stand deshalb in einer eigenen Kapsel, sonst wäre
-das Aneinandergehängte ein SyntaxError gewesen. Getrennte Seiten laden getrennte
-Dateien, und damit ist der Grund für die Kapseln weg: jede Datei hat ihre Namen wieder
-für sich, und jede ruft `startSession()` genau einmal.
+Jede Seite hat ihr eigenes Skript: `reviews.js`, `todos.js`. Getrennte Seiten laden
+getrennte Dateien; jede Datei hat ihre Namen für sich, und jede ruft `startSession()`
+genau einmal.
 
-Geteilt wird, was mehr als eine Seite braucht. Der Aufklapp-Block der Erledigten steht
-deshalb in `static/disclosure.js` — `setUpDoneCard()` samt Merkspeicher, geladen von der
-Task- und der Todo-Seite. Eine Seite kann ihn der anderen nicht leihen: jede lädt nur
-ihr eigenes Skript.
-
-`project.ListTasks()` sortiert nach Dateinamen; die Nummer steht vorn und ordnet damit
-bereits richtig. Als Titel dient die erste Überschrift, ersatzweise der Dateiname —
-dieselbe Regel wie bei der Doku.
-
-Jede Zeile sagt außerdem, ob der Task schon gegengelesen wurde. Erkannt wird das an der
-`## Review-Log`-Sektion, die `/k-task-refine` an **jede** geprüfte Datei anhängt, auch an
-die unveränderte — dieselbe Spur, an der `/k-task-run` Schritt 2 das prüft. Nennt die
-Überschrift ein Datum, steht es dabei; mehrere Runden hängen mehrere Logs an, gezeigt
-wird das jüngste. Codeblöcke bleiben außen vor, sonst gälte eine zitierte Vorlage als
-Nachweis. Ein Task ohne Log ist kein Fehler, aber der Grund, warum `/k-task-run` vor der
-Ausführung nachfragt — deshalb steht er in Warnfarbe. Ein fehlendes Task-Verzeichnis ist anders als bei der
-Doku **kein** Befund: angelegt wird es nicht mehr, und „keine Tasks" ist dieselbe Auskunft
-wie ein leeres Verzeichnis.
-
-Die Liste stellt die offenen Tasks untereinander — die Zeile trägt Dateinamen
-und Titel, das liest sich nebeneinander schlecht. Ein Klick zeigt den Task als Markdown
-in einer Karte **unter** der Liste, nicht in einem Fenster darüber: die Liste bleibt
-sichtbar, der nächste Task ist einen Klick entfernt. Gerendert wird wie bei der Doku mit
-Goldmark, rohes HTML aus der Quelle bleibt abgeschaltet.
-
-Darunter steht ein zugeklappter Block mit den **erledigten** Tasks aus `done/`. Sie
-werden nie weniger, deshalb liegen sie nicht in der Hauptliste; geholt werden sie erst
-beim ersten Aufklappen über `/api/tasks/done`, denn für die Liste wird jede Datei einmal
-gelesen. Ob der Block offen war, merkt sich die Seite im `localStorage` — die Erledigten
-sucht man meist mehrmals hintereinander. `project.ListDoneTasks()` dreht die Ordnung um:
-bei Abgearbeitetem zählt der letzte Stand, die jüngste Nummer steht oben. Den
-Review-Stand trägt die Zeile dort nicht — nach der Ausführung sagt er nichts mehr aus.
-
-`taskFilePath()` prüft den angefragten Namen: eine Datei unmittelbar im Task-Verzeichnis
-oder als `done/<datei>.md` eine erledigte, Endung `.md`. Erledigte sind der einzige
-Grund, den flachen Vergleich mit `filepath.Base()` zu verlassen; genau dieses eine
-Verzeichnis, genau eine Ebene tiefer — alles andere fällt weiterhin weg. Die Namen aus
-beiden Listen sind damit dieselben, unter denen die Datei wieder angefragt wird.
+Der Aufklapp-Block der erledigten Todos steht in `static/disclosure.js` —
+`setUpDoneCard()` samt Merkspeicher, geladen von der Todo-Seite; in einer eigenen Datei,
+damit eine weitere Seite mit einem solchen Block dasselbe Verhalten einbinden kann. Die
+Erledigten werden nie weniger, deshalb liegen sie nicht in der Hauptliste; geholt werden sie
+erst beim ersten Aufklappen über `/api/todos/done`. Ob der Block offen war, merkt sich die
+Seite im `localStorage` — die Erledigten sucht man meist mehrmals hintereinander.
 
 ## Chat in der Oberfläche
 
@@ -4178,7 +4043,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/tools` | Security-Tool-Preflight, read-only |
 | `POST` | `/api/languages` | `project.languages` setzen; antwortet mit dem neuen Tool-Zustand |
 | `GET` | `/api/base-tools` | Befund zu den Basis-Werkzeugen aus dem Kontext, read-only; PATH-Lookup je Werkzeug, kein Skriptaufruf |
-| `GET` | `/api/reviews` | bisherige Läufe auflisten, read-only; angelegt wird über die Commands |
+| `GET` | `/api/reviews` | solange die Review-Wege pausieren, keine Läufe, sondern `{available, paused: true, message}` mit dem Satz der Sperre (`review.PausedMessage`); liest nichts |
 | `GET` | `/api/gh` | der gh-Befund dieses Rechners für die Setup-Karte „GitHub CLI"; schreibt nichts |
 | `GET` | `/api/github/overview` | Repo, Default-Branch, gh-Konto, `viewerPermission`, Remote samt SSH-Alias-Hinweis, letzter Lauf je Workflow auf dem Default-Branch, letzter Tag und Commits seitdem, je Feld ein Hinweis in `notes`, dazu `via` (Dienst der Zugangsdatei und Zeile von run, ohne Dienst das aktive Konto); Frist 20 s für die ganze Anfrage, samt Wahl des Dienstes; nur lesend |
 | `GET` | `/api/github/pulls` | offene Pull Requests, dazu die letzten 20 geschlossenen und gemergten, getrennt; eine GraphQL-Abfrage; `repo=owner/name` überspringt das Auflösen; Frist 20 s samt Auflösen; nur lesend |
@@ -4202,13 +4067,10 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 | `GET` | `/api/inventory` | Stand des Versionsinventars aus dem Frontmatter der Inventardatei, dazu der Zustand der Quellenkonfiguration; read-only |
 | `POST` | `/api/inventory` | Erhebung anstoßen über `project.RunInventory` (`inventory.Run`, danach die README von `docs/generated/versions/` aus ihrer Vorlage); schreibt die Inventardatei nur bei inhaltlicher Änderung, die README nur, wenn sie fehlt oder abweicht; antwortet mit Zahlen, Ablehnungen, Ausschlüssen, nicht auswertbaren Quellen, Hinweisen, `readme` und dem Stand danach |
 | `GET` | `/api/inventory/file` | die Inventardatei als HTML lesen, ohne Frontmatter; fester Pfad, kein Parameter; read-only |
-| `GET` | `/api/tasks` | offene Tasks auflisten, read-only |
-| `GET` | `/api/tasks/done` | erledigte Tasks aus `done/` auflisten, read-only |
-| `GET` | `/api/tasks/file` | einen Task als HTML lesen, read-only |
-| `GET` | `/api/todos` | offene Todos aus der Kephalaion-Collection (`todos/`) auflisten; `code` `kephalaion_unavailable`, wenn Kephalaion nicht erreichbar ist; `hint` meldet ein nicht übernommenes `data/todos.json` oder eine zurückgebliebene `TODO.md` |
+| `GET` | `/api/todos` | offene Todos aus der Kephalaion-Collection (`todos/`) auflisten; `code` `kephalaion_unavailable`, wenn Kephalaion nicht erreichbar ist |
 | `GET` | `/api/todos/done` | abgehakte Todos (`todos/done/`) auflisten |
 | `GET` | `/api/todos/search?q=` | offene und erledigte Todos, deren Text `q` enthält (Groß- und Kleinschreibung egal) |
-| `POST` | `/api/todos` | ein Todo anlegen (`{"text", "origin"}`); Antwort `{ok, todo, code, message, hint}`, abgelehnt etwa mit `todos_not_migrated` |
+| `POST` | `/api/todos` | ein Todo anlegen (`{"text", "origin"}`); Antwort `{ok, todo, code, message}` |
 | `POST` | `/api/todos/{id}/done`, `/api/todos/{id}/reopen` | ein Todo abhaken bzw. wieder öffnen, Antwort wie beim Anlegen |
 | `GET` | `/api/chat/status` | ob der OpenCode-Dienst erreichbar, bereit und hier benutzbar ist, mit Adresse, Version, Projektverzeichnis, ob ein Passwort mitgeht und ob ein Container erkannt wurde; `blocked` und `hint`, wenn keiner benutzbar ist; read-only |
 | `GET` | `/api/chat/sessions` | oberste Sitzungen des Projekts beim Dienst, über `GET /session?roots=true&limit=50` |
@@ -4232,7 +4094,7 @@ eine Kind-Sitzung deshalb keine Rückfrage — der gebaute Weg greift erst, wenn
 
 Statische Assets liegen unter `/static/`. Die Seiten sind `/` (Status; ohne
 Projektkonfiguration eine Umleitung nach `/setup`), `/setup`, `/workflows` mit
-`/workflows/tasks`, `/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/branches`,
+`/workflows/reviews` und `/workflows/todos`, dazu `/chat` mit den Sitzungsseiten `/chat/{id}`, `/github`, `/branches`,
 `/docs`, `/inventory`, `/mcp` und `/mcp-servers` mit den Detailseiten
 `/mcp-servers/{assistant}/{name}`; alle rendert `renderPage()` mit denselben
 Fragmenten für Kopf, linke Spalte, Sperrfläche und Workflow-Karten — keine Seite trägt
@@ -4264,7 +4126,7 @@ Das Paket `health` ist eine Sammelstelle, keine Prüfung: Es kennt Typen, `Regis
 mitgelieferten Texte gibt; vorher war das eine `warning`), Basis-Werkzeuge (je fehlendem eine `warning` mit dem Installationsbefehl) und die
 Quellenkonfiguration des Versionsinventars (Dokument da, aber unlesbar, oder bei bereiter
 Anbindung nicht lesbar: `error`; Anbindung nicht bereit: still, das trägt der Bereich
-`kephalaion`; alte Datei unter `k-playbook-local/`: `warning`) — stehen in
+`kephalaion`) — stehen in
 `project/health.go` und werden beim Laden des Pakets `project` registriert. Der Umweg ist
 der Importzyklus: Die Quellen lesen aus `project` (`DetectBaseTools`,
 `LoadVersionSources`, `kephalaionCheck`), und `project.Briefing` trägt den Report, also
@@ -4356,7 +4218,7 @@ zwangsläufig eine abweichende Antwort.
 Das erste Werkzeug ist `k_playbook_context`. Es gibt dasselbe JSON zurück wie das
 Subkommando — dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen
 lassen. Dazu kommen zwei Familien nach demselben Muster „Subkommando trägt, MCP ist
-Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik — vier der fünf zurzeit
+Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik — alle fünf zurzeit
 gesperrt, sie antworten mit `reviews_paused` (§„Die Review-Wege pausieren") — und `k_playbook_todo_*`
 (`todos.go`) um `project/todos.go`. Dazu kommt `k_playbook_doc_read`
 (`docs.go`) um `project.ResolveDocRef`, dieselbe Auflösung wie `k-playbook read`, und
@@ -4960,7 +4822,7 @@ die Datei über `defer`; SIGINT und SIGTERM werden gleich behandelt, damit sie a
 einem `kill` weg ist.
 
 Warum das Laufzeitverzeichnis und nicht das Projekt: Die Datei gehört zu diesem Rechner,
-und `k-playbook-local/` gehört dem Projekt. `$XDG_RUNTIME_DIR` trennt Host und DevContainer,
+nicht dem Projekt. `$XDG_RUNTIME_DIR` trennt Host und DevContainer,
 weil es je Sitzung vergeben wird. Der Rückfall ins Home — auf macOS immer — nimmt ein
 geteiltes Home als bekannte Grenze in Kauf: ist dort der Projektpfad identisch gemountet,
 sieht die andere Seite eine PID aus fremdem Namensraum und ein Loopback, das nicht
@@ -5032,17 +4894,13 @@ selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 | Weg | Schreibt | Nur wenn |
 |---|---|---|
 | `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
-| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; die abgelösten Zusatzblöcke Session-Memory und Befunde; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
-
-`k-playbook-local/` legt die Startpflege nicht an, auch nicht, wenn es ganz fehlt (Task 147,
-§„`k-playbook-local/` läuft aus"); der frühere erste Weg dieser Tabelle ist entfernt.
+| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
 
 Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
 Neue, nicht erfasste Dateien darf er anlegen — ob sie eingecheckt werden, entscheidet das
 Projekt. Ausgenommen sind allein Reparaturen an Inhalt, den k-playbook selbst geschrieben
 hat: die Korrektur des veralteten Wrapper-Eintrags (`MCPStateOutdated`), der Nachzug des
-veralteten Anstoßblocks in `AGENTS.md`, das Entfernen der zwei abgelösten Zusatzblöcke
-dort (Session-Memory, Befunde — ihr Inhalt kommt mit dem Briefing; seit Task 096) und die
+veralteten Anstoßblocks in `AGENTS.md` und die
 Migration des `CLAUDE.md`-Symlinks zur Include-Datei auf dem Lesepfad. Eine bewusste, vom Nutzer entschiedene Ausnahme ist
 außerdem das Neuanlegen einer erfassten, lokal gelöschten `AGENTS.md` (§„Instruktionen").
 Jeder Weg ist idempotent — ein zweiter Lauf schreibt
@@ -5353,8 +5211,7 @@ Jedes Programm hat zehn Sekunden.
 Die Container-Erkennung lag vorher in `webui/browser.go`; sie liegt jetzt in
 `internal/hostenv/`, weil Browser-Start, Chat-Wächter und Meldung dieselbe Antwort
 brauchen. Was bewusst noch fehlt: ein rechnerlokaler Schalter gegen den Ton (einen Platz
-dafür gibt es noch nicht; `k-playbook-local/K-PLAYBOOK.local.yaml` ist seit Task 138
-Altbestand), Hooks in den Assistenten, die am Ende
+dafür gibt es noch nicht), Hooks in den Assistenten, die am Ende
 eines Turns `k-playbook notify` rufen, und ein Weg vom Devcontainer zum Desktop davor.
 
 ### Browser öffnen

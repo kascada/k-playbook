@@ -18,10 +18,7 @@
   finding in a later run.
 - **A body of knowledge instead of code search.** The entry of the project
   documentation is `keph:/docs/` in the project's Kephalaion collection; the briefing
-  names it, and a session reads it before it reads code. `docs/README.md` on disk is
-  the older index from before the move; `/k-upgrade` moves the rest into the collection,
-  deletes old code documentation on disk and removes the doc references from
-  `AGENTS.md`.
+  names it, and a session reads it before it reads code.
 - **Multi-agent loops instead of a single opinion.** `/k-task-refine` hardens tasks in
   rounds of Critic, Editor and Moderator — the advisors are read-only, only the
   Moderator writes, and every round lands in the review log. In an audit several
@@ -29,7 +26,7 @@
   then pulls it together.
 - **That saves tokens.** Scanners produce the evidence, not the model: the AI reads the
   merged `review-input.json` instead of the repository. Project knowledge comes from
-  the docs instead of a fresh analysis, and the run state lives on disk — an
+  the docs instead of a fresh analysis, and the run state is stored with the run — an
   interrupted session resumes rather than starting over.
 - **Scan tools instead of guesswork.** gitleaks, trufflehog, trivy, semgrep, ruff,
   gosec, govulncheck, osv-scanner, grype, pip-audit and syft are listed in a matrix
@@ -88,7 +85,7 @@ project/
 ```
 
 The same interface then registers the MCP server and sets up the linking for the
-assistants; it does not create `k-playbook-local/`. If the environment has VS Code, it
+assistants. If the environment has VS Code, it
 also installs the extension *k-playbook Workspace Tools* into the VS Code server there, in the background and without
 a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. With Kephalaion
 set up, the extension also binds the public collection `k-playbook` and the project's own
@@ -107,14 +104,12 @@ project/
 │   └── skills/     │     one symlink per skill; OpenCode reads along here
 ├── .opencode/      │
 │   └── commands/ ──┤
-├── .k-playbook/    │
-│   ├── K-PLAYBOOK.yaml   the anchor; its block kephalaion: names hub and collection
-│   ├── share     ←─┤     -> ~/.local/share/k-playbook: shipped commands and skills,
-│   │               │        unpacked by the binary once per machine; not versioned
-│   ├── commands/ ←─┤     project-owned commands, committed (only when used)
-│   └── skills/   ←─┘     project-owned skills, committed (only when used)
-└── k-playbook-local/     being phased out: never created any more; what is left
-                          there is only read to move, report or list it
+└── .k-playbook/    │
+    ├── K-PLAYBOOK.yaml   the anchor; its block kephalaion: names hub and collection
+    ├── share     ←─┤     -> ~/.local/share/k-playbook: shipped commands and skills,
+    │               │        unpacked by the binary once per machine; not versioned
+    ├── commands/ ←─┤     project-owned commands, committed (only when used)
+    └── skills/   ←─┘     project-owned skills, committed (only when used)
 ```
 
 What k-playbook ships is not in the project. Commands, skills and scripts are unpacked by
@@ -125,46 +120,26 @@ in the public collection `k-playbook` on the project's Kephalaion hub and are re
 repository under `k-playbook/` instead; a clone that is still there is no longer read, and
 `/k-upgrade` deletes it.
 
+Everything a project owns lies in its Kephalaion collection or under `.k-playbook/`.
 Tasks, todos, the project documentation and the source configuration of the version
-inventory (`keph:/k-playbook/inventory.md`) live in the project's Kephalaion collection.
-Its hub and name stand in the block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`, committed
-with the project; the account of each machine, its token and the node's address come from
-Kephalaion itself (`kephalaion node client`). Setup no longer creates `docs/`, `tasks/`, `data/` or `material/`; `/k-upgrade` removes
-them from an existing project once they hold nothing but their README. The former
-rule directory is gone as well (task 135); `/k-upgrade` removes it once empty or warns
-that what is left there is no longer read. The same goes for the former directory of
-project-owned checks (task 134); checks no longer exist at all (task 155), and
-`/k-upgrade` removes the directory once empty or notes that what is left there no longer
-runs. Project-owned
-commands and skills live in `.k-playbook/commands/` and `.k-playbook/skills/` since task
-129; `k-playbook-local/commands/` and `k-playbook-local/skills/` are no longer read, and
-`/k-upgrade` removes them once empty or names each entry left there with its target. The former
-knowledge directories on disk are gone as well (task 123); `/k-upgrade` (3.0) clears what
-is left of them and offers each knowledge file for a move to `keph:/docs/manual/` or for
-deletion. Guidelines come shipped only (task 148): `k-playbook-local/guidelines/` is no
-longer read, project-owned guidelines live in `keph:/docs/guidelines/`, and `/k-upgrade`
-deletes a leftover directory, naming every file.
+inventory (`keph:/k-playbook/inventory.md`) live in the collection, and so do project-owned
+review recipes, instructions and includes (`keph:/k-playbook/`) and project-owned
+guidelines (`keph:/docs/guidelines/`); guidelines behind `k-playbook:` come shipped only.
+The collection's hub and name stand in the block `kephalaion:` of
+`.k-playbook/K-PLAYBOOK.yaml`, committed with the project; the account of each machine, its
+token and the node's address come from Kephalaion itself (`kephalaion node client`).
+Project-owned commands and skills live in `.k-playbook/commands/` and
+`.k-playbook/skills/`.
 
-`k-playbook-local/` is being phased out. k-playbook no longer creates the directory or
-anything in it — not when the interface starts, not on a button, not as a side effect of
-a tool; the **Project-owned structure** and **Local settings** blocks of the interface,
-with the button “Anlegen” and the switch for `priv/`, are gone. The program leaves what
-still lies there untouched; `/k-upgrade` clears it. It deletes `priv/` and the other
-former directories once they hold only their README and the managed `.gitignore`; where
-more lies in them, that `.gitignore` keeps working, and whether that content is versioned
-is decided by hand. `results/` is the exception: `/k-upgrade` deletes a leftover one
-without asking, even with content, naming every deleted file. Review results can be
-reproduced from the code; their content was usually not versioned and cannot be recovered
-from Git afterwards. In conversion 3.7 (task 150) `/k-upgrade` deletes
-`k-playbook-local/` itself without asking once nothing is left in it but a `.gitignore`,
-a `README.md` and empty subdirectories; otherwise it says in one line what still lies
-there. As its last conversion (3.8, task 156) it deletes a leftover clone `k-playbook/` and
-then removes the `.gitignore` lines that kept `k-playbook/` and `k-playbook-local/` out of
-Git, each only once its directory is gone. Until the storage of review
-results has moved, the review commands and tools are paused: `/k-review`, `/k-audit` and
-`/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error,
-and the MCP tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry`
-answer `reviews_paused` and write nothing.
+`/k-upgrade` has one conversion that needs a judgement (3.8): it deletes a leftover clone
+`k-playbook/` and then removes the `.gitignore` lines that kept `k-playbook/` out of Git,
+each only once its directory is gone.
+
+The reviews are paused: the location of review results is not decided yet. Until then
+`/k-review`, `/k-audit` and `/k-remediation` only say so, `k-playbook scan` and
+`k-playbook merge` end with an error, and the MCP tools `k_playbook_review_status`,
+`_create`, `_scan`, `_merge` and `_write_ai_entry` answer `reviews_paused` and write
+nothing.
 
 A project-owned entry of the same name fully replaces the shipped one; an empty one
 disables it. This holds for review recipes, instructions and includes in the project
@@ -238,8 +213,6 @@ missing from the `PATH`, otherwise updated through `kephalaion upgrade --auto` w
 Kephalaion considers that safe, with its node restarted; a hub, a global installation or an
 older `kephalaion` without `--auto` are only reported), then the release binary when the
 running program is older than the newest release tag, then
-moving hub and collection out of an old `k-playbook-local/K-PLAYBOOK.local.yaml` into the
-block `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml`,
 `AGENTS.md`, `CLAUDE.md`, linking and MCP entries (a stale entry is replaced, a missing one
 added when the file is not tracked by Git), and last the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
@@ -295,9 +268,9 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 
 - The installation is the binary alone, one per machine. A project carries its anchor and what it owns, no copy of the tool.
 - Shipped and project-owned are strictly separated: what comes with the binary — `~/.local/share/k-playbook/` and the texts from the hub — is replaced by an update, what the project owns is never touched by one.
-- Shipped reviews are not edited. A project deviates from a review by overlay: a local file of the same name replaces completely, an empty one disables.
+- Shipped reviews are not edited. A project deviates from a review by overlay: a project-owned recipe of the same name under `keph:/k-playbook/reviews/` replaces completely, an empty one disables.
 - Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
-- Tasks, todos, the project documentation and project-owned review recipes are documents in the project collection. `k-playbook-local/` is being phased out and is never created; review results get a new place, and until then review runs are paused.
+- Tasks, todos, the project documentation and project-owned review recipes are documents in the project collection; project-owned commands and skills lie under `.k-playbook/`. The location of review results is not decided yet; reviews are paused until then.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
 - The base tools k-playbook calls itself — `git`, `curl` or `wget`, `tar`, `python3`, `rg` — are the second exception, and a different one: they are not scanners but the ground the commands stand on, so a missing one warns and never stops a run. `install-base-tools.sh` prefers the distribution package manager and falls back to a user-local release install; k-playbook never escalates to root by itself, it prints the `sudo` command.
 - Nothing is written except after confirmation, step by step.

@@ -266,8 +266,7 @@ Kompakte Zusammenfassung:
 
 - `context.kephalaion.ok` ist nicht `true` oder ein Werkzeug meldet
   `kephalaion_unavailable` → kein Lauf; `context.kephalaion.message` nennen und auf die
-  Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf
-  `k-playbook-local/docs/code/`.
+  Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - `$ARGUMENTS` fehlt auf der Platte, liegt außerhalb von `context.project.dir` oder in
   einem der immer ausgeschlossenen Verzeichnisse → abbrechen, den Pfad nennen.
 - `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen.
@@ -300,5 +299,5 @@ Kompakte Zusammenfassung:
   und werden nur nach Bestätigung über `k_playbook_docs_exclude_add` eingetragen.
 - **`README.md` oder `index.md` schreiben.** Die README schreibt `publish`, den Index das
   Indizieren.
-- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es keinen Lauf; `k-playbook-local/docs/`
-  ist kein gültiger Ort mehr.
+- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es keinen Lauf; eine Datei auf der
+  Platte ist kein gültiger Ort für die Doku.

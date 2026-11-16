@@ -235,12 +235,30 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 
 // Kein mitgelieferter Text nennt das Feld playbook der Kontextausgabe mehr
 // als Wurzel, Leseort oder Ausschluss (Task 157): weder context.playbook.dir
-// noch playbook.dir, weder unter defaults/ noch unter share/. Die Wurzeln
-// sind project.dir und local.dir; ein liegengebliebener Clone steht als
+// noch playbook.dir, weder unter defaults/ noch unter share/. Die Wurzel
+// ist project.dir; ein liegengebliebener Clone steht als
 // fester Pfad <context.project.dir>/k-playbook/ da, nicht als Feld. Nur die
 // Liste der Fassungen im Handbuch (mcp.md) nennt context.playbook noch, als
 // das, was Fassung 6 trug.
 func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
+	assertShippedTextsLack(t, []string{"playbook.dir", "playbookDir"})
+}
+
+// Kein mitgelieferter Text nennt das frühere projekteigene Verzeichnis oder
+// das Kontextfeld mit seinem Ort mehr (Task 159), weder unter defaults/ noch unter
+// share/: Jeder Ablageort ist ein keph:-Verweis oder liegt unter .k-playbook/.
+// Der Verzeichnisname ist hier aus Teilen zusammengesetzt, damit die Suche
+// danach im Quell-Repo selbst keinen Treffer hat. Die Liste der Fassungen im
+// Handbuch (mcp.md) nennt context.local noch, als das, was Fassung 7 trug —
+// ohne „.dir“ und ohne das Verzeichnis.
+func TestMitgelieferteTexteNennenKeinLokalesVerzeichnis(t *testing.T) {
+	assertShippedTextsLack(t, []string{"k-playbook-" + "local", "local" + ".dir"})
+}
+
+// assertShippedTextsLack liest jede Datei unter defaults/ und share/ und
+// meldet jede Zeile, die eine der Zeichenfolgen aus gone trägt.
+func assertShippedTextsLack(t *testing.T, gone []string) {
+	t.Helper()
 	for _, dir := range []string{"defaults", "share"} {
 		root := filepath.Join("..", "..", "..", dir)
 		files := 0
@@ -257,9 +275,9 @@ func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
 			}
 			files++
 			for number, line := range strings.Split(string(data), "\n") {
-				for _, gone := range []string{"playbook.dir", "playbookDir"} {
-					if strings.Contains(line, gone) {
-						t.Errorf("%s:%d nennt %s: %s", path, number+1, gone, strings.TrimSpace(line))
+				for _, needle := range gone {
+					if strings.Contains(line, needle) {
+						t.Errorf("%s:%d nennt %s: %s", path, number+1, needle, strings.TrimSpace(line))
 					}
 				}
 			}
@@ -374,12 +392,9 @@ func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 		t.Errorf("k-upgrade.md ruft nicht `k-playbook upgrade`:\n%s", file)
 	}
 	module := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/erster-schritt.md"))))
-	// Seit Task 144 bindet 3.6 den Schreibweg der Quellenkonfiguration ein.
-	const configLine = "include: _shared/inventory-config.md\n"
-	config := strings.TrimSpace(string(inventoryBody(t, readRepoDefault(t, "commands/_shared/inventory-config.md"))))
 
 	got := mustResolveDoc(t, layers, ref)
-	want := strings.Replace(strings.Replace(file, includeLine, module+"\n", 1), configLine, config+"\n", 1)
+	want := strings.Replace(file, includeLine, module+"\n", 1)
 	if got.Content != want {
 		t.Errorf("eingesetzter Text:\n%q\nerwartet\n%q", got.Content, want)
 	}
@@ -391,8 +406,7 @@ func TestDefaultsKUpgradeBindetContextEin(t *testing.T) {
 	if !strings.Contains(got.Content, "`documents.always.content`") || strings.Contains(got.Content, "k-playbook context") {
 		t.Errorf("k-upgrade liest nicht aus dem Briefing:\n%s", got.Content)
 	}
-	if len(got.Includes) != 2 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1}) ||
-		got.Includes[1] != (DocInclude{Ref: "k-playbook:/commands/_shared/inventory-config.md", Origin: DocOriginDist, Depth: 1}) {
+	if len(got.Includes) != 1 || got.Includes[0] != (DocInclude{Ref: "k-playbook:/commands/_shared/erster-schritt.md", Origin: DocOriginDist, Depth: 1}) {
 		t.Errorf("includes: %+v", got.Includes)
 	}
 	if len(got.Problems) != 0 || got.Disabled || got.Directory {
@@ -617,7 +631,7 @@ func assertSharedDocsKopfUndScope(t *testing.T, shared string) {
 		"gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` und `/k-docs-tools`",
 		"`/k-doc-inventory` und `ks-overlay-repo-analyse` binden dieses Modul auch ein, wenden den Scope aber nicht an",
 		"`SCAN_ROOT = context.project.repoRoot`", "**Stand**", "`EXTRA_PATH`", "**Immer ausgeschlossen**",
-		"`context.local.dir`", "`<context.project.dir>/.k-playbook/`", "`<context.project.dir>/k-playbook/`",
+		"`<context.project.dir>/.k-playbook/`", "`<context.project.dir>/k-playbook/`",
 		"Altbestand: ein liegengebliebener Clone", "**Versteckte Pfade**",
 		"**Weitere Ausschlüsse**", "`.gitignore`", "`context.docs.exclude`", "`context.docs.problems`", "Aus K-PLAYBOOK.yaml",
 		"`NEW_EXCLUDES`", "**Ausschlüsse speichern.**", "`k_playbook_docs_exclude_add`", "k-playbook docs exclude add",
@@ -664,8 +678,8 @@ func TestDefaultsKDocsToolsIstHuelleUndText(t *testing.T) {
 			description = value
 		}
 	}
-	if !strings.Contains(description, "keph:/docs/generated/libs/") || strings.Contains(description, "k-playbook-local/docs/libs/") {
-		t.Errorf("description nennt nicht keph:/docs/generated/libs/ oder noch die Platte: %q", description)
+	if !strings.Contains(description, "keph:/docs/generated/libs/") {
+		t.Errorf("description nennt nicht keph:/docs/generated/libs/: %q", description)
 	}
 	for _, tool := range []string{"WebFetch", "mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
 		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_exclude_add",
@@ -850,7 +864,7 @@ func TestDefaultsOverlaySkillIstHuelleUndText(t *testing.T) {
 			t.Errorf("Skill-Text nennt %q nicht", needle)
 		}
 	}
-	for _, stale := range []string{"k-playbook-local/docs", "/k-docs-index", "_shared/context.md", "k-playbook context", ".claude/skills/", "PLAYBOOK.md"} {
+	for _, stale := range []string{"/k-docs-index", "_shared/context.md", "k-playbook context", ".claude/skills/", "PLAYBOOK.md"} {
 		if strings.Contains(file, stale) {
 			t.Errorf("Skill-Text trägt noch %q", stale)
 		}
@@ -1192,7 +1206,6 @@ func TestDefaultsFrontmatterTitelQuotiert(t *testing.T) {
 		"commands/k-docs-code.md":                                       {`title: "<Titel>"`, `description: "<Ein Satz: was dieses Dokument erklärt.>"`},
 		"commands/k-docs-tools.md":                                      {`title: "<Name, wie das Projekt ihn nennt>"`, `description: "Projektrelevante Pitfalls und Idiome für <Name>."`},
 		"commands/_skills/overlay-repo-analyse/overlay-doc.md.template": {`title: "<Overlay-Repo-Name>"`, `description: "<`},
-		"commands/k-upgrade.md":                                         {`title: "<Titel>"`},
 	}
 	for rel, needles := range templates {
 		file := readRepoDefault(t, rel)
@@ -1218,7 +1231,6 @@ func TestDefaultsFrontmatterTitelQuotiert(t *testing.T) {
 		"instructions/on-demand/doku-auftraege.md": "in doppelten Anführungszeichen, ein `\"` im Wert wird `\\\"`",
 		"instructions/always/210-workbench.md":     "`title` ist Pflicht, in doppelten Anführungszeichen",
 		"commands/k-task-create.md":                "Frontmatter mit `title` in doppelten\nAnführungszeichen",
-		"commands/k-upgrade.md":                    "Der eingesetzte Titel steht in doppelten Anführungszeichen, ein inneres `\"` als\n`\\\"`",
 	} {
 		if !strings.Contains(readRepoDefault(t, rel), needle) {
 			t.Errorf("%s nennt die Quotierregel nicht: %q", rel, needle)

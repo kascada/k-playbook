@@ -420,8 +420,7 @@ Kompakte Zusammenfassung:
 
 - `context.kephalaion.ok` ist nicht `true` oder ein Werkzeug meldet
   `kephalaion_unavailable` → kein Lauf; `context.kephalaion.message` nennen und auf die
-  Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf
-  `k-playbook-local/docs/libs/`.
+  Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - Das Inventar fehlt, und der Nutzer lässt es nicht erheben, oder `k-playbook inventory`
   scheitert → kein Lauf; die Meldung nennen und `/k-doc-inventory` als nächsten Schritt.
   Keine Manifeste selbst lesen.
@@ -458,5 +457,5 @@ Kompakte Zusammenfassung:
   `publish` vorbei.
 - **`README.md` oder `index.md` schreiben.** Die README schreibt `publish`, den Index das
   Indizieren.
-- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es keinen Lauf;
-  `k-playbook-local/docs/libs/` ist kein gültiger Ort mehr.
+- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es keinen Lauf; eine Datei auf der
+  Platte ist kein gültiger Ort für die Steckbriefe.

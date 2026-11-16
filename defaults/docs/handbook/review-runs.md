@@ -6,14 +6,14 @@ progress in it. For the artifacts created by an individual review, see
 emerged, see [`migration.md`](./migration.md).
 
 **Paused (task 147).** The storage of review results is being rebuilt. Until it stands,
-nothing creates or writes a run: `/k-audit`, `/k-review` and `/k-remediation` only say so,
-`k-playbook scan` and `k-playbook merge` end with an error and exit code 1, and the MCP
-tools `k_playbook_review_create`, `_scan`, `_merge` and `_write_ai_entry` answer
-`reviews_paused` ([`mcp.md`](./mcp.md#review-tools-are-paused)).
-`k_playbook_review_status` and the list of previous runs in the interface still read.
-`k-playbook-local/results/` is no longer created, and `/k-upgrade` deletes a leftover one.
-This page describes the run as it worked until then and as the code still implements it
-behind the lock.
+nothing creates, reads or writes a run: `/k-audit`, `/k-review` and `/k-remediation` only say
+so, `k-playbook scan` and `k-playbook merge` end with an error and exit code 1, and the five
+MCP tools `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`
+answer `reviews_paused` ([`mcp.md`](./mcp.md#review-tools-are-paused)). The interface shows
+the message of the lock instead of runs. This page describes the run as the code implements
+it behind the lock.
+
+`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
 
 ## The Run Is the Container
 
@@ -36,7 +36,7 @@ GUI selection for review recipes.
 ## The Run Directory
 
 ```text
-k-playbook-local/results/
+<ergebnisort>/
 └── 2026-08-12/                  the run, named after the day
     ├── run.json                 the definition: what was selected
     ├── entries/
@@ -57,7 +57,7 @@ know this directory: a run without a tool entry does not need it. An evidence so
 writes here, to `raw/<entry>.sarif`, and creates the directory if no tool ran before it.
 
 **There are two locations for raw data.** The result families under
-`k-playbook-local/results/<family>/YYYY-MM-DD/raw/` remain as they are: a targeted
+`<ergebnisort>/<family>/YYYY-MM-DD/raw/` remain as they are: a targeted
 `/k-review` run continues to create them, and `/k-remediation` works through the triage
 beside them; `ListRuns()` displays them as well. The run directory, by contrast, has no
 family because a run is precisely the container across families. Catalog recipes in the
@@ -323,8 +323,8 @@ Scope semantics for `mode: evidence`:
   also matches a file when it matches its directory: `installer` and `installer/**` both
   cover `installer/internal/review/run.go`.
 - Within the globs, the central exclusions of module search also apply: `k-playbook/`,
-  `k-playbook-local/`, `vendor/`, `node_modules/`, `testdata/`, and dot directories. They
-  are inherited and do not belong in the recipe again.
+  `vendor/`, `node_modules/`, `testdata/`, and dot directories. They are inherited and do
+  not belong in the recipe again.
 - The path scope is binding and enforced when reporting. `scope-hint` remains free text
   for `/k-review` and may neither extend nor override it.
 - The group ID is created in the merge, not the recipe: AI findings form one group per rule
@@ -501,10 +501,9 @@ whether a module exists is then unknown, and `skipped` would claim that there is
 to do.
 
 The search skips `k-playbook/` -- legacy: a clone of the tool left over from the former
-model --, the project-owned
-`k-playbook-local/`, plus `vendor/`, `testdata/`, `node_modules/`, and everything with a
-leading dot: none of these contain a project module. This list is in code rather than the
-catalog: unlike a tool exclusion, it does not belong to an invocation.
+model --, plus `vendor/`, `testdata/`, `node_modules/`, and everything with a leading dot:
+none of these contain a project module. This list is in code rather than the catalog:
+unlike a tool exclusion, it does not belong to an invocation.
 
 **The job records which module was checked**, including the one-module case where the job
 and filename remain unchanged. Otherwise, the name alone would provide that information
@@ -587,11 +586,11 @@ anything.
 
 Counting occurs **once per reference point and kind for the entire run**, not per job: the
 same tree walk over the same target produces the same result for every job of the same
-kind. It skips directories that no job sees anyway: `k-playbook/` and
-`k-playbook-local/results/`, both **anchored at the reference point**, plus everything
-with a leading dot. The anchoring is not a detail: `installer/cmd/k-playbook/` is code in
-this project, and excluding by name alone would consume it too, the same error as in Task
-004, where an unanchored pattern matched the entire project root. The list is in code
+kind. It skips directories that no job sees anyway: `k-playbook/`, **anchored at the
+reference point**, plus everything with a leading dot. The anchoring is not a detail:
+`installer/cmd/k-playbook/` is code in this project, and excluding by name alone would
+consume it too, the same error as in Task 004, where an unanchored pattern matched the
+entire project root. The list is in code
 ([`installer/internal/review/candidates.go`](../../../installer/internal/review/candidates.go)),
 for the same reason as the module-search list, and it is not the same: module search asks
 where a project module resides, while counting asks what a tool could have seen. Therefore,
@@ -678,13 +677,14 @@ no job, so perspective files retain exactly the form they had before, and files 
 
 ## The Interface
 
-The **Reviews** page of the Workflows section (`/workflows/reviews`) lists previous runs
-from `k-playbook-local/results/`, including their count next to the list. Each run shows its
-state and entry count; a directory without `run.json` is identified as such.
+The **Reviews** page of the Workflows section (`/workflows/reviews`) lists no runs at
+present. `GET /api/reviews` answers `{available, paused: true, message}`, and the page shows
+that message, the sentence of the lock, with the pill "Pausiert"; the card "Reviews" of the
+overview shows the same instead of a count.
 
-The interface does no more here: **it does not create or start a run.** A run is created
-through `/k-audit` or `/k-review` in the assistant, and scanned in the terminal with
-`k-playbook scan`.
+Behind the lock the interface does no more either: **it does not create or start a run.**
+A run is created through `/k-audit` or `/k-review` in the assistant, and scanned in the
+terminal with `k-playbook scan`.
 
 ## MCP Tools
 
@@ -700,9 +700,9 @@ manual path; MCP is intended for chat orchestration without shelling out to the
 | `k_playbook_review_merge` | write `review-input.json` and `review-input.md` | `k-playbook merge <lauf>` |
 | `k_playbook_review_write_ai_entry` | write an AI entry's status | no CLI equivalent |
 
-At present the four tools below `k_playbook_review_status` are paused: each call answers
-`reviews_paused` before the input is checked or the project is resolved, and writes
-nothing. What follows is their contract behind the lock.
+At present all five tools are paused: each call answers `reviews_paused` before the input
+is checked or the project is resolved, and reads and writes nothing. What follows is their
+contract behind the lock.
 
 All tools require `projectDir`, search upward from there for `.k-playbook/K-PLAYBOOK.yaml`, and return
 structured JSON envelopes. Errors are domain tool results with `ok: false`, not MCP
@@ -796,7 +796,7 @@ normalizes findings, groups recognizable duplicates, and writes two artifacts al
 the raw data:
 
 ```text
-k-playbook-local/results/<lauf>/
+<ergebnisort>/<lauf>/
 ├── review-input.json    complete audit evidence, JSON
 └── review-input.md      compact view, Markdown
 ```
@@ -1008,11 +1008,10 @@ state and fails if someone shifts it unnoticed.
 
 ## Effect of `known-decisions.md`
 
-`k-playbook-local/known-decisions.md` records findings that deliberately should no longer
+`<ergebnisort>/known-decisions.md` records findings that deliberately should no longer
 count as findings: false positives, accepted risks, deferred items, and rejected items. It
-is hand-maintained **input**, not a review result, which is why it resides directly in
-`k-playbook-local/`, next to `reviews/` and `guidelines/`, rather than in
-`results/`. No command creates it; it is written by hand and optional.
+is hand-maintained **input**, not a review result. No command creates it; it is written by
+hand and optional.
 
 Known decisions are applied centrally in the merge step before assessment. Matching does
 not happen in the chat: `k-playbook merge` loads `known-decisions.md`, marks covered
@@ -1078,15 +1077,10 @@ Which criterion suits which purpose: the difference is greater than the list sug
 
 Location:
 
-- `k-playbook-local/known-decisions.md`: the one project-wide file. There is no second
+- `<ergebnisort>/known-decisions.md`: the one project-wide file. There is no second
   search path and no run-specific version: a known decision is not bound to a run; that is
   what `expires` is for.
 - If the file does not exist, the merge visibly reports “no known decisions loaded”.
-- Transition: projects that still have the file under `k-playbook-local/results/` continue
-  to have it read from there. The merge then reports the move as a notice in
-  `review-input.md`, CLI output, and the result of the MCP tool
-  `k_playbook_review_merge`. If both exist, the new location wins and the old one is
-  reported as ignored. Reading the old location is temporary and will be removed.
 
 JSON effect:
 
@@ -1120,7 +1114,7 @@ merge-only portion, and construction of stable group IDs, is described by
 The module writes exactly one new Markdown artifact directly into the run directory:
 
 ```text
-k-playbook-local/results/<lauf>/review-triage.md
+<ergebnisort>/<lauf>/review-triage.md
 ```
 
 `review-triage.md` bundles groups by common cause, assigns priority `P1`/`P2`/`P3` and

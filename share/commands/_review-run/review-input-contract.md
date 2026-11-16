@@ -249,7 +249,9 @@ Ebenso gibt es kein `evidence[].source`, `evidence[].file`, `evidence[].line` od
 
 ## Bestandsartefakte
 
-Bestehende `review-input.json` unter `k-playbook-local/results/<YYYY-MM-DD>/` bleiben
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
+Bestehende `review-input.json` unter `<ergebnisort>/<YYYY-MM-DD>/` bleiben
 unverändert lesbar: Felder sind nur hinzugekommen, keines ist entfallen oder umbenannt
 worden, und `schemaVersion` bleibt `1`.
 

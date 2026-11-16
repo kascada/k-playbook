@@ -96,7 +96,7 @@ wie es hier festgelegt ist:
 
 ## Ausschlüsse
 
-Die zentralen Ausschlüsse der Modulsuche — `k-playbook/`, `k-playbook-local/`, `vendor/`,
+Die zentralen Ausschlüsse der Modulsuche — `k-playbook/`, `vendor/`,
 `node_modules/`, `testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
 nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
 

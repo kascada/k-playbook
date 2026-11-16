@@ -207,7 +207,7 @@ Was im Audit bleibt:
 ## Ausschlüsse
 
 Diese Ausschlüsse begrenzen den Scope im Evidence-Lauf und im Report. Die zentralen
-Ausschlüsse der Modulsuche — `k-playbook/`, `k-playbook-local/`, `vendor/`,
+Ausschlüsse der Modulsuche — `k-playbook/`, `vendor/`,
 `node_modules/`, `testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
 nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
 
@@ -244,8 +244,10 @@ Auswahlregel bei Überschreitung:
 Dieses Review moderiert keine Freigaben pro Fund. Es erzeugt ein vollständiges Ergebnis,
 das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
 
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
 Die Ergebnisfamilie ist `code`; der Lauf schreibt in den Family-Ordner
-`k-playbook-local/results/code/<datum>/` und dort genau zwei Dateien — `review-input.json`
+`<ergebnisort>/code/<datum>/` und dort genau zwei Dateien — `review-input.json`
 nach dem Belegvertrag und `review-triage.md` als Endartefakt. Den Ablauf beschreibt
 `/k-review`, 5b; rezeptspezifisch ist:
 
@@ -324,13 +326,13 @@ daneben einzeln aufrufbar, und ein solcher Lauf legt einen eigenen Family-Ordner
 **außerhalb** jedes Laufordners an:
 
 ```text
-k-playbook-local/results/code/<datum>/
+<ergebnisort>/code/<datum>/
 ```
 
 Sein `review-triage.md` geht direkt an `/k-remediation`:
 
 ```text
-/k-remediation k-playbook-local/results/code/<datum>/review-triage.md
+/k-remediation <ergebnisort>/code/<datum>/review-triage.md
 ```
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen

@@ -21,4 +21,4 @@ Erzeugtes liegt unter `generated/` (etwa `generated/versions/inventory.md`), Han
 unter `manual/`. Findet die Suche nichts Passendes, geh über die `index.md` der Verzeichnisse.
 
 Steht `kephalaion.ok` nicht auf `true`, ist die Projektdoku nicht erreichbar. Sag das,
-statt auszuweichen; einen Rückfall auf `k-playbook-local/docs/` gibt es nicht.
+statt auszuweichen; einen Rückfall auf die Platte gibt es nicht.

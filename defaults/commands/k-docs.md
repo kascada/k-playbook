@@ -21,7 +21,7 @@ include: _shared/erster-schritt.md
 include: _shared/docs.md
 
 Aus dem Briefing brauchst du `context.kephalaion` (`ok`, `address`, `message`),
-`context.project.dir`, `context.local.dir` und `context.docs` (`exclude`, `problems`). Ohne
+`context.project.dir` und `context.docs` (`exclude`, `problems`). Ohne
 `context.kephalaion.ok: true` endet der Command hier, wie die Ablage oben sagt.
 
 Die Erzeuger und ihre Verzeichnisse:
@@ -71,9 +71,6 @@ in Schritt 4 nennt dann `/k-upgrade`.
 
 Dazu auf der Platte, nur nachsehen:
 
-- `<context.local.dir>/docs/` — liegen dort noch Dateien außer `README.md`, ist die
-  Umstellung 3.2 von `/k-upgrade` offen. Gezählt wird je Unterverzeichnis; gelesen und als
-  gültig genommen wird davon nichts.
 - `<context.project.dir>/.k-playbook/work/docs/<erzeuger>/` — ein Arbeitsverzeichnis, das
   noch liegt, ist ein Lauf, der nicht veröffentlicht hat. Nenne Erzeuger und Alter der
   Merkdatei `<erzeuger>.checkout.json`.
@@ -125,9 +122,8 @@ gelesen, wo eine Prüfung unten es verlangt.
   selben Arbeitsgang über den Erzeuger nachgezogen (`/k-doc-inventory`); die Steckbriefe
   werden danach eingereiht (`erzeuger: tools`). Eine fremde, schon vorhandene Abweichung ist
   ein Hinweis an den Nutzer, kein stilles Nachziehen.
-- **Reste.** Dateien unter `<context.local.dir>/docs/` → `/k-upgrade`, Umstellung 3.2. Ein
-  liegengebliebenes Arbeitsverzeichnis → der Erzeuger fragt beim nächsten Lauf, ob
-  weitergemacht oder verworfen wird.
+- **Reste.** Ein liegengebliebenes Arbeitsverzeichnis → der Erzeuger fragt beim nächsten
+  Lauf, ob weitergemacht oder verworfen wird.
 
 Gibt es keine Befunde, sag das in einer Zeile.
 
@@ -147,8 +143,7 @@ Unsortiert  <N> Dokumente | —
 Aufträge    <N> (<N> code, <N> tools), ältester <entstanden> | keine
 README      <N> Vorlagen, <N> fehlen, <N> weichen ab | alle aktuell | keine Vorlagen
 Befunde     <N> (<Kategorien>) | keine
-Offen       Platte: <N> Dateien unter k-playbook-local/docs/ → /k-upgrade 3.2 | —
-            Arbeitsverzeichnis: <erzeuger> seit <alter> | —
+Offen       Arbeitsverzeichnis: <erzeuger> seit <alter> | —
 
 Mögliche Aktionen:
   1. inventory  Versionsinventar erheben            → /k-doc-inventory
@@ -203,7 +198,7 @@ Im Statuslauf:
 - Dokumente je Bereich, offene Aufträge und Befunde je Kategorie, gezählt.
 - Ausdrücklich: Es wurde nichts geschrieben.
 - Folge-Command: einer der Erzeuger aus Schritt 4, sobald der Nutzer ihn wählt; ohne Wahl
-  keiner. Sind Reste auf der Platte gemeldet: `/k-upgrade`.
+  keiner.
 
 Nach einer Weitergabe gilt der Abschluss des Erzeugers. Bei `alle` danach eine Zeile je
 Erzeuger: gelaufen, übersprungen oder abgebrochen, mit Grund — und eine Zeile `README` aus
@@ -215,7 +210,7 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
 
 - `context.kephalaion.ok` ist nicht `true` oder `list` meldet `kephalaion_unavailable` →
   kein Bericht; `context.kephalaion.message` nennen und auf die Projekt-Collection auf der
-  Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf `k-playbook-local/docs/`.
+  Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - Unbekanntes Argument → die gültigen nennen: `status`, `inventory`, `code`, `tools`,
   `alle`.
 - Der Text eines Erzeugers ist nicht lesbar (`not_found`) → die Installation ist
@@ -230,8 +225,8 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
 - **Befunde nebenbei beheben.** Kein Dokument wird im Statuslauf geändert, auch kein alter
   Kopf und kein Steckbrief mit abweichender Version.
 - **Den Stand des Inventars aus dem Rumpf lesen.** Er kommt nur aus dem Kopf.
-- **Die Platte als Doku nehmen.** `k-playbook-local/docs/` ist ein Rest für `/k-upgrade`,
-  keine Quelle.
+- **Die Platte als Doku nehmen.** Die Projektdoku liegt allein unter `keph:/docs/`; eine
+  Datei auf der Platte ist keine Quelle.
 - **`README.md` oder `index.md` von Hand schreiben.** Die README schreibt das Programm aus
   ihrer Vorlage (`k_playbook_docs_readme`), `index.md` erzeugt Kephalaion; kein Command
   schreibt sie mit Kephalaion `write` oder `create`.

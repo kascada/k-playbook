@@ -12,8 +12,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook_
 Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
 zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen, nichts
 schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-review` gerade umzieht
-und erst nach dem Umbau wieder geht. Bisherige Läufe unter `k-playbook-local/results/`
-löscht `/k-upgrade` ohne Rückfrage.
+und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
@@ -41,14 +40,17 @@ Produces:
 Recipes come from `catalogs.reviews`; `/k-review` darf nur Einträge mit
 `review.enabled: true` auswählen oder explizit ausführen. Fehlt der Block, gilt
 `review.enabled: true`; `audit.enabled` steuert ausschließlich `/k-audit` und MCP-Läufe.
-Everything a review produces goes under
-`<local.dir>/results/`. `known-decisions.md` is not produced by a review — it is a
-hand-maintained input and lives one level up. From the context output:
+Everything a review produces goes under `<ergebnisort>`. `known-decisions.md` is not
+produced by a review — it is a hand-maintained input.
 
-- `RESULTS_DIR` = `<local.dir>/results`
-- `RESULTS_DISPLAY_PATH` = `k-playbook-local/results`
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
+The paths:
+
+- `RESULTS_DIR` = `<ergebnisort>`
+- `RESULTS_DISPLAY_PATH` = `<ergebnisort>`
 - `LOG_FILE` = `<RESULTS_DIR>/log.md`
-- `KNOWN_DECISIONS` = `<local.dir>/known-decisions.md`
+- `KNOWN_DECISIONS` = `<ergebnisort>/known-decisions.md`
 
 Command-specific policy:
 

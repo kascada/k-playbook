@@ -59,10 +59,7 @@ Zwei Auskünfte, beide ohne eigene Dateilektüre:
    - `unavailable` → Kephalaion ist nicht erreichbar; über das Dokument ist nichts bekannt.
      Der Erhebungslauf bricht ab (Fehlerfälle unten).
    Fehlt das Feld `versionSources` ganz oder trägt es `path` statt `ref`, ist die
-   Installation älter als dieser Text: das sagen und auf `/k-upgrade` verweisen, statt die
-   alte Datei `k-playbook-local/version-sources.yaml` ersatzweise selbst zu öffnen. Meldet
-   das Briefing unter `health` die alte Datei als Altbestand, gilt sie nicht mehr; ihre
-   Einstellungen zieht `/k-upgrade` um.
+   Installation älter als dieser Text: das sagen und auf `/k-upgrade` verweisen.
 2. **Der Bestand des Inventars**: lies `keph:/docs/generated/versions/inventory.md` mit
    `k_playbook_doc_read` (ersatzweise `k-playbook read`). Kommt `not_found`, fehlt das
    Inventar — der Normalzustand vor dem ersten Lauf. Sonst nimm **nur** den YAML-Block
@@ -215,7 +212,7 @@ Kompakte Zusammenfassung:
 
 - `context.kephalaion.ok` ist nicht `true` → Kephalaion ist nicht bereit. Nenne
   `context.kephalaion.message` und die Projekt-Collection auf der Setup-Seite (`/k-gui`).
-  Keine Erhebung, kein Rückfall auf `k-playbook-local/docs/`. Meldet `k-playbook inventory`
+  Keine Erhebung, kein Rückfall auf die Platte. Meldet `k-playbook inventory`
   `kephalaion_unavailable`, gilt dasselbe.
 - `k-playbook inventory` meldet `stale_revision` → zwischen Lesen und Schreiben hat jemand
   anders das Inventar geschrieben. Nichts wurde überschrieben. Den Lauf einmal wiederholen;
@@ -228,8 +225,8 @@ Kompakte Zusammenfassung:
   ist so ein Defekt: das Dokument stammt aus einer alten Vorlage; der Nutzer entfernt `roots`
   und hebt die Fassung.
 - `context.versionSources.state` ist `unavailable` → Kephalaion ist nicht erreichbar. Keine
-  Erhebung, kein Rückfall auf die alte Datei unter `k-playbook-local/` oder still auf die
-  Standardquellen; `context.versionSources.error` und `context.kephalaion.message` nennen.
+  Erhebung, kein Rückfall auf die Platte oder still auf die Standardquellen;
+  `context.versionSources.error` und `context.kephalaion.message` nennen.
 - `k-playbook inventory` meldet `unbekanntes Kommando` → die Installation ist älter als
   dieser Command. Melden, `/k-upgrade` nennen, und die Erhebung **nicht** von Hand nachbauen.
 - Die Zeile `README:` meldet `failed`, und das Kommando endet mit einem Fehler → gescheitert
@@ -243,25 +240,21 @@ Kompakte Zusammenfassung:
   schreibt neu, weil ein Vergleich nicht möglich ist. Den Befund im Abschluss nennen.
 - Der Nutzer bestätigt den Diff der Quellenkonfiguration nicht → Dokument unverändert
   lassen, Erhebung trotzdem laufen lassen, im Abschluss als übersprungen führen.
-- Das Briefing meldet unter `health` die alte `k-playbook-local/version-sources.yaml` als
-  Altbestand → sie gilt nicht mehr und wird nicht gelesen; im Abschluss nennen und auf
-  `/k-upgrade` verweisen, das ihre Einstellungen umzieht. Nicht selbst umziehen.
 
 ## Anti-Muster (nicht tun)
 
 - **Die Erhebung nachbauen.** Manifeste von Hand lesen, Versionen schätzen, Zeilen ergänzen
   — dann gäbe es zwei Auslegungen des Vertrags, und die zweite ginge in keine Prüfung ein.
 - **Die Quellenkonfiguration selbst auswerten.** Ihr Zustand steht in
-  `context.versionSources`. Wer das Dokument für die Auswertung liest — oder die alte Datei
-  unter `k-playbook-local/` —, liest eine zweite, womöglich andere Antwort.
-  Gelesen wird es nur in Schritt 4, um es zu ergänzen.
+  `context.versionSources`. Wer das Dokument für die Auswertung liest, liest eine zweite,
+  womöglich andere Antwort. Gelesen wird es nur in Schritt 4, um es zu ergänzen.
 - **Die Quellenkonfiguration umschreiben.** Kein Umsortieren, kein Neuformatieren, kein
   Entfernen von Kommentaren, kein Schreiben ohne Bestätigung — sie ist handgepflegt.
 - **Das Inventar von Hand nachbessern** — weder in der Collection noch als Datei auf der
   Platte. Es wird bei jedem Lauf neu erzeugt; die Korrektur ist beim nächsten Mal weg und
   verdeckt bis dahin einen Befund.
-- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es kein Inventar. Eine Datei unter
-  `k-playbook-local/docs/versions/` ist ein Stand von früher, kein gültiger Ort.
+- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es kein Inventar. Eine Datei auf der
+  Platte ist kein gültiger Ort dafür.
 - **Abweichungen auflösen.** Sie werden ausgewiesen, nicht auf einen „richtigen“ Wert
   reduziert — das ist der Zweck des Inventars.
 - **Ablehnungen still übergehen.** Eine konfigurierte Quelle, die nicht gelesen werden

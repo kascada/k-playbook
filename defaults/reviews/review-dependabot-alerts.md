@@ -60,8 +60,10 @@ legt einen Family-Ordner außerhalb jedes Laufordners an; sein `review-triage.md
 direkt an `/k-remediation`:
 
 ```text
-/k-remediation k-playbook-local/results/dependabot-alerts/<datum>/review-triage.md
+/k-remediation <ergebnisort>/dependabot-alerts/<datum>/review-triage.md
 ```
+
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
 
 Es gibt dabei **keine familienübergreifende Zusammenführung und keine Dedupe gegen andere
 Quellen** mehr. `/k-remediation` nimmt genau eine Ergebnisdatei; ein Alert, den daneben

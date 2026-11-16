@@ -6,7 +6,7 @@
 # des Quell-Repos (kascada/k-playbook) und des privaten Dev-Repos
 # (kascada/k-playbook-dev; Git-Verzeichnis priv/.git, core.worktree = ../..).
 # Das Dev-Repo versioniert .k-playbook/ und priv/, das Quell-Repo alles
-# andere außer k-playbook-local/, das es nur zum Schutz ausblendet. Eine versionierte
+# andere. Eine versionierte
 # .k-playbook/K-PLAYBOOK.yaml im Quell-Repo läge in jedem Clone, auch in der
 # Installation, und die Suche nach dem Projekt bliebe dort hängen.
 #

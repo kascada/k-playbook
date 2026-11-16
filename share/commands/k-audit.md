@@ -12,8 +12,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook_
 Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
 zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen, nichts
 schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-audit` gerade umzieht
-und erst nach dem Umbau wieder geht. Bisherige Läufe unter `k-playbook-local/results/`
-löscht `/k-upgrade` ohne Rückfrage.
+und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
@@ -28,9 +27,11 @@ immer geltenden Anweisungen (`documents.always.content`).
 eigenen Zustand: Jeder Aufruf liest den Ist-Zustand über die MCP-Werkzeuge aus dem
 Laufverzeichnis und setzt genau dort fort.
 
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
 Ergebnisse dieses Commands:
 
-- ein Review-Lauf unter `k-playbook-local/results/YYYY-MM-DD/`, wenn ein neuer Lauf
+- ein Review-Lauf unter `<ergebnisort>/YYYY-MM-DD/`, wenn ein neuer Lauf
   bestätigt und angelegt wird,
 - Scanner-Fortschritt und AI-Entry-Fortschritt unter `entries/`,
 - SARIF der Evidence-Rezepte unter `raw/<entry>.sarif`,
@@ -47,10 +48,12 @@ Datum wählen als angegeben.
 Löse aus der Context-Ausgabe:
 
 - `RESOLVED_PROJECT_DIR` = `project.dir`
-- `RESOLVED_LOCAL_DIR` = `local.dir`
-- `RESOLVED_RESULTS_DIR` = `<local.dir>/results`
-- `RESULTS_DISPLAY_PATH` = `k-playbook-local/results`
 - `TODAY` = `now.date`
+
+Der Ort der Ergebnisse:
+
+- `RESOLVED_RESULTS_DIR` = `<ergebnisort>`
+- `RESULTS_DISPLAY_PATH` = `<ergebnisort>`
 
 Command-specific policy:
 
@@ -224,7 +227,7 @@ Betroffen sind die AI-Einträge mit `mode: evidence` — in der Statusausgabe di
 2. Verwende den im Lauf gespeicherten `scope`-Snapshot, insbesondere `scope.paths`. Der
    Pfad-Scope ist verbindlich und wird nicht aus dem Chat-Gedächtnis erweitert; innerhalb
    der Globs gelten zusätzlich die zentralen Ausschlüsse der Modulsuche (`k-playbook`,
-   `k-playbook-local`, `vendor`, `node_modules`, `testdata`, Punkt-Verzeichnisse).
+   `vendor`, `node_modules`, `testdata`, Punkt-Verzeichnisse).
 3. Führe das Rezept auf dem Code in diesem Scope aus. Die zulässigen Rule-IDs stehen im
    Rezept unter `audit.ruleIds`; sie kommen aus dem Rezept und nicht aus `run.json`.
 4. Schreibe das Ergebnis als SARIF nach `raw/<entry>.sarif`: `tool.driver.name` ist der
@@ -435,7 +438,7 @@ Lies zum Abschluss den Status erneut und melde:
 - Pfad zu `review-input.json`, `review-input.md` und `review-triage.md`,
 - offene technische Fehler oder bewusst übersprungene Einträge,
 - den nächsten fachlichen Schritt:
-  `/k-remediation k-playbook-local/results/<lauf>/review-triage.md` für die Abarbeitung
+  `/k-remediation <ergebnisort>/<lauf>/review-triage.md` für die Abarbeitung
   der Triage.
 
 Ein Lauf ist nicht vollständig, solange eine Evidence-Quelle offen ist oder `triage.state`
@@ -447,7 +450,7 @@ Handoff: `review-triage.md` ist das aktuelle Ergebnisartefakt und geht direkt in
 Abarbeitung — einen Zwischenschritt gibt es nicht. Nenne wörtlich:
 
 ```text
-/k-remediation k-playbook-local/results/<lauf>/review-triage.md
+/k-remediation <ergebnisort>/<lauf>/review-triage.md
 ```
 
 ## Fehlerfälle

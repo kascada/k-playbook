@@ -341,8 +341,8 @@ then nothing is written and the interface says so.
 | Tool | Purpose |
 |---|---|
 | `k_playbook_context` | return the resolved working state like `k-playbook context` and synchronize assistant linking |
-| `k_playbook_review_status` | read the selection basis for new runs or the status of an existing run |
-| `k_playbook_review_create` | **temporarily unavailable**, answers `reviews_paused` ([below](#review-tools-are-paused)); otherwise: create a review run or return validated `run.json` in a dry run |
+| `k_playbook_review_status` | **temporarily unavailable**, answers `reviews_paused` ([below](#review-tools-are-paused)); otherwise: read the selection basis for new runs or the status of an existing run |
+| `k_playbook_review_create` | **temporarily unavailable**, answers `reviews_paused`; otherwise: create a review run or return validated `run.json` in a dry run |
 | `k_playbook_review_scan` | **temporarily unavailable**, answers `reviews_paused`; otherwise: execute a run's tool entries through `review.Execute` |
 | `k_playbook_review_merge` | **temporarily unavailable**, answers `reviews_paused`; otherwise: consolidate a run through `merge.Run` into `review-input.json` and `review-input.md` |
 | `k_playbook_review_write_ai_entry` | **temporarily unavailable**, answers `reviews_paused`; otherwise: write the status and result of an AI review entry |
@@ -374,11 +374,11 @@ reads the status and makes its own decision from it.
 
 ### Review Tools Are Paused
 
-The storage of review results is being rebuilt, and until it stands every writing review
-path is locked (task 147). `k_playbook_review_create`, `k_playbook_review_scan`,
-`k_playbook_review_merge` and `k_playbook_review_write_ai_entry` stay in the tool list with
-their names and schemas, but each call is answered with the error code `reviews_paused` and
-one sentence giving the reason, marked as a tool error:
+The storage of review results is being rebuilt, and until it stands every review path is
+locked (task 147). The five tools `k_playbook_review_status`, `k_playbook_review_create`,
+`k_playbook_review_scan`, `k_playbook_review_merge` and `k_playbook_review_write_ai_entry`
+stay in the tool list with their names and schemas, but each call is answered with the error
+code `reviews_paused` and one sentence giving the reason, marked as a tool error:
 
 ```json
 {
@@ -395,17 +395,19 @@ one sentence giving the reason, marked as a tool error:
 ```
 
 The answer comes before any check of the input and before the project is resolved: nothing
-is read, moved, created or written, no run and no `k-playbook-local/results/`. That holds
-for a dry run, for a `projectDir` that leads to no project, and for a missing one as well —
-these four tools do not answer `invalid_input` or `project_not_found` while they are
-paused. Their description in the tool list starts with “Vorübergehend nicht verfügbar”. The
-lock names no date; it holds until the new storage stands. The subcommands
-`k-playbook scan` and `k-playbook merge` are locked the same way and end with the same
-sentence and exit code 1.
+is read, moved, created or written, no run and no result. That holds for a dry run, for a
+`projectDir` that leads to no project, and for a missing one as well — the five tools do not
+answer `invalid_input` or `project_not_found` while they are paused. Their description in
+the tool list starts with “Vorübergehend nicht verfügbar”. The lock names no date; it holds
+until the new storage stands. The subcommands `k-playbook scan` and `k-playbook merge` are
+locked the same way and end with the same sentence and exit code 1. The interface lists no
+runs either: `GET /api/reviews` answers with the same sentence, and the **Reviews** page
+shows it.
 
-`k_playbook_review_status` stays open: it only reads runs, entry states and the selection
-basis and creates nothing. The sections below describe the contract of the four tools as
-it applies again once the lock is lifted.
+`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
+
+The sections below describe the contract of the five tools as it applies again once the
+lock is lifted.
 
 ### Review Response Contract
 
@@ -418,8 +420,6 @@ All review tools return the same envelope. Success:
   "project": {
     "inputDir": "/provided/path",
     "root": "/project",
-    "localDir": "/project/k-playbook-local",
-    "reviewRunsDir": "/project/k-playbook-local/results",
     "languages": ["go"]
   },
   "data": {},
@@ -449,7 +449,9 @@ are stable and in `snake_case`, including `invalid_input`, `project_not_found`, 
 `invalid_mode`, `invalid_selection`, `selection_unknown`, `selection_unavailable`,
 `entry_not_found`, `entry_kind_invalid`, `entry_state_invalid`, `result_required`,
 `result_path_invalid`, `read_failed`, `write_failed`, `preflight_failed`, `execution_failed`,
-`merge_failed`, and — while the review tools are paused — `reviews_paused`.
+`merge_failed`, and — while the review tools are paused — `reviews_paused`. Behind the lock,
+`results_dir_undecided` is the answer as long as the program knows no location for the
+results.
 
 `invalid_input` is the code for a missing, empty, or whitespace-only `projectDir`, with empty
 `details`; nothing was executed, and the call is to be repeated with `projectDir`.
@@ -555,8 +557,8 @@ reference `k-playbook:/reviews/<name>` -- the shipped layer lies in `<hub>:k-pla
 disk (task 131) --, and since task 143 the same effective reference for a project-owned or
 overriding one, whose layer lies in the project collection under `keph:/k-playbook/reviews/`. The
 tools read a single recipe through `project.ReadCatalogEntry`, which resolves the reference and
-also still reads the disk paths of older runs, such as a project-owned recipe under the former
-`k-playbook-local/reviews/`. The selection in `k_playbook_review_status`
+reads any other value as a path on disk, such as the one an older `run.json` carries. The
+selection in `k_playbook_review_status`
 (`available`) and `k_playbook_review_create` reads all recipes through the layers it built the
 catalog with (`project.BuildContextWithLayers`, `project.ReadCatalogEntryWith`), so it opens
 the shipped layer once per selection instead of once per recipe (task 132).
@@ -598,7 +600,7 @@ For **OpenCode**, the behavior was verified on 2026-08-22 with the server shippe
 version: a 158-second scan run completed in an OpenCode client with
 `mcp.k-playbook.timeout: 90000` (90 seconds), without aborting the tool call; no scanner
 persisted `reason: "cancelled"`. The evidence is based on persisted entry states
-(`k-playbook-local/results/<run>/entries/*.json`).
+(`<ergebnisort>/<run>/entries/*.json`).
 
 The value belongs in the client configuration and is not written by k-playbook. This
 repository's committed `opencode.json` does **not** set it; it contains only the registration
@@ -620,7 +622,7 @@ An explicit client cancellation after scanning starts still aborts the scanners 
 last scanner that was running persists `reason: "cancelled"`. Progress notifications do not
 change this -- they address only the timeout failure mode, not cancellation.
 
-### Todo Contract and Migration
+### Todo Contract
 
 The four todo tools are thin wrappers. The load-bearing layer is the subcommand
 `k-playbook todo`: the MCP server is registered **per project** (see "Registering"), so a
@@ -681,41 +683,6 @@ The text of the todo.
 - `doneMigrated` marks a `done` that came from a migration, so it is not mistaken for the day
   someone ticked the entry off.
 
-**The former store `k-playbook-local/data/todos.json`** is no longer read by any path except
-`k-playbook todo migrate`; the others only check whether it exists. While it does, every
-response carries a `hint` naming `k-playbook todo migrate`, listing shows the collection
-only, and add, update and delete are rejected with **`todos_not_migrated`**, so that no new todo
-takes a number a former entry is meant to keep. `k-playbook todo migrate`:
-
-- **First run or latecomer** is decided by content, not by the marker file alone (`/k-upgrade`
-  3.4 may remove `data/` together with the renamed files): a run is a latecomer if
-  `data/todos.json.migriert` exists **or** a document under `todos/` or `todos/done/` does not
-  match `todos.json` — its number does not occur there, or it does, but with a different text.
-  Otherwise it is a first run: with an empty collection, or when every document matches, e.g.
-  after an aborted first run.
-- **First run**: creates one document per entry under the fixed name
-  `<id, three digits>-<short-name>.md`, not through the numbering, so the former ids survive;
-  done entries go straight to `todos/done/`. The frontmatter is the format above, with
-  `created` always written (empty when the entry had none), `done`, `origin`, `doneMigrated`.
-  An entry whose number already exists as a document with the same text is skipped, so a run
-  after an abort continues the first run with the former numbers. Only once every entry has
-  arrived is the file renamed to `data/todos.json.migriert`.
-- **Latecomer** (for example a `data/todos.json` written again by an older installed binary, or
-  a collection that already holds todos of its own): its entries are appended through the
-  normal numbering, so their former ids are not kept, done ones straight to `todos/done/`, with
-  the same frontmatter; an entry whose text already exists as a document is skipped, so nothing
-  is created twice and no number collides, also on a repeated run after an abort. "Twice" means
-  the same text: a document edited after an aborted first run keeps its new text, and the old
-  one is added beside it. Afterwards the file is renamed under a name of its own
-  (`todos.json.nachzuegler-<date>[-<n>]`).
-- `todos.json.migriert` is never overwritten; renamed files are never read again. The output
-  names the created and skipped entries. `migrate` can be repeated.
-
-A leftover `k-playbook-local/TODO.md` (the Markdown checklist before `todos.json`) is only
-reported in `hint`: it is not taken over, its entries are to be transferred by hand. The
-former translation on first access, `k-playbook todo import` and the response field `migrated`
-are gone.
-
 Ticking off keeps the entry, deleting removes it -- two separate tools, so a model cannot throw
 away history by accident.
 
@@ -751,8 +718,8 @@ document of the project's collection through the node's replica (Kephalaion `rea
 client, access as for the `doc` tools, `~` replaced by `kephalaion.user`); `k-playbook:` the
 kinds `instructions/`, `reviews/`, `guidelines/` and `commands/`, each a single
 file local before shipped, and as include targets `includes/` and `testdata/`; `guidelines/`
-(task 148) and the README templates `docs/<pfad>/README.md` (task 137) only from the shipped
-layer, without a local version. Only
+(task 148), `testdata/` and the README templates `docs/<pfad>/README.md` (task 137) only from
+the shipped layer, without a local version. Only
 `instructions/always/` is assembled. The shipped layer of every kind is read from the public
 collection `<hub>:k-playbook` under `defaults/` through the node's replica (task 131): the hub
 of the project binding, the account Kephalaion chooses for it (`kephalaion node client`),
@@ -764,8 +731,7 @@ the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/command
 `catalogs` in `k_playbook_context` (`overlayDocDir`): for `reviews`, name,
 `origin` and `disabled` of an entry are the same over both ways, which a test checks.
 `guidelines` is not an overlay kind (task 148): it is read only from the shipped
-`<hub>:k-playbook/defaults/guidelines/`, a file under `k-playbook-local/guidelines/` neither
-replaces nor disables anything, and the context output has no field `guidelines` any more
+`<hub>:k-playbook/defaults/guidelines/`, and the context output has no field `guidelines`
 (see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
 
 Include lines (`include: <ref>`, absolute or relative within the same prefix) are replaced by
@@ -847,7 +813,7 @@ from it.
 
 `todos` has tools of its own (`OwnTools`, task 097) and is not reachable through the `doc`
 tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…` reference is
-`invalid_input` there. Contract: "Todo Contract and Migration".
+`invalid_input` there. Contract: "Todo Contract".
 
 `docs` are the documentation orders (task 124): one per session and producer, written after a
 code change, closed by `/k-docs-code` or `/k-docs-tools` after a successful `publish` with
@@ -857,10 +823,8 @@ code change, closed by `/k-docs-code` or `/k-docs-tools` after a successful `pub
 `<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
 Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
 user area is rejected. Directories come into being in Kephalaion with their first document.
-`tasks` starts at 001 like the other kinds (task 105): the task files from disk move into the
-collection under the same name and number, and only the file name has to be unique, not the
-number -- the earlier start at 100, meant to keep clear of the files on disk, had nothing left
-to separate.
+`tasks` starts at 001 like the other kinds (task 105); only the file name has to be unique,
+not the number.
 
 **Inputs.** All four take `projectDir` (required by contract, like every tool).
 
@@ -1233,7 +1197,7 @@ projectDocs, health, context}`:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"7"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, the directory of the former clone in the project) |
+| `schemaVersion` | the version of the briefing output, `"8"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, the directory of the former clone in the project, `"7"` still had `context.local`, which `"8"` no longer carries) |
 | `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` in its first line (see "Head of the plain text" below) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
@@ -1242,17 +1206,16 @@ projectDocs, health, context}`:
 | `work.user` | the own Kephalaion user whose work is listed |
 | `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` and `problem` (unreadable frontmatter or a title that looks cut off at ` #`, as in `k_playbook_doc_list`; absent otherwise -- the plain text appends it to the line after ` — `) -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
 | `work.openFindings` | the number of documents in `queue/findings/` |
-| `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to `k-playbook-local/docs/` |
+| `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to the disk |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
 | `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
-| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `local`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`). An object that is left empty this way is dropped as well, so `catalogs` does not appear in the section at all since the catalog `checks` was removed (task 155). The context output has no field `guidelines` any more (task 148); guidelines stand only under `documents.guidelines` |
+| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`). An object that is left empty this way is dropped as well, so `catalogs` does not appear in the section at all since the catalog `checks` was removed (task 155). The context output has no field `guidelines` any more (task 148); guidelines stand only under `documents.guidelines` |
 | `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as
 `catalogs` in `k_playbook_context` and `k_playbook_doc_read` (`overlayDocDir`): local before
 shipped, an empty local file disables. `guidelines` is the exception (task 148): the kind has
-no local layer, its entries come only from the shipped `<hub>:k-playbook/defaults/guidelines/`,
-and nothing reads `k-playbook-local/guidelines/`.
+no local layer, its entries come only from the shipped `<hub>:k-playbook/defaults/guidelines/`.
 
 Deliberately not in the briefing's own sections: contents (except `documents.always.content`,
 see above), commands, skills, scripts,
@@ -1302,11 +1265,9 @@ is always present, `[]` without a problem. The sources in this version:
 | `kephalaion` | the block `kephalaion:` is in `.k-playbook/K-PLAYBOOK.yaml`, but the state of `kephalaion.Check` is not `ok` (invalid entry, `kephalaion` missing or too old, client information failed, node address not loopback, no account chosen, token missing, node unreachable, login invalid, hub unknown or never synced, collection unreadable …) | `error` | the remedy the state's message names (the part after „Abhilfe:“), otherwise per state: fix the entry, `kephalaion upgrade`, `kephalaion node account default <hub> <account>`, `kephalaion node account setup <hub> <account>`, check the node (`kephalaion status`), sync the hub, or choose a readable collection in the GUI; without any `kephalaion` binary the installation |
 | `kephalaion` | not configured | `error` (a `warning` until task 131) | enter the block `kephalaion:` (hub, collection) in `.k-playbook/K-PLAYBOOK.yaml` and commit it, or set up the binding in the GUI; without it there are no shipped texts (`k-playbook:`, the briefing) and `keph:` references, workbench and `work` are out of reach |
 | `kephalaion` | the block `kephalaion:` in `.k-playbook/K-PLAYBOOK.yaml` carries an `account:` | `warning` | remove the line and commit; the account of this machine is set with `kephalaion node account default <hub> <account>` |
-| `kephalaion` | the old `k-playbook-local/K-PLAYBOOK.local.yaml` still holds a block `kephalaion:` (or is unreadable) | `warning` | run `/k-upgrade`: `k-playbook upgrade` moves hub and collection into the block, then `/k-upgrade` deletes the old file after confirmation |
 | `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
 | `versionSources` | the source configuration `keph:/k-playbook/inventory.md` is present, but unreadable, of an unknown schema version, or carries `roots` (`versionSources.state` `invalid`) | `error` | fix the frontmatter or remove the document; the details are in `context.versionSources.error` |
 | `versionSources` | the Kephalaion binding is ready, but the document cannot be read (`versionSources.state` `unavailable`); with a binding that is not ready this area stays silent, area `kephalaion` carries the error | `error` | check Kephalaion on this machine (`kephalaion status`, `kephalaion` in `k-playbook context`) |
-| `versionSources` | the old `k-playbook-local/version-sources.yaml` still exists; it is no longer read (task 144) | `warning` | run `/k-upgrade`: conversion 3.6 moves `exclude`, `sources`, and `helm_values` into `keph:/k-playbook/inventory.md` and deletes the old file after asking |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |
 | `github` | the file reads, but a service has no `available` access -- every access is `unavailable` or `disabled`, judged without the network (`github-access.md`, "Availability"): `services.<name>: kein verfügbarer Zugang — <reason of the first access that is not disabled>` | `warning` | set up an access of that service in the file; `k-playbook github check` names the reason per access |
 | `share` | `K_PLAYBOOK_SHARE_DIR` is set but not an absolute path | `warning` | set it to an absolute path or remove it; until then the shipped commands and skills are missing |

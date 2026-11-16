@@ -12,8 +12,7 @@ findet sie hier.
 
 Die Dateien hier werden ausgeliefert und gelten in jedem Projekt. Was nur ein Projekt
 betrifft, steht als Guideline in der Projekt-Collection unter `keph:/docs/guidelines/`.
-Das frühere `k-playbook-local/guidelines/` entfällt; `/k-upgrade` löscht es. Wie
-mitgelieferte und projekteigene Guidelines zusammenspielen, ist noch offen (Todo #40).
+Wie mitgelieferte und projekteigene Guidelines zusammenspielen, ist noch offen (Todo #40).
 
 ## Dateien
 

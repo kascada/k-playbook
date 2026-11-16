@@ -12,7 +12,7 @@ Decided 2026-10-14 (task 087). The version for sessions is
 | Prefix | Meaning | Example |
 |---|---|---|
 | `project:` | a file in the project, path from the project root | `project:/scripts/123.sh` |
-| `k-playbook:` | resolved by k-playbook, local before shipped (`guidelines/` and `docs/` shipped only) | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/guidelines/betrieb.md` |
+| `k-playbook:` | resolved by k-playbook, local before shipped (`guidelines/`, `docs/` and `testdata/` shipped only) | `k-playbook:/instructions/on-demand/befunde.md`, `k-playbook:/guidelines/betrieb.md` |
 | `k-playbook:` with a trailing `/` | a directory, assembled into one text -- only directories on a fixed list, today only `instructions/always/` | `k-playbook:/instructions/always/` |
 | `keph:` | the project's collection in Kephalaion | `keph:/docs/manual/abc.md` |
 | `keph:` with a trailing `/` | a directory in the project's collection, listed with Kephalaion `list` (`recursive`, `frontmatter`), its documents read one by one | `keph:/docs/` |
@@ -37,9 +37,10 @@ More examples:
   `instructions/on-demand/` or `instructions/` itself, is read file by file with its name; a
   reference to it ending in `/` lacks the file name and is an error (`invalid_input`).
 - **`k-playbook:` is read only through k-playbook**, never directly from
-  `k-playbook-local/` or `keph:/k-playbook/`, and never from `k-playbook/` -- a clone left
-  over from the former model, which the program no longer reads. k-playbook decides whether a local version replaces or disables the
-  shipped one; whoever looks on disk can pick the wrong version.
+  `keph:/k-playbook/` or `.k-playbook/commands/`, and never from `k-playbook/` -- a clone left
+  over from the former model, which the program no longer reads. k-playbook decides whether a
+  local version replaces or disables the shipped one; whoever looks on their own can pick the
+  wrong version.
 - **A reference k-playbook does not know is an error.** The tool reports it with an error
   code; it does not fall back to reading from disk, and the session reports it instead of
   searching for the file on its own.
@@ -53,15 +54,22 @@ More examples:
 - **The public collection `<hub>:k-playbook` is not a reference target.** Its `defaults/` is
   the shipped layer behind `k-playbook:`; a direct reference would bypass the override by
   local content.
+- **Nothing under `keph:/queue/` is a reference target, findings least of all.** The queue is
+  emptied regularly: findings move into the knowledge store, doc orders are worked off, and a
+  reference to an entry then points nowhere. A text that stays (task, workbench topic, docs,
+  code comment, commit or PR text, progress lines of a run) carries what it needs from a
+  finding in its own words; it may say that a finding was written or an order queued, without
+  the reference. Naming the directory a new entry is written to is not a reference.
+  `instructions/on-demand/verweise-nachziehen.md` says how existing ones are removed.
 
 ## Bringing References up to Date
 
 Older text still carries relative links and bare paths where a reference is meant. How such
 a place is recognized, which prefix a bare path gets, what stays untouched as evidence and
 how it is changed stands once, for sessions, in
-`instructions/on-demand/verweise-nachziehen.md` (task 108); `/k-task-refine`, `/k-upgrade`
-3.3 and every session follow it. It also says which part is recognizable in the text alone and
-which part needs a judgment.
+`instructions/on-demand/verweise-nachziehen.md` (task 108); `/k-task-refine` and every
+session follow it. It also says which part is recognizable in the text alone and which part
+needs a judgment.
 
 ## Placeholder `~` for the Own User
 
@@ -92,8 +100,9 @@ real name.
 
 ## Why These Names
 
-- `project:` and not `local:`, because "local" already names the layer `k-playbook-local/`.
-  A `local:` reference would read as "from `k-playbook-local/`", which it is not.
+- `project:` and not `local:`, because "local" already names the project-owned layer behind
+  `k-playbook:` (origin `local`). A `local:` reference would read as "from that layer", which
+  it is not.
 - `keph:` carries no address because the address is not a property of the content: the same
   project reaches its collection on different machines through different hub aliases.
 - The scheme belongs to k-playbook. Kephalaion's own addressing (`collection` + `name`)
@@ -152,18 +161,20 @@ An unknown reference -- a file, or an assembled directory that neither layer has
 Two kinds exist only as targets: **`includes/`** holds text blocks for include lines
 (`defaults/includes/`, overridable by `keph:/k-playbook/includes/` in the project collection
 since task 143, an empty local document disables), and **`testdata/`** holds fixed test cases that come out the same on every
-installation (`defaults/testdata/`). Both are resolved like `instructions/`, but appear in no
-catalog, no briefing and no help text: nobody reads them for their own sake.
+installation (`defaults/testdata/`); it exists shipped only and has no local version
+(`docDistOnlyKinds` in `docref.go`). `includes/` is resolved like `instructions/`. Both appear
+in no catalog, no briefing and no help text: nobody reads them for their own sake.
 
 A third kind outside the catalogs is **`docs/`** (task 137): `k-playbook:/docs/<path>/README.md`
 is the template for `keph:/docs/<path>/README.md` in the project collection
 (`defaults/docs/<path>/README.md` in the source repo, on the hub under
 `<hub>:k-playbook/defaults/`). It has **no local version**: only the shipped
-layer is read (`docDistOnlyKinds` in `docref.go`), a file under `k-playbook-local/docs/` does
-not win and an empty one does not disable, because the README is the same in every project
-and comes from one source. The reader kind `guidelines/` is the second kind on that list
-(task 148): `k-playbook:/guidelines/<name>.md` answers from the shipped layer only, and
-`k-playbook-local/guidelines/` is not read. A missing template is `not_found`. The tree under `docs/` is the
+layer is read (`docDistOnlyKinds` in `docref.go`), nothing in the project replaces or
+disables it, because the README is the same in every project and comes from one source. The
+reader kind `guidelines/` is the second kind on that list (task 148):
+`k-playbook:/guidelines/<name>.md` answers from the shipped layer only; project-owned
+guidelines live under `keph:/docs/guidelines/` and are no layer behind `k-playbook:`.
+`testdata/` is the third. A missing template is `not_found`. The tree under `docs/` is the
 list of templates -- there is no second list in the code; `docs/README.md` at the top has no
 template, it belongs to Kephalaion. `k-playbook docs readme` (MCP `k_playbook_docs_readme`)
 writes the READMEs from these templates ([mcp.md](mcp.md#generated-docs-checkout-and-publish)).
@@ -254,7 +265,7 @@ Two layers, compared by name:
 | Layer | Directory | Origin |
 |---|---|---|
 | shipped | the public collection `<hub>:k-playbook` under `defaults/` — what the hub fetched from the latest release; every kind is read there, with the same path below `defaults/` | `dist` |
-| local | `instructions/`, `includes/` and `reviews/` from the project collection under `k-playbook/` (`keph:/k-playbook/<kind>/`) since task 143; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; `testdata/` still from `k-playbook-local/`; never for `docs/`, the README templates (task 137), and never for `guidelines/` (task 148: `k-playbook-local/guidelines/` is no longer read) | `local`, or `override` when it replaces a shipped file of the same name |
+| local | `instructions/`, `includes/` and `reviews/` from the project collection under `k-playbook/` (`keph:/k-playbook/<kind>/`) since task 143; `commands/` (with its modules such as `_shared/`) from `.k-playbook/commands/` since task 129; these are the only places of the local layer — `docs/`, the README templates (task 137), `guidelines/` (task 148) and `testdata/` exist shipped only | `local`, or `override` when it replaces a shipped file of the same name |
 
 The shipped layer is read from Kephalaion since task 131 (`NewKephDefaultsSource` in
 `defaultsdocs.go`): the hub is the one of the project binding, the collection is always
@@ -277,8 +288,9 @@ text here — so it carries the text itself and must not point at the same refer
 would resolve to that file. First command on this route: `/k-upgrade` (task 092).
 
 The resolution goes through an exchangeable source — a directory listing and a file read per
-layer. The shipped layer is Kephalaion, the local layer partly Kephalaion and partly the disk;
-the caller does not notice the difference.
+layer. The shipped layer is Kephalaion, the local layer partly Kephalaion (the project
+collection) and partly the disk (`.k-playbook/commands/`); the caller does not notice the
+difference.
 
 The local layer of `instructions/`, `includes/` and `reviews/` lies in the project collection
 under `k-playbook/` since task 143 (`NewKephProjectLayerSource` in `projectlayer.go`), with the
@@ -288,8 +300,7 @@ recursive listing, read ahead per directory, only existing files read — with o
 an empty `k-playbook/` is an empty layer, not an error, and there is no `VERSION` check and no
 `fetch_release` remedy. Any error of the project collection (no binding, not listable, not
 readable) is `kephalaion_unavailable`, also when `<hub>:k-playbook` is readable; the shipped
-layer is never served alone. `k-playbook-local/instructions/`, `includes/` and `reviews/` are
-no longer read (hard switch); `/k-upgrade` 3.4 removes them.
+layer is never served alone.
 
 **`location`.** A part of the local layer that lies in the collection carries its place as a
 `keph:` reference next to the origin: `parts[].location` and `includes[].location` in the answer of

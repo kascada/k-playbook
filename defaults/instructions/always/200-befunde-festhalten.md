@@ -8,7 +8,8 @@ gilt, steht in `k-playbook:/instructions/on-demand/befunde.md`; lies es vor dem 
 einer Sitzung.
 
 Ein Befund wartet darauf, in die Wissensablage übernommen zu werden, und verschwindet danach.
-Verweise deshalb nicht auf ihn. Der Stand eines laufenden Vorhabens, also Plan, offene Punkte
+Verweise deshalb nicht auf ihn, auch nicht in Fortschrittszeilen oder Zusammenfassungen
+(Abschnitt „Verweise“). Der Stand eines laufenden Vorhabens, also Plan, offene Punkte
 und Fortschritt, ist kein Befund; er gehört in die Workbench (Abschnitt „Die Workbench“).
 
 Halte knapp fest, sobald etwas belegt ist. Ausführlicher wird es, sobald ein Problem erkannt

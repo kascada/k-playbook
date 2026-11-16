@@ -22,7 +22,7 @@ Kephalaion-Revisionen seines Dokuments, nicht in Git.
   `user/*/tasks/` samt `done/` plus eins, dreistellig; die erste ist `001`. Diese Regel steht
   nur hier. Niemand zählt selbst, und niemand gibt eine Nummer vor.
 - **Eindeutig ist nur der Dateiname** `<NNN>-<kurzname>.md`, nicht die Nummer. Zwei Tasks mit
-  derselben Nummer und verschiedenen Namen sind zulässig, etwa nach dem Umzug von der Platte.
+  derselben Nummer und verschiedenen Namen sind zulässig.
   Eine Nummer als Argument eines Commands wird deshalb so aufgelöst: zuerst unter den eigenen
   offenen Tasks (`k_playbook_doc_list`, Sorte `tasks`), dann unter den eigenen erledigten
   (`done: true`). Passt mehr als ein Dokument, zeige alle Treffer und lass den Nutzer wählen.
@@ -37,8 +37,7 @@ gestützt Code ändert, prüft den Verweis, bevor er etwas schreibt oder Code ä
 - **Fremd.** Er nimmt nur Verweise, deren User-Pfadteil `~` oder `kephalaion.user` ist. Einen
   anderen weist er vorher ab; die Meldung nennt `foreign_user`, den Fehler, den die
   Dokument-Operationen dafür ohnehin melden würden. Ausgenommen sind reines Lesen und Suchen,
-  etwa der Abgleich in `/k-remediation` mit `user: "*"`, und das Anlegen beim Umzug in
-  `/k-upgrade` 3.3.
+  etwa der Abgleich in `/k-remediation` mit `user: "*"`.
 - **Erledigt.** Ein Verweis unter `done/` führt zur selben Rückfrage wie eine Nummer, die nur
   unter den eigenen erledigten Tasks trifft. Welche Rückfrage das ist, sagt der Command:
   `/k-task-run` bietet an, den Task wieder zu öffnen; `/k-task-refine` fragt, ob er trotzdem
@@ -174,7 +173,7 @@ Dokuments, der letzte Pfadteil des Verweises, etwa `014-setup-tts.md`; `<datum>`
 |---|---|---|
 | `## Review-Log (<datum>)` | `/k-task-refine` | der Task wurde gegengelesen |
 | `<!-- k-task-run: snapshot <datei> <kennung> -->` | `/k-task-run`, Hauptkontext | Snapshot des Arbeitsbaums vor dem Task; `<kennung>` ist ein Git-Tree in der Ausführungswurzel |
-| `<!-- k-task-run: etappe <n> erledigt <datum> --> <beleg>` | Ausführungs-Sub-Agent von `/k-task-run`; `/k-upgrade` 3.3 beim Umzug aus einer alten Tabelle `## Fortschritt` | Etappe `<n>` ist erledigt (Fortschrittszeile, unten) |
+| `<!-- k-task-run: etappe <n> erledigt <datum> --> <beleg>` | Ausführungs-Sub-Agent von `/k-task-run` | Etappe `<n>` ist erledigt (Fortschrittszeile, unten) |
 | `<!-- k-task-run: fortschritt zurückgesetzt <datum> -->` | `/k-task-run`, Hauptkontext | alle Etappen gelten wieder als offen (Fortschrittszeile, unten) |
 | `<!-- k-task-run: ausgeführt <datei> -->` | `/k-task-run`, Hauptkontext, mit dem Kopf von `## Ausführung` | ausgeführt; solange das Dokument nicht in `done/` liegt, nicht abgeschlossen. Zählt nur nach der letzten Kennzeile „wieder geöffnet“ |
 | `<!-- k-task-run: abgebrochen <datei> -->` | `/k-task-run`, Hauptkontext, mit dem Kopf von `## Ausführung` eines abgebrochenen Laufs | der Lauf wurde abgebrochen; der Task bleibt offen |
@@ -230,10 +229,8 @@ keine Zeile, die später geändert wird.
   Etappe ohne solche Zeile ist offen. Eine offene Etappe gilt als nicht ausgeführt, auch wenn
   Teile davon im Code sichtbar sind — der Sub-Agent prüft zu Beginn der Etappe selbst, was
   schon da ist.
-- **Alte Tabelle `## Fortschritt`.** Eine solche Tabelle aus der Zeit auf der Platte liest
-  allein `/k-upgrade` 3.3: Beim Umzug übersetzt es ihre erledigten Zeilen in
-  Fortschrittszeilen, die Tabelle bleibt als Beleg stehen. `/k-task-run` wertet sie nicht
-  aus. Ohne Fortschrittszeilen gelten ihre Etappen als offen.
+- **Alte Tabelle `## Fortschritt`.** `/k-task-run` wertet eine solche Tabelle nicht aus.
+  Ohne Fortschrittszeilen gelten ihre Etappen als offen.
 
 ### Lesen und schreiben
 

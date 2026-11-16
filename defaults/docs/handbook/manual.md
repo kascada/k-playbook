@@ -14,7 +14,7 @@ The goal is controlled, traceable, and repeatable assistant work:
 - Keep shipped and project-owned content clearly separate.
 - Update commands, skills and review recipes with the program: `k-playbook upgrade`
   brings the binary and what it unpacks, the hub brings the shipped texts.
-- Store tasks, reviews, and results in fixed locations.
+- Store tasks, findings, and documentation in fixed locations.
 - Make review, task, and remediation flows auditable.
 - Establish docs as the first source for later AI sessions.
 
@@ -25,19 +25,18 @@ lies in the project:
 
 ```text
 project/
-├── .k-playbook/
-│   ├── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
-│   ├── commands/         project-owned commands (only when used)
-│   └── skills/           project-owned skills (only when used)
-└── k-playbook-local/     being phased out: never created any more
+└── .k-playbook/
+    ├── K-PLAYBOOK.yaml   the anchor; the directory holding .k-playbook/ is the project root
+    ├── commands/         project-owned commands (only when used)
+    └── skills/           project-owned skills (only when used)
 ```
 
 | Part | Owner | What happens on update |
 |---|---|---|
-| `.k-playbook/K-PLAYBOOK.yaml` | the project | remains untouched |
+| `.k-playbook/K-PLAYBOOK.yaml`, `.k-playbook/commands/`, `.k-playbook/skills/` | the project | remains untouched |
+| the project collection in Kephalaion: `keph:/k-playbook/`, `keph:/docs/`, `keph:/user/<user>/tasks/`, `todos/` | the project | remains untouched |
 | the binary `~/.local/bin/k-playbook` and what it unpacks into `~/.local/share/k-playbook/` (commands, skills, scripts) | k-playbook | replaced by `k-playbook upgrade` or the update button |
 | the shipped texts in `<hub>:k-playbook/defaults/` | k-playbook | the hub fetches the new release |
-| `k-playbook-local/` | the project | being phased out: k-playbook no longer creates it and no longer reads `guidelines/` there (task 148); `/k-upgrade` clears leftovers and deletes the directory itself once only a `.gitignore`, a `README.md` and empty subdirectories remain (3.7, task 150); more on leftovers in [`k-playbook-format.md`](./k-playbook-format.md) |
 
 Because the installation is the binary alone, nothing shipped lies in the
 project, and an update cannot touch anything the project owns. In the former
@@ -65,12 +64,13 @@ flowchart LR
 
 ### Paths are derived, not stored in config
 
-There is no longer a `paths:` block. Every location derives from the location
-of `K-PLAYBOOK.yaml`: project-owned commands and skills are under `.k-playbook/`,
-and project knowledge under `keph:/docs/` in the project collection. Review results have no place at present; review runs are paused
-(task 147). Tasks are documents in the project collection as well,
-`keph:/user/<user>/tasks/`, not files on disk. A command therefore neither guesses
-nor reads a path: it derives it, or it takes the reference.
+There is no longer a `paths:` block. Every location is fixed: project-owned
+commands and skills are under `.k-playbook/`, next to `K-PLAYBOOK.yaml`, and
+project knowledge is under `keph:/docs/` in the project collection. Tasks are
+documents in the project collection as well, `keph:/user/<user>/tasks/`, not
+files on disk. The location of review results is not decided yet; reviews are
+paused until then (task 147). A command therefore neither guesses nor reads a
+path: it derives it, or it takes the reference.
 
 The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
@@ -79,8 +79,7 @@ The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 Three directories exist twice: `reviews/`, `commands/`, and `skills/`. What
 applies is the union of both sides. **For the same name, the project-owned entry
 wins, completely**: the shipped entry is not read at all. Checks no longer exist
-(task 155), neither shipped nor project-owned; `/k-upgrade` removes a leftover
-`k-playbook-local/checks/`.
+(task 155), neither shipped nor project-owned.
 
 Content is disabled with an **empty** local entry: nothing except blank lines
 and comments. This lets the file record its own reason, without requiring a
@@ -174,7 +173,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 |---|---|---|
 | Project | `/k-gui` | Start the interface, check and set up project state |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
-| Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings |
+| Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings (temporarily unavailable while reviews are paused) |
 | Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
 | Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check docs follow-up (`/k-enforcement` temporarily unavailable), diagnose tests, read histories, mark VS Code |
 
@@ -219,7 +218,9 @@ Details are in [`task-flow.md`](./task-flow.md).
 
 ### Code review flow
 
-Report reviews produce auditable artifacts and lead to remediation when needed:
+Reviews are paused until the location of their results is decided; `/k-review`,
+`/k-audit` and `/k-remediation` are temporarily unavailable. The flow itself:
+report reviews produce auditable artifacts and lead to remediation when needed:
 
 ```text
 /k-review <name>
@@ -254,8 +255,7 @@ Kephalaion `list` on `docs/` (`recursive`, `frontmatter`) until Kephalaion gener
 `docs/index.md`. Hand-written documentation lives under `keph:/docs/manual/`; a session
 changes a page in place with `k_playbook_doc_replace` and `k_playbook_doc_append` (with
 `since_revision`), not by rewriting it with Kephalaion `write`. There is
-no fallback to `k-playbook-local/docs/`; `/k-upgrade` (3.2) moves what lies there per
-origin into the collection or clears it, after confirmation.
+no fallback to the disk.
 
 `/k-docs-code` and the skill `ks-overlay-repo-analyse` share
 `keph:/docs/generated/code/` (task 109): `k-playbook docs checkout code` fetches the
@@ -271,13 +271,6 @@ content: `/k-docs-code` reads code, `/k-docs-tools` reads libraries, and
 `/k-doc-inventory` reads declared versions from manifests, lockfiles, container,
 Helm, and CI files. Skip a stage if it has no input. Raw material has no inbox of its
 own (task 123); full-text search over `keph:/docs/` is Kephalaion's.
-
-A `docs/README.md` on disk is the old index from before the move to the collection: the
-binary no longer writes `references.docs` into `opencode.json`, and `/k-upgrade` (3.2)
-proposes to remove the index and the references to it in `AGENTS.md` and
-`opencode.json[c]` once their entries are moved. The former knowledge directories under
-`k-playbook-local/` are gone as well (task 123); `/k-upgrade` (3.0) clears what is left of
-them in an existing project.
 
 Each subdirectory of `docs/` represents an origin; a file's frontmatter records
 which tool wrote it under `generated.by`. No command writes doc files in

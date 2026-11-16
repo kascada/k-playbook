@@ -1,7 +1,7 @@
 # Betrieb: Wo abgelegte Dateien landen
 
 Diese Guideline legt fest, wohin eine Datei gehört, die im Lauf der Arbeit entsteht —
-eine Task, ein Review-Ergebnis, eine Doku-Seite, eine Notiz, Rohmaterial. Sie ist die
+eine Task, ein Befund, eine Doku-Seite, eine Notiz. Sie ist die
 eine Auskunft dazu. Ein Command, ein Skill oder eine Regel, die eine Datei ablegt,
 verweist hierher, statt den Ort ein zweites Mal zu begründen.
 
@@ -11,73 +11,58 @@ verweist hierher, statt den Ort ein zweites Mal zu begründen.
 Texte kommen über `k-playbook:`-Verweise, Commands, Skills und Skripte liegen unter
 `~/.local/share/k-playbook/` und gehören dem Programm. Was dort abgelegt oder geändert
 wird, ist nach der nächsten Aktualisierung weg — ohne Fehlermeldung, ohne Spur. Alles, was
-das Projekt hervorbringt, liegt im Projekt selbst, in `k-playbook-local/` oder in seiner
-Collection. Liegt im Projekt noch ein Verzeichnis `k-playbook/`, ist das ein
-liegengebliebener Clone aus dem früheren Modell: Auch dorthin wird nie geschrieben, und
-`/k-upgrade` löscht ihn.
+das Projekt hervorbringt, liegt im Projekt selbst oder in seiner Collection. Liegt im
+Projekt noch ein Verzeichnis `k-playbook/`, ist das ein liegengebliebener Clone aus dem
+früheren Modell: Auch dorthin wird nie geschrieben, und `/k-upgrade` löscht ihn.
 
-**Pfade werden nicht geraten.** Der Ort wird aus der Ausgabe von `k-playbook context`
-abgeleitet — im Briefing dieselben Felder unter `context` —: `project.dir` für das
-Hauptverzeichnis, `local.dir` für alles Projekteigene. Jeder Ort unten leitet sich aus
-`local.dir` ab, nie aus einer Konfiguration und nie durch Suchen. Ein fest verdrahteter
-Pfad geht in dem Moment kaputt, in dem ein Projekt anders heißt oder tiefer liegt. Für
-Text, den ein Mensch liest, bleibt die kurze Schreibweise `k-playbook-local/...` richtig;
-zum Schreiben wird der aufgelöste Pfad benutzt.
-
-**Ein fehlendes Verzeichnis wird nie still angelegt.** Fehlt ein Ort aus der Tabelle
-unten, wird gefragt, ob genau dieses Verzeichnis angelegt oder `/k-gui` gestartet werden
-soll, das die projektlokale Struktur wiederherstellt. Nicht hart abbrechen, nicht still
-anlegen, nie einen anderen Pfad nehmen. Das gilt für die Verzeichnisse, die das
-Einrichten anlegt. Ausgenommen sind die Zeilen mit „entsteht beim ersten Lauf von …“:
-Dort ist ein fehlendes Verzeichnis der normale Zustand vor dem ersten Lauf, und der
-erzeugende Command legt es ohne Rückfrage selbst an.
+**Pfade werden nicht geraten.** Jeder Ort, an dem etwas abgelegt wird, ist ein
+`keph:`-Verweis oder liegt unter der Projektwurzel, dort unter `.k-playbook/`. Die
+Projektwurzel ist `project.dir` aus der Ausgabe von `k-playbook context` — im Briefing
+dasselbe Feld unter `context` —, nie ein Wert aus einer Konfiguration und nie das Ergebnis
+einer Suche. Ein fest verdrahteter Pfad geht in dem Moment kaputt, in dem ein Projekt
+anders heißt oder tiefer liegt. Für Text, den ein Mensch liest, bleibt die kurze
+Schreibweise `.k-playbook/...` richtig; zum Schreiben wird der aufgelöste Pfad benutzt.
 
 ## Was wohin
 
-Alle Pfade relativ zu `local.dir`, also `k-playbook-local/`.
-
 | Was | Wohin | Wer legt es ab |
 |---|---|---|
-| Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task, nicht unter `local.dir` | `/k-task-create`, `/k-remediation` über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
-| Task, erledigt | `keph:/user/~/tasks/done/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
-| Kurznotiz, unsortiert | `todos/` in der Projekt-Collection, nicht unter `local.dir` | `/k-todo`, `k-playbook todo`, die Oberfläche |
-| Review- und Audit-Lauf | `results/<YYYY-MM-DD>/` bzw. `results/<familie>/<YYYY-MM-DD>/` | `/k-review`, `/k-audit` |
-| Lauf-Protokoll | `results/log.md` | `/k-review`, `/k-audit` |
-| Bewusste Entscheidung zu einem Befund | `known-decisions.md` | von Hand |
-| Befund aus Analyse oder Fehlersuche | `keph:/queue/findings/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Befund, nicht unter `local.dir` | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`, Nachträge von `/k-danke`; Form nach `k-playbook:/instructions/on-demand/befunde.md` |
-| Stand eines laufenden Vorhabens | `keph:/user/~/workbench/<NNN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`; Form nach der Anweisung „Die Workbench“ |
-| Ergebnis, das der Nutzer mittelfristig sichern und zeigen will | `keph:/results/<YYYY-MM-DD>-<kurzname>.md` — in der Projekt-Collection, projektweit, nur `.md`, nicht unter `local.dir`; nicht dasselbe wie `results/` unter `local.dir`, das `/k-review` und `/k-audit` noch benutzen | nur auf Wunsch des Nutzers oder wenn ein Command es ausdrücklich vorsieht, nie als Pflicht; über Kephalaion `create`, aufgeräumt vom Nutzer; Form nach `k-playbook:/instructions/on-demand/ergebnisse.md` |
-| Doku aus dem Code | `keph:/docs/generated/code/<NN>-<slug>.md` — in der Projekt-Collection, nicht unter `local.dir`; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/code/`, ohne Kephalaion gibt es keine | `/k-docs-code` und der Skill `ks-overlay-repo-analyse`, nur über `k-playbook docs checkout\|publish code` |
-| Steckbrief zu Library oder Tool | `keph:/docs/generated/libs/<name>.md` — in der Projekt-Collection, nicht unter `local.dir`; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/libs/`, ohne Kephalaion gibt es keine | `/k-docs-tools`, nur über `k-playbook docs checkout\|publish libs` |
-| Versionsinventar | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar | `/k-doc-inventory`, `k-playbook inventory` |
-| Handgeschriebene Doku | `keph:/docs/manual/<slug>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
+| Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task | `/k-task-create`, `/k-remediation` über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
+| Task, erledigt | `keph:/user/~/tasks/done/<NNN>-<slug>.md` — in der Projekt-Collection | `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
+| Kurznotiz, unsortiert | `todos/` in der Projekt-Collection | `/k-todo`, `k-playbook todo`, die Oberfläche |
+| Befund aus Analyse oder Fehlersuche | `keph:/queue/findings/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Befund | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`, Nachträge von `/k-danke`; Form nach `k-playbook:/instructions/on-demand/befunde.md` |
+| Stand eines laufenden Vorhabens | `keph:/user/~/workbench/<NNN>-<slug>.md` — in der Projekt-Collection | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`; Form nach der Anweisung „Die Workbench“ |
+| Ergebnis, das der Nutzer mittelfristig sichern und zeigen will | `keph:/results/<YYYY-MM-DD>-<kurzname>.md` — in der Projekt-Collection, projektweit, nur `.md` | nur auf Wunsch des Nutzers oder wenn ein Command es ausdrücklich vorsieht, nie als Pflicht; über Kephalaion `create`, aufgeräumt vom Nutzer; Form nach `k-playbook:/instructions/on-demand/ergebnisse.md` |
+| Doku aus dem Code | `keph:/docs/generated/code/<NN>-<slug>.md` — in der Projekt-Collection; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/code/`, ohne Kephalaion gibt es keine | `/k-docs-code` und der Skill `ks-overlay-repo-analyse`, nur über `k-playbook docs checkout\|publish code` |
+| Steckbrief zu Library oder Tool | `keph:/docs/generated/libs/<name>.md` — in der Projekt-Collection; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/libs/`, ohne Kephalaion gibt es keine | `/k-docs-tools`, nur über `k-playbook docs checkout\|publish libs` |
+| Versionsinventar | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar | `/k-doc-inventory`, `k-playbook inventory` |
+| Handgeschriebene Doku | `keph:/docs/manual/<slug>.md` — in der Projekt-Collection | von Hand, über Kephalaion `create` bzw. `write` |
 | Doku-Index | `keph:/docs/README.md` und `index.md` je Verzeichnis — erzeugt Kephalaion | kein Command |
-| Notiz, Zwischenstand, Privates | `priv/` | von Hand |
-| Quellen des Versionsinventars | `keph:/k-playbook/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; Einstellungen im Frontmatter, nur Pfade unterhalb der Projektwurzel | `/k-doc-inventory` nur nach ausdrücklicher Bestätigung und nur ergänzend, `/k-upgrade` beim Umzug aus der alten `version-sources.yaml`, sonst von Hand |
-| Anbindung an die Kephalaion-Collection | Block `kephalaion:` mit `hub` und `collection` in `.k-playbook/K-PLAYBOOK.yaml` unter `project.dir`, nicht unter `local.dir` — versioniert und für alle Nutzer des Projekts gleich; den Account wählt Kephalaion je Rechner (`kephalaion node client`), eine `K-PLAYBOOK.local.yaml` gibt es nicht mehr | der Einrichtungsschritt der Oberfläche nach bestandenem Test, `k-playbook upgrade` beim Umzug aus der alten Datei, sonst von Hand; danach committen |
-| Projekteigenes Rezept | `reviews/` | von Hand |
-| Projekteigener Command | `.k-playbook/commands/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command | von Hand |
-| Projekteigener Skill | `.k-playbook/skills/` unter `project.dir`, nicht unter `local.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |
-| Projekteigene Vorgabe | `keph:/docs/guidelines/<thema>.md` — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
-| Projekteigene Anweisung | `keph:/k-playbook/instructions/always/<nummer>-<thema>.md` (gilt in jeder Sitzung) oder `keph:/k-playbook/instructions/on-demand/<thema>.md` (auf Abruf) — in der Projekt-Collection, nicht unter `local.dir` | von Hand, über Kephalaion `create` bzw. `write` |
-| Skripte, Werkzeugmatrizen | `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — die eine Ausnahme von `local.dir`: nur lesen und aufrufen, nie schreiben | k-playbook |
+| Quellen des Versionsinventars | `keph:/k-playbook/inventory.md` — in der Projekt-Collection; Einstellungen im Frontmatter, nur Pfade unterhalb der Projektwurzel | `/k-doc-inventory` nur nach ausdrücklicher Bestätigung und nur ergänzend, sonst von Hand |
+| Anbindung an die Kephalaion-Collection | Block `kephalaion:` mit `hub` und `collection` in `.k-playbook/K-PLAYBOOK.yaml` unter `project.dir` — versioniert und für alle Nutzer des Projekts gleich; den Account wählt Kephalaion je Rechner (`kephalaion node client`) | der Einrichtungsschritt der Oberfläche nach bestandenem Test, sonst von Hand; danach committen |
+| Projekteigenes Rezept | `keph:/k-playbook/reviews/review-<name>.md` — in der Projekt-Collection | von Hand, über Kephalaion `create` bzw. `write` |
+| Projekteigener Command | `.k-playbook/commands/` unter `project.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command | von Hand |
+| Projekteigener Skill | `.k-playbook/skills/` unter `project.dir` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill | von Hand |
+| Projekteigene Vorgabe | `keph:/docs/guidelines/<thema>.md` — in der Projekt-Collection | von Hand, über Kephalaion `create` bzw. `write` |
+| Projekteigene Anweisung | `keph:/k-playbook/instructions/always/<nummer>-<thema>.md` (gilt in jeder Sitzung) oder `keph:/k-playbook/instructions/on-demand/<thema>.md` (auf Abruf) — in der Projekt-Collection | von Hand, über Kephalaion `create` bzw. `write` |
+| Skripte, Werkzeugmatrizen | `~/.local/share/k-playbook/scripts/`, `~/.local/share/k-playbook/scripts/security-tools.tsv` — kein Ablageort, sie gehören dem Programm: nur lesen und aufrufen, nie schreiben | k-playbook |
 
 **Todos gehen ausschließlich über `/k-todo`, nie von Hand.** Ihre Ablage, die
 Dokumente unter `todos/` in der Projekt-Collection, gehört dem Werkzeug: gelesen und
 geschrieben wird sie über den Command, über das Subkommando `k-playbook todo` oder über
 die Oberfläche. Wer sie selbst öffnet, führt eine zweite Auslegung des Formats ein, die
-in keine Prüfung eingeht. Ein `data/todos.json` von früher übernimmt
-`k-playbook todo migrate`; eine ältere `TODO.md` wird nur noch gemeldet.
+in keine Prüfung eingeht.
+
+Für Review-Ergebnisse nennt die Tabelle keinen Ort: Er ist noch nicht entschieden; bis
+dahin pausieren die Reviews.
 
 Die Projektdoku ist nach Herkunft geteilt, nicht nach Thema. Das Unterverzeichnis von
 `keph:/docs/` sagt, wer die Datei erzeugt hat und was sie veralten lässt:
 `generated/code/` folgt dem Code, `generated/libs/` den Libraries, `generated/versions/`
 den deklarierten Versionen, `manual/` folgt niemandem außer der Hand, die sie schreibt —
 auch `manual/handbook/`, das Handbuch des Projekts, das die Oberfläche unter einem eigenen
-Menüpunkt zeigt. Alle liegen in der Collection. Ein `versions/`, `manual/` oder
-`extracted/` unter `docs/` auf der Platte ist ein Stand von damals; `/k-upgrade` (3.2) bringt ihn nach
-Kephalaion oder räumt ihn ab. Wer eine Datei in die falsche Herkunft legt, hängt sie an
-den falschen Nachzug.
+Menüpunkt zeigt. Alle liegen in der Collection. Wer eine Datei in die falsche Herkunft
+legt, hängt sie an den falschen Nachzug.
 
 ## Namen
 
@@ -96,9 +81,8 @@ den falschen Nachzug.
 
 - **Ein Plan als Datei.** Eine Umsetzung, die über einen trivialen Einzelschritt
   hinausgeht, wird eine Task — nicht `plan.md`, nicht `konzept.md` neben dem Code.
-- **Ein projekteigener Check in `checks/`.** Das Verzeichnis gibt es nicht mehr (Task 134),
-  und Checks gibt es überhaupt nicht mehr (Task 155): Ein Skript dort läuft nie.
-  `/k-upgrade` räumt es ab.
+- **Ein projekteigener Check.** k-playbook führt keine Checks aus (Task 155): Ein Skript,
+  das als Check abgelegt wird, läuft nie.
 - **Eine zweite Doku-Wurzel.** Projektwissen für AI-Sessions hat genau einen Einstieg:
   `keph:/docs/`, das Briefing nennt ihn unter `Projektdoku`. Eine weitere Sammlung
   daneben — auch ein Index auf der Platte — wird nicht gefunden und veraltet unbemerkt.
@@ -106,21 +90,8 @@ den falschen Nachzug.
   `keph:/docs/generated/versions/inventory.md` werden von ihrem Erzeuger neu geschrieben;
   eine Korrektur von Hand ist beim nächsten Lauf weg.
 
-## Was nicht ins Repository gehört
-
-`results/` ist vollständig lokal: ein Review ist aus dem Code wiederholbar, sein
-Ergebnis ist ein Stand von einer Maschine zu einem Zeitpunkt. Rohausgaben von
-Secret-Scannern enthalten gefundene Geheimnisse im Klartext und dürfen nie eingecheckt
-werden.
-
-`cache/` ist ebenfalls lokal, aus einem anderen Grund: was dort liegt, ist aus dem
-Projekt abgeleitet und jederzeit neu baubar. Ableitbares im Repository veraltet
-unbemerkt. Wer etwas Unwiederbringliches ablegen will, braucht ein anderes Verzeichnis —
-`cache/` darf ohne Rückfrage gelöscht werden.
-
-Bei `priv/` und `material/` entscheidet das Projekt. Was gerade gilt, zeigt die
-Oberfläche im Block **Lokale Einstellungen** — gemessen mit `git check-ignore`, nicht
-geraten.
+Rohausgaben von Secret-Scannern enthalten gefundene Geheimnisse im Klartext und werden
+nie eingecheckt.
 
 ## Einen Ablageort ergänzen
 
@@ -129,5 +100,5 @@ benutzt. Ein Ort, den nur ein Command-Text kennt, ist für jeden anderen unsicht
 der zweite Command legt dann etwas Ähnliches woanders ab, und ab da gibt es zwei
 Wahrheiten.
 
-Eine projekteigene Fassung unter `k-playbook-local/guidelines/` gibt es nicht mehr;
-projekteigene Guidelines liegen unter `keph:/docs/guidelines/`.
+Diese Guideline gibt es nur mitgeliefert. Projekteigene Vorgaben liegen unter
+`keph:/docs/guidelines/`.

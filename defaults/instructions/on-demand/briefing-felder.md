@@ -34,7 +34,6 @@ Contract“ — dieses Blatt hält mit ihm Schritt, ein Test prüft die Vollstä
 | `context.project.repoRoot`, `context.project.vcs` | Das Code-Repository für Git-Operationen, und ob es unter Versionskontrolle steht. |
 | `context.project.config` | Der Pfad der Konfiguration `K-PLAYBOOK.yaml`. Nur zur Auskunft; gelesen wird sie nie selbst. |
 | `context.project.languages` | Die Sprachen, für die das Projekt Werkzeuge braucht. Immer gefüllt — ein fehlender Eintrag fällt auf den Standard zurück, es gibt nichts zu deuten. |
-| `context.local.dir` | Alles, was das Projekt besitzt. |
 | `context.remediation` | Wie Befunde abgearbeitet werden: `mode`, `target`, `grouping`, `quickWins`, `branchPrefix`, `prRequired`, `directFixes`, `configured`. |
 | `context.docs` | Was die Docs-Erzeuger beim Code-Scan zusätzlich zu ihren festen Ausschlüssen auslassen, aus dem Block `docs` in `K-PLAYBOOK.yaml`: `exclude` (Muster wie in `.gitignore`, relativ zu `project.repoRoot`; leer ohne Block) und `problems` (verworfene Einträge, je `pattern` und `reason`). Von hier lesen — nie die Datei selbst; eingetragen wird über `k_playbook_docs_exclude_add`. |
 | `context.gh` | Der Befund zur GitHub CLI auf diesem Rechner: installiert, angemeldet, aktives Konto, bereit; Einzelheiten unten. |
@@ -70,9 +69,7 @@ Dokument.
   `error` nennt den Grund. Es gibt keinen Rückfall auf die Platte und keinen auf die
   Standardquellen.
 
-Die alte Datei `<local.dir>/version-sources.yaml` liest kein Programmteil mehr. Liegt sie noch,
-meldet die Umgebungsprüfung sie als Altbestand; `/k-upgrade` zieht ihren Inhalt um. Auf einer
-Installation, die älter ist als das Feld, fehlt es. Der vollständige Vertrag steht in
+Auf einer Installation, die älter ist als das Feld, fehlt es. Der vollständige Vertrag steht in
 `k-playbook:/docs/handbook/version-inventory.md`.
 
 ### `health`
@@ -81,8 +78,7 @@ Installation, die älter ist als das Feld, fehlt es. Der vollständige Vertrag s
 Felder `context.kephalaion`, `context.baseTools` und `context.versionSources`
 stehen weiter unverändert da. Die Einträge heute: Die Anbindung an Kephalaion ist eingetragen,
 aber nicht `ok` — `error`, denn `keph:`-Verweise und `work` sind dann nicht erreichbar; sie
-ist nicht eingetragen — ebenfalls `error`. Steht im Block `kephalaion:` ein `account:` oder
-liegt noch die alte `k-playbook-local/K-PLAYBOOK.local.yaml` mit Block `kephalaion:` —
+ist nicht eingetragen — ebenfalls `error`. Steht im Block `kephalaion:` ein `account:` —
 `warning`. Ohne Anbindung gibt es auch kein Briefing: Es
 scheitert mit `kephalaion_unavailable`, weil die mitgelieferten Texte aus der Collection
 kommen. Je fehlendem Basis-Werkzeug
@@ -90,8 +86,7 @@ kommen. Je fehlendem Basis-Werkzeug
 `keph:/k-playbook/inventory.md` ist da, aber nicht lesbar, von anderer Fassung oder trägt
 `roots` (`state` `invalid`) — `error`; ebenso, wenn sie nicht erreichbar ist (`unavailable`),
 außer Kephalaion selbst ist nicht bereit: Dann trägt den Fehler schon der Bereich
-`kephalaion`. Die Einzelheiten stehen in `context.versionSources.error`. Liegt noch die alte
-`<local.dir>/version-sources.yaml` — `warning`, Abhilfe `/k-upgrade`. Das Programm ist älter
+`kephalaion`. Die Einzelheiten stehen in `context.versionSources.error`. Das Programm ist älter
 als das neueste veröffentlichte Release (Bereich `program`) — `warning`, Abhilfe
 `k-playbook upgrade`; das neueste Release liest die Prüfung aus einem Zwischenspeicher, der
 einige Stunden alt sein kann, und ohne Netz schweigt sie.

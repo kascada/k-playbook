@@ -1215,8 +1215,7 @@ func opencodeMemoryConfigured(content map[string]any) bool {
 // Eintrag AGENTS.md unter instructions. Einen Eintrag references.docs mit dem
 // Einstieg der Projektdoku schreibt das Binary seit Task 101 nicht mehr — der
 // Einstieg ist keph:/docs/ und kommt aus dem Briefing; ein keph:-Verweis taugt
-// nicht als Pfad in references. Vorhandene Einträge bleiben stehen; die
-// Umstellung 3.2 in /k-upgrade schlägt vor, sie zu entfernen.
+// nicht als Pfad in references. Vorhandene Einträge bleiben stehen.
 func opencodeMemoryPatchOps(content map[string]any) []jsonPatchOp {
 	ops := []jsonPatchOp{}
 	switch values := content[opencodeInstructionsKey].(type) {

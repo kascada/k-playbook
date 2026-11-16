@@ -52,7 +52,6 @@ fields from two loads.
 | `project.dir` | The main directory — where `K-PLAYBOOK.yaml` sits. |
 | `project.repoRoot`, `project.vcs` | The code repository for Git operations, and whether it is under version control. |
 | `project.languages` | The languages this project needs tools for. Always filled — a missing entry falls back to the default, so there is nothing to interpret. |
-| `local.dir` | Everything the project owns. |
 | `catalogs` | Effective `reviews` — shipped and project-local already merged, `origin` recorded, switched-off entries marked `disabled`. There are no checks any more. |
 | `remediation` | How findings are to be worked off. |
 | `gh` | Whether the GitHub CLI is installed and logged in on this machine (a host finding). |
@@ -78,9 +77,7 @@ not part of `exclude`: that rule comes from the contract, not from the document.
 - `unavailable` — Kephalaion is not reachable; nothing is known about the document. `error`
   gives the reason. There is no fallback to the disk and none to the default sources.
 
-The old file `<local.dir>/version-sources.yaml` is no longer read by anything. If it is still
-there, the health check reports it as a leftover; `/k-upgrade` moves its content. The field is
-absent on an installation older than it. The full contract is in
+The field is absent on an installation older than it. The full contract is in
 `k-playbook:/docs/handbook/version-inventory.md`.
 
 `gh` is a host finding for this machine only: `gh.installed`, `gh.loggedIn`, `gh.account`,
@@ -92,69 +89,53 @@ gh's own configuration, not verified against the server, so a token can still be
 
 ## Where the rest lives
 
-The layout is fixed. Everything below is derived from `local.dir` and `project.dir` from
-the output above — never from configuration, and never by searching. What k-playbook ships
-is not in the project: the texts come through `k-playbook:` references, commands, skills
-and scripts lie under `~/.local/share/k-playbook/`.
+The layout is fixed. Every place where something is stored is a `keph:` reference or lies
+under `.k-playbook/` in `project.dir` from the output above — never taken from
+configuration, and never found by searching. What k-playbook ships is not in the project:
+the texts come through `k-playbook:` references, commands, skills and scripts lie under
+`~/.local/share/k-playbook/`.
 
 | Artifact | Path |
 |---|---|
-| tasks | `keph:/user/~/tasks/` in der Projekt-Collection, ein Dokument je Task; Form nach `k-playbook:/instructions/on-demand/tasks.md`. Der bisherige Ort auf der Platte (`tasks/` unter `local.dir`) wird nicht mehr beschrieben; `/k-upgrade` (3.3) zieht ihn um |
+| tasks | `keph:/user/~/tasks/` in der Projekt-Collection, ein Dokument je Task; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
 | completed tasks | `keph:/user/~/tasks/done/` — `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
 | todo | über `/k-todo` bzw. das Subkommando `k-playbook todo`; die Ablage besitzt Go |
-| project documentation | `keph:/docs/` — in der Projekt-Collection, nicht unter `local.dir`; das Briefing nennt den Einstieg unter `Projektdoku`, gelesen mit Kephalaion `list` (`recursive`, `frontmatter`), ohne Kephalaion nicht erreichbar |
-| code documentation | `keph:/docs/generated/code/` — in der Projekt-Collection, nicht unter `local.dir`; geschrieben von `/k-docs-code` und dem Skill `ks-overlay-repo-analyse` nur über `k-playbook docs checkout\|publish code`, ohne Kephalaion gibt es keine |
-| tool profiles | `<local.dir>/docs/libs/` — entsteht beim ersten Lauf von `/k-docs-tools` |
-| version inventory | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar |
-| hand-written documentation | `keph:/docs/manual/` — in der Projekt-Collection, nicht unter `local.dir` |
-| version inventory sources | `keph:/k-playbook/inventory.md` — in der Projekt-Collection, nicht unter `local.dir`; handgepflegt, ergänzt nur von `/k-doc-inventory` nach Bestätigung; ihr Zustand steht in `versionSources` |
-| findings from analysis and debugging | `keph:/queue/findings/` in der Projekt-Collection, ein Dokument je Befund; Form nach `k-playbook:/instructions/on-demand/befunde.md`. Der bisherige Ort `<local.dir>/material/befunde/` wird nicht mehr beschrieben |
-| known decisions | `<local.dir>/known-decisions.md` |
-| review results | `<local.dir>/results/<family>/<date>/` |
-| review log | `<local.dir>/results/log.md` |
-| unversioned working files | `<local.dir>/priv/` |
+| project documentation | `keph:/docs/` — in der Projekt-Collection; das Briefing nennt den Einstieg unter `Projektdoku`, gelesen mit Kephalaion `list` (`recursive`, `frontmatter`), ohne Kephalaion nicht erreichbar |
+| code documentation | `keph:/docs/generated/code/` — in der Projekt-Collection; geschrieben von `/k-docs-code` und dem Skill `ks-overlay-repo-analyse` nur über `k-playbook docs checkout\|publish code`, ohne Kephalaion gibt es keine |
+| tool profiles | `keph:/docs/generated/libs/` — in der Projekt-Collection; geschrieben von `/k-docs-tools` nur über `k-playbook docs checkout\|publish libs`, ohne Kephalaion gibt es keine |
+| version inventory | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar |
+| hand-written documentation | `keph:/docs/manual/` — in der Projekt-Collection |
+| version inventory sources | `keph:/k-playbook/inventory.md` — in der Projekt-Collection; handgepflegt, ergänzt nur von `/k-doc-inventory` nach Bestätigung; ihr Zustand steht in `versionSources` |
+| findings from analysis and debugging | `keph:/queue/findings/` in der Projekt-Collection, ein Dokument je Befund; Form nach `k-playbook:/instructions/on-demand/befunde.md` |
+| known decisions | `<ergebnisort>/known-decisions.md` |
+| review results | `<ergebnisort>/<family>/<date>/` |
+| review log | `<ergebnisort>/log.md` |
 | project-local commands | `<project.dir>/.k-playbook/commands/` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Command |
 | project-local skills | `<project.dir>/.k-playbook/skills/` — versioniert; das Einrichten legt es nicht an, es entsteht mit dem ersten eigenen Skill |
 | scripts | `~/.local/share/k-playbook/scripts/` |
 | security tool matrix | `~/.local/share/k-playbook/scripts/security-tools.tsv` |
 
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
 Jedes Unterverzeichnis von `docs/` steht für eine Herkunft, nicht für ein einzelnes
 Werkzeug. Ein Werkzeug schreibt ausschließlich in Verzeichnisse seiner eigenen Herkunft;
 welches Werkzeug eine einzelne Datei geschrieben hat, steht in ihrem Frontmatter unter
-`generated.by`. `docs/README.md` auf der Platte ist der alte Platten-Index, den
-`/k-upgrade` (3.2) abräumt. In `keph:/docs/manual/` schreibt kein
-Command Doc-Dateien. Flache `docs/*.md` aus der Zeit vor dieser Struktur haben keinen
-Erzeuger: sie werden nur gelistet, geschrieben werden sie von keinem Command.
-
-`<local.dir>/material/` is the old source side: raw notes, chat transcripts and hand-offs.
-Nothing reads or indexes it. Its subdirectory `material/befunde/` holds the findings written
-before they moved to `keph:/queue/findings/`; nothing writes there any more. Everything below
-`material/` is left untouched by every command.
+`generated.by`. In `keph:/docs/manual/` schreibt kein Command Doc-Dateien. Flache
+`docs/*.md` aus der Zeit vor dieser Struktur haben keinen Erzeuger: sie werden nur
+gelistet, geschrieben werden sie von keinem Command.
 
 The project-local side of `catalogs.reviews` lives in the project collection under
 `keph:/k-playbook/reviews/`. Do not read it directly — `catalogs` already contains the
 merged result. Guidelines have no project-local side. They are shipped
 only: this output does not list them, the briefing names them under `documents.guidelines`,
-and they are read as `k-playbook:/guidelines/<name>.md`. A leftover `<local.dir>/guidelines/`
-is not read, and `/k-upgrade` removes it. Checks no longer exist at all; a leftover
-`<local.dir>/checks/` is not read either, and `/k-upgrade` removes it too.
+and they are read as `k-playbook:/guidelines/<name>.md`.
 
 `<project.dir>/.k-playbook/commands/` and `skills/` overlay the shipped ones by the same
 rule, but they are not in `catalogs`: the assistant loaded them at startup, so by the time a
 command runs, the effective set is already in place. They matter only when you **write**
-one — put it there, never into `~/.local/share/k-playbook/` and no longer into
-`<local.dir>/commands/` or `<local.dir>/skills/`, which nothing reads since task 129, and
-note that it takes effect
+one — put it there, never into `~/.local/share/k-playbook/`, and note that it takes effect
 after the next `k-playbook briefing` or `/k-gui` has linked it and the assistant has been
 restarted.
-
-If a directory listed here is missing, ask before creating exactly that directory. Do not
-stop hard, do not create it silently, and never substitute another path. `/k-gui` restores
-nothing here: k-playbook no longer creates `<local.dir>` or anything in it — not on
-startup, not on a button, not through a tool —, so a missing directory under `local.dir`
-is the normal state, not a defect of the setup. The rows marked „entsteht beim ersten
-Lauf von …" are exempt: there, a missing directory is the normal state before the first
-run, and the producing command creates its own directory without asking.
 
 ## Rules
 
@@ -170,9 +151,10 @@ run, and the producing command creates its own directory without asking.
   directories yourself and do not re-derive which entry wins.
 - Skip entries marked `disabled`. They were switched off on purpose; the file says why.
 - Never write into `~/.local/share/k-playbook/`. It belongs to the program and is replaced
-  when the program is updated. Everything a command produces goes into `local.dir`. A
-  directory `k-playbook/` in the project is a leftover clone from the former model: never
-  write into it either; `/k-upgrade` deletes it.
+  when the program is updated. Everything a command produces goes into the project
+  collection or under `.k-playbook/` in `project.dir`. A directory `k-playbook/` in the
+  project is a leftover clone from the former model: never write into it either;
+  `/k-upgrade` deletes it.
 - **Before the first call to GitHub — `gh`, or a network command of git — read
   `k-playbook:/commands/_shared/gh.md` with `k_playbook_doc_read` (without MCP:
   `k-playbook read k-playbook:/commands/_shared/gh.md`) and follow it.** It alone decides

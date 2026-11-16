@@ -40,6 +40,12 @@ installation, not against a newly created example project.
 Discussed, not yet implemented. The section grows with the individual steps; what is stated
 here is decided, everything else is listed under "Open" at the end.
 
+`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
+While they are paused, all five review tools of the MCP server answer `reviews_paused`,
+`k-playbook scan` and `k-playbook merge` end with the same refusal, and `/k-review`, `/k-audit`
+and `/k-remediation` are temporarily unavailable. What follows records what was decided and
+built before the pause.
+
 **The problem.** Today, every scan review starts its own tools -- described in prose in the
 recipe and run by the assistant. `review-dependency-cve`, `review-iac-container`, and
 `review-secret-scanning` each carry their own preflight, invocation lines, and findings format.
@@ -140,7 +146,7 @@ findings at all -- it supplies `grype` and remains outside the merge.
   the tool version. What applied in a run therefore remains readable from `raw/` -- the purpose
   for which the directory is auditable.
 
-**Completed: merge tool.** From Task 014 (`k-playbook-local/tasks/done/014-sarif-merge-review-input.md`).
+**Completed: merge tool.** From Task 014.
 A dedicated subcommand instead of an external runtime: `k-playbook merge <run>` reads `run.json`,
 `entries/*.json`, and `raw/*.sarif`, normalizes findings, deduplicates them, and writes two
 artifacts: `review-input.json` as complete audit evidence and `review-input.md` as a compact
@@ -149,13 +155,11 @@ External candidates were excluded: Microsoft SARIF Multitool would pull in .NET 
 `sarif-tools` (PyPI) does not cover cross-tool deduplication and `entries` context.
 
 First real run (2026-08-19, this repository): 347 findings, 227 groups. Raw data remained
-untouched. Second real run on the same day at the OMNI project
-(`~/dev/squad-km-dev-setup/k-playbook-local/results/2026-08-19/`): 327 findings, 141 groups --
+untouched. Second real run on the same day at the OMNI project: 327 findings, 141 groups --
 the deduplication effect is significantly stronger there because lockfile lines bundle many CVEs.
 
-**Completed: merge improvements from the real run.** From Task 016
-(`k-playbook-local/tasks/done/016-merge-nachbesserungen.md`). Six points that came from the
-first two real runs have been cleanly incorporated into the merge:
+**Completed: merge improvements from the real run.** From Task 016. Six points that came from
+the first two real runs have been cleanly incorporated into the merge:
 
 - Same-location bundle within the same entry/job/tool pulls multiple rule IDs at one location
   into one group without losing evidence.
@@ -175,8 +179,7 @@ Real run after 016: k-playbook repository 347/173, OMNI 327/110. Fanout location
 `_old/` tree and `requirements.txt:29` are visibly bundled; `unknown` disappears. Raw data in
 both runs was `sha256`-identical before and after the merge.
 
-**Completed: soft skip from the catalog.** From Task 015
-(`k-playbook-local/tasks/done/015-scanner-soft-skip.md`). It was triggered by `osv-scanner` in
+**Completed: soft skip from the catalog.** From Task 015. It was triggered by `osv-scanner` in
 the OMNI run on 2026-08-19: exit 128 plus "No package sources found", without SARIF -- treated
 by the runner as a technical `failed` even though the tool itself reported that there was nothing
 to check under the reference point. Rather than writing a special case for every scanner into the
@@ -188,15 +191,14 @@ readable SARIF wins and remains `done`, broken non-empty SARIF remains `failed`,
 and runner cancellation. Details are in [`review-runs.md`](./review-runs.md#states) and the
 header line of [`share/scripts/scanners.tsv`](../../../share/scripts/scanners.tsv).
 
-**Completed: alternative 2, command orchestrated through MCP.** From Task 018
-(`k-playbook-local/tasks/done/018-review-run-und-triage.md`). `/k-audit` is now enabled: the
+**Completed: alternative 2, command orchestrated through MCP.** From Task 018. `/k-audit` is
+now enabled: the
 command creates or continues runs through MCP, reads status before every step, starts scanners,
 runs AI review entries, starts the merge, and then invokes the `review-scan-triage` assessment
 module. The selection basis comes from `k_playbook_review_status` in `available` mode: tools,
 active review recipes, and the `scan-triage` command-module entry are confirmed before `create`.
 
-**Completed: MCP tools for review runs.** From Task 017
-(`k-playbook-local/tasks/done/017-mcp-review-werkzeuge.md`). The MCP server provides five tools
+**Completed: MCP tools for review runs.** From Task 017. The MCP server provides five tools
 with a consistent response/error envelope and mandatory `projectDir`:
 `k_playbook_review_status`, `_create`, `_scan`, `_merge`, and `_write_ai_entry`. They call the
 existing domain logic under `installer/internal/review/*` and `installer/internal/review/merge/*`
@@ -243,24 +245,19 @@ run of a family recipe. This is the deliberate consequence of the migration: `/k
 accepts exactly one result file and is not extended for multiple sources.
 
 **What the removal means for already configured projects.** In a target project that updated
-its installation -- at that time a clone -- it meant three things:
+its installation -- at that time a clone -- it meant two things:
 
-- Existing `summary-*.md` under `k-playbook-local/results/` remain. Nothing creates them
-  anymore; `/k-remediation` continues to read them as legacy input. Anyone who no longer needs
-  them deletes them manually -- `results/` is not versioned anyway.
 - With the update, the command disappears from the catalog, and the symlinks under
   `.claude/commands/` and `.opencode/commands/` are then orphaned.
   Setup in the interface removes them itself. The order cannot be reversed: first update,
   then set up. In reverse, setup still resolves the catalog from the old state and creates
   the links again.
 - **A project-local overlay otherwise remains alive.** A same-named file under
-  `.k-playbook/commands/` (before task 129 `k-playbook-local/commands/`) previously overlaid
-  the shipped command. If the shipped one is
+  `.k-playbook/commands/` previously overlaid the shipped command. If the shipped one is
   removed, it no longer overlays anything, but becomes an independent project-owned command and
   remains registered. It must be deleted in the target project.
 
-**Completed: `known-decisions.md` applies project-wide.** From Task 019
-(`k-playbook-local/tasks/done/019-known-decisions.md`). The format is fixed: one `##` entry per
+**Completed: `known-decisions.md` applies project-wide.** From Task 019. The format is fixed: one `##` entry per
 decision, exactly one fenced `yaml` block with required fields, followed by rationale.
 `k-playbook merge` reads the file, marks covered findings and groups in `review-input.json`, and
 shows complete or partial coverage in `review-input.md`. The assessment module no longer matches
@@ -276,43 +273,10 @@ any run of this repository. It also does not hold up conceptually -- a deliberat
 not run-bound, `expires` exists for that -- and it had a silent side effect: a file nobody
 expects could fully override a project-wide decision.
 
-At the same time, the project-wide file moved one level up from `k-playbook-local/results/` to
-`k-playbook-local/known-decisions.md`. `results/` is "everything reviews create"; this file is
-maintained by hand and is input, not output. It deliberately remains **not** an entry in
-`LocalStructure()`: `CreateLocal()` creates file entries with `writeIfMissing`, so the new
-location would always exist afterward -- and transitional reading of the old location would never
-run. `/k-gui` therefore does not create it; its purpose is in
-[`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd). The old location continues to
-be read until 2027-02-28 and the move is reported visibly; removal is a project todo
-(`/k-todo`), triggered by the comment on `legacyResultsDirName`.
-
-**Completed: todos move from `TODO.md` to `data/todos.json`.** From Task 053. The project todos
-used to live in `k-playbook-local/TODO.md`, a Markdown checklist that the `/k-todo` command wrote
-by hand. They now live in `k-playbook-local/data/todos.json`, a document owned by Go: it carries
-an `id` per entry that is never reused, a `created` and a `done` date, an optional `origin`, and
-`nextId` at the document level.
-
-The translation happens once, on the first access through any of the three layers -- the
-interface, `k-playbook todo`, or the MCP tools `k_playbook_todo_*`. All three go through the same
-function in `internal/project`, writing accesses included: `add` in a project that still has a
-`TODO.md` migrates first and never creates a second, empty document beside it. Text, order, and
-done state are preserved. Timestamps are not invented: `created` stays empty, because the
-Markdown file never said when an entry was written, and a done entry receives the migration date
-with `doneMigrated` marking it as exactly that, not as the day someone ticked it off. The
-`TODO.md` is removed afterward.
-
-If both files exist, access does not fail: the JSON document is read and written, and the
-leftover `TODO.md` is reported as a hint -- `hint` in the web response, a warning in the CLI and
-MCP envelopes, never `message`. Only the migration itself refuses in that case, and its message
-names the way out: `k-playbook todo import k-playbook-local/TODO.md` appends the Markdown entries
-to the existing document and removes the file.
-
-Two directories arrived with it: `k-playbook-local/data/` for machine files that belong to the
-project's state, versioned and without a `.gitignore`, and `k-playbook-local/cache/` for derived
-content that can be rebuilt at any time, private by default as `results/` was then. Both left the
-project-owned structure again with task 107: the todos live in the collection. `cache/` was then
-created only by the index of the knowledge gate, which task 123 removed together with the other
-knowledge directories on disk; `/k-upgrade` 3.0 deletes a leftover `cache/`.
+The project-wide file lies at the location of the review results, as
+`<ergebnisort>/known-decisions.md`. It is maintained by hand and is input, not output; the
+program does not create it. Its purpose is in
+[`review-runs.md`](./review-runs.md#effect-of-known-decisionsmd).
 
 **Completed: namespace convention for command modules.** Decided together with Task 018 and
 anchored in `rules/command-authoring.md`: `commands/_<name>/` contains modules (not a command).
@@ -322,8 +286,7 @@ example `_docs/`, once the Docs commands receive shared modules). Overlay works 
 `commands/`; an empty file disables it. The rule stood in `rules/command-authoring.md` until
 task 135 removed the kind; its content is being split into guidelines and instructions.
 
-**First real triage run.** 2026-08-19, this repository, `review-triage.md` under
-`k-playbook-local/results/2026-08-19/`. 173 groups were condensed into six bundles plus one
+**First real triage run.** 2026-08-19, this repository. 173 groups were condensed into six bundles plus one
 remaining group: B1 Dependency Upgrade Go (P1/S), B2 Path Validation (P2/S), B3 Process Calls
 (P2/K), B4 File Permissions and Ignored Cleanup Errors (P2/T), B5 Remove `_old/` from Scope
 (P3/X), B6 Staticcheck Cleanup (P3/T). The bundle cut demonstrates the benefit of the whole

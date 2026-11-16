@@ -92,7 +92,7 @@ wie es hier festgelegt ist:
 
 ## Ausschlüsse
 
-Die zentralen Ausschlüsse der Modulsuche — `k-playbook/`, `k-playbook-local/`, `vendor/`,
+Die zentralen Ausschlüsse der Modulsuche — `k-playbook/`, `vendor/`,
 `node_modules/`, `testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
 nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
 
@@ -110,8 +110,10 @@ dort würde beim Melden verworfen.
 Dieses Review moderiert keine Freigaben pro Fund. Es erzeugt ein vollständiges
 Ergebnis, das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
 
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
 Die Ergebnisfamilie ist `tech`; der Lauf schreibt in den Family-Ordner
-`k-playbook-local/results/tech/<datum>/` und dort genau zwei Dateien — `review-input.json`
+`<ergebnisort>/tech/<datum>/` und dort genau zwei Dateien — `review-input.json`
 nach dem Belegvertrag und `review-triage.md` als Endartefakt. Den Ablauf beschreibt
 `/k-review`, 5b; rezeptspezifisch ist:
 
@@ -168,13 +170,13 @@ Evidence-Quelle mit; dort steckt sein Beleg schon im gemeinsamen Merge. Über
 einen eigenen Family-Ordner **außerhalb** jedes Laufordners an:
 
 ```text
-k-playbook-local/results/tech/<datum>/
+<ergebnisort>/tech/<datum>/
 ```
 
 Sein `review-triage.md` geht direkt an `/k-remediation`:
 
 ```text
-/k-remediation k-playbook-local/results/tech/<datum>/review-triage.md
+/k-remediation <ergebnisort>/tech/<datum>/review-triage.md
 ```
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen

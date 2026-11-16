@@ -15,8 +15,7 @@ etwas, ist sie nachzuziehen.
 - Mitgelieferte und lokale Teile werden gemeinsam
   nach der Ziffer am Anfang des Namens sortiert, und zwar numerisch: `20-` kommt vor `100-`.
   Bei gleicher Ziffer entscheidet der Name. Die lokalen Teile liegen in der Collection des
-  Projekts unter `keph:/k-playbook/instructions/always/`; `k-playbook-local/instructions/always/`
-  wird nicht mehr gelesen.
+  Projekts unter `keph:/k-playbook/instructions/always/`.
 - Ein gleichnamiger lokaler Teil ersetzt den mitgelieferten vollständig. Ein leerer lokaler
   Teil schaltet ihn ab. Leer heißt: nur Leerzeilen und Zeilen, die mit `#` beginnen — auch
   eine Datei nur aus Überschriften schaltet also ab.
@@ -54,11 +53,11 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
   Erstes, weil alle weiteren Teile Verweise benutzen.
 - `030-briefing.md`: Die Regeln jeder Sitzung zum Briefing — einmal laden, die Handvoll
   Felder, die Umgebungsprüfung `health` in der ersten Antwort nennen und nichts still beheben,
-  nichts selbst lesen, Ablegen nur aus `local.dir`, dazu der Satz, der auf
-  `on-demand/k-playbook.md` zeigt: zu lesen, bevor eine Sitzung über k-playbook Auskunft gibt
-  oder eine Projektregel anlegt, ändert, verschiebt oder abschaltet. Steht gleich nach den
-  Verweisen, weil das Briefing das Erste ist, was eine Sitzung liest; Nachschlagbares dazu
-  liegt in `on-demand/briefing-felder.md`.
+  nichts selbst lesen, Ablegen nur als `keph:`-Verweis oder unter der Projektwurzel, dazu der
+  Satz, der auf `on-demand/k-playbook.md` zeigt: zu lesen, bevor eine Sitzung über k-playbook
+  Auskunft gibt oder eine Projektregel anlegt, ändert, verschiebt oder abschaltet. Steht gleich
+  nach den Verweisen, weil das Briefing das Erste ist, was eine Sitzung liest; Nachschlagbares
+  dazu liegt in `on-demand/briefing-felder.md`.
 - `100-projektwissen-zuerst.md`: Zuerst die Projektdoku lesen, dann den Code.
 - `200-befunde-festhalten.md`: Erkenntnisse aus Analyse und Fehlersuche festhalten.
 - `210-workbench.md`: Den Stand eines laufenden Vorhabens in der Workbench führen. Steht

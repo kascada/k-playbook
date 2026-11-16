@@ -6,7 +6,7 @@
 
 - after cloning k-playbook into a project, for the three setup steps.
 - when linking is stuck and you want to see why: it is brought up to date automatically, but an actual project file in the way or a conflict in `CLAUDE.md` does not resolve itself. The assistants section explains the resolution.
-- when symlinks are broken. It no longer creates `k-playbook-local/` or anything in it; a missing directory there is not a defect.
+- when symlinks are broken.
 
 If you only want to know whether everything is correct, open the interface and look without confirming any of the steps: it writes only after confirmation.
 
@@ -26,33 +26,33 @@ All projects of a machine therefore run with the same program version, and the s
 
 No. In the former model the installation was a clone of the k-playbook repository under `<project>/k-playbook/`. Today nothing of the tool lies in the project: commands, skills and scripts are unpacked by the binary into `~/.local/share/k-playbook/`, and the shipped texts come from the hub.
 
-A clone that is still there is not read any more. `/k-upgrade` deletes it as its last conversion (3.8) and then removes the line that kept it out of Git from `.gitignore`; see [`installation.md`](./installation.md#update).
+A clone that is still there is not read any more. `/k-upgrade` deletes it (conversion 3.8) and then removes the line that kept it out of Git from `.gitignore`; see [`installation.md`](./installation.md#update).
 
 ## Where is `K-PLAYBOOK.yaml`?
 
-In the project root, under `.k-playbook/`: `.k-playbook/K-PLAYBOOK.yaml`. It belongs to the project, is committed with it and is never overwritten by an update. `k-playbook-local/` beside it
-held project-owned files; it is being phased out and no longer created, and `/k-upgrade`
-deletes it once nothing is left in it but a `.gitignore`, a `README.md` and empty
-subdirectories (3.7, task 150):
+In the project root, under `.k-playbook/`: `.k-playbook/K-PLAYBOOK.yaml`. It belongs to the project, is committed with it and is never overwritten by an update:
 
 ```text
 project/
-├── .k-playbook/
-│   └── K-PLAYBOOK.yaml    the anchor
-└── k-playbook-local/      being phased out; deleted by /k-upgrade once empty
+└── .k-playbook/
+    └── K-PLAYBOOK.yaml    the anchor
 ```
 
 Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The tool moves such a file into `.k-playbook/` on its first call; an older program then no longer finds the project, so every environment of the project needs the new program.
 
 ## Where are the paths for tasks, reviews, and results?
 
-Nowhere: they derive from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`. Results are under `k-playbook-local/results/`. Tasks are not files at all any more: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)); `/k-upgrade` 3.3 moves older task files from `k-playbook-local/tasks/` there, and 3.4 removes the directory once it is empty; setup no longer creates it. 3.7 finally deletes `k-playbook-local/` itself once it is empty.
+Nowhere: no path is configured. Tasks are not files: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)). Project-owned review recipes are documents in the same collection under `keph:/k-playbook/reviews/`. What lies on disk, project-owned commands and skills under `.k-playbook/commands/` and `.k-playbook/skills/`, derives from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`.
+
+Review results belong to `<ergebnisort>`.
+`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
+All five review tools of the MCP server are blocked, and `/k-review`, `/k-audit` and `/k-remediation` are temporarily unavailable.
 
 Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
 ## How do I change a shipped review recipe?
 
-You do not: the shipped layer comes from the hub. Instead, create a document with the same name in the project collection under `keph:/k-playbook/reviews/` (task 143; `k-playbook-local/reviews/` is no longer read):
+You do not: the shipped layer comes from the hub. Instead, create a document with the same name in the project collection under `keph:/k-playbook/reviews/` (task 143):
 
 ```text
 <hub>:k-playbook/defaults/reviews/review-code.md    is no longer read
@@ -61,7 +61,7 @@ keph:/k-playbook/reviews/review-code.md             applies on its own
 
 The local file **completely** replaces the shipped one. It must therefore contain the whole recipe; individual sections are not retained from the original. The cost is that later improvements to the original no longer reach this copy.
 
-There are no checks any more (task 155): k-playbook ships none, and there are no project-owned ones either. A leftover `k-playbook-local/checks/` is not read; `/k-upgrade` removes it.
+There are no checks any more (task 155): k-playbook ships none, and there are no project-owned ones either.
 
 ## How do I disable a shipped review recipe?
 
@@ -103,8 +103,6 @@ Yes. `.k-playbook/commands/` holds them, and `.k-playbook/skills/` holds custom 
 .k-playbook/commands/k-todo.md   replaces the shipped item
 .k-playbook/skills/my-skill/SKILL.md
 ```
-
-The former place, `k-playbook-local/commands/` and `k-playbook-local/skills/`, is no longer read since task 129; `/k-upgrade` names what is left there with its target.
 
 The new command is registered automatically: at the next `k-playbook briefing`, the call at the beginning of every session, or when the assistants section of the interface is next displayed. Then restart the assistant; it reads commands at startup.
 

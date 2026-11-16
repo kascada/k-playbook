@@ -85,11 +85,10 @@ mehr nach und sperrt ihn nicht mehr; einen liegengebliebenen löscht `/k-upgrade
 Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt. Eine vorhandene
 `K-PLAYBOOK.yaml` wird nie überschrieben.
 
-`k-playbook-local/` legt das Werkzeug nicht mehr an, weder beim Start noch auf Knopfdruck
-noch als Nebenwirkung eines Werkzeugs; was dort noch liegt, bleibt unberührt. Die
-schreibenden Review-Wege (`k-playbook scan`, `k-playbook merge` und die MCP-Werkzeuge
-`k_playbook_review_create`, `_scan`, `_merge`, `_write_ai_entry`) sind vorübergehend
-gesperrt, bis die Ablage der Review-Ergebnisse umgebaut ist.
+Projekteigenes liegt in der Collection des Projekts oder unter `.k-playbook/`. Die
+Review-Wege (`k-playbook scan`, `k-playbook merge` und die MCP-Werkzeuge
+`k_playbook_review_status`, `_create`, `_scan`, `_merge`, `_write_ai_entry`) sind gesperrt:
+Der Ort der Review-Ergebnisse ist noch nicht entschieden; bis dahin pausieren die Reviews.
 
 Wenn die Oberfläche wegen eines Ankers in einem übergeordneten Verzeichnis nicht die
 Ersteinrichtung zeigt, legt `k-playbook config create` den Anker bewusst ohne Suche an.

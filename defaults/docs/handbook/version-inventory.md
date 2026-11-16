@@ -40,7 +40,7 @@ These names are fixed and used unchanged everywhere.
 | Command | `/k-doc-inventory` — hull `share/commands/k-doc-inventory.md`, text `defaults/commands/k-doc-inventory.md`, read as `k-playbook:/commands/k-doc-inventory.md` |
 | Shared include of the docs commands | `defaults/commands/_shared/docs.md` |
 | Inventory document | `keph:/docs/generated/versions/inventory.md` — in the project collection (`kephalaion.address`), name `docs/generated/versions/inventory.md`; the constant `inventory.DocName` |
-| Source configuration | `keph:/k-playbook/inventory.md` — in the project collection, name `k-playbook/inventory.md`; the constant `versionsources.DocName` (task 144; before that `k-playbook-local/version-sources.yaml`, now only recognized as a legacy file) |
+| Source configuration | `keph:/k-playbook/inventory.md` — in the project collection, name `k-playbook/inventory.md`; the constant `versionsources.DocName` (task 144) |
 | Generator in frontmatter | `generated.by: k-doc-inventory` |
 
 The command deliberately uses the singular `doc`, although the rest of the family uses
@@ -50,8 +50,7 @@ it in every location at once, not silently in one place.
 `generated.by` is `k-doc-inventory` for **both** invocation paths, including when the
 subcommand was called directly. The origin identifies the generator, not the invocation
 path. `docs/generated/versions/` in the project collection is the only place to which this
-generator writes, and it writes to no other — in particular not to
-`k-playbook-local/docs/` any more.
+generator writes, and it writes to no other.
 
 ## Data model for an inventory row
 
@@ -589,15 +588,6 @@ and field names are stated below under "State in the context output". The reader
 collector, `installer/internal/project/versionsources.go` (context, health), and the
 interface.
 
-**Legacy file.** `k-playbook-local/version-sources.yaml` is no longer read as configuration
-(hard switch, as in task 143). If it is still there, the health check and
-`k-playbook inventory` report it as a legacy file with a pointer to `/k-upgrade`, which
-moves `exclude`, relative `sources`, and `helm_values` into the document — names, but does
-not move, a non-empty `roots`, absolute paths, and `helm_values` from a file with
-`schema_version: 1` — and then deletes the file after asking. Between the program update
-and `/k-upgrade` a project lacks its exclusions; a collection run in that window reads too
-much. That gap is accepted.
-
 ### Fields
 
 | Key | Required | Meaning |
@@ -678,22 +668,17 @@ produces its own notice, while the other files yield their rows.
 
 **Decided:** the document carries `schema_version: 3`, and only `3` is read.
 
-- `1` and `2` belonged to the former file `k-playbook-local/version-sources.yaml`: `2` added
-  `helm_values`, which `1` rejected visibly instead of applying. A document with `1` or `2`
-  would be one written by hand with the old meaning (including `roots`) and aborts the run.
+- `1` and `2` date from the time before the collection. A document with `1` or `2` would be
+  one written by hand with the old meaning (including `roots`) and aborts the run.
 - `3` came with the move into the collection (task 144). It removes `roots`; the meaning of
   a configuration changed, so the version changed with it. A document with `roots` is
   rejected, even with `schema_version: 3`.
-- When `/k-upgrade` moves an old file, `helm_values` from a file with `schema_version: 1` are
-  named, not moved: they were never applied, and moving them would make them take effect
-  suddenly.
 
 ### Template
 
-A new document gets this skeleton, created by `/k-doc-inventory` on the first confirmed
-addition and by `/k-upgrade` when it moves an old file; the wording is in
-`defaults/commands/_shared/inventory-config.md`, which both include. Filled lists are
-written as blocks, not as `[]`.
+A new document gets this skeleton. Only `/k-doc-inventory` creates it, on the first
+confirmed addition; the wording is in `defaults/commands/_shared/inventory-config.md`,
+which that command includes. Filled lists are written as blocks, not as `[]`.
 
 ```markdown
 ---
@@ -788,8 +773,8 @@ Four states, and no more:
 - **`invalid`**: the document exists but has no readable frontmatter, another
   `schema_version`, or a `roots` key; `error` says which, with the line.
 - **`unavailable`**: Kephalaion is not reachable, so nothing is known about the document;
-  `error` carries the reason. There is no fallback to the legacy file on disk and none,
-  silently, to the default sources.
+  `error` carries the reason. There is no fallback to the disk and none, silently, to the
+  default sources.
 
 The context invocation does **not** abort for an invalid or unreachable document. It runs
 at the start of every command; an invalid additional configuration must not disable every
@@ -798,14 +783,12 @@ The inventory **collection run** does abort, as stated under "Error cases"; this
 contradiction, but the distinction between reporting and collecting.
 
 If the field is entirely absent, or carries `path` instead of `ref`, the installation is
-older than this contract. A command then points to `/k-upgrade` and does not open the old
-file instead.
+older than this contract. A command then says so and points to `/k-upgrade`.
 
 **Health check.** Area `versionSources`: an `invalid` document is an `error`; with a ready
 Kephalaion binding, a document that cannot be read is an `error` too; with a binding that is
 not ready, this area stays silent, because area `kephalaion` already carries the error and
-its remedy. A legacy `k-playbook-local/version-sources.yaml` is a `warning` pointing to
-`/k-upgrade`.
+its remedy.
 
 ## The Inventory Document
 
@@ -820,9 +803,7 @@ Kephalaion client of the project, `internal/inventory` knows only the small stor
 interface (`Read`, `Create`, `Write`) and the document name. Without a ready Kephalaion
 binding (`kephalaion.ok` not `true`) there is **no inventory**: the subcommand aborts with
 `kephalaion_unavailable` and the reason from the binding, the interface shows the state
-"not reachable", and nothing falls back to disk. A file left under
-`k-playbook-local/docs/versions/` is a state from before the move, not the inventory; it
-is cleared by `/k-upgrade`, not by the generator.
+"not reachable", and nothing falls back to disk.
 
 The source configuration `keph:/k-playbook/inventory.md` is the hand-maintained control of
 the collection run, not its output; the run reads it through the same store before it
@@ -1052,7 +1033,6 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 | The document has no frontmatter, or the frontmatter is unreadable YAML | **Abort** before any collection, with document, line, and the parser message. Nothing is written. Partially interpreting an invalid configuration would mean applying a trust boundary other than the documented one. |
 | `schema_version` is absent or not `3` | **Abort**, as for `K-PLAYBOOK.yaml`. |
 | The frontmatter carries `roots`, even empty | **Abort**, with the line. `roots` was removed with schema version 3; see "Allowed Root". |
-| `k-playbook-local/version-sources.yaml` still exists | Not read. Health check and subcommand report it as a legacy file with a pointer to `/k-upgrade`. |
 | Invalid entry in `helm_values` | The **entry** is rejected with line and reason; the run continues. |
 | Configured Helm value yields no row | Visible notice for the file with key, item, configuration line, and reason; see "Configured Helm values". |
 | Absolute `path` in `sources:` or `helm_values:` | The **entry** is rejected with line and reason; the run continues. |

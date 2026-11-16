@@ -12,9 +12,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook_
 Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
 zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen, nichts
 schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-remediation` gerade
-umzieht und erst nach dem Umbau wieder geht. Vorhandene `review-triage.md` unter
-`k-playbook-local/results/` bleiben unverändert liegen und lassen sich danach wieder
-abarbeiten.
+umzieht und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 

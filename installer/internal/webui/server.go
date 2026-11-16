@@ -494,7 +494,8 @@ func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, workflowsTemplate, areaWorkflows, "/workflows", "Workflows")
 }
 
-// reviewsTemplate ist die Seite der Reviews: die bisherigen Läufe.
+// reviewsTemplate ist die Seite der Reviews: Solange die Review-Wege
+// pausieren, zeigt sie die Meldung der Sperre.
 var reviewsTemplate = pageTemplate("reviews.html")
 
 func reviewsPageHandler(w http.ResponseWriter, r *http.Request) {

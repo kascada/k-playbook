@@ -23,11 +23,11 @@ Beispiele:
 
 Regeln:
 
-- **`k-playbook:` liest du nur über k-playbook**, nie selbst aus `k-playbook-local/` und nie
-  aus `k-playbook/` — einem liegengebliebenen Clone aus dem früheren Modell, falls das
-  Projekt noch einen hat; das Programm liest ihn nicht mehr. k-playbook entscheidet, ob eine
-  lokale Fassung die mitgelieferte ersetzt oder abschaltet. Wer selbst nachsieht, kann die
-  falsche Fassung erwischen.
+- **`k-playbook:` liest du nur über k-playbook**, nie selbst aus `k-playbook/` — einem
+  liegengebliebenen Clone aus dem früheren Modell, falls das Projekt noch einen hat; das
+  Programm liest ihn nicht mehr. k-playbook entscheidet, ob eine lokale Fassung die
+  mitgelieferte ersetzt oder abschaltet. Wer selbst nachsieht, kann die falsche Fassung
+  erwischen.
 - **Ein Verweis, der auf `/` endet, meint ein Verzeichnis.** Zusammengebaut wird nur
   `k-playbook:/instructions/always/`: Du bekommst alle Dateien darin als einen Text, in der
   festgelegten Reihenfolge. Jedes andere `k-playbook:`-Verzeichnis, etwa `on-demand/`, liest
@@ -48,3 +48,13 @@ Regeln:
   `kephalaion.account`: Das Konto gilt nur für diesen Rechner, der User ist die Person.
   Nur ein ganzer Pfadteil `~` ist der Platzhalter. Verweise, die k-playbook selbst ausgibt,
   enthalten schon den echten Namen.
+- **Auf nichts unter `keph:/queue/` wird verwiesen, vor allem nicht auf Befunde.** Die Queue
+  wird regelmäßig geleert: Befunde (`keph:/queue/findings/`) gehen in die Wissensablage über,
+  Doku-Aufträge (`keph:/queue/docs/`) werden abgearbeitet. Ein Verweis auf einen Eintrag
+  läuft danach ins Leere. Das gilt für jeden Text, der bleibt: Task, Workbench-Thema, Doku,
+  Kommentar am Code, Commit- und PR-Text, auch Fortschrittszeilen und Zusammenfassungen eines
+  Laufs. Was der Text aus einem Befund oder Auftrag braucht, schreibst du in eigenen Worten
+  hinein. Dass ein Befund geschrieben oder ein Auftrag eingereiht wurde, darf dort stehen, ohne
+  Verweis; den Verweis nennst du nur in deiner Antwort an den Nutzer. Kein Verweis ist die
+  Ortsangabe, wohin ein neuer Eintrag geschrieben wird, etwa „Befunde in
+  `keph:/queue/findings/`“.

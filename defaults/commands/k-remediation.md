@@ -5,9 +5,7 @@
 Dieser Command wird auf die neue Ablage für Ergebnisse umgebaut und steht bis dahin nicht
 zur Verfügung. Führe nichts von dem aus, was darunter steht — nichts lesen, nichts
 schreiben, nichts anbieten. Sag dem Nutzer in einem Satz, dass `/k-remediation` gerade
-umzieht und erst nach dem Umbau wieder geht. Vorhandene `review-triage.md` unter
-`k-playbook-local/results/` bleiben unverändert liegen und lassen sich danach wieder
-abarbeiten.
+umzieht und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
@@ -17,12 +15,14 @@ gebildet: welche Findings zusammengehören, was zuerst kommt, was Quick-Win ist 
 eigenen Task/Branch/PR braucht. Tasks entstehen in der Projekt-Collection, nicht auf der
 Platte.
 
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
+
 Unterstützt aktuelle und historische Formate:
 
-- Audit-Läufe wie `project:/k-playbook-local/results/<date>/review-triage.md` mit `review-input.json` — der Hauptweg.
-- Aktuelle Result-Familien wie `project:/k-playbook-local/results/<family>/<date>/review-triage.md` mit optionalem `review-input.json`.
-- Legacy-Result-Summaries wie `project:/k-playbook-local/results/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
-- Legacy-Result-Familien wie `project:/k-playbook-local/results/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, nur wenn im selben Ordner kein `review-triage.md` vorhanden ist.
+- Audit-Läufe wie `<ergebnisort>/<date>/review-triage.md` mit `review-input.json` — der Hauptweg.
+- Aktuelle Result-Familien wie `<ergebnisort>/<family>/<date>/review-triage.md` mit optionalem `review-input.json`.
+- Legacy-Result-Summaries wie `<ergebnisort>/summary-YYYY-MM-DD.md` mit priorisierten Remediation-Gruppen.
+- Legacy-Result-Familien wie `<ergebnisort>/<family>/<date>/assessment.md` mit zugehörigem `findings.md`, nur wenn im selben Ordner kein `review-triage.md` vorhanden ist.
 
 **`summary-*.md` ist ein reiner Lesepfad.** Seit dem Wegfall des nachgelagerten
 Priorisierungsschritts erzeugt nichts mehr eine Summary: weder `/k-audit` noch `/k-review`
@@ -64,11 +64,14 @@ Verbindlich für Ablage, Name und Nummer, Kopf und Aufbau eines Tasks ist
 `k-playbook:/instructions/on-demand/tasks.md`. Lies sie mit `k_playbook_doc_read`, bevor du
 einen Task anlegst oder gegen bestehende Tasks abgleichst; dieser Text wiederholt sie nicht.
 
+Der Ort der Ergebnisse:
+
+- `RESULTS_DIR` = `<ergebnisort>`
+- `KNOWN_DECISIONS` = `<ergebnisort>/known-decisions.md`
+- `LOG_FILE` = `<RESULTS_DIR>/log.md`
+
 Aus dem Briefing:
 
-- `RESULTS_DIR` = `<context.local.dir>/results`
-- `KNOWN_DECISIONS` = `<context.local.dir>/known-decisions.md`
-- `LOG_FILE` = `<RESULTS_DIR>/log.md`
 - `REMEDIATION_MODE`, `REMEDIATION_TARGET_DIR`, `REMEDIATION_TARGET_DISPLAY`,
   `REMEDIATION_GROUPING`, `REMEDIATION_QUICK_WINS`, `REMEDIATION_BRANCH_PREFIX`,
   `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus `context.remediation`.
@@ -115,7 +118,7 @@ Akzeptierte direkte Argumente:
 - `<RESULTS_DIR>/<family>/<date>/review-triage.md`
 - Legacy: `<RESULTS_DIR>/summary-*.md`, soweit im Projekt noch eine liegt
 - Legacy: `<RESULTS_DIR>/<family>/<date>/assessment.md`, wenn dort kein `review-triage.md` liegt
-- Projektrelative Varianten davon, mit oder ohne Präfix `project:/`, z. B. `project:/k-playbook-local/results/2026-07-23/review-triage.md` oder `project:/k-playbook-local/results/dependabot-alerts/2026-07-23/review-triage.md`
+- Dieselben Dateien in jeder Schreibweise des Orts, z. B. `<ergebnisort>/2026-07-23/review-triage.md` oder `<ergebnisort>/dependabot-alerts/2026-07-23/review-triage.md`
 
 Wenn nicht:
 
@@ -311,15 +314,16 @@ feste Zeile, als eigene Zeile am Zeilenanfang unter `## Kontext`, kein Listenpun
 Remediation-Anker: <QUELLE_REF> <bündel-id>
 ```
 
-`QUELLE_REF` ist die Quelle der Arbeitsdatei als Verweis, `project:/<projektrelativer Pfad>`,
-etwa `project:/k-playbook-local/results/dependabot-alerts/2026-07-23/review-triage.md`; `<bündel-id>`
+`QUELLE_REF` ist die Quelle der Arbeitsdatei als Verweis,
+etwa `<ergebnisort>/dependabot-alerts/2026-07-23/review-triage.md`; `<bündel-id>`
 die Bündel- oder Gruppen-ID, etwa `B1` oder `P1-01`.
 
 1. Je geplantem Bündel mit `k_playbook_doc_grep` über die Sorte suchen: `kind: tasks`,
    `user: "*"`, `done: true`, `pattern` = die Ankerzeile, am Zeilenanfang und am Zeilenende
    verankert, Punkte und andere Sonderzeichen maskiert, etwa
-   `^Remediation-Anker: project:/k-playbook-local/results/dependabot-alerts/2026-07-23/review-triage\.md B1$`.
-   Die Antwort nennt je Treffer `ref` und die Zeile.
+   `^Remediation-Anker: <ergebnisort>/dependabot-alerts/2026-07-23/review-triage\.md B1$`.
+   `<ergebnisort>` ist in diesem Muster ein Platzhalter: An seiner Stelle steht der Ort,
+   maskiert wie der Rest. Die Antwort nennt je Treffer `ref` und die Zeile.
 2. **Alte Tasks ohne Anker.** Ein alter Task ist einer ohne **jede** Ankerzeile; ein Task mit
    Anker für ein anderes Bündel derselben Quelle ist keiner. Gesucht wird in drei Schritten,
    jeweils mit `count_only`: Die Antwort nennt dann je Dokument einen Zähler, auch 0, und die
@@ -329,8 +333,8 @@ die Bündel- oder Gruppen-ID, etwa `B1` oder `P1-01`.
       mit `pattern` = `^Remediation-Anker: ` suchen. Jeder Task mit einem Zähler über 0 trägt
       einen Anker.
    b) **Tasks, die die Quelle nennen.** Einmal ebenso mit dem bisherigen Muster suchen:
-      `pattern` = der projektrelative Pfad der Quelle als Regex (Punkte maskiert, etwa
-      `results/dependabot-alerts/2026-07-23/review-triage\.md`). Von den Tasks mit einem Zähler über 0
+      `pattern` = der Pfad der Quelle unterhalb von `<ergebnisort>` als Regex (Punkte
+      maskiert, etwa `dependabot-alerts/2026-07-23/review-triage\.md`). Von den Tasks mit einem Zähler über 0
       jeden verwerfen, dessen `ref` unter a) einen Zähler über 0 hat. Übrig bleiben die alten
       Tasks, die die Quelle nennen.
    c) **Zuordnung zum Bündel.** Für jeden übrigen Task je geplantem Bündel mit
@@ -476,7 +480,7 @@ Nummer, Kopf und Aufbau stehen dort und werden hier nicht wiederholt:
    (Frontmatter mit `title`, Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen) mit
    Kephalaion `write` schreiben, `collection` = `context.kephalaion.address`, `name` = Pfad
    des Verweises ohne führenden `/`. Kontext = Befundtext + die Quelle als Verweis
-   `QUELLE_REF` (`project:/…`). Ziel = die saubere Lösung (kein Quick-and-Dirty). Jeder
+   `QUELLE_REF`. Ziel = die saubere Lösung (kein Quick-and-Dirty). Jeder
    Verweis im Task hat die Form aus `k-playbook:/instructions/on-demand/tasks.md`,
    „Verweise“ — Dateien des Projekts als `project:/…`.
 
@@ -487,10 +491,10 @@ Nummer, Kopf und Aufbau stehen dort und werden hier nicht wiederholt:
     wiedererkennt. Fehlt sie, entsteht beim nächsten Lauf ein zweiter Task zum selben Befund.
     Sie gilt in **jedem** `RESULT_FORMAT`. Daneben muss der Task enthalten:
 
-    - Bei `RESULT_FORMAT=audit-run`: Quelle `project:/k-playbook-local/results/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
-    - Bei `RESULT_FORMAT=result-family`: Quelle `project:/k-playbook-local/results/<family>/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
-    - Bei `RESULT_FORMAT=summary` (Legacy-Lesepfad, siehe Schritt 2): Quelle `project:/k-playbook-local/results/summary-<date>.md`, die Gruppen-ID aus der Summary (z. B. `P1-01`), dazu die von der Summary verlinkten Quellen und deren Bündel-/Finding-IDs, soweit sie dort stehen.
-    - Bei `RESULT_FORMAT=legacy-result-family`: Quelle `project:/k-playbook-local/results/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `project:/k-playbook-local/results/<family>/<date>/findings.md`, Raw-Quelle falls vorhanden und die ursprüngliche `Ort`-/`Message`-Angabe.
+    - Bei `RESULT_FORMAT=audit-run`: Quelle `<ergebnisort>/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
+    - Bei `RESULT_FORMAT=result-family`: Quelle `<ergebnisort>/<family>/<date>/review-triage.md`, Bündel-/Gruppen-ID(s) aus `review-triage.md`, Evidence aus `review-input.json` falls vorhanden, Raw-Quelle falls vorhanden und die ursprüngliche Ort-/Message-Angabe.
+    - Bei `RESULT_FORMAT=summary` (Legacy-Lesepfad, siehe Schritt 2): Quelle `<ergebnisort>/summary-<date>.md`, die Gruppen-ID aus der Summary (z. B. `P1-01`), dazu die von der Summary verlinkten Quellen und deren Bündel-/Finding-IDs, soweit sie dort stehen.
+    - Bei `RESULT_FORMAT=legacy-result-family`: Quelle `<ergebnisort>/<family>/<date>/assessment.md`, Finding-ID(s) aus `findings.md`, Arbeitsregister `<ergebnisort>/<family>/<date>/findings.md`, Raw-Quelle falls vorhanden und die ursprüngliche `Ort`-/`Message`-Angabe.
     - Bei Bündeln: Bündelname, alle Finding-IDs, gemeinsame Ursache/Fix-Route, Ziel-Root als `REMEDIATION_TARGET_REF`, vorgeschlagener Branch `<REMEDIATION_BRANCH_PREFIX><NNN>-<slug>`, PR-Pflicht aus der Remediation-Policy und ein Verifikationsplan für das Bündel.
     - Bei einem Treffer unter `done/`: den erledigten Vorgänger mit seinem `keph:`-Verweis und dem Umstand, dass derselbe Befund erneut aufgetreten ist.
     - Bei `mode: task-branch-pr` zusätzlich diese Struktur, `## Ausführungskontext` unmittelbar nach `## Intent`, `## Branch-Preflight` vor `## Zu bauen`:
@@ -645,7 +649,7 @@ Am Ende der Summary einen nachvollziehbaren Abschnitt pflegen:
 
 ## Schritt 8 — Log-Eintrag
 
-Nichts wird archiviert oder verschoben. Lauf-Verzeichnisse bleiben stabil unter `project:/k-playbook-local/results/<date>/`, Family-Verzeichnisse unter `project:/k-playbook-local/results/<family>/<date>/`; vorhandene Legacy-Summaries bleiben stabil dort liegen, wo sie liegen — direkt unter `project:/k-playbook-local/results/`. Abschluss erfolgt bei Audit-Läufen und aktuellen Result-Familien über `## Remediation-Status` in `review-triage.md`, bei Legacy-Familien über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`, bei einer Legacy-Summary direkt in der Summary.
+Nichts wird archiviert oder verschoben. Lauf-Verzeichnisse bleiben stabil unter `<ergebnisort>/<date>/`, Family-Verzeichnisse unter `<ergebnisort>/<family>/<date>/`; vorhandene Legacy-Summaries bleiben stabil dort liegen, wo sie liegen — direkt unter `<ergebnisort>/`. Abschluss erfolgt bei Audit-Läufen und aktuellen Result-Familien über `## Remediation-Status` in `review-triage.md`, bei Legacy-Familien über Statuswerte in `findings.md` und optional `## Remediation-Status` in `assessment.md`, bei einer Legacy-Summary direkt in der Summary.
 
 Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auch dann, wenn er keinen einzigen Befund geändert hat:
 

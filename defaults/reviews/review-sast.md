@@ -206,13 +206,15 @@ steckt sein Beleg schon im gemeinsamen Merge und eine Aggregation danach wäre d
 einen eigenen Family-Ordner **außerhalb** jedes Laufordners an:
 
 ```text
-k-playbook-local/results/sast/<datum>/
+<ergebnisort>/sast/<datum>/
 ```
+
+`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
 
 Sein `review-triage.md` geht direkt an `/k-remediation`:
 
 ```text
-/k-remediation k-playbook-local/results/sast/<datum>/review-triage.md
+/k-remediation <ergebnisort>/sast/<datum>/review-triage.md
 ```
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen

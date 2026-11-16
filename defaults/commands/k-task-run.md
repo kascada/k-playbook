@@ -116,8 +116,8 @@ Das Argument entscheidet:
   „ausgeführt“ nicht mehr (5a). Meldet ein Lesen oder Zählen unter dem neuen Verweis direkt
   danach `not_found` oder eine ältere Revision, ist das der Replica-Nachlauf aus
   `k-playbook:/instructions/on-demand/tasks.md`, kein fremder Schreiber.
-- Verzeichnisse und Dateipfade gibt es als Argument nicht mehr; ein solches Argument ist ein
-  Fehler mit dem Hinweis auf `/k-upgrade` (Umstellung 3.3), der Tasks von der Platte umzieht.
+- Verzeichnisse und Dateipfade gibt es als Argument nicht; ein solches Argument ist ein
+  Fehler.
 
 Je Task merkst du dir `TASK_REF` (der Verweis), `TASK_FILE` (der letzte Pfadteil, etwa
 `014-setup-tts.md`) und `TASK_STEM` (ohne `.md`).
@@ -554,7 +554,7 @@ oder ohne Snapshot (5b.1) folgt direkt 5f, Schritt 6 — kein Diff, kein Review.
 
 **3. Rezept bestimmen**, ohne es zu lesen: aus `documents.reviews` des Briefings der Eintrag
 mit `ref` `k-playbook:/reviews/review-code.md`. So greift ein Overlay unter
-`<context.local.dir>/reviews/`.
+`keph:/k-playbook/reviews/`.
 
 - Vorhanden, Herkunft nicht `disabled`: `REVIEW_RECIPE = <ref>` — der Sub-Agent führt Teil 1
   und Teil 2 des Moduls aus.
@@ -834,7 +834,7 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
 `k-playbook:/instructions/on-demand/doku-auftraege.md`; dieser Text wiederholt sie nicht.
 
 - Grundlage ist `CHANGED_PATHS` aus 5f, Schritt 6 — nur Namen, kein Diff. Code für `code` ist
-  Quelltext unter `context.project.repoRoot` außerhalb von `k-playbook-local/`, `.k-playbook/`,
+  Quelltext unter `context.project.repoRoot` außerhalb von `.k-playbook/`,
   einem liegengebliebenen Clone `k-playbook/` (Altbestand), versteckten Pfaden und
   `context.docs.exclude`; ein geändertes Manifest oder
   Lockfile betrifft `tools`.

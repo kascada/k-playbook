@@ -61,8 +61,8 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
 - Gelesen und geschrieben wird über die Verweisregel aus dem Briefing: `keph:`-Verweise mit
   `k_playbook_doc_read` bzw. Kephalaion `read`, Collection = `context.kephalaion.address`.
 - Steht `context.kephalaion.ok` nicht auf `true`, ist die Ablage nicht erreichbar. Dann gibt es
-  kein Ergebnis und keinen Rückfall auf die Platte: nichts nach `k-playbook-local/docs/`
-  schreiben, nichts von dort als gültig lesen. Sag, dass Kephalaion nicht bereit ist, nenne
+  kein Ergebnis und keinen Rückfall auf die Platte: nichts ersatzweise in eine Datei
+  schreiben, keine Datei als gültig lesen. Sag, dass Kephalaion nicht bereit ist, nenne
   `context.kephalaion.message`, und verweise auf die Projekt-Collection auf der Setup-Seite
   (`/k-gui`).
 
@@ -119,11 +119,10 @@ Dieser Abschnitt gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-
 ein, wenden den Scope aber nicht an — das Inventar liest seine Quellen nach seinem eigenen
 Vertrag, der Overlay-Skill die Repos, die er analysiert.
 
-Aus dem Briefing brauchst du dafür `context.project.dir`, `context.project.repoRoot`,
-`context.local.dir`, dazu `context.docs.exclude` und
-`context.docs.problems` — die dauerhaften Ausschlüsse des Projekts aus `K-PLAYBOOK.yaml` und
-die Einträge, die dort verworfen wurden. Der Scope ergibt sich aus Briefing und Argument,
-nicht geraten:
+Aus dem Briefing brauchst du dafür `context.project.dir`, `context.project.repoRoot`, dazu
+`context.docs.exclude` und `context.docs.problems` — die dauerhaften Ausschlüsse des
+Projekts aus `K-PLAYBOOK.yaml` und die Einträge, die dort verworfen wurden. Der Scope ergibt
+sich aus Briefing und Argument, nicht geraten:
 
 - `SCAN_ROOT = context.project.repoRoot` — immer, nicht das aktuelle Verzeichnis.
 - **Stand** — beschrieben wird der Arbeitsbaum von `SCAN_ROOT`, wie er ausgecheckt ist.
@@ -137,8 +136,8 @@ nicht geraten:
   `context.project.dir`. Fehlt er oder liegt er außerhalb, abbrechen und den Pfad nennen —
   ein anderes Projekt wird dort dokumentiert, nicht von hier. `EXTRA_PATH` ist dieser Pfad,
   sonst leer.
-- **Immer ausgeschlossen**, auch wenn das Argument hineinzeigt: `context.local.dir`
-  (`k-playbook-local/`), `<context.project.dir>/.k-playbook/` und
+- **Immer ausgeschlossen**, auch wenn das Argument hineinzeigt:
+  `<context.project.dir>/.k-playbook/` und
   `<context.project.dir>/k-playbook/` — Altbestand: ein liegengebliebener Clone von
   k-playbook aus dem früheren Modell, den `/k-upgrade` löscht; er ist Werkzeug, kein Code
   des Projekts, und wird nicht dokumentiert. Zeigt `$ARGUMENTS` in einen davon, abbrechen
@@ -170,7 +169,7 @@ den Preflight **einmal** bestätigen:
 Scope         <SCAN_ROOT> (project.repoRoot)
 Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
 Zusätzlich    <EXTRA_PATH> | —
-Immer außen   k-playbook/, k-playbook-local/, .k-playbook/, .git/
+Immer außen   k-playbook/, .k-playbook/, .git/
 Versteckt     ausgeschlossen (.*) | ausgenommen: <aus Argument oder hint>
 Aus K-PLAYBOOK.yaml  <context.docs.exclude, durch Komma getrennt> | —
               verworfen: <pattern> — <reason>   (je Eintrag aus context.docs.problems)

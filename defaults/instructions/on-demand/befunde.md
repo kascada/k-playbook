@@ -36,7 +36,8 @@ wurde, nicht sein Inhalt.
   neuen Befund.
 - **Auf einen Befund wird nicht verwiesen.** Er wartet darauf, in die Wissensablage übernommen
   zu werden, und verschwindet danach. Was ein laufendes Vorhaben als Beleg braucht, steht in
-  seinem Workbench-Thema; was der Code braucht, steht im Kommentar am Code.
+  seinem Workbench-Thema; was der Code braucht, steht im Kommentar am Code. Die Regel gilt für
+  die ganze Queue und steht in `k-playbook:/instructions/always/010-verweise.md`.
 - **Ist Kephalaion nicht erreichbar** (`kephalaion_unavailable`, `kephalaion.ok` nicht `true`),
   weichst du nicht auf die Platte aus. Sag es und gib den Befund vollständig in deiner Antwort
   wieder, damit er nicht verloren geht.
@@ -60,7 +61,7 @@ title: "<der Befund in einem Satz>"
 thema: "<wenige Worte, unter denen verwandte Befunde zusammengehören>"
 sicherheit: bestaetigt | unbestaetigt | widerlegt
 sitzung: <session aus dem Briefing>
-entstanden: arbeit | k-danke | migration
+entstanden: arbeit | k-danke
 ziel:
 ---
 ```
@@ -74,9 +75,9 @@ ziel:
 - `sitzung` ist die Kennung deiner Sitzung, das Feld `session` des Briefings (im Klartext die
   Zeile `Sitzung:`). Daran findet `/k-danke` die Befunde dieser Sitzung. Hast du das Briefing
   neu geladen, nimm die neue Kennung.
-- `entstanden` ist `arbeit` für alles, was während der Arbeit geschrieben wird, `k-danke` für
-  das, was `/k-danke` nachträgt, und `migration` für das, was `/k-upgrade` aus den früheren
-  Thema-Dateien unter `material/befunde/` übernimmt.
+- `entstanden` ist `arbeit` für alles, was während der Arbeit geschrieben wird, und `k-danke`
+  für das, was `/k-danke` nachträgt. Ein vorhandener Befund kann `migration` tragen; neu
+  vergeben wird der Wert nicht.
 - `ziel` bleibt beim Schreiben leer. Nur `/k-danke` setzt es, und nur nach Bestätigung durch
   den Nutzer: `wissen` (Projektwissen für die Wissensablage), `falle` (was man vor dem Handeln
   wissen muss), `regel` (was jedes Mal zu geschehen hat) oder `verwerfen` (nicht übernehmen).

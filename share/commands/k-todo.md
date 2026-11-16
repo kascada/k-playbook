@@ -67,14 +67,6 @@ Bei mehreren Treffern zur Auswahl stellen. Ohne Bestätigung wird nichts
 geschrieben — die unscharfe Zuordnung ist Sache des Modells, aber nicht ohne
 Rückfrage.
 
-## Schritt 3 — Nebenmeldungen weitergeben
-
-- `hint` — eine frühere Ablage liegt noch auf der Platte: ein noch nicht
-  übernommenes `k-playbook-local/data/todos.json` (Ausweg `k-playbook todo
-  migrate`) oder eine zurückgebliebene `TODO.md`, die nicht übernommen wird. Kein
-  Fehler: Die Liste zeigt, was in der Collection liegt. Den Hinweis samt
-  genanntem Ausweg weitergeben und **nicht** von Hand aufräumen.
-
 Folge-Command: keiner. Mit der Ausgabe des Aufrufs ist die Todo-Verwaltung
 abgeschlossen.
 
@@ -91,8 +83,7 @@ abgeschlossen.
 - **Die Dokumente unter `todos/` von Hand lesen oder schreiben.** Auch nicht
   „nur kurz nachsehen": es gäbe dann zwei Auslegungen des Formats, und die zweite
   ginge in keine Prüfung ein.
-- **Eine `TODO.md` oder ein `data/todos.json` schreiben oder anlegen.** Beide
-  Ablagen sind Geschichte; ein `data/todos.json` von früher übernimmt allein
-  `k-playbook todo migrate`.
+- **Eine `TODO.md` oder eine andere Datei für Todos anlegen.** Todos liegen
+  allein in der Projekt-Collection; eine Datei daneben liest kein Werkzeug.
 - **Erledigtes löschen.** Abhaken behält den Eintrag, Löschen wirft ihn weg.
 - **Bei einem Stichwort ungefragt schreiben.** Erst Treffer zeigen, dann handeln.
