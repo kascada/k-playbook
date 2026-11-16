@@ -128,6 +128,6 @@ func setTodoDone(w http.ResponseWriter, r *http.Request, done bool) {
 		return
 	}
 	writeTodoChange(w, func(dir string) (project.Todo, error) {
-		return project.UpdateTodo(r.Context(), dir, id, nil, &done)
+		return project.UpdateTodo(r.Context(), dir, id, nil, &done, nil)
 	})
 }

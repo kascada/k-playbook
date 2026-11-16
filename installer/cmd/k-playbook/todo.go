@@ -142,7 +142,7 @@ func runTodoAdd(args []string) error {
 
 func runTodoUpdate(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("erwartet wird todo update <id> [--text <text>] [--done] [--reopen]")
+		return fmt.Errorf("erwartet wird todo update <id> [--text <text>] [--origin <herkunft>] [--done] [--reopen]")
 	}
 
 	id, err := parseTodoID(args[0])
@@ -152,6 +152,7 @@ func runTodoUpdate(args []string) error {
 
 	var text *string
 	var done *bool
+	var origin *string
 	for index := 1; index < len(args); index++ {
 		switch args[index] {
 		case "--text":
@@ -161,6 +162,13 @@ func runTodoUpdate(args []string) error {
 			index++
 			value := args[index]
 			text = &value
+		case "--origin":
+			if index+1 >= len(args) {
+				return fmt.Errorf("--origin erwartet einen Wert (ein leerer Wert \"\" entfernt die Herkunft)")
+			}
+			index++
+			value := args[index]
+			origin = &value
 		case "--done":
 			if done != nil && !*done {
 				return fmt.Errorf("--done und --reopen schließen einander aus")
@@ -174,11 +182,11 @@ func runTodoUpdate(args []string) error {
 			value := false
 			done = &value
 		default:
-			return fmt.Errorf("unbekanntes Argument: %s — erwartet wird todo update <id> [--text <text>] [--done] [--reopen]", args[index])
+			return fmt.Errorf("unbekanntes Argument: %s — erwartet wird todo update <id> [--text <text>] [--origin <herkunft>] [--done] [--reopen]", args[index])
 		}
 	}
-	if text == nil && done == nil {
-		return fmt.Errorf("nichts zu ändern: erwartet wird mindestens --text, --done oder --reopen")
+	if text == nil && done == nil && origin == nil {
+		return fmt.Errorf("nichts zu ändern: erwartet wird mindestens --text, --origin, --done oder --reopen")
 	}
 
 	projectDir, err := todoProjectDir()
@@ -186,7 +194,7 @@ func runTodoUpdate(args []string) error {
 		return err
 	}
 
-	todo, err := project.UpdateTodo(context.Background(), projectDir, id, text, done)
+	todo, err := project.UpdateTodo(context.Background(), projectDir, id, text, done, origin)
 	if err != nil {
 		return docError(err)
 	}
@@ -260,8 +268,10 @@ Unterbefehle:
             Legt einen Eintrag an und vergibt die nächste Kennung. Nach dem
             Löschen des Eintrags mit der höchsten Kennung wird diese wieder
             vergeben.
-  update <id> [--text <text>] [--done] [--reopen]
-            Ändert den Text, hakt ab (--done) oder öffnet wieder (--reopen).
+  update <id> [--text <text>] [--origin <herkunft>] [--done] [--reopen]
+            Ändert den Text, setzt oder ändert die Herkunft (--origin; ein
+            leerer Wert --origin "" entfernt sie), hakt ab (--done) oder
+            öffnet wieder (--reopen). Was nicht angegeben ist, bleibt.
   delete <id>
             Entfernt einen Eintrag.
 

@@ -148,6 +148,80 @@ func TestTodoUpdateHaktAbUndOeffnetWieder(t *testing.T) {
 	}
 }
 
+// Ein Aufruf nur mit origin wird angenommen, mit Wert und mit "" (Task 160).
+// Fehlt origin, bleibt die Herkunft; "" entfernt sie.
+func TestTodoUpdateNurHerkunft(t *testing.T) {
+	root, store := newTodoProject(t)
+	store.Put("todos/001-erster.md", "---\norigin: keph:/queue/findings/x.md\n---\n\nErster\n")
+	ctx := context.Background()
+	base := todoBaseInput{ProjectDir: root}
+	update := func(input todoUpdateInput) todoEnvelope {
+		t.Helper()
+		input.todoBaseInput, input.ID = base, 1
+		result, _, err := todoUpdateTool(ctx, nil, input)
+		if err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		return decodeTodoEnvelope(t, result)
+	}
+	content := func() string {
+		t.Helper()
+		c, ok := store.Content("todos/001-erster.md")
+		if !ok {
+			t.Fatalf("Dokument fehlt: %v", store.Names())
+		}
+		return c
+	}
+
+	origin := "Task 160"
+	if envelope := update(todoUpdateInput{Origin: &origin}); !envelope.OK || envelope.Todo.Origin != origin ||
+		envelope.Todo.Text != "Erster" {
+		t.Fatalf("nur origin mit Wert: %#v %#v", envelope.Todo, envelope.Error)
+	}
+
+	// Fehlt origin, bleibt die Herkunft.
+	text := "Erster, neu"
+	if envelope := update(todoUpdateInput{Text: &text}); !envelope.OK || envelope.Todo.Origin != origin {
+		t.Fatalf("ohne origin: %#v %#v", envelope.Todo, envelope.Error)
+	}
+	if c := content(); !strings.Contains(c, "origin: Task 160\n") {
+		t.Fatalf("Herkunft ohne Angabe verloren: %q", c)
+	}
+
+	empty := ""
+	if envelope := update(todoUpdateInput{Origin: &empty}); !envelope.OK || envelope.Todo.Origin != "" ||
+		envelope.Todo.Text != text {
+		t.Fatalf("nur origin leer: %#v %#v", envelope.Todo, envelope.Error)
+	}
+	if c := content(); c != text+"\n" {
+		t.Fatalf("Herkunft nicht entfernt: %q", c)
+	}
+
+	// Nichts angegeben: die Vorprüfung weist ab und nennt origin.
+	envelope := update(todoUpdateInput{})
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" ||
+		!strings.Contains(envelope.Error.Message, "origin") {
+		t.Fatalf("leerer Aufruf: %#v", envelope)
+	}
+}
+
+// Ein fehlendes origin und ein leeres "" kommen über JSON unterscheidbar an.
+func TestTodoUpdateInputUnterscheidetFehlendUndLeer(t *testing.T) {
+	var missing, empty todoUpdateInput
+	if err := json.Unmarshal([]byte(`{"id":1,"text":"x"}`), &missing); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(`{"id":1,"origin":""}`), &empty); err != nil {
+		t.Fatal(err)
+	}
+	if missing.Origin != nil {
+		t.Fatalf("fehlendes origin: %q", *missing.Origin)
+	}
+	if empty.Origin == nil || *empty.Origin != "" {
+		t.Fatalf("leeres origin: %v", empty.Origin)
+	}
+}
+
 func TestTodoUpdateUndDeleteMeldenUnbekannteKennung(t *testing.T) {
 	root, store := newTodoProject(t)
 	store.Put("todos/001-erster.md", "Erster\n")

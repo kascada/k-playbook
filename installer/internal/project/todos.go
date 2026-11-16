@@ -306,8 +306,10 @@ func (a *todoAccess) todoNames(name string) (open, done string) {
 	return a.kind.Dir + "/" + file, a.kind.Dir + "/" + docDoneDir + "/" + file
 }
 
-// UpdateTodo ändert Text und Erledigt-Zustand eines Eintrags. Beide Argumente
-// sind optional: nil lässt das Feld, wie es ist.
+// UpdateTodo ändert Text, Erledigt-Zustand und Herkunft eines Eintrags. Alle
+// drei Argumente sind optional: nil lässt das Feld, wie es ist. Ein leerer
+// origin (nach TrimSpace) entfernt die Herkunft; ändert sich nur sie, bleiben
+// Text, Erledigt-Zustand und Ort des Eintrags unberührt.
 //
 // Abhaken schreibt done: mit dem heutigen Datum und verschiebt danach nach
 // done/ — in dieser Reihenfolge, weil rename kein Datum festhält.
@@ -317,7 +319,7 @@ func (a *todoAccess) todoNames(name string) (open, done string) {
 // (etwa outcome_unknown); der erste bleibt stehen und wird beim Lesen
 // übergangen. Jedes Schreiben bereinigt dabei ein übrig gebliebenes oder
 // fehlendes done:.
-func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, done *bool) (Todo, error) {
+func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, done *bool, origin *string) (Todo, error) {
 	var newText string
 	if text != nil {
 		newText = strings.TrimSpace(*text)
@@ -325,8 +327,8 @@ func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, do
 			return Todo{}, docRefErrorf(DocCodeInvalidInput, "leerer Text: ein Todo braucht einen Inhalt")
 		}
 	}
-	if text == nil && done == nil {
-		return Todo{}, docRefErrorf(DocCodeInvalidInput, "nichts zu ändern: erwartet wird text oder done")
+	if text == nil && done == nil && origin == nil {
+		return Todo{}, docRefErrorf(DocCodeInvalidInput, "nichts zu ändern: erwartet wird text, done oder origin")
 	}
 	access, err := openTodos(projectDir)
 	if err != nil {
@@ -340,6 +342,9 @@ func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, do
 	doc := entry.doc
 	if text != nil {
 		doc.Text = newText
+	}
+	if origin != nil {
+		doc.Origin = strings.TrimSpace(*origin)
 	}
 	toDone := entry.done
 	if done != nil {

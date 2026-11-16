@@ -212,7 +212,7 @@ func TestTodosAnlegenAbhakenWiederoeffnenLoeschen(t *testing.T) {
 
 	// Abhaken: erst done: schreiben, dann verschieben.
 	store.calls = nil
-	done, err := UpdateTodo(ctx, root, 1, nil, boolPtr(true))
+	done, err := UpdateTodo(ctx, root, 1, nil, boolPtr(true), nil)
 	if err != nil || done.Done != today() || done.DoneMigrated {
 		t.Fatalf("abhaken: %+v %v", done, err)
 	}
@@ -235,7 +235,7 @@ func TestTodosAnlegenAbhakenWiederoeffnenLoeschen(t *testing.T) {
 
 	// Wiederöffnen: erst zurück, dann das Feld entfernen.
 	store.calls = nil
-	reopened, err := UpdateTodo(ctx, root, 1, nil, boolPtr(false))
+	reopened, err := UpdateTodo(ctx, root, 1, nil, boolPtr(false), nil)
 	if err != nil || reopened.Done != "" {
 		t.Fatalf("wiederöffnen: %+v %v", reopened, err)
 	}
@@ -248,7 +248,7 @@ func TestTodosAnlegenAbhakenWiederoeffnenLoeschen(t *testing.T) {
 	}
 
 	neu := "Erster Punkt, neu gefasst"
-	changed, err := UpdateTodo(ctx, root, 1, &neu, nil)
+	changed, err := UpdateTodo(ctx, root, 1, &neu, nil, nil)
 	if err != nil || changed.Text != neu || changed.Origin != "Task 097" {
 		t.Fatalf("Text ändern: %+v %v", changed, err)
 	}
@@ -272,16 +272,16 @@ func TestTodosAnlegenAbhakenWiederoeffnenLoeschen(t *testing.T) {
 		t.Fatalf("Nummer nach dem Löschen: %+v %v", again, err)
 	}
 
-	_, err = UpdateTodo(ctx, root, 99, nil, boolPtr(true))
+	_, err = UpdateTodo(ctx, root, 99, nil, boolPtr(true), nil)
 	wantCode(t, err, DocCodeNotFound)
 	_, err = DeleteTodo(ctx, root, 99)
 	wantCode(t, err, DocCodeNotFound)
 	_, err = AddTodo(ctx, root, "   ", "")
 	wantCode(t, err, DocCodeInvalidInput)
 	blank := " "
-	_, err = UpdateTodo(ctx, root, 1, &blank, nil)
+	_, err = UpdateTodo(ctx, root, 1, &blank, nil, nil)
 	wantCode(t, err, DocCodeInvalidInput)
-	_, err = UpdateTodo(ctx, root, 1, nil, nil)
+	_, err = UpdateTodo(ctx, root, 1, nil, nil, nil)
 	wantCode(t, err, DocCodeInvalidInput)
 }
 
@@ -320,14 +320,14 @@ func TestTodosCreatedUndDoneNachDenRegeln(t *testing.T) {
 	// Das nächste Schreiben bereinigt: done: unter todos/ fällt weg, unter
 	// done/ kommt das gezeigte Datum dazu.
 	text4 := "Übrig gebliebenes done, bereinigt"
-	if _, err := UpdateTodo(ctx, root, 4, &text4, nil); err != nil {
+	if _, err := UpdateTodo(ctx, root, 4, &text4, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if c := store.docs["todos/004-rest.md"].content; c != text4+"\n" {
 		t.Fatalf("done: unter todos/ nicht bereinigt: %q", c)
 	}
 	text5 := "Erledigt ohne done, bereinigt"
-	updated, err := UpdateTodo(ctx, root, 5, &text5, nil)
+	updated, err := UpdateTodo(ctx, root, 5, &text5, nil, nil)
 	if err != nil || updated.Done != stampDate("2026-10-05T12:00:00.000Z") {
 		t.Fatalf("Todo 5: %+v %v", updated, err)
 	}
@@ -337,7 +337,7 @@ func TestTodosCreatedUndDoneNachDenRegeln(t *testing.T) {
 	// Abhaken eines schon Erledigten setzt das heutige Datum und entfernt
 	// doneMigrated, ohne zu verschieben.
 	store.calls = nil
-	redone, err := UpdateTodo(ctx, root, 6, nil, boolPtr(true))
+	redone, err := UpdateTodo(ctx, root, 6, nil, boolPtr(true), nil)
 	if err != nil || redone.Done != today() || redone.DoneMigrated {
 		t.Fatalf("Todo 6: %+v %v", redone, err)
 	}
@@ -345,11 +345,107 @@ func TestTodosCreatedUndDoneNachDenRegeln(t *testing.T) {
 		t.Fatalf("Todo 6: %v", writes)
 	}
 	// Übernommenes created bleibt beim Abhaken stehen, auch leer.
-	if done1, err := UpdateTodo(ctx, root, 1, nil, boolPtr(true)); err != nil || done1.Created != "" {
+	if done1, err := UpdateTodo(ctx, root, 1, nil, boolPtr(true), nil); err != nil || done1.Created != "" {
 		t.Fatalf("Todo 1: %+v %v", done1, err)
 	}
 	if c := store.docs["todos/done/001-leer.md"].content; !strings.Contains(c, "created: \"\"\n") {
 		t.Fatalf("leeres created verloren: %q", c)
+	}
+}
+
+func stringPtr(value string) *string { return &value }
+
+// Die Herkunft lässt sich setzen, ändern und entfernen; ohne Angabe bleibt
+// sie. Text, Erledigt-Zustand und Ort bleiben dabei unberührt (Task 160).
+func TestTodosHerkunftAendern(t *testing.T) {
+	root := todoProject(t)
+	store := newFakeTodoStore()
+	useTodoStore(t, store)
+	ctx := context.Background()
+	stamp := "2026-10-01T12:00:00.000Z"
+	store.put("todos/001-offen.md", "Offen ohne Herkunft\n", stamp, stamp)
+
+	// Setzen.
+	set, err := UpdateTodo(ctx, root, 1, nil, nil, stringPtr("  Task 160 "))
+	if err != nil || set.Origin != "Task 160" || set.Text != "Offen ohne Herkunft" || set.Done != "" {
+		t.Fatalf("setzen: %+v %v", set, err)
+	}
+	if c := store.docs["todos/001-offen.md"].content; c != "---\norigin: Task 160\n---\n\nOffen ohne Herkunft\n" {
+		t.Fatalf("Inhalt nach dem Setzen: %q", c)
+	}
+	// Ändern.
+	changed, err := UpdateTodo(ctx, root, 1, nil, nil, stringPtr("Task 161"))
+	if err != nil || changed.Origin != "Task 161" {
+		t.Fatalf("ändern: %+v %v", changed, err)
+	}
+	// Ohne Angabe bleibt sie.
+	text := "Offen, neuer Text"
+	kept, err := UpdateTodo(ctx, root, 1, &text, nil, nil)
+	if err != nil || kept.Origin != "Task 161" || kept.Text != text {
+		t.Fatalf("unverändert ohne Angabe: %+v %v", kept, err)
+	}
+	if c := store.docs["todos/001-offen.md"].content; !strings.Contains(c, "origin: Task 161\n") {
+		t.Fatalf("Herkunft verloren: %q", c)
+	}
+	// Entfernen mit leerem Wert, auch nur aus Leerraum.
+	removed, err := UpdateTodo(ctx, root, 1, nil, nil, stringPtr("  "))
+	if err != nil || removed.Origin != "" || removed.Text != text {
+		t.Fatalf("entfernen: %+v %v", removed, err)
+	}
+	if c := store.docs["todos/001-offen.md"].content; c != text+"\n" {
+		t.Fatalf("Inhalt nach dem Entfernen: %q", c)
+	}
+	if open, _ := ListTodos(ctx, root); len(open) != 1 || open[0].Origin != "" {
+		t.Fatalf("offen nach dem Entfernen: %+v", open)
+	}
+
+	// Alle drei fehlen: nichts zu ändern.
+	_, err = UpdateTodo(ctx, root, 1, nil, nil, nil)
+	wantCode(t, err, DocCodeInvalidInput)
+}
+
+// Nur die Herkunft eines erledigten Todos ändern: Es bleibt unter
+// todos/done/, Text und done: bleiben; fehlt done:, trägt der Rückfall das
+// gezeigte Datum ein (Task 160).
+func TestTodosHerkunftErledigterTodos(t *testing.T) {
+	root := todoProject(t)
+	store := newFakeTodoStore()
+	useTodoStore(t, store)
+	ctx := context.Background()
+	stamp := "2026-10-01T12:00:00.000Z"
+	store.put("todos/done/001-mit.md", "---\norigin: keph:/queue/findings/x.md\ndone: 2026-10-02\ndoneMigrated: true\n---\n\nErledigt mit done\n", stamp, stamp)
+	store.put("todos/done/002-ohne.md", "Erledigt ohne done\n", stamp, "2026-10-05T12:00:00.000Z")
+
+	store.calls = nil
+	updated, err := UpdateTodo(ctx, root, 1, nil, nil, stringPtr(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Todo{ID: 1, Text: "Erledigt mit done", Created: stampDate(stamp), Done: "2026-10-02", DoneMigrated: true}
+	if updated != want {
+		t.Fatalf("Todo 1: %+v, erwartet %+v", updated, want)
+	}
+	if writes := store.writes(); len(writes) != 1 || !strings.HasPrefix(writes[0], "write todos/done/001-mit.md @") {
+		t.Fatalf("Todo 1 verschoben oder mehrfach geschrieben: %v", writes)
+	}
+	if c := store.docs["todos/done/001-mit.md"].content; c != "---\ndone: 2026-10-02\ndoneMigrated: true\n---\n\nErledigt mit done\n" {
+		t.Fatalf("Todo 1, Inhalt: %q", c)
+	}
+
+	store.calls = nil
+	updated, err = UpdateTodo(ctx, root, 2, nil, nil, stringPtr("Task 160"))
+	fallback := stampDate("2026-10-05T12:00:00.000Z")
+	if err != nil || updated.Origin != "Task 160" || updated.Text != "Erledigt ohne done" || updated.Done != fallback {
+		t.Fatalf("Todo 2: %+v %v", updated, err)
+	}
+	if writes := store.writes(); len(writes) != 1 || !strings.HasPrefix(writes[0], "write todos/done/002-ohne.md @") {
+		t.Fatalf("Todo 2 verschoben oder mehrfach geschrieben: %v", writes)
+	}
+	if c := store.docs["todos/done/002-ohne.md"].content; c != "---\norigin: Task 160\ndone: "+fallback+"\n---\n\nErledigt ohne done\n" {
+		t.Fatalf("Todo 2, Inhalt: %q", c)
+	}
+	if done, _ := ListDoneTodos(ctx, root); len(done) != 2 {
+		t.Fatalf("erledigte: %+v", done)
 	}
 }
 
@@ -403,7 +499,7 @@ func TestTodosZweiterSchrittScheitert(t *testing.T) {
 	store.put("todos/001-a.md", "A\n", stamp, stamp)
 	store.failOn["rename"] = &kephalaion.ToolError{Tool: "rename", Code: kephalaion.CodeOutcomeUnknown, Message: "Ausgang offen"}
 
-	_, err := UpdateTodo(context.Background(), root, 1, nil, boolPtr(true))
+	_, err := UpdateTodo(context.Background(), root, 1, nil, boolPtr(true), nil)
 	wantCode(t, err, DocCodeOutcomeUnknown)
 	if !strings.Contains(err.Error(), "done/") || !strings.Contains(err.Error(), "k-playbook todo list --all") {
 		t.Fatalf("Meldung: %v", err)
@@ -429,7 +525,7 @@ func TestTodosVeralteteRevision(t *testing.T) {
 	stale := &staleTodoStore{fakeTodoStore: store}
 	useTodoStore(t, stale)
 	text := "B"
-	_, err := UpdateTodo(context.Background(), root, 1, &text, nil)
+	_, err := UpdateTodo(context.Background(), root, 1, &text, nil, nil)
 	wantCode(t, err, DocCodeStaleRevision)
 	if store.docs["todos/001-a.md"].content != "von anderswo\n" {
 		t.Fatalf("fremde Änderung überschrieben: %q", store.docs["todos/001-a.md"].content)

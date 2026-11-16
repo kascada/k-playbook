@@ -168,6 +168,40 @@ func TestTodoAddListUndAbhaken(t *testing.T) {
 	}
 }
 
+// todo update <id> --origin <wert> und --origin "" ohne weitere Optionen
+// werden angenommen; der leere Wert entfernt die Herkunft (Task 160).
+func TestTodoUpdateNurHerkunft(t *testing.T) {
+	store := todoProjectStore(t)
+	todoProjectRoot(t)
+	store.Put("todos/001-erster.md", "---\norigin: keph:/queue/findings/x.md\n---\n\nErster\n")
+
+	output, err := runTodoCaptured(t, "update", "1", "--origin", "Task 160")
+	if err != nil {
+		t.Fatalf("todo update --origin: %v", err)
+	}
+	if got := decodeTodoOutput[todoEntryOutput](t, output); got.Todo.Origin != "Task 160" || got.Todo.Text != "Erster" {
+		t.Fatalf("Herkunft gesetzt: %+v", got.Todo)
+	}
+
+	output, err = runTodoCaptured(t, "update", "1", "--origin", "")
+	if err != nil {
+		t.Fatalf("todo update --origin \"\": %v", err)
+	}
+	if got := decodeTodoOutput[todoEntryOutput](t, output); got.Todo.Origin != "" || got.Todo.Text != "Erster" {
+		t.Fatalf("Herkunft entfernt: %+v", got.Todo)
+	}
+	if c, _ := store.Content("todos/001-erster.md"); c != "Erster\n" {
+		t.Fatalf("Inhalt nach dem Entfernen: %q", c)
+	}
+
+	if _, err := runTodoCaptured(t, "update", "1", "--origin"); err == nil {
+		t.Error("--origin ohne Wert angenommen")
+	}
+	if _, err := runTodoCaptured(t, "update", "1"); err == nil || !strings.Contains(err.Error(), "--origin") {
+		t.Errorf("update ohne Option: %v", err)
+	}
+}
+
 func TestTodoLehntUnbekannteKennungUndLeerenTextAb(t *testing.T) {
 	todoProject(t)
 

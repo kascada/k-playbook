@@ -348,7 +348,7 @@ then nothing is written and the interface says so.
 | `k_playbook_review_write_ai_entry` | **temporarily unavailable**, answers `reviews_paused`; otherwise: write the status and result of an AI review entry |
 | `k_playbook_todo_list` | list the project todos; `includeDone` adds the completed ones, `search` filters by text |
 | `k_playbook_todo_add` | add a todo and assign the next id |
-| `k_playbook_todo_update` | change the text, tick a todo off, or reopen it |
+| `k_playbook_todo_update` | change the text, tick a todo off, reopen it, or set, change or remove its origin (`origin`; `""` removes it) |
 | `k_playbook_todo_delete` | remove a todo permanently |
 | `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/reviews/…`, `/guidelines/…` (shipped only) and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`, `docs`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
@@ -661,6 +661,14 @@ The text of the todo.
 - **The body is `text`.** The frontmatter carries only `origin` (optional), `done` (a date, only
   under `done/`), `doneMigrated` (optional, `true`) and `created` (only for migrated entries);
   other fields are kept as they are. A todo without any of them has no frontmatter.
+- **`origin` is changed through the tools, not with Kephalaion's `write`** (task 160):
+  `k_playbook_todo_update` with `origin` and `k-playbook todo update <id> --origin <value>` set
+  or change it; an empty value (`""`, also whitespace only) removes the field. Without
+  `origin` it stays as it is; `text`, `done` and `origin` are each optional, but at least one is
+  required (`invalid_input` otherwise). Changing only `origin` leaves the text, the done state
+  and the location (`todos/` or `todos/done/`) as they are; an existing `done:` is kept, a
+  missing one under `done/` is filled in from the fallback below. In the tool's schema `origin`
+  is optional, so a missing field and `""` stay distinguishable. The GUI does not change it.
 - **`created`:** if `created:` is in the frontmatter it applies, even when empty -- migrated
   entries without a date stay empty, timestamps are not invented. Otherwise Kephalaion's
   `created` stamp applies. Always a date `YYYY-MM-DD`.

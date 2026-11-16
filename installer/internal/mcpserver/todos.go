@@ -48,6 +48,10 @@ type todoUpdateInput struct {
 	ID   int     `json:"id" jsonschema:"Pflicht. Kennung des Eintrags."`
 	Text *string `json:"text,omitempty" jsonschema:"Neuer Text. Ohne Angabe bleibt der bestehende."`
 	Done *bool   `json:"done,omitempty" jsonschema:"true hakt ab, false öffnet wieder. Ohne Angabe bleibt der Erledigt-Zustand."`
+	// Origin ist ein Zeiger wie Text und Done: Nur so sind ein fehlendes Feld
+	// (Herkunft bleibt) und ein leerer Wert (Herkunft wird entfernt)
+	// unterscheidbar — anders als bei todoAddInput.Origin.
+	Origin *string `json:"origin,omitempty" jsonschema:"Neue Herkunftsnotiz, etwa \"Task 026\". Ein leerer Wert entfernt sie. Ohne Angabe bleibt die bestehende."`
 }
 
 type todoDeleteInput struct {
@@ -94,8 +98,8 @@ func addTodoTools(server *mcp.Server) {
 	}, todoAddTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: todoToolUpdate,
-		Description: "Ändert Text oder Erledigt-Zustand eines Todos. Abhaken behält den Eintrag und verschiebt ihn " +
-			"nach todos/done/; stale_revision: Das Todo hat sich seit dem Lesen geändert, neu listen und noch einmal." +
+		Description: "Ändert Text, Erledigt-Zustand oder Herkunft (origin) eines Todos; ein leerer origin entfernt " +
+			"die Herkunft. Abhaken behält den Eintrag und verschiebt ihn nach todos/done/; stale_revision: Das Todo hat sich seit dem Lesen geändert, neu listen und noch einmal." +
 			todoStateHelp + todoWriteHelp + " Hülle über `k-playbook todo update`.",
 	}, todoUpdateTool)
 	mcp.AddTool(server, &mcp.Tool{
@@ -165,11 +169,11 @@ func todoAddTool(ctx context.Context, req *mcp.CallToolRequest, input todoAddInp
 
 func todoUpdateTool(ctx context.Context, req *mcp.CallToolRequest, input todoUpdateInput) (*mcp.CallToolResult, any, error) {
 	return wrapTodoTool(todoToolUpdate, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
-		if input.Text == nil && input.Done == nil {
+		if input.Text == nil && input.Done == nil && input.Origin == nil {
 			return todoErrorResult(todoToolUpdate, projectDir, "invalid_input",
-				fmt.Errorf("nichts zu ändern: erwartet wird text oder done"))
+				fmt.Errorf("nichts zu ändern: erwartet wird text, done oder origin"))
 		}
-		todo, err := project.UpdateTodo(ctx, projectDir, input.ID, input.Text, input.Done)
+		todo, err := project.UpdateTodo(ctx, projectDir, input.ID, input.Text, input.Done, input.Origin)
 		if err != nil {
 			return todoErrorResult(todoToolUpdate, projectDir, todoErrorCode(err, "failed"), err)
 		}
