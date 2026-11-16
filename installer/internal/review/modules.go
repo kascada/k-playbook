@@ -32,10 +32,6 @@ var moduleSearchExcluded = map[string]bool{
 	// Task 156, mit eigenem Modul. Sein Code ist ausgeliefertes Material,
 	// nicht Code des Projekts.
 	"k-playbook": true,
-	// Ergebnisse, Tasks und Notizen — hier ganz und nicht nur results/ wie in
-	// den Scans: Projektcode liegt dort keiner, ein Modul hätte nichts zu
-	// suchen.
-	"k-playbook-local": true,
 	// Eingebundene Fremdquellen. Ihr Manifest gehört dem, von dem sie stammen.
 	"vendor":       true,
 	"node_modules": true,

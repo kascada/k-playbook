@@ -94,28 +94,19 @@ func TestAssistantHandlerZiehtUmbenennungNach(t *testing.T) {
 }
 
 // Die Karte nennt, was das Einrichten an AGENTS.md nachgezogen hat: den neuen
-// Aufruf beim ersetzten Anstoß und die entfernten Blöcke mit dem Grund. Der
-// Hinweis auf einen Block ohne Grenze kommt als Fehler des Einrichtens in den
-// Text und steht deshalb nicht noch einmal hier.
+// Aufruf beim ersetzten Anstoß. Der Hinweis auf einen Anstoß ohne Grenze kommt
+// als Fehler des Einrichtens in den Text und steht deshalb nicht noch einmal
+// hier.
 func TestDescribeSetupNenntNachzugAnAgents(t *testing.T) {
-	setup := project.AssistantSetup{
-		RootRefreshed:        true,
-		RootAnstossRefreshed: true,
-		RootBlocksRemoved:    []string{"Session-Memory-Block", "Befunde-Block"},
-	}
-	setup.Root.Hint = "das Ende des abgelösten Befunde-Blocks ließ sich nicht bestimmen"
+	setup := project.AssistantSetup{RootRefreshed: true}
+	setup.Root.Hint = "das Ende des veralteten Anstoßblocks ließ sich nicht bestimmen"
 
 	text := describeSetup(setup)
 	if strings.Contains(text, setup.Root.Hint) {
 		t.Errorf("der Hinweis stünde doppelt im Text: %s", text)
 	}
-	for _, erwartet := range []string{
-		"auf den aktuellen Aufruf gebracht (k-playbook briefing)",
-		"Session-Memory-Block und Befunde-Block aus AGENTS.md entfernt; der Inhalt kommt mit dem Briefing.",
-	} {
-		if !strings.Contains(text, erwartet) {
-			t.Errorf("%q fehlt in: %s", erwartet, text)
-		}
+	if erwartet := "auf den aktuellen Aufruf gebracht (k-playbook briefing)"; !strings.Contains(text, erwartet) {
+		t.Errorf("%q fehlt in: %s", erwartet, text)
 	}
 	if strings.Contains(text, "k-playbook context") {
 		t.Errorf("der abgelöste Aufruf steht in der Meldung: %s", text)

@@ -174,25 +174,9 @@ func TestRegistrySourcePresent(t *testing.T) {
 	}
 }
 
-// Der frühere Ort k-playbook-local/<sorte>/ wird seit Task 129 nicht mehr
-// gelesen: weder ein neuer Name noch eine abschaltende leere Datei wirkt dort.
-func TestResolveRegistryLiestAltenOrtNicht(t *testing.T) {
+// Projekteigene Commands liegen unter .k-playbook/commands/.
+func TestProjectAssetDirLiegtUnterProjectDir(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "mitgeliefert\n")
-	writeFile(t, filepath.Join(shipped(t), "skills", "alpha", skillFileName), "# Alpha\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-a.md"), "")
-	writeFile(t, filepath.Join(root, LocalDirName, "commands", "k-alt.md"), "alt\n")
-	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alpha", skillFileName), "")
-	writeFile(t, filepath.Join(root, LocalDirName, "skills", "alt", skillFileName), "# Alt\n\nText.\n")
-
-	commands := ResolveRegistry(root, KindCommands)
-	if len(commands) != 1 || commands[0].Name != "k-a.md" || commands[0].Origin != "dist" || commands[0].Disabled {
-		t.Errorf("Commands: %+v, erwartet nur k-a.md mitgeliefert", commands)
-	}
-	skills := ResolveRegistry(root, KindSkills)
-	if len(skills) != 1 || skills[0].Name != "alpha" || skills[0].Origin != "dist" || skills[0].Disabled {
-		t.Errorf("Skills: %+v, erwartet nur alpha mitgeliefert", skills)
-	}
 	if want := filepath.Join(root, ProjectDirName, "commands"); ProjectAssetDir(root, KindCommands) != want {
 		t.Errorf("ProjectAssetDir = %q, erwartet %q", ProjectAssetDir(root, KindCommands), want)
 	}

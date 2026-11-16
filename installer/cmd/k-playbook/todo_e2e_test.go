@@ -40,9 +40,6 @@ func todoProjectRoot(t *testing.T) string {
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
-	if err := os.MkdirAll(project.LocalDir(root), 0o755); err != nil {
-		t.Fatalf("k-playbook-local anlegen: %v", err)
-	}
 
 	before, err := os.Getwd()
 	if err != nil {
@@ -89,15 +86,10 @@ func decodeTodoOutput[T any](t *testing.T, output string) T {
 }
 
 // --help ist der Rauchtest nach einem Release: Exit 0, Kurzhilfe, und die
-// Daten bleiben unangetastet — eine vorhandene TODO.md liegt danach
-// unverändert da, und die Collection wird nicht gefragt.
+// Collection wird nicht gefragt.
 func TestTodoHilfeIstFolgenlos(t *testing.T) {
 	store := todoProjectStore(t)
-	root := todoProjectRoot(t)
-	legacy := project.LegacyTodoFile(root)
-	if err := os.WriteFile(legacy, []byte("- [ ] Unangetastet\n"), 0o644); err != nil {
-		t.Fatalf("TODO.md anlegen: %v", err)
-	}
+	todoProjectRoot(t)
 
 	for _, args := range [][]string{{}, {"--help"}, {"help"}} {
 		output, err := runTodoCaptured(t, args...)
@@ -109,16 +101,6 @@ func TestTodoHilfeIstFolgenlos(t *testing.T) {
 		}
 	}
 
-	content, err := os.ReadFile(legacy)
-	if err != nil {
-		t.Fatalf("TODO.md fehlt nach der Hilfe: %v", err)
-	}
-	if string(content) != "- [ ] Unangetastet\n" {
-		t.Errorf("TODO.md wurde verändert: %q", content)
-	}
-	if pathExistsForTest(project.TodoFile(root)) {
-		t.Error("die Hilfe hat data/todos.json angelegt")
-	}
 	if len(store.Calls) != 0 {
 		t.Errorf("die Hilfe hat Kephalaion gefragt: %v", store.Calls)
 	}
@@ -252,51 +234,11 @@ func TestTodoListSucht(t *testing.T) {
 	}
 }
 
-// import gibt es nicht mehr; vor der Übernahme von data/todos.json sind
-// Schreibvorgänge mit Code abgelehnt, die Liste geht.
-func TestTodoOhneImportUndNichtUebernommen(t *testing.T) {
-	root := todoProject(t)
+// import gibt es nicht mehr.
+func TestTodoOhneImport(t *testing.T) {
+	todoProject(t)
 	if _, err := runTodoCaptured(t, "import", "x.md"); err == nil || !strings.Contains(err.Error(), "unbekannter Unterbefehl") {
 		t.Fatalf("import: %v", err)
-	}
-	if err := os.MkdirAll(project.TodoDataDir(root), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(project.TodoFile(root), []byte(`{"todos":[]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	output, err := runTodoCaptured(t, "list")
-	if err != nil || !strings.Contains(decodeTodoOutput[todoListOutput](t, output).Hint, "k-playbook todo migrate") {
-		t.Fatalf("list: %v %s", err, output)
-	}
-	if _, err := runTodoCaptured(t, "add", "neu"); err == nil || !strings.Contains(err.Error(), project.TodoCodeNotMigrated) {
-		t.Fatalf("add vor der Übernahme: %v", err)
-	}
-}
-
-func TestTodoMigrateUebernimmt(t *testing.T) {
-	store := todoProjectStore(t)
-	root := todoProjectRoot(t)
-	if err := os.MkdirAll(project.TodoDataDir(root), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(project.TodoFile(root), []byte(`{"schemaVersion":1,"nextId":3,"todos":[
-		{"id":2,"text":"Zweiter","created":"2026-09-01","done":"2026-09-02","origin":"Test"}]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	output, err := runTodoCaptured(t, "migrate")
-	if err != nil {
-		t.Fatalf("todo migrate: %v", err)
-	}
-	result := decodeTodoOutput[project.TodoMigration](t, output)
-	if result.Mode != "first" || len(result.Created) != 1 || result.Created[0].Name != "todos/done/002-zweiter.md" {
-		t.Fatalf("Ergebnis: %+v", result)
-	}
-	if _, ok := store.Content("todos/done/002-zweiter.md"); !ok || pathExistsForTest(project.TodoFile(root)) {
-		t.Fatalf("nicht übernommen: %v", store.Names())
-	}
-	if _, err := runTodoCaptured(t, "migrate", "x"); err == nil {
-		t.Error("migrate mit Argument angenommen")
 	}
 }
 

@@ -64,7 +64,7 @@ func moduleScanner(job string, tool string, args ...string) Scanner {
 
 func neuerLauf(t *testing.T, entries ...Entry) string {
 	t.Helper()
-	runDir, err := CreateRun(newLocalDir(t), day(t, "2026-08-16"), []string{"python", "go"}, entries)
+	runDir, err := CreateRun(newResultsDir(t), day(t, "2026-08-16"), []string{"python", "go"}, entries)
 	if err != nil {
 		t.Fatalf("CreateRun: %v", err)
 	}

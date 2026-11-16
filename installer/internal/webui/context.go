@@ -26,7 +26,6 @@ type contextDisplay struct {
 	ProjectDir string `json:"projectDir"`
 	RepoRoot   string `json:"repoRoot"`
 	Config     string `json:"config"`
-	Local      string `json:"local"`
 }
 
 func contextHandler(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +56,6 @@ func contextHandler(w http.ResponseWriter, r *http.Request) {
 			ProjectDir: project.DisplayPath(built.Project.Dir),
 			RepoRoot:   project.DisplayPath(built.Project.RepoRoot),
 			Config:     project.DisplayPath(built.Project.Config),
-			Local:      project.DisplayPath(built.Local.Dir),
 		},
 	})
 }

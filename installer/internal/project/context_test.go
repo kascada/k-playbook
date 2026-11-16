@@ -9,20 +9,14 @@ import (
 	"time"
 )
 
-// newContextProject baut ein Projekt mit mitgelieferter Ebene (test-defaults/)
-// und lokalem Verzeichnis.
+// newContextProject baut ein Projekt mit mitgelieferter Ebene (test-defaults/).
 func newContextProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	for _, dir := range []string{
-		filepath.Join(root, testDefaultsDir, "reviews"),
-		filepath.Join(LocalDir(root), "reviews"),
-		filepath.Join(LocalDir(root), "guidelines"),
-	} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("%s anlegen: %v", dir, err)
-		}
+	dir := filepath.Join(root, testDefaultsDir, "reviews")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("%s anlegen: %v", dir, err)
 	}
 	writeFile(t, ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
 	return root
@@ -55,19 +49,12 @@ func TestBuildContextLoestKatalogeAuf(t *testing.T) {
 	write(t, filepath.Join(root, testDefaultsDir, "reviews", "review-tech.md"), "# mitgeliefert\n")
 	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-code.md"), "# eigene Fassung\n\nText.\n")
 	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-eigen.md"), "# nur lokal\n\nText.\n")
-	// Der frühere Ort k-playbook-local/reviews/ wird nicht mehr gelesen
-	// (Task 143): Weder schaltet diese leere Datei ab, noch kommt ein Rezept
-	// hinzu.
-	write(t, filepath.Join(LocalDir(root), "reviews", "review-tech.md"), "")
-	write(t, filepath.Join(LocalDir(root), "reviews", "review-alt.md"), "# alter Ort\n")
-	// Ein liegengebliebenes k-playbook-local/rules/ ergibt keinen Katalog:
-	// Die Sorte gibt es nicht mehr.
-	write(t, filepath.Join(LocalDir(root), "rules", "eigene.md"), "# liegengeblieben\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
+	// Einen Katalog rules gibt es nicht: Die Sorte ist entfallen.
 	if _, ok := context.Catalogs["rules"]; ok {
 		t.Errorf("Katalog der entfallenen Sorte rules: %+v", context.Catalogs["rules"])
 	}
@@ -141,14 +128,13 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	}
 }
 
-// Den Katalog checks gibt es nicht mehr (Task 155): Liegengebliebene
-// Verzeichnisse k-playbook/checks/ und k-playbook-local/checks/ ergeben
-// keinen Katalog, weder in der Kontextausgabe noch im JSON.
+// Den Katalog checks gibt es nicht mehr (Task 155): Ein liegengebliebenes
+// Verzeichnis k-playbook/checks/ ergibt keinen Katalog, weder in der
+// Kontextausgabe noch im JSON.
 func TestBuildContextOhneKatalogChecks(t *testing.T) {
 	root := newContextProject(t)
 
 	write(t, filepath.Join(PlaybookDir(root), "checks", "check_secrets.sh"), "#!/bin/sh\necho x\n")
-	write(t, filepath.Join(LocalDir(root), "checks", "check_eigen.sh"), "#!/bin/sh\necho eigen\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -329,8 +315,8 @@ func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 		t.Fatalf("BuildContext: %v", err)
 	}
 
-	if context.Local.Dir != LocalDir(root) {
-		t.Errorf("Local.Dir = %q", context.Local.Dir)
+	if context.Project.Dir != root {
+		t.Errorf("Project.Dir = %q, erwartet %q", context.Project.Dir, root)
 	}
 	if context.Project.VCS != "git" {
 		t.Errorf("VCS = %q", context.Project.VCS)
@@ -340,12 +326,9 @@ func TestBuildContextLiefertPfadeUndRemediation(t *testing.T) {
 	}
 }
 
-// Das Feld guidelines gibt es nicht mehr (Task 148): Dateien unter
-// k-playbook-local/guidelines/ nennt die Kontextausgabe nicht, auch wenn sie
-// daliegen.
+// Das Feld guidelines gibt es nicht mehr (Task 148).
 func TestBuildContextNenntKeineGuidelines(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(LocalDir(root), "guidelines", "stil.md"), "# Vorgabe\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -362,18 +345,14 @@ func TestBuildContextNenntKeineGuidelines(t *testing.T) {
 	if _, ok := fields["guidelines"]; ok {
 		t.Errorf("die Kontextausgabe trägt guidelines: %s", fields["guidelines"])
 	}
-	if strings.Contains(string(data), "stil.md") {
-		t.Errorf("die Kontextausgabe nennt die lokale Guideline:\n%s", data)
-	}
 }
 
 // Das Feld instructions gibt es nicht mehr (Task 148): Eine k-playbook.md in
-// einem liegengebliebenen Clone k-playbook/ oder in k-playbook-local/ nennt
-// die Kontextausgabe nicht, auch wenn die Datei daliegt.
+// einem liegengebliebenen Clone k-playbook/ nennt die Kontextausgabe nicht,
+// auch wenn die Datei daliegt.
 func TestBuildContextNenntKeineInstructions(t *testing.T) {
 	root := newContextProject(t)
 	write(t, filepath.Join(PlaybookDir(root), "k-playbook.md"), "# mitgeliefert\n")
-	write(t, filepath.Join(LocalDir(root), "k-playbook.md"), "# projekteigen\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -397,7 +376,8 @@ func TestBuildContextNenntKeineInstructions(t *testing.T) {
 
 // Das Feld playbook gibt es nicht mehr (Task 157): Die Kontextausgabe nennt
 // keinen Ort einer Installation im Projekt, auch wenn ein liegengebliebener
-// Clone k-playbook/ daliegt. Die Wurzeln sind project.dir und local.dir.
+// Clone k-playbook/ daliegt. Auch das Feld local ist entfallen (Task 159):
+// Die einzige Wurzel ist project.dir.
 func TestBuildContextNenntKeinPlaybook(t *testing.T) {
 	root := newContextProject(t)
 	write(t, filepath.Join(PlaybookDir(root), "VERSION"), "v0.0.0\n")
@@ -420,14 +400,13 @@ func TestBuildContextNenntKeinPlaybook(t *testing.T) {
 	if _, ok := fields["playbook"]; ok {
 		t.Errorf("die Kontextausgabe trägt playbook: %s", fields["playbook"])
 	}
-	for _, kept := range []string{"project", "local"} {
-		if _, ok := fields[kept]; !ok {
-			t.Errorf("die Kontextausgabe trägt %s nicht:\n%s", kept, data)
-		}
+	if _, ok := fields["project"]; !ok {
+		t.Errorf("die Kontextausgabe trägt project nicht:\n%s", data)
 	}
-	// Der Pfad des Clones steht nirgends, auch nicht unter anderem Namen;
-	// k-playbook-local/ beginnt gleich und ist deshalb mit Anführungszeichen
-	// abgegrenzt.
+	if _, ok := fields["local"]; ok {
+		t.Errorf("die Kontextausgabe trägt local: %s", fields["local"])
+	}
+	// Der Pfad des Clones steht nirgends, auch nicht unter anderem Namen.
 	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(data), string(quoted)) {
 		t.Errorf("die Kontextausgabe nennt %s:\n%s", PlaybookDir(root), data)
 	}

@@ -64,7 +64,8 @@ func TestDescribeJobUebersprungen(t *testing.T) {
 // Ohne den Clone <projekt>/k-playbook/ verweigert scan nicht mehr mit „die
 // Installation … fehlt“ (Task 154). Geprüft wird der Teil hinter der Pause:
 // runScan als Ganzes endet zurzeit immer an review.Paused und bestünde auch
-// mit der Sperre.
+// mit der Sperre. Das Ergebnisverzeichnis kommt über die Naht
+// review.ResultsDirOverride, die nur Tests setzen.
 func TestScanRunOhneCloneVerlangtKeineInstallation(t *testing.T) {
 	root := t.TempDir()
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
@@ -72,6 +73,8 @@ func TestScanRunOhneCloneVerlangtKeineInstallation(t *testing.T) {
 		t.Fatalf("%s/ darf es im Testprojekt nicht geben: %v", project.PlaybookDirName, err)
 	}
 	t.Chdir(root)
+	review.ResultsDirOverride = filepath.Join(root, "ergebnisse")
+	t.Cleanup(func() { review.ResultsDirOverride = "" })
 
 	err := scanRun([]string{"kein-lauf"})
 	if err == nil {
@@ -83,6 +86,19 @@ func TestScanRunOhneCloneVerlangtKeineInstallation(t *testing.T) {
 	}
 	if !strings.Contains(got, "kein-lauf ist nicht lesbar") {
 		t.Errorf("Fehler = %q, erwartet, dass scan bis zum Lesen des Laufs kommt", got)
+	}
+}
+
+// Ohne die Naht kennt scan keinen Ort der Review-Ergebnisse: Der Teil hinter
+// der Pause endet mit review.ErrResultsDirUndecided, bevor er einen Lauf
+// liest.
+func TestScanRunOhneOrtMeldetUnentschieden(t *testing.T) {
+	root := t.TempDir()
+	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
+	t.Chdir(root)
+
+	if err := scanRun([]string{"kein-lauf"}); !errors.Is(err, review.ErrResultsDirUndecided) {
+		t.Errorf("Fehler = %v, erwartet %v", err, review.ErrResultsDirUndecided)
 	}
 }
 

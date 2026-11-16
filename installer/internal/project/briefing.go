@@ -44,8 +44,10 @@ import (
 // documents.always.content, Fassung 4 den Abschnitt health, Fassung 5 die
 // Sitzungskennung session; in Fassung 6 entfällt documents.rules, die Sorte
 // rules gibt es nicht mehr; in Fassung 7 entfällt context.playbook, den Clone
-// k-playbook/ im Projekt gibt es nicht mehr.
-const BriefingSchemaVersion = "7"
+// k-playbook/ im Projekt gibt es nicht mehr; in Fassung 8 entfällt
+// context.local, Projekteigenes liegt in der Collection und unter
+// .k-playbook/.
+const BriefingSchemaVersion = "8"
 
 // BriefingOriginDisabled ist die Herkunft eines Eintrags, den ein leerer
 // lokaler Eintrag abgeschaltet hat. Im Briefing ersetzt sie die Herkunft, denn
@@ -394,8 +396,8 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 // kommt (startDir; projectDir ist das daraus gefundene Projekt). Der Rest
 // kommt dann aus ContextForDir(startDir) — genau wie `k-playbook context` im
 // selben Verzeichnis —, und context.github liest das Remote des Repos, in dem
-// startDir liegt: ein eigenes Repo unterhalb des Projekts (k-playbook-local/)
-// bekommt sein eigenes.
+// startDir liegt: ein eigenes Repo unterhalb des Projekts bekommt sein
+// eigenes.
 func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) (Briefing, error) {
 	layers := ProjectDocLayers(projectDir)
 	briefing := Briefing{

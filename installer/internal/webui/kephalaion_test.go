@@ -68,9 +68,6 @@ func kephProject(t *testing.T) (root string) {
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
-	if err := os.MkdirAll(project.LocalDir(root), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if out, err := exec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v %s", err, out)
 	}
@@ -182,9 +179,6 @@ func TestKephalaionSaveWritesOnlyAfterPassedTest(t *testing.T) {
 	}
 	if config, _ := project.ReadConfig(root); config.Kephalaion.Binding().Address() != "vm:k-playbook" {
 		t.Fatalf("gelesen: %+v", config.Kephalaion)
-	}
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), kephalaion.LegacyFileName)); !os.IsNotExist(err) {
-		t.Fatal("alte lokale Datei angelegt")
 	}
 
 	// Der Zwischenspeicher ist verworfen: die Anzeige zeigt sofort ok, mit

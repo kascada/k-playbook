@@ -118,17 +118,14 @@ func describeSetup(setup project.AssistantSetup) string {
 	case setup.RootExtended:
 		parts = append(parts, "Der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
 	}
-	if setup.RootAnstossRefreshed {
+	if setup.RootRefreshed {
 		parts = append(parts, "Der veraltete Anstoß in "+project.RootInstructionsFile+
 			" wurde auf den aktuellen Aufruf gebracht ("+project.InstalledCommandName+" briefing).")
-	}
-	if len(setup.RootBlocksRemoved) > 0 {
-		parts = append(parts, describeRemovedBlocks(setup.RootBlocksRemoved))
 	}
 	if len(setup.ConfigBlocksRemoved) > 0 {
 		parts = append(parts, project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
 	}
-	// Ein Block, der sich nicht abgrenzen ließ (Root.Hint), steht nicht hier:
+	// Ein Anstoß, der sich nicht abgrenzen ließ (Root.Hint), steht nicht hier:
 	// er kommt als Fehler aus ApplyAssistantSetup und damit ohnehin in den
 	// Text; beim Lesen der Karte zeigt ihn der Zustand der Wurzeldatei.
 	if note := project.DescribeSetupReadmes(setup.Readmes); note != "" {
@@ -136,13 +133,6 @@ func describeSetup(setup project.AssistantSetup) string {
 	}
 
 	return strings.Join(parts, " ")
-}
-
-// describeRemovedBlocks formuliert, welche abgelösten Zusatzblöcke aus
-// AGENTS.md entfernt wurden — und warum das kein Verlust ist.
-func describeRemovedBlocks(names []string) string {
-	return strings.Join(names, " und ") + " aus " + project.RootInstructionsFile +
-		" entfernt; der Inhalt kommt mit dem Briefing."
 }
 
 // assistantState liest den aktuellen Zustand.

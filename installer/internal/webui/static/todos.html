@@ -52,7 +52,6 @@
             <p class="hint">
               Aus der Kephalaion-Collection, nach Kennung. Erledigte (abgehakte) Einträge stehen darunter.
             </p>
-            <p id="todos-hint" class="hint" hidden></p>
             <form id="todo-add-form" class="todo-form" autocomplete="off">
               <input id="todo-add-text" type="text" placeholder="Neues Todo" aria-label="Text des neuen Todos" spellcheck="true" disabled>
               <button id="todo-add-button" type="submit" class="secondary" disabled>Anlegen</button>
@@ -81,8 +80,7 @@
             <p id="todos-search-message" class="message"></p>
           </section>
 
-          <!-- Wie bei den erledigten Tasks: zugeklappt, erst beim Aufklappen
-               geholt. -->
+          <!-- Zugeklappt, erst beim Aufklappen geholt. -->
           <details class="card" id="todos-done-card">
             <summary class="section-head disclosure">
               <div class="disclosure-title">
@@ -96,7 +94,6 @@
               <code>/k-todo done &lt;id&gt;</code> oder der Knopf an einem offenen Eintrag hakt einen Punkt
               ab, er bleibt dabei stehen.
             </p>
-            <p id="todos-done-hint" class="hint" hidden></p>
             <div id="todos-done-list" class="todo-list empty"></div>
             <p id="todos-done-message" class="message"></p>
           </details>

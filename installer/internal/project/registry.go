@@ -62,9 +62,7 @@ func (e RegistryEntry) LinkSource() string {
 // .k-playbook/share schon steht; verlinkt wird durch ihn hindurch.
 //
 // Projekteigen ist .k-playbook/<sorte>/ (ProjectAssetDir), versioniert neben
-// der Konfiguration. Der frühere Ort k-playbook-local/<sorte>/ wird seit Task
-// 129 nicht mehr gelesen, auch nicht als Übergang: was dort noch liegt, wirkt
-// nicht mehr, und /k-upgrade nennt es mit seinem Ziel.
+// der Konfiguration.
 func registryDirs(projectDir string, kind AssetKind) (shipped string, local string) {
 	if dir := sharedDataDir(); dir != "" {
 		shipped = filepath.Join(dir, string(kind))
@@ -107,12 +105,12 @@ func throughShareLink(projectDir string, kind AssetKind, shippedDir string, path
 // Abgeschaltete Einträge bleiben im Ergebnis, damit die Oberfläche sie zeigen
 // kann; registriert werden sie nicht.
 func ResolveRegistry(projectDir string, kind AssetKind) []RegistryEntry {
-	shippedDir, localDir := registryDirs(projectDir, kind)
+	shippedDir, ownDir := registryDirs(projectDir, kind)
 	shipped := map[string]string{}
 	if shippedDir != "" {
 		shipped = registrySources(shippedDir, kind)
 	}
-	local := registrySources(localDir, kind)
+	local := registrySources(ownDir, kind)
 
 	names := map[string]bool{}
 	for name := range shipped {

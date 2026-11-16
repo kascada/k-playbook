@@ -22,7 +22,7 @@
                aria-current="page" nur auf der Übersicht selbst. /mcp hat
                keinen Unterpunkt — die Karte und die Detailseite des eigenen
                Servers führen dorthin. Die Unterpunkte stehen in jedem Bereich:
-               wer von Setup aus zu den Tasks will, soll nicht erst die
+               wer von Setup aus zu den Todos will, soll nicht erst die
                Übersicht laden müssen. Ohne Installation gibt es keine
                MCP-Dateien und keinen Unterpunkt, wie bei Workflows. -->
           <nav class="area-nav" aria-label="Bereiche">
@@ -33,7 +33,6 @@
             {{if .Installed}}
             <a class="area-nav-subitem{{if hasPrefix .Page "/mcp-servers"}} active{{end}}" href="/mcp-servers"{{if eq .Page "/mcp-servers"}} aria-current="page"{{end}}>MCP-Server</a>
             <a class="area-nav-item{{if eq .Area "workflows"}} active{{end}}" href="/workflows"{{if eq .Area "workflows"}} aria-current="{{if eq .Page "/workflows"}}page{{else}}true{{end}}"{{end}}>Workflows</a>
-            <a class="area-nav-subitem{{if eq .Page "/workflows/tasks"}} active{{end}}" href="/workflows/tasks"{{if eq .Page "/workflows/tasks"}} aria-current="page"{{end}}>Tasks</a>
             <a class="area-nav-subitem{{if eq .Page "/workflows/reviews"}} active{{end}}" href="/workflows/reviews"{{if eq .Page "/workflows/reviews"}} aria-current="page"{{end}}>Reviews</a>
             <a class="area-nav-subitem{{if eq .Page "/workflows/todos"}} active{{end}}" href="/workflows/todos"{{if eq .Page "/workflows/todos"}} aria-current="page"{{end}}>Todos</a>
             <a class="area-nav-item{{if eq .Area "chat"}} active{{end}}" href="/chat"{{if eq .Area "chat"}} aria-current="{{if eq .Page "/chat"}}page{{else}}true{{end}}"{{end}}>Chat</a>

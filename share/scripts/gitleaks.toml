@@ -12,18 +12,15 @@
 useDefault = true
 
 [[allowlists]]
-description = "k-playbook: liegengebliebener Clone und die Ergebnisse früherer Läufe"
+description = "k-playbook: liegengebliebener Clone"
 # Altbestand: Ein liegengebliebener Clone des Werkzeugs unter <projekt>/k-playbook/ aus
 # dem früheren Modell (/k-upgrade löscht ihn) ist ausgeliefertes Material und kein Code
-# des Projekts. k-playbook-local/results/ trägt die Rohdaten früherer Läufe:
-# ohne diesen Ausschluss fände der nächste Lauf die Funde des vorigen in dessen
-# eigenem SARIF wieder und meldete sie als neue Treffer.
+# des Projekts.
 #
-# Beide Muster sind mit ^ an der Projektwurzel verankert, und die Jobs scannen deshalb
+# Das Muster ist mit ^ an der Projektwurzel verankert, und die Jobs scannen deshalb
 # . statt eines absoluten Pfades: ohne Anker griffe (^|/)k-playbook/ in einem Projekt,
 # das selbst k-playbook heißt, auf jeden Pfad unterhalb der Wurzel — der Lauf schlösse
 # dann alles aus und meldete stumm null Befunde.
 paths = [
   '''^k-playbook/''',
-  '''^k-playbook-local/results/''',
 ]

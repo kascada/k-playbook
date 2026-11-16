@@ -41,7 +41,7 @@ func writeText(t *testing.T, path string, content string) {
 
 func TestBuildLiestSARIFUndNormalisiertFindings(t *testing.T) {
 	projectDir := t.TempDir()
-	runDir := filepath.Join(projectDir, review.ResultsDirName, "2026-08-19")
+	runDir := filepath.Join(projectDir, "results", "2026-08-19")
 	writeJSON(t, filepath.Join(runDir, review.RunFileName), review.Run{
 		SchemaVersion: review.SchemaVersion,
 		Created:       "2026-08-19T12:00:00Z",
@@ -107,7 +107,7 @@ func TestBuildLiestSARIFUndNormalisiertFindings(t *testing.T) {
 
 func TestBuildFuehrtFehlendeEntryDateiAlsStart(t *testing.T) {
 	projectDir := t.TempDir()
-	runDir := filepath.Join(projectDir, review.ResultsDirName, "2026-08-19")
+	runDir := filepath.Join(projectDir, "results", "2026-08-19")
 	writeJSON(t, filepath.Join(runDir, review.RunFileName), review.Run{
 		SchemaVersion: review.SchemaVersion,
 		Created:       "2026-08-19T12:00:00Z",
@@ -909,7 +909,7 @@ func TestWriteSchreibtArtefakte(t *testing.T) {
 	result := Result{
 		SchemaVersion: 1,
 		Generated:     "2026-08-19T10:00:00Z",
-		Run:           RunContext{Name: "2026-08-19", Dir: "k-playbook-local/results/2026-08-19", Languages: []string{"go"}},
+		Run:           RunContext{Name: "2026-08-19", Dir: "ergebnisse/2026-08-19", Languages: []string{"go"}},
 		Entries:       []EntrySummary{{Name: "ruff", Kind: review.KindTool, State: review.StateStart, Jobs: []JobSummary{}}},
 	}
 	output, err := Write(Options{RunDir: runDir}, result)
@@ -925,7 +925,7 @@ func TestWriteSchreibtArtefakte(t *testing.T) {
 
 func TestBuildSchreibtKnownDecisionCoverageUndLaesstRawUnveraendert(t *testing.T) {
 	projectDir := t.TempDir()
-	localResultsDir := filepath.Join(projectDir, review.ResultsDirName)
+	localResultsDir := filepath.Join(projectDir, "results")
 	runDir := filepath.Join(localResultsDir, "2026-08-19")
 	writeJSON(t, filepath.Join(runDir, review.RunFileName), review.Run{
 		SchemaVersion: review.SchemaVersion,
@@ -961,7 +961,7 @@ func TestBuildSchreibtKnownDecisionCoverageUndLaesstRawUnveraendert(t *testing.T
 		t.Fatalf("Raw lesen: %v", err)
 	}
 
-	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-19", RunDir: runDir, LocalDir: projectDir, Now: fixedNow})
+	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-19", RunDir: runDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -1354,7 +1354,7 @@ func evidenceEntry(name string, sarif string) fixtureEntry {
 // das zugehörige SARIF unter raw/.
 func runDirWithEntries(t *testing.T, projectDir string, name string, entries ...fixtureEntry) string {
 	t.Helper()
-	runDir := filepath.Join(projectDir, review.ResultsDirName, name)
+	runDir := filepath.Join(projectDir, "results", name)
 	selected := make([]review.Entry, 0, len(entries))
 	for _, item := range entries {
 		entry := review.Entry{Name: item.name, Kind: item.kind, State: review.StateStart, Mode: item.mode}
@@ -1485,7 +1485,7 @@ func TestStableIDFuerKIEvidenceUeberlebtZeileUndMeldung(t *testing.T) {
 	firstDir := evidenceRunDir(t, projectDir, "2026-08-25", "review-tech",
 		sarifFixture("review-tech", sarifResultFixture("tech.altlast", "warning",
 			"installer/internal/app.go", 12, "Veraltete Abhängigkeit an dieser Stelle")))
-	first, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: firstDir, LocalDir: projectDir, Now: fixedNow})
+	first, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: firstDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Build Lauf 1: %v", err)
 	}
@@ -1496,7 +1496,7 @@ func TestStableIDFuerKIEvidenceUeberlebtZeileUndMeldung(t *testing.T) {
 	secondDir := evidenceRunDir(t, projectDir, "2026-08-26", "review-tech",
 		sarifFixture("review-tech", sarifResultFixture("tech.altlast", "warning",
 			"installer/internal/app.go", 87, "Diese Stelle hängt an einer Bibliothek, die niemand mehr pflegt")))
-	second, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, LocalDir: projectDir, Now: fixedNow})
+	second, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Build Lauf 2: %v", err)
 	}
@@ -1516,7 +1516,7 @@ func TestStableIDFuerKIEvidenceUeberlebtZeileUndMeldung(t *testing.T) {
 	writeText(t, filepath.Join(projectDir, "known-decisions.md"),
 		"## kd-ai-altlast\n\n```yaml\nid: kd-ai-altlast\ncategory: wontfix\nmatch:\n  - stableId: "+
 			first.Groups[0].StableID+"\n```\n\nBewusst so gelassen.\n")
-	covered, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, LocalDir: projectDir, Now: fixedNow})
+	covered, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Build Lauf 2 mit Decision: %v", err)
 	}
@@ -1542,7 +1542,7 @@ func TestBuildSammeltEvidenceEintragNebenScannerEin(t *testing.T) {
 			sarifResultFixture("tech.altlast", "error", "installer/internal/app.go", 88, "Nicht mehr gepflegte Bibliothek"))),
 	)
 
-	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, LocalDir: projectDir, Now: fixedNow})
+	result, output, err := Run(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -1627,7 +1627,7 @@ func TestEvidenceSeverityFolgtDemLevel(t *testing.T) {
 	writeText(t, mappingPath, "tool\trule_prefix\tseverity\tnotes\nreview-tech\ttech.\tnote\tRückfall\n")
 
 	result, err := Build(Options{
-		ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, LocalDir: projectDir,
+		ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, DecisionsDir: projectDir,
 		SeverityMappingPath: mappingPath, Now: fixedNow,
 	})
 	if err != nil {
@@ -1661,7 +1661,7 @@ func TestEvidenceDecisionOhneWiederfundBleibtNichtAngewendet(t *testing.T) {
 	firstDir := evidenceRunDir(t, projectDir, "2026-08-25", "review-tech",
 		sarifFixture("review-tech", sarifResultFixture("tech.altlast", "warning",
 			"installer/internal/app.go", 12, "Nicht mehr gepflegte Bibliothek")))
-	first, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: firstDir, LocalDir: projectDir, Now: fixedNow})
+	first, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: firstDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Build Lauf 1: %v", err)
 	}
@@ -1675,7 +1675,7 @@ func TestEvidenceDecisionOhneWiederfundBleibtNichtAngewendet(t *testing.T) {
 	// Derselbe Auftrag, andere Fundmenge: ein leeres SARIF ist ein gültiges
 	// Ergebnis, kein Fehler.
 	secondDir := evidenceRunDir(t, projectDir, "2026-08-26", "review-tech", sarifFixture("review-tech"))
-	second, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, LocalDir: projectDir, Now: fixedNow})
+	second, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-26", RunDir: secondDir, DecisionsDir: projectDir, Now: fixedNow})
 	if err != nil {
 		t.Fatalf("Build Lauf 2: %v", err)
 	}
@@ -1711,7 +1711,7 @@ func TestEvidenceDeckungPathGlobUndRuleIDLocation(t *testing.T) {
 				sarifResultFixture("tech.altlast", "warning", "installer/internal/app.go", line, "Nicht mehr gepflegte Bibliothek"))),
 		)
 		writeText(t, filepath.Join(projectDir, "known-decisions.md"), decision)
-		result, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, LocalDir: projectDir, Now: fixedNow})
+		result, err := Build(Options{ProjectDir: projectDir, RunName: "2026-08-25", RunDir: runDir, DecisionsDir: projectDir, Now: fixedNow})
 		if err != nil {
 			t.Fatalf("Build: %v", err)
 		}

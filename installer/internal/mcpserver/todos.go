@@ -56,17 +56,12 @@ type todoDeleteInput struct {
 }
 
 // todoEnvelope ist die Antwortform aller vier Werkzeuge.
-//
-// hint meldet ein noch nicht übernommenes data/todos.json oder eine
-// zurückgebliebene TODO.md. Das ist kein Fehler — eine Liste kommt trotzdem;
-// hint steht auch neben einem Fehler, etwa neben todos_not_migrated.
 type todoEnvelope struct {
 	OK         bool               `json:"ok"`
 	Tool       string             `json:"tool"`
 	ProjectDir string             `json:"projectDir"`
 	Todos      []project.Todo     `json:"todos,omitempty"`
 	Todo       *project.Todo      `json:"todo,omitempty"`
-	Hint       string             `json:"hint,omitempty"`
 	Error      *todoErrorEnvelope `json:"error,omitempty"`
 }
 
@@ -79,11 +74,10 @@ type todoErrorEnvelope struct {
 // Zustände.
 const todoStateHelp = " Die Todos liegen als Dokumente in der Kephalaion-Collection des Projekts (todos/, erledigt " +
 	"todos/done/). kephalaion_unavailable heißt: Kephalaion ist nicht erreichbar, es gibt dann keine Todos und " +
-	"keinen Rückfall auf die Platte. hint meldet ein noch nicht übernommenes data/todos.json (dann " +
-	"`k-playbook todo migrate`) oder eine zurückgebliebene TODO.md, die nicht übernommen wird."
+	"keinen Rückfall auf die Platte."
 
 // todoWriteHelp ergänzt die Beschreibungen der schreibenden Werkzeuge.
-const todoWriteHelp = " Solange data/todos.json besteht, ist das abgelehnt: todos_not_migrated. outcome_unknown: " +
+const todoWriteHelp = " outcome_unknown: " +
 	"Der Vorgang kann angekommen sein — nicht wiederholen, sondern mit k_playbook_todo_list (includeDone) nachsehen."
 
 func addTodoTools(server *mcp.Server) {
@@ -113,24 +107,24 @@ func addTodoTools(server *mcp.Server) {
 
 func todoListTool(ctx context.Context, req *mcp.CallToolRequest, input todoListInput) (*mcp.CallToolResult, any, error) {
 	return wrapTodoTool(todoToolList, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
-		todos, notice, err := listTodosFor(ctx, projectDir, input.IncludeDone, input.Search)
+		todos, err := listTodosFor(ctx, projectDir, input.IncludeDone, input.Search)
 		if err != nil {
-			return todoErrorResult(todoToolList, projectDir, todoErrorCode(err, "read_failed"), err, notice)
+			return todoErrorResult(todoToolList, projectDir, todoErrorCode(err, "read_failed"), err)
 		}
 		return todoResult(todoEnvelope{
 			OK: true, Tool: todoToolList, ProjectDir: projectDir,
-			Todos: todos, Hint: notice.Hint,
+			Todos: todos,
 		}, false)
 	}), nil, nil
 }
 
 // listTodosFor wählt die Liste: offene oder alle, mit search nur die
 // Treffer daraus.
-func listTodosFor(ctx context.Context, projectDir string, includeDone bool, search string) ([]project.Todo, project.TodoNotice, error) {
+func listTodosFor(ctx context.Context, projectDir string, includeDone bool, search string) ([]project.Todo, error) {
 	if strings.TrimSpace(search) != "" {
-		found, notice, err := project.SearchTodos(ctx, projectDir, search)
+		found, err := project.SearchTodos(ctx, projectDir, search)
 		if err != nil || includeDone {
-			return found, notice, err
+			return found, err
 		}
 		open := []project.Todo{}
 		for _, todo := range found {
@@ -138,7 +132,7 @@ func listTodosFor(ctx context.Context, projectDir string, includeDone bool, sear
 				open = append(open, todo)
 			}
 		}
-		return open, notice, nil
+		return open, nil
 	}
 	if includeDone {
 		return project.ListAllTodos(ctx, projectDir)
@@ -147,7 +141,7 @@ func listTodosFor(ctx context.Context, projectDir string, includeDone bool, sear
 }
 
 // todoErrorCode ist der Code eines Fehlers der Fachlogik
-// (kephalaion_unavailable, todos_not_migrated, not_found, …); ohne Code gilt
+// (kephalaion_unavailable, not_found, …); ohne Code gilt
 // fallback.
 func todoErrorCode(err error, fallback string) string {
 	if code := project.DocRefErrorCode(err); code != "" {
@@ -158,13 +152,13 @@ func todoErrorCode(err error, fallback string) string {
 
 func todoAddTool(ctx context.Context, req *mcp.CallToolRequest, input todoAddInput) (*mcp.CallToolResult, any, error) {
 	return wrapTodoTool(todoToolAdd, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
-		todo, notice, err := project.AddTodo(ctx, projectDir, input.Text, input.Origin)
+		todo, err := project.AddTodo(ctx, projectDir, input.Text, input.Origin)
 		if err != nil {
-			return todoErrorResult(todoToolAdd, projectDir, todoErrorCode(err, "failed"), err, notice)
+			return todoErrorResult(todoToolAdd, projectDir, todoErrorCode(err, "failed"), err)
 		}
 		return todoResult(todoEnvelope{
 			OK: true, Tool: todoToolAdd, ProjectDir: projectDir,
-			Todo: &todo, Hint: notice.Hint,
+			Todo: &todo,
 		}, false)
 	}), nil, nil
 }
@@ -173,28 +167,28 @@ func todoUpdateTool(ctx context.Context, req *mcp.CallToolRequest, input todoUpd
 	return wrapTodoTool(todoToolUpdate, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
 		if input.Text == nil && input.Done == nil {
 			return todoErrorResult(todoToolUpdate, projectDir, "invalid_input",
-				fmt.Errorf("nichts zu ändern: erwartet wird text oder done"), project.TodoNotice{})
+				fmt.Errorf("nichts zu ändern: erwartet wird text oder done"))
 		}
-		todo, notice, err := project.UpdateTodo(ctx, projectDir, input.ID, input.Text, input.Done)
+		todo, err := project.UpdateTodo(ctx, projectDir, input.ID, input.Text, input.Done)
 		if err != nil {
-			return todoErrorResult(todoToolUpdate, projectDir, todoErrorCode(err, "failed"), err, notice)
+			return todoErrorResult(todoToolUpdate, projectDir, todoErrorCode(err, "failed"), err)
 		}
 		return todoResult(todoEnvelope{
 			OK: true, Tool: todoToolUpdate, ProjectDir: projectDir,
-			Todo: &todo, Hint: notice.Hint,
+			Todo: &todo,
 		}, false)
 	}), nil, nil
 }
 
 func todoDeleteTool(ctx context.Context, req *mcp.CallToolRequest, input todoDeleteInput) (*mcp.CallToolResult, any, error) {
 	return wrapTodoTool(todoToolDelete, input.ProjectDir, func(projectDir string) *mcp.CallToolResult {
-		todo, notice, err := project.DeleteTodo(ctx, projectDir, input.ID)
+		todo, err := project.DeleteTodo(ctx, projectDir, input.ID)
 		if err != nil {
-			return todoErrorResult(todoToolDelete, projectDir, todoErrorCode(err, "failed"), err, notice)
+			return todoErrorResult(todoToolDelete, projectDir, todoErrorCode(err, "failed"), err)
 		}
 		return todoResult(todoEnvelope{
 			OK: true, Tool: todoToolDelete, ProjectDir: projectDir,
-			Todo: &todo, Hint: notice.Hint,
+			Todo: &todo,
 		}, false)
 	}), nil, nil
 }
@@ -205,17 +199,16 @@ func todoDeleteTool(ctx context.Context, req *mcp.CallToolRequest, input todoDel
 func wrapTodoTool(tool string, inputDir string, fn func(projectDir string) *mcp.CallToolResult) *mcp.CallToolResult {
 	projectDir, err := resolveProjectDir(inputDir)
 	if err != nil {
-		return todoErrorResult(tool, projectDir, projectDirErrorCode(err), err, project.TodoNotice{})
+		return todoErrorResult(tool, projectDir, projectDirErrorCode(err), err)
 	}
 	return fn(projectDir)
 }
 
-func todoErrorResult(tool string, projectDir string, code string, err error, notice project.TodoNotice) *mcp.CallToolResult {
+func todoErrorResult(tool string, projectDir string, code string, err error) *mcp.CallToolResult {
 	return todoResult(todoEnvelope{
 		OK:         false,
 		Tool:       tool,
 		ProjectDir: projectDir,
-		Hint:       notice.Hint,
 		Error:      &todoErrorEnvelope{Code: code, Message: err.Error()},
 	}, true)
 }

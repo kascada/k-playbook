@@ -290,9 +290,6 @@ func routes(state *serverState) http.Handler {
 	mux.HandleFunc("GET /api/inventory", inventoryHandler)
 	mux.HandleFunc("POST /api/inventory", runInventoryHandler)
 	mux.HandleFunc("GET /api/inventory/file", inventoryFileHandler)
-	mux.HandleFunc("GET /api/tasks", tasksHandler)
-	mux.HandleFunc("GET /api/tasks/done", doneTasksHandler)
-	mux.HandleFunc("GET /api/tasks/file", taskFileHandler)
 	mux.HandleFunc("GET /api/todos", todosHandler)
 	mux.HandleFunc("GET /api/todos/done", doneTodosHandler)
 	mux.HandleFunc("GET /api/todos/search", searchTodosHandler)
@@ -338,7 +335,6 @@ func routes(state *serverState) http.Handler {
 	}
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /workflows", workflowsPageHandler)
-	mux.HandleFunc("GET /workflows/tasks", tasksPageHandler)
 	mux.HandleFunc("GET /workflows/reviews", reviewsPageHandler)
 	mux.HandleFunc("GET /workflows/todos", todosPageHandler)
 	mux.HandleFunc("GET /chat", chatPageHandler)
@@ -496,14 +492,6 @@ var workflowsTemplate = pageTemplate("workflows.html")
 
 func workflowsPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, workflowsTemplate, areaWorkflows, "/workflows", "Workflows")
-}
-
-// tasksTemplate ist die Seite der Tasks: die offenen, die erledigten und der
-// gelesene Inhalt.
-var tasksTemplate = pageTemplate("tasks.html")
-
-func tasksPageHandler(w http.ResponseWriter, r *http.Request) {
-	renderPage(w, tasksTemplate, areaWorkflows, "/workflows/tasks", "Tasks")
 }
 
 // reviewsTemplate ist die Seite der Reviews: die bisherigen Läufe.

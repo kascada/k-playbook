@@ -276,7 +276,7 @@ func TestStaleRevisionIstEinSichtbarerFehler(t *testing.T) {
 }
 
 // Ohne erreichbare Collection gibt es kein Inventar: Run bricht mit dem
-// Fehler des Stores ab, legt nichts auf der Platte ab und meldet nichts als
+// Fehler des Stores ab, legt nichts im Store ab und meldet nichts als
 // geschrieben.
 func TestOhneErreichbareCollectionGibtEsKeinInventar(t *testing.T) {
 	options := newRunProject(t)
@@ -293,9 +293,6 @@ func TestOhneErreichbareCollectionGibtEsKeinInventar(t *testing.T) {
 	}
 	if len(store.Names()) != 0 {
 		t.Errorf("trotz Abbruch liegt etwas im Store: %v", store.Names())
-	}
-	if _, err := os.Stat(filepath.Join(options.ProjectDir, "k-playbook-local", "docs")); !os.IsNotExist(err) {
-		t.Error("einen Rückfall auf die Platte gibt es nicht")
 	}
 	if _, _, err := Run(context.Background(), nil, options); err == nil {
 		t.Error("ohne Store muss Run abbrechen")

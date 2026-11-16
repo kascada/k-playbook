@@ -21,7 +21,7 @@
 // der Auskunft. Ein Token erscheint in keinem Ergebnis, keinem Fehler und
 // keinem Log.
 //
-// Das Paket hängt nur von der Standardbibliothek und yamllite ab, damit
+// Das Paket hängt nur von der Standardbibliothek ab, damit
 // project es für die Kontextausgabe einbinden kann.
 package kephalaion
 
@@ -45,44 +45,6 @@ func (b Binding) Address() string {
 		return ""
 	}
 	return b.Hub + ":" + b.Collection
-}
-
-// yamlLinePattern liest die Zeilennummer vom Anfang eines Fehlers von
-// yamllite.Parse; jeder Hinweis dort beginnt mit „Zeile <n>: “.
-var yamlLinePattern = regexp.MustCompile(`^Zeile ([0-9]+): `)
-
-// yamlProblemKinds sind die festen Anfänge der Hinweise von yamllite und ihr
-// Satz für eine Meldung — ohne den Teil, der Text aus der Datei zitiert.
-var yamlProblemKinds = []struct{ prefix, kind string }{
-	{"Tabulator in der Einrückung", "Tabulator in der Einrückung"},
-	{"Einrückung passt zu keiner offenen Ebene", "Einrückung passt zu keiner offenen Ebene"},
-	{"weder Schlüssel noch Listeneintrag", "weder Schlüssel noch Listeneintrag"},
-	{"nicht geschlossene Flow-Liste", "nicht geschlossene Flow-Liste"},
-	{"nicht geschlossene Flow-Abbildung", "nicht geschlossene Flow-Abbildung"},
-	{"überzähliges Zeichen", "überzähliges Zeichen nach einem Flow-Wert"},
-	{"Schlüssel ", "Schlüssel ohne Doppelpunkt in einer Flow-Abbildung"},
-}
-
-// describeYAMLError beschreibt einen Fehler von yamllite.Parse nur mit
-// Zeilennummer und Art des ersten Hinweises. Der Fehler selbst zitiert Text
-// aus der Datei — steht dort versehentlich ein Token auf einer eigenen Zeile,
-// landete es sonst in einer Meldung. Deshalb wird aus dem Fehlertext nur
-// gelesen, was vor jedem zitierten Inhalt steht.
-func describeYAMLError(err error) string {
-	text := err.Error()
-	match := yamlLinePattern.FindStringSubmatch(text)
-	if match == nil {
-		return "Aufbau nicht lesbar; der Inhalt wird nicht zitiert"
-	}
-	rest := text[len(match[0]):]
-	kind := "Aufbau nicht lesbar"
-	for _, candidate := range yamlProblemKinds {
-		if strings.HasPrefix(rest, candidate.prefix) {
-			kind = candidate.kind
-			break
-		}
-	}
-	return "Zeile " + match[1] + ": " + kind + "; der Inhalt wird nicht zitiert"
 }
 
 // namePattern ist die Namensregel von Kephalaion (internal/ident/ident.go

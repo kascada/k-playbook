@@ -58,9 +58,9 @@ type LegacyContentError struct {
 
 func (e *LegacyContentError) Error() string {
 	return fmt.Sprintf("in %s/ liegen Projektinhalte aus dem abgelösten Modell (%s); "+
-		"sie gehören nach %s/ und müssen zuerst dorthin umziehen — %s/ ist der Ort des "+
+		"sie sind zuerst an einen Ort außerhalb von %s/ zu sichern — %s/ ist der Ort des "+
 		"früheren Clones, den /k-upgrade löscht",
-		PlaybookDirName, strings.Join(e.Paths, ", "), LocalDirName, PlaybookDirName)
+		PlaybookDirName, strings.Join(e.Paths, ", "), PlaybookDirName, PlaybookDirName)
 }
 
 // ResetConfig führt das Zurücksetzen aus. Geschrieben wird erst, wenn nichts

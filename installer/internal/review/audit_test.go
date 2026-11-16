@@ -109,9 +109,9 @@ func TestValidateAuditContract(t *testing.T) {
 }
 
 func TestCreateRunFriertModusUndPfadScopeEin(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	runDir, err := CreateRun(localDir, day(t, "2026-08-25"), []string{"go"}, []Entry{
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-25"), []string{"go"}, []Entry{
 		{Name: "review-tech", Kind: KindAI, Mode: ModeEvidence, Scope: &Scope{Paths: []string{"installer/**", "commands/**"}}},
 		{Name: "review-secret-scanning", Kind: KindAI, Scope: &Scope{Tools: []string{"gitleaks"}}},
 	})
@@ -141,9 +141,9 @@ func TestCreateRunFriertModusUndPfadScopeEin(t *testing.T) {
 }
 
 func TestCreateRunWeistUnbekannteBetriebsartAb(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	_, err := CreateRun(localDir, day(t, "2026-08-25"), nil, []Entry{
+	_, err := CreateRun(resultsDir, day(t, "2026-08-25"), nil, []Entry{
 		{Name: "review-tech", Kind: KindAI, Mode: "scanner"},
 	})
 	if err == nil {
@@ -197,9 +197,9 @@ func TestReadRunLiestAltlaufOhneModeAlsPerspektive(t *testing.T) {
 // Ein Perspektiven-Lauf schreibt kein mode-Feld: run.json bleibt Zeichen für
 // Zeichen so, wie sie vor der Evidence-Betriebsart aussah.
 func TestCreateRunSchreibtKeinModeFeldFuerPerspektiven(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	runDir, err := CreateRun(localDir, day(t, "2026-08-25"), []string{"go"}, []Entry{
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-25"), []string{"go"}, []Entry{
 		{Name: "gitleaks", Kind: KindTool},
 	})
 	if err != nil {
@@ -226,7 +226,6 @@ func TestPathExcludedFromScope(t *testing.T) {
 		"installer/.golangci.yml":           false,
 		".golangci.yml":                     false,
 		"k-playbook/reviews/review-tech.md": true,
-		"k-playbook-local/tasks/031.md":     true,
 		"installer/testdata/go.mod":         true,
 		"web/node_modules/x/index.js":       true,
 		"third/vendor/lib/a.go":             true,

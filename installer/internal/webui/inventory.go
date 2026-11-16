@@ -60,10 +60,6 @@ type inventorySourcesState struct {
 	// unbekannter Fassung ist, oder wenn Kephalaion nicht erreichbar ist. Der
 	// Erhebungslauf bricht dann ab; die Anzeige nennt den Grund.
 	Error string `json:"error,omitempty"`
-	// Legacy nennt die alte Datei unter k-playbook-local/, wenn sie noch
-	// liegt — Altbestand, der nicht mehr gelesen wird, mit dem Hinweis auf
-	// /k-upgrade.
-	Legacy string `json:"legacy,omitempty"`
 }
 
 // inventoryResponse ist der Stand des Inventars: Status aus dem Frontmatter
@@ -163,7 +159,6 @@ func inventorySources(projectDir string, config versionsources.Config, err error
 		Exclude:     len(read.Exclude),
 		HelmValues:  len(read.HelmValues),
 	}
-	state.Legacy = project.LegacyVersionSourcesMessage(projectDir)
 	return state
 }
 

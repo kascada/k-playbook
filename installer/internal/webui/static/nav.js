@@ -46,8 +46,8 @@ function buildBlockNav() {
     if (pill) {
       new MutationObserver(sync).observe(pill, { attributes: true, attributeFilter: ["class"] });
     }
-    // Die Überschrift kann sich zur Laufzeit ändern: /workflows schreibt den
-    // Titel des geöffneten Tasks in die Karte. Ohne diesen Beobachter bliebe
+    // Die Überschrift kann sich zur Laufzeit ändern: Eine Seite schreibt den
+    // Titel des geöffneten Dokuments in die Karte. Ohne diesen Beobachter bliebe
     // der Eintrag auf der Beschriftung des Seitenaufbaus stehen. childList
     // fängt den ausgetauschten Textknoten, characterData den umgeschriebenen.
     new MutationObserver(sync).observe(heading, { childList: true, characterData: true, subtree: true });

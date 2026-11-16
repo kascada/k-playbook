@@ -135,7 +135,7 @@ func projectDirErrorCode(err error) string {
 // Aufrufer soll sagen, wonach gesucht wurde.
 //
 // Gemeinsam für alle Werkzeugfamilien, die nur den Anker brauchen: Todos und
-// Wissensverzeichnis liegen unter k-playbook-local/, nicht im Katalog der
+// Dokumente liegen in der Collection des Projekts, nicht im Katalog der
 // Installation. Zweimal aufgelöst hieße zwei Chancen, es verschieden zu tun.
 func resolveProjectDir(inputDir string) (string, error) {
 	if err := checkProjectDir(inputDir); err != nil {

@@ -3,14 +3,16 @@ package review
 import "errors"
 
 // Die Review-Wege pausieren (Task 147): Die Ablage der Review-Ergebnisse wird
-// umgebaut, und bis dahin legt kein Weg einen Lauf an oder schreibt Ergebnisse
-// — die MCP-Werkzeuge k_playbook_review_create, _scan, _merge und
-// _write_ai_entry nicht und die Subkommandos scan und merge nicht. Gesperrt
-// wird an den Einstiegen; der Review-Code darunter bleibt, wie er ist.
-// k_playbook_review_status liest nur und bleibt offen.
+// umgebaut, und bis dahin legt kein Weg einen Lauf an, liest einen oder
+// schreibt Ergebnisse — die fünf MCP-Werkzeuge k_playbook_review_create,
+// _status, _scan, _merge und _write_ai_entry nicht, die Subkommandos scan und
+// merge nicht, und die Oberfläche zeigt statt der Läufe die Meldung der
+// Sperre. Gesperrt wird an den Einstiegen; der Review-Code darunter bleibt.
 //
-// Die Sperre nennt keinen Termin: Sie gilt, bis die neue Ablage steht. Dann
-// fallen diese Datei und ihre Aufrufer.
+// Die Sperre nennt keinen Termin: Sie gilt, bis die neue Ablage steht. Wer sie
+// aufhebt, braucht zusätzlich zwei Dinge: den Ort der Ergebnisse (ResultsDir
+// liefert bis zur Entscheidung nur einen Fehler) und einen Ausschluss dieses
+// Orts für die Scanner, damit sie Rohausgaben früherer Läufe nicht lesen.
 
 // PausedCode ist der Fehlercode, mit dem die gesperrten Wege antworten.
 const PausedCode = "reviews_paused"
@@ -27,4 +29,26 @@ var ErrPaused = errors.New(PausedMessage)
 // immer ErrPaused.
 func Paused() error {
 	return ErrPaused
+}
+
+// ErrResultsDirUndecided sagt, dass das Programm keinen Ort für die
+// Review-Ergebnisse kennt.
+var ErrResultsDirUndecided = errors.New("Der Ort der Review-Ergebnisse ist noch nicht entschieden.")
+
+// ResultsDirOverride ist eine Naht für Tests: Nur Tests setzen sie, auf ein
+// temporäres Verzeichnis, und setzen sie danach zurück. Im Programm bleibt sie
+// leer.
+var ResultsDirOverride string
+
+// ResultsDir ist die eine Stelle, von der der Code hinter der Sperre das
+// Ergebnisverzeichnis bekommt: das Verzeichnis, unter dem die Läufe und die
+// known-decisions.md liegen. Bis der Ort entschieden ist, liefert sie immer
+// ErrResultsDirUndecided; die Funktionen darunter (RunDir, ListRuns,
+// CreateRun, merge.Options, knowndecisions.Load) nehmen das Verzeichnis als
+// Parameter.
+func ResultsDir() (string, error) {
+	if ResultsDirOverride != "" {
+		return ResultsDirOverride, nil
+	}
+	return "", ErrResultsDirUndecided
 }

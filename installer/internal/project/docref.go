@@ -42,8 +42,8 @@ import (
 // gehen darüber. Dieselbe Sorte kommt so über jeden Weg gleich heraus.
 // instructions und guidelines sind trotzdem keine Sorten in catalogKinds():
 // Sie erscheinen nicht unter catalogs, das Briefing liefert sie. guidelines/
-// hat seit Task 148 keine lokale Ebene mehr: k-playbook-local/guidelines/
-// liest nichts, das Feld guidelines der Kontextausgabe ist entfernt.
+// hat seit Task 148 keine lokale Ebene mehr, das Feld guidelines der
+// Kontextausgabe ist entfernt.
 
 // Die Präfixe des Schemas.
 const (
@@ -101,11 +101,12 @@ const docDocsRoot = "docs"
 var docRefKinds = append(append([]string{}, docReaderKinds...), docIncludesRoot, docTestdataRoot, docDocsRoot)
 
 // docDistOnlyKinds sind die Sorten ohne lokale Ebene: ResolveDocRef und
-// overlayDocDir lesen sie nur aus der mitgelieferten, eine Datei unter
-// k-playbook-local/ gewinnt dort nicht und schaltet nichts ab. guidelines/
-// gehört seit Task 148 dazu: Projekteigene Guidelines liegen unter
-// keph:/docs/guidelines/ und sind keine Ebene hinter k-playbook: (Todo #40).
-var docDistOnlyKinds = []string{docDocsRoot, docGuidelinesRoot}
+// overlayDocDir lesen sie nur aus der mitgelieferten, eine projekteigene
+// Fassung gibt es nicht. guidelines/ gehört seit Task 148 dazu: Projekteigene
+// Guidelines liegen unter keph:/docs/guidelines/ und sind keine Ebene hinter
+// k-playbook: (Todo #40). testdata/ ist Prüfmaterial des Programms und kommt
+// ebenfalls nur mitgeliefert.
+var docDistOnlyKinds = []string{docDocsRoot, docGuidelinesRoot, docTestdataRoot}
 
 // docAssembledDirs sind die Verzeichnisse, die ein Verweis mit „/" am Ende
 // zusammenbaut — Pfade ab der Wurzel von k-playbook:, ohne Schrägstrich am
@@ -325,12 +326,8 @@ func memoKephDocs(open func() (KephDocs, error)) func() (KephDocs, error) {
 // ersten Zugriff; Task 143). Die Sorte commands/ liest aus
 // .k-playbook/commands/, demselben Ort, aus dem die Verlinkung projekteigene
 // Commands nimmt (ProjectAssetDir), samt der Bausteine unter
-// commands/_shared/; eine Datei dort ersetzt Hülle und Text zugleich.
-// testdata/ liest bis zu seinem Umbau weiter aus k-playbook-local/. Die
-// früheren Orte k-playbook-local/commands/ (seit Task 129),
-// k-playbook-local/instructions/, includes/, reviews/ (seit Task 143) und
-// k-playbook-local/guidelines/ (seit Task 148, die Sorte hat keine lokale
-// Ebene mehr) liest nichts mehr.
+// commands/_shared/; eine Datei dort ersetzt Hülle und Text zugleich. Jede
+// andere Sorte hat keine projekteigene Ebene.
 func NewProjectLocalDocSource(projectDir string) DocSource {
 	return newProjectLocalDocSource(projectDir, NewProjectLayerSource(projectDir))
 }
@@ -340,23 +337,21 @@ func NewProjectLocalDocSource(projectDir string) DocSource {
 // Speicher.
 func newProjectLocalDocSource(projectDir string, collection DocSource) DocSource {
 	return projectLocalDocSource{
-		local:      NewDiskDocSource(LocalDir(projectDir)),
 		project:    NewDiskDocSource(filepath.Join(projectDir, ProjectDirName)),
 		collection: collection,
 	}
 }
 
 type projectLocalDocSource struct {
-	local      DocSource
 	project    DocSource
 	collection DocSource
 }
 
 // pick wählt nach dem ersten Segment: instructions/, includes/ und reviews/
-// aus der Collection, commands/ aus .k-playbook/, alles andere aus
-// k-playbook-local/. Der Pfad bleibt derselbe, weil jeder Ort denselben
-// Aufbau hat. Eine Sorte ohne lokale Ebene (docDistOnlyKinds, etwa
-// guidelines/) hat hier keinen Ort: Wer trotzdem fragt, findet nichts.
+// aus der Collection, commands/ aus .k-playbook/. Der Pfad bleibt derselbe,
+// weil jeder Ort denselben Aufbau hat. Jede andere Sorte — auch die ohne
+// lokale Ebene (docDistOnlyKinds, etwa guidelines/ und testdata/) — hat hier
+// keinen Ort: Wer trotzdem fragt, findet nichts.
 func (s projectLocalDocSource) pick(p string) DocSource {
 	first, _, _ := strings.Cut(p, "/")
 	switch {
@@ -364,10 +359,8 @@ func (s projectLocalDocSource) pick(p string) DocSource {
 		return s.project
 	case isProjectLayerKind(first):
 		return s.collection
-	case isDistOnlyDocRef(first):
-		return noDocSource{}
 	}
-	return s.local
+	return noDocSource{}
 }
 
 // noDocSource ist eine Ebene ohne Inhalt: jedes Verzeichnis und jede Datei

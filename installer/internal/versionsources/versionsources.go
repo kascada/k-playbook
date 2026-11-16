@@ -1,8 +1,7 @@
 // Package versionsources liest die Quellenkonfiguration des Versionsinventars,
 // das Dokument keph:/k-playbook/inventory.md in der Collection des Projekts
 // (Task 144). Die Konfiguration steht im Frontmatter des Dokuments, der Rumpf
-// erklärt sie; die alte Datei unter k-playbook-local/ liest seitdem kein
-// Programmteil mehr als Konfiguration (harter Wechsel, /k-upgrade zieht um).
+// erklärt sie.
 //
 // Es gibt genau diese eine Implementierung. Sie wird von mehreren Seiten
 // benutzt: vom Sammler des Inventars, von `k-playbook context`, das den
@@ -49,9 +48,9 @@ const (
 //
 // Fassung 3 kam mit dem Umzug in die Collection (Task 144): `roots` gibt es
 // nicht mehr, gelesen wird nur unterhalb der Projektwurzel. Die Fassungen 1
-// und 2 gehörten zur alten Datei unter k-playbook-local/; ein Dokument mit
-// ihnen wäre eines, das jemand von Hand mit der alten Bedeutung geschrieben
-// hat, und wird abgelehnt.
+// und 2 stammen aus der Zeit vor der Collection; ein Dokument mit ihnen wäre
+// eines, das jemand von Hand mit der alten Bedeutung geschrieben hat, und
+// wird abgelehnt.
 const SchemaVersion = 3
 
 // Envs ist die geschlossene Menge der Umgebungslabels.

@@ -3,7 +3,6 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
@@ -21,9 +20,6 @@ func newTodoProject(t *testing.T) (string, *kephtest.Store) {
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
-	}
-	if err := os.MkdirAll(project.LocalDir(root), 0o755); err != nil {
-		t.Fatalf("k-playbook-local anlegen: %v", err)
 	}
 	store := kephtest.New()
 	original := project.OpenTodoStore
@@ -77,37 +73,17 @@ func TestTodoListTrenntOffeneUndErledigteUndSucht(t *testing.T) {
 }
 
 func TestTodoWerkzeugeMeldenZustaende(t *testing.T) {
-	root, store := newTodoProject(t)
+	root, _ := newTodoProject(t)
 	ctx := context.Background()
 	base := todoBaseInput{ProjectDir: root}
-	if err := os.MkdirAll(project.TodoDataDir(root), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(project.TodoFile(root), []byte(`{"todos":[]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	result, _, _ := todoListTool(ctx, nil, todoListInput{todoBaseInput: base})
-	envelope := decodeTodoEnvelope(t, result)
-	if !envelope.OK || !strings.Contains(envelope.Hint, "k-playbook todo migrate") {
-		t.Fatalf("Liste neben data/todos.json: %+v", envelope)
-	}
-	result, _, _ = todoAddTool(ctx, nil, todoAddInput{todoBaseInput: base, Text: "neu"})
-	envelope = decodeTodoEnvelope(t, result)
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != project.TodoCodeNotMigrated || envelope.Hint == "" || !result.IsError {
-		t.Fatalf("add vor der Übernahme: %+v", envelope)
-	}
-	if len(store.Names()) != 0 {
-		t.Fatalf("trotz Sperre angelegt: %v", store.Names())
-	}
 
 	project.OpenTodoStore = func(string) (project.TodoStore, string, error) {
 		_, err := project.OpenUserDocs(root)
 		return nil, "", err
 	}
-	result, _, _ = todoListTool(ctx, nil, todoListInput{todoBaseInput: base})
-	envelope = decodeTodoEnvelope(t, result)
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != project.DocCodeKephalaionUnavailable {
+	result, _, _ := todoListTool(ctx, nil, todoListInput{todoBaseInput: base})
+	envelope := decodeTodoEnvelope(t, result)
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != project.DocCodeKephalaionUnavailable || !result.IsError {
 		t.Fatalf("ohne Kephalaion: %+v", envelope)
 	}
 }

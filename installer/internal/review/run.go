@@ -18,8 +18,6 @@ import (
 )
 
 const (
-	// ResultsDirName ist das Verzeichnis unter local.dir, in dem die Läufe liegen.
-	ResultsDirName = "results"
 	// RunFileName trägt Festlegung und Gesamtzustand eines Laufs.
 	RunFileName = "run.json"
 	// EntriesDirName nimmt je Eintrag eine eigene Datei auf.
@@ -157,7 +155,7 @@ type Summary struct {
 	Name string `json:"name"`
 	Dir  string `json:"dir"`
 	// EntryCount stammt aus run.json, State wird aus entries/ abgeleitet.
-	// Fehlt run.json, bleiben beide leer: unter results/ können auch
+	// Fehlt run.json, bleiben beide leer: Im Ergebnisverzeichnis können auch
 	// Verzeichnisse aus der Zeit davor liegen.
 	State      State `json:"state"`
 	EntryCount int   `json:"entryCount"`
@@ -174,14 +172,10 @@ func ValidEntryName(name string) bool {
 	return entryNamePattern.MatchString(name)
 }
 
-// ResultsDir ist das Verzeichnis, in dem die Läufe liegen.
-func ResultsDir(localDir string) string {
-	return filepath.Join(localDir, ResultsDirName)
-}
-
-// RunDir ist das Verzeichnis eines Laufs.
-func RunDir(localDir string, name string) string {
-	return filepath.Join(ResultsDir(localDir), name)
+// RunDir ist das Verzeichnis eines Laufs unter dem Ergebnisverzeichnis
+// resultsDir.
+func RunDir(resultsDir string, name string) string {
+	return filepath.Join(resultsDir, name)
 }
 
 // EntryFile ist die Datei, in die ein Eintrag seinen Fortschritt schreibt.
@@ -191,11 +185,10 @@ func EntryFile(runDir string, name string) string {
 
 // ListRuns liefert die vorhandenen Läufe, den jüngsten zuerst.
 //
-// Gelistet werden alle Verzeichnisse unter results/, nicht nur die mit einer
+// Gelistet werden alle Verzeichnisse unter resultsDir, nicht nur die mit einer
 // run.json: ältere Ergebnisse aus der Zeit vor diesem Modell sollen sichtbar
 // bleiben, statt stillschweigend zu fehlen.
-func ListRuns(localDir string) ([]Summary, error) {
-	resultsDir := ResultsDir(localDir)
+func ListRuns(resultsDir string) ([]Summary, error) {
 	entries, err := os.ReadDir(resultsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -268,7 +261,7 @@ func ReadRun(runDir string) (Run, error) {
 // werden, welche gilt.
 //
 // Angelegt wird nur; gestartet wird nichts.
-func CreateRun(localDir string, day time.Time, languages []string, entries []Entry) (string, error) {
+func CreateRun(resultsDir string, day time.Time, languages []string, entries []Entry) (string, error) {
 	if len(entries) == 0 {
 		return "", fmt.Errorf("kein Eintrag ausgewählt")
 	}
@@ -290,13 +283,12 @@ func CreateRun(localDir string, day time.Time, languages []string, entries []Ent
 		seen[entry.Name] = true
 	}
 
-	resultsDir := ResultsDir(localDir)
 	if !isDir(resultsDir) {
-		return "", fmt.Errorf("%s fehlt — die projekteigene Struktur ist nicht vollständig", resultsDir)
+		return "", fmt.Errorf("das Ergebnisverzeichnis %s fehlt", resultsDir)
 	}
 
 	name := day.Format(DateLayout)
-	runDir := RunDir(localDir, name)
+	runDir := RunDir(resultsDir, name)
 	// MkdirAll wäre hier falsch: ein vorhandenes Verzeichnis soll auffallen.
 	if err := os.Mkdir(runDir, 0o755); err != nil {
 		if os.IsExist(err) {

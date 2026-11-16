@@ -2,7 +2,6 @@ package project
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -110,11 +109,9 @@ func TestVersionSourcesDefektIstZustand(t *testing.T) {
 	}
 }
 
-// Ist Kephalaion nicht bereit, ist das ein eigener Zustand — nicht „fehlt“,
-// und die alte Datei auf der Platte wird nicht gelesen.
+// Ist Kephalaion nicht bereit, ist das ein eigener Zustand — nicht „fehlt“.
 func TestVersionSourcesNichtErreichbarFaelltNichtZurueck(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), "schema_version: 1\nexclude:\n  - tests/**\n")
 	write(t, versionSourcesDoc(root), "---\nschema_version: 3\nexclude:\n  - x/**\n---\n")
 
 	state := versionSourcesWithStatus(root, kephalaion.Status{State: kephalaion.StateNodeUnreachable, Message: "Node antwortet nicht."})
@@ -149,28 +146,5 @@ func TestContextForDirTraegtVersionSources(t *testing.T) {
 	}
 	if plain.VersionSources != nil {
 		t.Errorf("BuildContext fragt die Collection nicht: %+v", plain.VersionSources)
-	}
-}
-
-// Die alte Datei wird erkannt, nicht gelesen.
-func TestLegacyVersionSourcesWirdErkannt(t *testing.T) {
-	root := t.TempDir()
-	if path, present := LegacyVersionSources(root); present || !strings.HasSuffix(path, filepath.Join(LocalDirName, LegacyVersionSourcesFileName)) {
-		t.Errorf("ohne Datei: %s, %v", path, present)
-	}
-	if LegacyVersionSourcesMessage(root) != "" {
-		t.Error("ohne Datei kein Satz")
-	}
-	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), "egal\n")
-	if _, present := LegacyVersionSources(root); !present {
-		t.Error("die Datei wird nicht erkannt")
-	}
-	message := LegacyVersionSourcesMessage(root)
-	if !strings.Contains(message, LegacyVersionSourcesDisplay) || !strings.Contains(message, versionsources.DocRef) ||
-		!strings.Contains(message, "/k-upgrade") {
-		t.Errorf("Satz = %q", message)
-	}
-	if err := os.Remove(filepath.Join(LocalDir(root), LegacyVersionSourcesFileName)); err != nil {
-		t.Fatal(err)
 	}
 }

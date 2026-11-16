@@ -230,14 +230,13 @@ func TestDiscoverLoeschtAlteKonfigurationNebenNeuer(t *testing.T) {
 	}
 }
 
-// Im Quell-Repo ist die alte Datei ein relativer Symlink nach
-// k-playbook-local/. Umziehen muss die Datei dahinter; der verschobene Link
-// zeigte ins Leere.
+// Ist die alte Datei ein relativer Symlink in ein Unterverzeichnis, muss die
+// Datei dahinter umziehen; der verschobene Link zeigte ins Leere.
 func TestDiscoverZiehtZielEinesSymlinksUm(t *testing.T) {
 	root := t.TempDir()
-	real := filepath.Join(root, LocalDirName, ConfigFileName)
+	real := filepath.Join(root, "ablage", ConfigFileName)
 	writeFile(t, real, "schema_version: 3\n# hinter dem Link\n")
-	if err := os.Symlink(filepath.Join(LocalDirName, ConfigFileName), legacyConfigPath(root)); err != nil {
+	if err := os.Symlink(filepath.Join("ablage", ConfigFileName), legacyConfigPath(root)); err != nil {
 		t.Fatalf("Symlink anlegen: %v", err)
 	}
 

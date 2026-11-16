@@ -534,13 +534,10 @@ func staleRegistryLinks(projectRoot string, target string, wanted []RegistryEntr
 }
 
 // ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link, in die
-// projekteigenen Quellen .k-playbook/commands/ und .k-playbook/skills/, ins
-// lokale Verzeichnis oder in den früheren Clone k-playbook/ zeigen — also die,
-// die von uns stammen. Der Clone steht dabei, damit die Links aus der Zeit vor
-// Stufe 2 als unsere
-// erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben;
-// ebenso das lokale Verzeichnis für die Links in den früheren Ort
-// k-playbook-local/<sorte>/, den seit Task 129 nichts mehr liest.
+// projekteigenen Quellen .k-playbook/commands/ und .k-playbook/skills/ oder in
+// den früheren Clone k-playbook/ zeigen — also die, die von uns stammen. Der
+// Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere
+// erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben.
 func ownedLinks(projectRoot string, dir string, prefix string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -551,7 +548,6 @@ func ownedLinks(projectRoot string, dir string, prefix string) []string {
 		ShareLink(projectRoot),
 		ProjectAssetDir(projectRoot, KindCommands),
 		ProjectAssetDir(projectRoot, KindSkills),
-		LocalDir(projectRoot),
 		PlaybookDir(projectRoot),
 	}
 	names := []string{}

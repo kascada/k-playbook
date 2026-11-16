@@ -729,13 +729,13 @@ func (c *checker) checkRemoteOnly() {
 	c.add(check)
 }
 
-// checkConfigInTarget vergleicht K-PLAYBOOK.yaml und k-playbook-local/ zwischen
-// HEAD und Ziel, wenn sie im umgeschalteten Repo liegen.
+// checkConfigInTarget vergleicht K-PLAYBOOK.yaml zwischen HEAD und Ziel, wenn
+// die Datei im umgeschalteten Repo liegt.
 func (c *checker) checkConfigInTarget(ctx context.Context) {
 	check := Check{ID: "konfiguration-im-ziel", Title: "Konfiguration im Ziel gleich"}
 	if !configInRepo(c.options.ProjectDir, c.options.RepoDir) {
 		check.Result = ResultOK
-		check.Reason = project.ConfigFileName + " und " + project.LocalDirName + "/ liegen außerhalb des Code-Repos und wechseln nicht mit."
+		check.Reason = project.ConfigFileName + " liegt außerhalb des Code-Repos und wechselt nicht mit."
 		c.add(check)
 		return
 	}
@@ -753,12 +753,9 @@ func (c *checker) checkConfigInTarget(ctx context.Context) {
 		return
 	}
 	paths := []string{}
-	for _, path := range []string{project.ConfigPath(c.options.ProjectDir), project.LocalDir(c.options.ProjectDir)} {
-		relative, err := filepath.Rel(resolvedPath(top), resolvedPath(filepath.Dir(path)))
-		if err != nil {
-			continue
-		}
-		paths = append(paths, filepath.ToSlash(filepath.Join(relative, filepath.Base(path))))
+	configPath := project.ConfigPath(c.options.ProjectDir)
+	if relative, err := filepath.Rel(resolvedPath(top), resolvedPath(filepath.Dir(configPath))); err == nil {
+		paths = append(paths, filepath.ToSlash(filepath.Join(relative, filepath.Base(configPath))))
 	}
 	topRepo := Repo{Runner: c.st.repo.Runner, Dir: top}
 	out, err := topRepo.readString(ctx, append([]string{"diff", "--name-only", "HEAD", c.targetRef, "--"}, paths...)...)
@@ -768,11 +765,11 @@ func (c *checker) checkConfigInTarget(ctx context.Context) {
 		check.Reason = describeError("Der Vergleich der Konfiguration", err)
 	case strings.TrimSpace(out) == "":
 		check.Result = ResultOK
-		check.Reason = project.ConfigFileName + " und " + project.LocalDirName + "/ sind im Ziel gleich."
+		check.Reason = project.ConfigFileName + " ist im Ziel gleich."
 	default:
 		changed := strings.Split(strings.TrimSpace(out), "\n")
 		check.Result = ResultHint
-		check.Reason = "Im Ziel " + countText(len(changed), "Datei unterscheidet", "Dateien unterscheiden") + " sich in " + project.ConfigFileName + " oder " + project.LocalDirName + "/. Nach dem Wechsel gelten Konfiguration, Regeln und Tasks des Ziels."
+		check.Reason = "Im Ziel unterscheidet sich " + project.ConfigFileName + ". Nach dem Wechsel gilt die Konfiguration des Ziels."
 		check.Details = limitDetails(changed, 20)
 	}
 	c.add(check)

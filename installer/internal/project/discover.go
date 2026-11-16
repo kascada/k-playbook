@@ -95,9 +95,8 @@ func legacyConfigPath(projectDir string) string {
 // migrateConfig zieht eine K-PLAYBOOK.yaml vom früheren Ort nach ConfigPath um.
 //
 // Liegt am neuen Ort schon eine, gilt sie, und die alte wird gelöscht. Sonst
-// wird die alte verschoben. Ist die alte ein Symlink — so im Quell-Repo, wo
-// sie auf k-playbook-local/K-PLAYBOOK.yaml zeigt —, zieht die Datei um, auf die
-// er zeigt, und der Link wird entfernt: Ein verschobener relativer Link zeigte
+// wird die alte verschoben. Ist die alte ein Symlink, zieht die Datei um, auf
+// die er zeigt, und der Link wird entfernt: Ein verschobener relativer Link zeigte
 // ins Leere. Gelöscht wird bei vorhandenem neuem Ort nur der Link, nie sein
 // Ziel; das kann außerhalb des Projekts liegen.
 //

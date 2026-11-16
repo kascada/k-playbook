@@ -12,9 +12,7 @@ import (
 // k-playbook/ (Task 143), mit demselben Baum wie unter k-playbook:/ — neben
 // docs/, queue/, todos/ und user/. Gleicher Name ersetzt das Mitgelieferte,
 // eine leere Datei schaltet es ab, ein neuer Name kommt hinzu; die Regel ist
-// dieselbe wie für jede Ebene (overlayDocDir). k-playbook-local/instructions/,
-// includes/ und reviews/ liest seitdem nichts mehr (harter Wechsel); /k-upgrade
-// räumt sie ab.
+// dieselbe wie für jede Ebene (overlayDocDir).
 //
 // Fehlt k-playbook/ in der Collection, ist die Ebene leer, ohne Fehler. Ein
 // Fehler beim Zugriff auf die Collection ist dagegen kephalaion_unavailable,
@@ -27,9 +25,8 @@ const ProjectLayerDirName = "k-playbook"
 
 // projectLayerKinds sind die Sorten, deren projekteigene Ebene in der
 // Collection liegt. commands/ bleibt in .k-playbook/commands/ (die Assistenten
-// brauchen die Hüllen auf der Platte), testdata/ bleibt bis zu seinem Umbau
-// in k-playbook-local/; guidelines/ hat keine projekteigene Ebene mehr (Task
-// 148, docDistOnlyKinds).
+// brauchen die Hüllen auf der Platte); guidelines/ und testdata/ haben keine
+// projekteigene Ebene (docDistOnlyKinds).
 var projectLayerKinds = []string{docInstructionsRoot, docIncludesRoot, "reviews"}
 
 // OpenProjectLayerStore öffnet den Zugang zur Collection des Projekts für die

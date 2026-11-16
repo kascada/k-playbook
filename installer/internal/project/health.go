@@ -50,10 +50,9 @@ func init() {
 // Fehlt kephalaion an allen Orten der Suche, ist das die Abhilfe vor jeder
 // anderen: Ohne Binary gibt es keine Auskunft und damit keine Anbindung.
 //
-// Dazu je eine Warnung, wenn im Block kephalaion: von K-PLAYBOOK.yaml ein
+// Dazu eine Warnung, wenn im Block kephalaion: von K-PLAYBOOK.yaml ein
 // account: steht — er wird nicht gelesen (Task 138), der Account kommt von
-// Kephalaion — und wenn die alte k-playbook-local/K-PLAYBOOK.local.yaml noch
-// einen Block kephalaion: trägt; den Umzug macht /k-upgrade.
+// Kephalaion.
 func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 	var problems []health.Problem
 	if config, err := ReadConfig(projectDir); err == nil && config.Kephalaion.AccountSet {
@@ -64,21 +63,6 @@ func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 				"der Account kommt von Kephalaion (kephalaion node client).",
 			Hint: "Die Zeile account: aus dem Block entfernen und committen; welcher Account auf diesem Rechner gilt, " +
 				"legt kephalaion node account default <hub> <account> fest.",
-		})
-	}
-	if _, present, err := kephalaion.ReadLegacyBinding(LocalDir(projectDir)); err != nil || present {
-		message := "In " + LegacyKephalaionDisplay + " steht noch ein Block kephalaion:; k-playbook liest die Anbindung " +
-			"nicht mehr von dort, sondern aus dem Block kephalaion: von " + ConfigDisplayName + "."
-		if err != nil {
-			message = LegacyKephalaionDisplay + " liegt noch, ist aber nicht lesbar (" + err.Error() + "); k-playbook liest " +
-				"die Anbindung nicht mehr von dort, sondern aus dem Block kephalaion: von " + ConfigDisplayName + "."
-		}
-		problems = append(problems, health.Problem{
-			Level:   health.LevelWarning,
-			Area:    health.AreaKephalaion,
-			Message: message,
-			Hint: "/k-upgrade ausführen: k-playbook upgrade zieht Hub und Collection in den Block um, danach löscht " +
-				"/k-upgrade die alte Datei nach Rückfrage.",
 		})
 	}
 	status := kephalaionCheck(projectDir)
@@ -171,19 +155,8 @@ func healthBaseTools(_ context.Context, projectDir string) []health.Problem {
 //   - Ist Kephalaion nicht bereit, schweigt diese Quelle: Den Fehler trägt
 //     schon der Bereich kephalaion mit seiner Abhilfe, und ein zweiter Satz
 //     zur selben Ursache sagte nichts Neues.
-//   - Liegt die alte Datei unter k-playbook-local/ noch, ist das eine
-//     Warnung mit dem Hinweis auf /k-upgrade — gelesen wird sie nicht.
 func healthVersionSources(ctx context.Context, projectDir string) []health.Problem {
 	var problems []health.Problem
-	if message := LegacyVersionSourcesMessage(projectDir); message != "" {
-		problems = append(problems, health.Problem{
-			Level: health.LevelWarning,
-			Area:  health.AreaVersionSources,
-			Message: LegacyVersionSourcesDisplay + " liegt noch; k-playbook liest die Quellenkonfiguration des " +
-				"Versionsinventars nicht mehr von dort, sondern aus " + versionsources.DocRef + ".",
-			Hint: legacyVersionSourcesHint,
-		})
-	}
 	_, opened, err := LoadVersionSources(ctx, projectDir)
 	switch {
 	case err == nil:

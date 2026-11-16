@@ -132,9 +132,7 @@ Die Bereiche heute:
   versionSources  keph:/k-playbook/inventory.md da, aber nicht lesbar, von
                   unbekannter Fassung oder mit roots: error; Kephalaion
                   bereit, das Dokument aber nicht erreichbar: error (nicht
-                  bereit meldet schon kephalaion); liegt die alte
-                  k-playbook-local/version-sources.yaml noch: warning
-                  (Altbestand, /k-upgrade zieht um)
+                  bereit meldet schon kephalaion)
   github          die persönliche GitHub-Zugangsdatei ~/.config/k-playbook/
                   github.yaml sagt etwas Falsches: je Problem ein error mit
                   dem Pfad in der Datei vorn im Satz; je Dienst ohne

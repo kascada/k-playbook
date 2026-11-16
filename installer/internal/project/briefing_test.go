@@ -20,8 +20,7 @@ import (
 // newBriefingProject baut ein Projekt mit beiden Ebenen: ersetzt,
 // abgeschaltet, nur lokal und nur mitgeliefert kommen in jeder Sorte vor. Die
 // projekteigene Ebene von instructions/ und reviews/ liegt in der Collection
-// des Projekts (test-collection/ baut sie, isolateDefaults); was noch unter
-// k-playbook-local/instructions/ und reviews/ liegt, liest nichts mehr.
+// des Projekts (test-collection/ baut sie, isolateDefaults).
 func newBriefingProject(t *testing.T) string {
 	t.Helper()
 
@@ -45,11 +44,6 @@ func newBriefingProject(t *testing.T) string {
 		"test-collection/k-playbook/instructions/on-demand/release.md":  "",
 		"test-collection/k-playbook/instructions/on-demand/eigen.md":    "## Eigen auf Abruf\n\nText.\n",
 		"test-collection/k-playbook/reviews/review-tech.md":             "# Abgeschaltet.\n",
-		"k-playbook-local/rules/eigene.md":                              "# Liegengeblieben\n",
-		"k-playbook-local/instructions/always/300-alt.md":               "## Alter Ort\n",
-		"k-playbook-local/instructions/on-demand/muster.md":             "",
-		"k-playbook-local/reviews/review-code.md":                       "",
-		"k-playbook-local/guidelines/stil.md":                           "# Stil\n\nText.\n",
 	}
 	for rel, content := range files {
 		path := filepath.Join(root, filepath.FromSlash(rel))
@@ -136,9 +130,8 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 		t.Errorf("onDemand:\n%+v\nerwartet\n%+v", briefing.Documents.OnDemand, wantOnDemand)
 	}
 
-	// Die Sorte rules gibt es nicht mehr: Ein liegengebliebenes
-	// k-playbook-local/rules/ erscheint nirgends im Briefing.
-	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "rules") || strings.Contains(string(data), "eigene.md") {
+	// Die Sorte rules gibt es nicht mehr: Sie erscheint nirgends im Briefing.
+	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "rules") {
 		t.Errorf("documents nennt die entfallene Sorte: %s %v", data, err)
 	}
 
@@ -152,21 +145,12 @@ func TestBriefingListetDokumenteMitHerkunft(t *testing.T) {
 		t.Errorf("reviews:\n%+v\nerwartet\n%+v", briefing.Documents.Reviews, wantReviews)
 	}
 
-	// Guidelines kommen nur mitgeliefert, README nie: Die Datei stil.md unter
-	// k-playbook-local/guidelines/ zählt nicht (Task 148).
+	// Guidelines kommen nur mitgeliefert (Task 148), README nie.
 	wantGuidelines := []BriefingEntry{
 		{Ref: "k-playbook:/guidelines/betrieb.md", Title: "Betrieb: Ablageorte", Origin: DocOriginDist},
 	}
 	if !reflect.DeepEqual(briefing.Documents.Guidelines, wantGuidelines) {
 		t.Errorf("guidelines:\n%+v\nerwartet\n%+v", briefing.Documents.Guidelines, wantGuidelines)
-	}
-
-	// Der frühere Ort k-playbook-local/instructions/ und reviews/ wirkt nicht
-	// mehr (Task 143), ebenso k-playbook-local/guidelines/ (Task 148):
-	// 300-alt.md und stil.md kommen nicht hinzu, die leeren Dateien dort
-	// schalten muster.md und review-code.md nicht ab.
-	if data, err := json.Marshal(briefing.Documents); err != nil || strings.Contains(string(data), "300-alt.md") || strings.Contains(string(data), "stil.md") {
-		t.Errorf("documents nennt eine Datei vom alten Ort: %s %v", data, err)
 	}
 
 	// Jeder Verweis des Briefings lässt sich über ResolveDocRef lesen, mit
@@ -493,7 +477,8 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 // context — wie bei work —, kein Fehler: das übrige Briefing bleibt.
 // Der Abschnitt context trägt kein Feld playbook mehr (Task 157, Fassung 7),
 // auch wenn ein liegengebliebener Clone k-playbook/ im Projekt liegt — weder
-// als Feld noch im JSON des Briefings.
+// als Feld noch im JSON des Briefings. Seit Fassung 8 fehlt auch das Feld
+// local (Task 159): die einzige Wurzel ist project.
 func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
@@ -506,8 +491,8 @@ func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "7" {
-		t.Errorf("schemaVersion %q, erwartet 7", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "8" {
+		t.Errorf("schemaVersion %q, erwartet 8", briefing.SchemaVersion)
 	}
 	if !briefing.Context.Available {
 		t.Fatalf("context: %+v", briefing.Context)
@@ -515,10 +500,11 @@ func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	if value, ok := briefing.Context.Field("playbook"); ok {
 		t.Errorf("context trägt playbook: %s", value)
 	}
-	for _, kept := range []string{"project", "local"} {
-		if _, ok := briefing.Context.Field(kept); !ok {
-			t.Errorf("context trägt %s nicht", kept)
-		}
+	if _, ok := briefing.Context.Field("project"); !ok {
+		t.Errorf("context trägt project nicht")
+	}
+	if value, ok := briefing.Context.Field("local"); ok {
+		t.Errorf("context trägt local: %s", value)
 	}
 
 	encoded, err := json.Marshal(briefing)
@@ -533,8 +519,10 @@ func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	if err := json.Unmarshal(raw["context"], &section); err != nil {
 		t.Fatalf("context im JSON: %v\n%s", err, raw["context"])
 	}
-	if _, ok := section["playbook"]; ok {
-		t.Errorf("context im JSON trägt playbook: %s", raw["context"])
+	for _, absent := range []string{"playbook", "local"} {
+		if _, ok := section[absent]; ok {
+			t.Errorf("context im JSON trägt %s: %s", absent, raw["context"])
+		}
 	}
 	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(encoded), string(quoted)) {
 		t.Errorf("das Briefing nennt %s:\n%s", PlaybookDir(root), encoded)
@@ -712,8 +700,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "7" {
-		t.Errorf("schemaVersion %q, erwartet 7", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "8" {
+		t.Errorf("schemaVersion %q, erwartet 8", briefing.SchemaVersion)
 	}
 	if !briefing.Health.OK || len(briefing.Health.Problems) != 0 {
 		t.Errorf("health ohne Probleme: %+v", briefing.Health)
@@ -727,12 +715,10 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	}
 
 	// Ein Fehler und eine Warnung — die nicht eingetragene Anbindung ist seit
-	// Task 131 ein Fehler, die alte Quellenkonfiguration unter
-	// k-playbook-local/ Altbestand (Task 144): beide da, ok falsch,
-	// Reihenfolge nach Bereich. Die alte Datei wird nicht gelesen, auch eine
-	// unlesbare nicht.
+	// Task 131 ein Fehler, ein fehlendes Basis-Werkzeug eine Warnung: beide
+	// da, ok falsch, Reihenfolge nach Bereich.
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
-	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), ": ungültig\n")
+	write(t, filepath.Join(shipped(t), "scripts", "base-tools.tsv"), baseMatrixHeader+"k-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n")
 	briefing, err = BuildBriefing(t.Context(), root)
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
@@ -741,12 +727,9 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if report.OK || len(report.Problems) != 2 {
 		t.Fatalf("health: %+v", report)
 	}
-	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError ||
-		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelWarning {
+	if report.Problems[0].Area != health.AreaBaseTools || report.Problems[0].Level != health.LevelWarning ||
+		report.Problems[1].Area != health.AreaKephalaion || report.Problems[1].Level != health.LevelError {
 		t.Errorf("Einträge: %+v", report.Problems)
-	}
-	if strings.Contains(report.Problems[1].Message, "ungültig") {
-		t.Errorf("Eintrag zitiert die Datei: %+v", report.Problems[1])
 	}
 	// Dieselbe Antwort wie health.Check selbst.
 	if direct := health.Check(t.Context(), root); !reflect.DeepEqual(direct, report) {

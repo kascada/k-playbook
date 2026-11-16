@@ -22,7 +22,7 @@ func docTree(t *testing.T, dist map[string]string, local map[string]string) (Doc
 
 	root := t.TempDir()
 	distDir := filepath.Join(root, "k-playbook")
-	localDir := filepath.Join(root, "k-playbook-local")
+	localDir := filepath.Join(root, "projekteigen")
 	writeDocTree(t, distDir, dist)
 	writeDocTree(t, localDir, local)
 	return DocLayers{Dist: NewDiskDocSource(distDir), Local: NewDiskDocSource(localDir)}, distDir, localDir
@@ -441,11 +441,11 @@ func TestDocRefProjekt(t *testing.T) {
 	}, nil)
 	root := t.TempDir()
 	writeDocTree(t, root, map[string]string{
-		"scripts/123.sh":                     "#!/bin/sh\necho hallo\n",
-		"k-playbook-local/docs/README.md":    "# Doku\n",
-		"k-playbook-local/docs/leer.md":      "",
-		"k-playbook-local/docs/kommentar.md": "# nur Überschrift\n",
-		"ordner/":                            "",
+		"scripts/123.sh":            "#!/bin/sh\necho hallo\n",
+		"notizen/docs/README.md":    "# Doku\n",
+		"notizen/docs/leer.md":      "",
+		"notizen/docs/kommentar.md": "# nur Überschrift\n",
+		"ordner/":                   "",
 	})
 	layers.Project = NewDiskDocSource(root)
 
@@ -456,18 +456,18 @@ func TestDocRefProjekt(t *testing.T) {
 	if !reflect.DeepEqual(file.Parts, []DocPart{{Name: "123.sh", Origin: DocOriginProject}}) {
 		t.Errorf("parts: %+v", file.Parts)
 	}
-	if doc := mustResolveDoc(t, layers, "project:/k-playbook-local/docs/README.md"); doc.Content != "# Doku\n" {
-		t.Errorf("Datei unter k-playbook-local/: %+v", doc)
+	if doc := mustResolveDoc(t, layers, "project:/notizen/docs/README.md"); doc.Content != "# Doku\n" {
+		t.Errorf("Datei in einem Unterverzeichnis: %+v", doc)
 	}
 	// Leer heißt leer, nicht abgeschaltet: es gibt keine zweite Ebene, die
 	// eine leere Datei abschalten könnte.
-	for _, ref := range []string{"project:/k-playbook-local/docs/leer.md", "project:/k-playbook-local/docs/kommentar.md"} {
+	for _, ref := range []string{"project:/notizen/docs/leer.md", "project:/notizen/docs/kommentar.md"} {
 		doc := mustResolveDoc(t, layers, ref)
 		if doc.Disabled || doc.Hint != "" || len(doc.Parts) != 1 || doc.Parts[0].Disabled {
 			t.Errorf("%s: als abgeschaltet gemeldet: %+v", ref, doc)
 		}
 	}
-	if doc := mustResolveDoc(t, layers, "project:/k-playbook-local/docs/kommentar.md"); doc.Content != "# nur Überschrift\n" {
+	if doc := mustResolveDoc(t, layers, "project:/notizen/docs/kommentar.md"); doc.Content != "# nur Überschrift\n" {
 		t.Errorf("Inhalt der Kommentar-Datei: %q", doc.Content)
 	}
 
@@ -822,15 +822,15 @@ func TestDocRefSorteCommands(t *testing.T) {
 func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	root := newContextProject(t)
 	files := map[string]string{
-		"test-defaults/reviews/README.md":          "# Liesmich\n",
-		"test-defaults/reviews/review-code.md":     "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
-		"test-defaults/reviews/review-tech.md":     "# Tech\n",
-		"test-defaults/reviews/review-sast.md":     "# SAST\n",
-		"test-defaults/reviews/notiz.md":           "# kein Rezept\n",
-		"k-playbook-local/reviews/review-sast.md":  "",
-		"k-playbook-local/reviews/review-tech.md":  "# Abgeschaltet.\n",
-		"k-playbook-local/reviews/review-eigen.md": "# Eigen\n\nText.\n",
-		"k-playbook-local/reviews/.versteckt.md":   "# versteckt\n",
+		"test-defaults/reviews/README.md":                    "# Liesmich\n",
+		"test-defaults/reviews/review-code.md":               "---\nname: review-code\naudit:\n  enabled: true\n---\n# Code\n",
+		"test-defaults/reviews/review-tech.md":               "# Tech\n",
+		"test-defaults/reviews/review-sast.md":               "# SAST\n",
+		"test-defaults/reviews/notiz.md":                     "# kein Rezept\n",
+		"test-collection/k-playbook/reviews/review-sast.md":  "",
+		"test-collection/k-playbook/reviews/review-tech.md":  "# Abgeschaltet.\n",
+		"test-collection/k-playbook/reviews/review-eigen.md": "# Eigen\n\nText.\n",
+		"test-collection/k-playbook/reviews/.versteckt.md":   "# versteckt\n",
 	}
 	for rel, content := range files {
 		write(t, filepath.Join(root, filepath.FromSlash(rel)), content)
@@ -902,9 +902,6 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 		".k-playbook/commands/k-danke.md":     "",
 		".k-playbook/commands/eigener.md":     "# eigener\n\nText.\n",
 		".k-playbook/commands/_x/eins.md":     "# eins\n\nlokal\n",
-		// Der frühere Ort wird nicht mehr gelesen (Task 129).
-		"k-playbook-local/commands/k-upgrade.md": "",
-		"k-playbook-local/commands/alt.md":       "# alt\n\nText.\n",
 	} {
 		// Die Hüllen liegen mitgeliefert unter ~/.local/share/k-playbook.
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -932,12 +929,6 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 	}
 	if want := map[string]string{"_x/eins.md": "override", "_x/zwei.md": "dist", "eigener.md": "local", "k-danke.md": "override", "k-gui.md": "override", "k-upgrade.md": "dist"}; !reflect.DeepEqual(origins, want) {
 		t.Errorf("Herkünfte %v, erwartet %v", origins, want)
-	}
-	if _, err := ResolveDocRef(layers, "k-playbook:/commands/alt.md"); DocRefErrorCode(err) != DocCodeNotFound {
-		t.Errorf("Datei am alten Ort über k-playbook:/commands/ erreichbar: %v", err)
-	}
-	if doc := mustResolveDoc(t, layers, "k-playbook:/commands/k-upgrade.md"); doc.Disabled || !strings.HasSuffix(doc.Content, "Text\n") {
-		t.Errorf("leere Datei am alten Ort schaltet ab: %+v", doc)
 	}
 	for _, entry := range registry {
 		ref := "k-playbook:/commands/" + entry.Name
@@ -1351,6 +1342,8 @@ func TestDocRefIncludeKeph(t *testing.T) {
 // includes/ ist eine Sorte: mitgeliefert aus defaults/, lokal ersetzt, leer
 // schaltet ab; mit „/“ am Ende fehlt der Dateiname. Geprüft mit testeigenen
 // Ebenen — defaults/includes/ trägt nur die README und keinen Baustein.
+// testdata/ kommt nur mitgeliefert: Eine lokale Datei gleichen Namens gewinnt
+// nicht.
 func TestDocRefSorteIncludes(t *testing.T) {
 	layers, _, _ := docTree(t, map[string]string{
 		"includes/context.md": "---\ntitle: Kontext\n---\n\n## Kontext\n\nMitgeliefert.\n",
@@ -1364,6 +1357,7 @@ func TestDocRefSorteIncludes(t *testing.T) {
 		"includes/ersetzt.md": "## Ersetzt\n\nLokal.\n",
 		"includes/aus.md":     "",
 		"includes/eigen.md":   "## Eigen\n\nLokal.\n",
+		"testdata/x/fall.md":  "## Fall\n\nLokal.\n",
 	})
 
 	for ref, want := range map[string]DocPart{
@@ -1380,6 +1374,9 @@ func TestDocRefSorteIncludes(t *testing.T) {
 	}
 	if got := mustResolveDoc(t, layers, "k-playbook:/includes/ersetzt.md").Content; got != "## Ersetzt\n\nLokal.\n" {
 		t.Errorf("lokale Fassung: %q", got)
+	}
+	if got := mustResolveDoc(t, layers, "k-playbook:/testdata/x/fall.md").Content; got != "## Fall\n" {
+		t.Errorf("testdata liefert nicht die mitgelieferte Fassung: %q", got)
 	}
 	// Ein Command bindet Bausteine ein; der abgeschaltete setzt nichts ein.
 	cmd := mustResolveDoc(t, layers, "k-playbook:/commands/k-danke.md")

@@ -12,6 +12,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion/kephtest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // healthE2EProject legt ein Projekt an, in dem genau ein Problem steht: die
@@ -69,11 +70,14 @@ func TestHealthKlartextNichtEingetragenIstFehler(t *testing.T) {
 }
 
 func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
-	root := healthE2EProject(t)
-	// Die alte Quellenkonfiguration ist Altbestand (Task 144): eine Warnung
-	// neben dem Fehler, gelesen wird sie nicht.
-	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
-	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
+	healthE2EProject(t)
+	// Ein Basis-Werkzeug der Matrix fehlt im PATH: eine Warnung neben dem
+	// Fehler.
+	path := filepath.Join(sharetest.Dir(t), "scripts", "base-tools.tsv")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("name\tgroup\trole\tguarded\tmethods\tapt_package\tgithub_repo\tasset_ref\tasset_pattern\nk-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,11 +85,8 @@ func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
 	if err == nil || err.Error() != "" || exitCodeOf(err) != healthExitProblems {
 		t.Fatalf("Fehler: %v (Code %d)", err, exitCodeOf(err))
 	}
-	if !strings.Contains(stdout, "  [warning] versionSources: "+project.LegacyVersionSourcesDisplay+" liegt noch") {
+	if !strings.Contains(stdout, "  [warning] baseTools: Das Basis-Werkzeug k-weg fehlt im PATH") {
 		t.Errorf("Ausgabe:\n%s", stdout)
-	}
-	if strings.Contains(stdout, "ungültig") {
-		t.Errorf("Ausgabe zitiert die Datei:\n%s", stdout)
 	}
 
 	stdout, err = runHealthCaptured(t, "--json")
@@ -99,9 +100,9 @@ func TestHealthFehlerEndetMitEinsUndJSONTraegtDenReport(t *testing.T) {
 	if report.OK || len(report.Problems) != 2 {
 		t.Fatalf("Report: %+v", report)
 	}
-	// Sortiert nach Bereich: kephalaion vor versionSources.
-	if report.Problems[0].Area != health.AreaKephalaion || report.Problems[0].Level != health.LevelError ||
-		report.Problems[1].Area != health.AreaVersionSources || report.Problems[1].Level != health.LevelWarning || report.Problems[1].Hint == "" {
+	// Sortiert nach Bereich: baseTools vor kephalaion.
+	if report.Problems[0].Area != health.AreaBaseTools || report.Problems[0].Level != health.LevelWarning || report.Problems[0].Hint == "" ||
+		report.Problems[1].Area != health.AreaKephalaion || report.Problems[1].Level != health.LevelError {
 		t.Errorf("Problems: %+v", report.Problems)
 	}
 	// Der Report ist das ganze JSON — kein Umschlag auf der Kommandozeile.

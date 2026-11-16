@@ -2,10 +2,6 @@ package project
 
 import (
 	"context"
-	"errors"
-	"io/fs"
-	"os"
-	"path/filepath"
 
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
@@ -15,43 +11,7 @@ import (
 // Collection des Projekts, im Dokument versionsources.DocRef
 // (keph:/k-playbook/inventory.md). Gelesen wird sie allein von
 // internal/versionsources; hier wird nur der Zugang geöffnet und der Zustand
-// für Kontextausgabe, Briefing und Gesundheitsprüfung aufbereitet. Die alte
-// Datei unter k-playbook-local/ liest kein Programmteil mehr als
-// Konfiguration — liegt sie noch, ist sie Altbestand, den /k-upgrade umzieht.
-
-// LegacyVersionSourcesFileName ist die alte Quellenkonfiguration unter
-// k-playbook-local/. Sie wird nur noch erkannt, um sie als Altbestand zu
-// melden, nie gelesen.
-const LegacyVersionSourcesFileName = "version-sources.yaml"
-
-// LegacyVersionSourcesDisplay ist die alte Datei, wie eine Meldung sie nennt.
-const LegacyVersionSourcesDisplay = LocalDirName + "/" + LegacyVersionSourcesFileName
-
-// LegacyVersionSources meldet, ob die alte Datei noch liegt, und nennt ihren
-// Pfad. Gelesen wird sie dabei nicht.
-func LegacyVersionSources(projectDir string) (string, bool) {
-	path := filepath.Join(LocalDir(projectDir), LegacyVersionSourcesFileName)
-	if _, err := os.Lstat(path); err != nil {
-		return path, !errors.Is(err, fs.ErrNotExist)
-	}
-	return path, true
-}
-
-// legacyVersionSourcesHint ist die Abhilfe zum Altbestand, gleich wo er
-// gemeldet wird.
-const legacyVersionSourcesHint = "/k-upgrade ausführen: zieht exclude, sources und helm_values in " +
-	versionsources.DocRef + " um und löscht die alte Datei danach nach Rückfrage."
-
-// LegacyVersionSourcesMessage ist der Satz zum Altbestand: wo die alte Datei
-// liegt und dass sie nicht mehr gilt. Leer, wenn sie nicht liegt.
-func LegacyVersionSourcesMessage(projectDir string) string {
-	if _, present := LegacyVersionSources(projectDir); !present {
-		return ""
-	}
-	return LegacyVersionSourcesDisplay + " liegt noch; k-playbook liest die Quellenkonfiguration des " +
-		"Versionsinventars nicht mehr von dort, sondern aus " + versionsources.DocRef + ". Abhilfe: " +
-		legacyVersionSourcesHint
-}
+// für Kontextausgabe, Briefing und Gesundheitsprüfung aufbereitet.
 
 // Die Zustände von versionSources in der Kontextausgabe.
 const (

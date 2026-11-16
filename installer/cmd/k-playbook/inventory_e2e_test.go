@@ -115,9 +115,6 @@ func TestSubkommandoUeberDieFixtureErgibtDieDateiDerFachlogik(t *testing.T) {
 	if expected := inventory.Render(result, status.GeneratedAt); expected != written {
 		t.Error("das Dokument des Subkommandos ist nicht das Rendering der Fachlogik")
 	}
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
-		t.Error("das Subkommando hat auf der Platte geschrieben")
-	}
 	if status.Deviations != len(result.Deviations) || status.SourcesRead != len(result.Sources) {
 		t.Errorf("Status %+v, Fachlogik %d Abweichungen, %d Quellen", status, len(result.Deviations), len(result.Sources))
 	}
@@ -183,8 +180,7 @@ func captureStdout(t *testing.T, fn func()) string {
 }
 
 // Ohne bereite Anbindung bricht das Subkommando mit kephalaion_unavailable
-// und dem Grund ab, bevor es eine Quelle liest; auf der Platte entsteht
-// nichts.
+// und dem Grund ab, bevor es eine Quelle liest.
 func TestSubkommandoOhneKephalaionBrichtAb(t *testing.T) {
 	root, _ := fixtureProject(t, "vollstaendig")
 	project.OpenInventoryStore = func(string) (inventory.Store, error) {
@@ -198,9 +194,6 @@ func TestSubkommandoOhneKephalaionBrichtAb(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "(kephalaion_unavailable)") || !strings.Contains(err.Error(), "nicht bereit") {
 		t.Errorf("der Fehler nennt Code und Grund nicht: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
-		t.Error("einen Rückfall auf die Platte gibt es nicht")
 	}
 }
 
@@ -227,34 +220,5 @@ func TestSubkommandoOhneVorlageSchreibtDasInventar(t *testing.T) {
 	}
 	if _, ok := store.Content("docs/generated/versions/README.md"); ok {
 		t.Error("README trotz fehlender Vorlage angelegt")
-	}
-}
-
-// Liegt die alte Datei unter k-playbook-local/ noch, nennt das Subkommando
-// sie als Altbestand mit dem Hinweis auf /k-upgrade — gelesen wird sie
-// nicht: Ihr Ausschluss wirkt nicht, der aus der Collection schon.
-func TestSubkommandoMeldetAltbestandUndLiestIhnNicht(t *testing.T) {
-	root, store := fixtureProject(t, "vollstaendig")
-	legacy := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
-	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(legacy, []byte("schema_version: 1\nexclude:\n  - \"**/*\"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	out := captureStdout(t, func() {
-		if err := runInventory(nil); err != nil {
-			t.Fatalf("runInventory: %v", err)
-		}
-	})
-	if !strings.HasPrefix(out, "Altbestand: "+project.LegacyVersionSourcesDisplay+" liegt noch") || !strings.Contains(out, "/k-upgrade") {
-		t.Errorf("der Bericht nennt den Altbestand nicht vorn:\n%s", out)
-	}
-	if strings.Contains(out, "**/*") || strings.Contains(out, "Ausgewertete Quellen:         0\n") {
-		t.Errorf("der Ausschluss der alten Datei wirkt — sie wurde gelesen:\n%s", out)
-	}
-	if _, ok := store.Content(inventory.DocName); !ok {
-		t.Errorf("das Inventar wurde nicht geschrieben: %v", store.Names())
 	}
 }

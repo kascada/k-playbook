@@ -274,18 +274,12 @@ func TestProjectLayerHubLesbarProjektNicht(t *testing.T) {
 }
 
 // Nur instructions/, includes/ und reviews/ kommen aus der Collection;
-// commands/ bleibt in .k-playbook/commands/. Der frühere Ort
-// k-playbook-local/instructions/, includes/ und reviews/ wird nicht mehr
-// gelesen, ebenso k-playbook-local/guidelines/ (Task 148): guidelines/ hat
-// keine lokale Ebene, weder auf der Platte noch in der Collection.
+// commands/ bleibt in .k-playbook/commands/. guidelines/ hat keine lokale
+// Ebene (Task 148), auch nicht in der Collection.
 func TestProjectLocalDocSourceWaehltDenOrt(t *testing.T) {
 	root := t.TempDir()
 	writeDocTree(t, root, map[string]string{
 		".k-playbook/commands/k-eigen.md":                  "Command.\n",
-		"k-playbook-local/guidelines/stil.md":              "Stil.\n",
-		"k-playbook-local/instructions/on-demand/alt.md":   "Alt.\n",
-		"k-playbook-local/includes/alt.md":                 "Alt.\n",
-		"k-playbook-local/reviews/review-alt.md":           "Alt.\n",
 		"test-collection/k-playbook/reviews/review-neu.md": "Neu.\n",
 		"test-collection/k-playbook/includes/neu.md":       "Neu.\n",
 		"test-collection/k-playbook/commands/k-eigen.md":   "falsch\n",
@@ -300,18 +294,15 @@ func TestProjectLocalDocSourceWaehltDenOrt(t *testing.T) {
 	}))
 
 	for file, want := range map[string]string{
-		"commands/k-eigen.md":           "Command.\n",
-		"guidelines/stil.md":            "",
-		"reviews/review-neu.md":         "Neu.\n",
-		"includes/neu.md":               "Neu.\n",
-		"reviews/review-alt.md":         "",
-		"includes/alt.md":               "",
-		"instructions/on-demand/alt.md": "",
+		"commands/k-eigen.md":   "Command.\n",
+		"guidelines/stil.md":    "",
+		"reviews/review-neu.md": "Neu.\n",
+		"includes/neu.md":       "Neu.\n",
 	} {
 		data, err := source.Read(file)
 		switch {
 		case want == "" && err == nil:
-			t.Errorf("%s: vom alten Ort gelesen: %q", file, data)
+			t.Errorf("%s: gelesen, obwohl die Sorte keine lokale Ebene hat: %q", file, data)
 		case want != "" && (err != nil || string(data) != want):
 			t.Errorf("%s: %q, %v; erwartet %q", file, data, err, want)
 		}

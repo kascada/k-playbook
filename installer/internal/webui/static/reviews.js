@@ -1,6 +1,7 @@
 "use strict";
 
-// Seite "Reviews": die bisherigen Läufe aus k-playbook-local/results/.
+// Seite "Reviews": Solange die Review-Wege pausieren, zeigt sie statt der
+// Läufe die Meldung der Sperre aus /api/reviews.
 //
 // Gelesen wird nur. Ein Lauf wird über /k-audit oder /k-review angestoßen,
 // nicht über die Oberfläche.
@@ -15,7 +16,6 @@ startSession((message) => {
 
 const elements = {
   runsPill: document.getElementById("runs-pill"),
-  runsList: document.getElementById("runs-list"),
   runsMessage: document.getElementById("runs-message"),
 };
 
@@ -26,14 +26,11 @@ async function load() {
     const response = await fetch("/api/reviews", { cache: "no-store" });
     render(await response.json());
   } catch {
-    elements.runsMessage.textContent = "Läufe konnten nicht geladen werden.";
+    elements.runsMessage.textContent = "Der Stand der Reviews konnte nicht geladen werden.";
   }
 }
 
 function render(data) {
-  elements.runsList.replaceChildren();
-  elements.runsMessage.textContent = data.message || "";
-
   if (!data.available) {
     elements.runsPill.className = "pill muted";
     elements.runsPill.textContent = "Unbekannt";
@@ -41,32 +38,7 @@ function render(data) {
     return;
   }
 
-  if (data.message) {
-    elements.runsPill.className = "pill warn";
-    elements.runsPill.textContent = "Nicht lesbar";
-    return;
-  }
-
-  const runs = data.runs || [];
-  elements.runsPill.className = runs.length ? "pill ok" : "pill muted";
-  elements.runsPill.textContent = runs.length ? `${runs.length}` : "keine";
-
-  if (runs.length === 0) {
-    elements.runsMessage.textContent = "Noch kein Lauf angelegt.";
-    return;
-  }
-
-  for (const run of runs) {
-    const row = document.createElement("div");
-    const term = document.createElement("dt");
-    term.textContent = run.name;
-    const detail = document.createElement("dd");
-    // Ein Verzeichnis ohne run.json stammt aus der Zeit vor diesem Modell. Das
-    // gehört gesagt, statt es als leeren Lauf auszugeben.
-    detail.textContent = run.hasRunFile
-      ? `${run.state} — ${run.entryCount} Einträge`
-      : "ohne run.json";
-    row.append(term, detail);
-    elements.runsList.append(row);
-  }
+  elements.runsPill.className = data.paused ? "pill muted" : "pill warn";
+  elements.runsPill.textContent = data.paused ? "Pausiert" : "Nicht lesbar";
+  elements.runsMessage.textContent = data.message || "";
 }

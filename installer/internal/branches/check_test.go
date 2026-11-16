@@ -526,10 +526,9 @@ func TestVorpruefungKonfigurationImZiel(t *testing.T) {
 
 	run(t, f.work, "switch", "-q", "-c", "andere-konfiguration")
 	commit(t, f.work, ".k-playbook/K-PLAYBOOK.yaml", "schema_version: 3\ngit:\n  switch: off\n", "Konfiguration im Ziel")
-	commit(t, f.work, "k-playbook-local/notiz.md", "# anders\n", "Datei im Ziel")
 	run(t, f.work, "switch", "-q", "main")
 	check := expectResult(t, RunCheck(ctx, f.checkOptions("andere-konfiguration")), "konfiguration-im-ziel", ResultHint)
-	if len(check.Details) != 2 {
+	if len(check.Details) != 1 {
 		t.Errorf("Details = %v", check.Details)
 	}
 

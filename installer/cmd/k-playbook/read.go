@@ -131,8 +131,7 @@ ab dem Arbeitsverzeichnis aufwärts.
             .k-playbook/commands/.
   k-playbook:/guidelines/<name>.md
             Eine Leitlinie. Nur mitgeliefert: eine lokale Fassung gibt es
-            nicht, auch kein Abschalten durch eine leere Datei;
-            k-playbook-local/guidelines/ wird nicht gelesen.
+            nicht, auch kein Abschalten durch eine leere Datei.
   k-playbook:/docs/<pfad>/README.md
             Die Vorlage für keph:/docs/<pfad>/README.md (k-playbook docs
             readme). Nur mitgeliefert: eine lokale Fassung gibt es nicht,

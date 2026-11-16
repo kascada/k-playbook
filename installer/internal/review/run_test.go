@@ -8,15 +8,11 @@ import (
 	"time"
 )
 
-// newLocalDir legt eine projekteigene Struktur mit results/ an, wie sie die
-// Oberfläche anlegt.
-func newLocalDir(t *testing.T) string {
+// newResultsDir legt ein leeres Ergebnisverzeichnis an, unter dem die Läufe
+// entstehen.
+func newResultsDir(t *testing.T) string {
 	t.Helper()
-	localDir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(localDir, ResultsDirName), 0o755); err != nil {
-		t.Fatalf("results anlegen: %v", err)
-	}
-	return localDir
+	return t.TempDir()
 }
 
 func day(t *testing.T, value string) time.Time {
@@ -29,9 +25,9 @@ func day(t *testing.T, value string) time.Time {
 }
 
 func TestCreateRunLegtVerzeichnisUndDateiAn(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	runDir, err := CreateRun(localDir, day(t, "2026-08-12"), []string{"python", "go"}, []Entry{
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-12"), []string{"python", "go"}, []Entry{
 		{Name: "semgrep", Kind: KindTool},
 		{Name: "review-secret-scanning", Kind: KindAI},
 	})
@@ -71,10 +67,10 @@ func TestCreateRunLegtVerzeichnisUndDateiAn(t *testing.T) {
 
 // Ein Tag, ein Lauf. Der zweite Versuch muss auffallen und darf nichts anfassen.
 func TestCreateRunBrichtBeiVorhandenemVerzeichnisAb(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 	entries := []Entry{{Name: "semgrep", Kind: KindTool}}
 
-	runDir, err := CreateRun(localDir, day(t, "2026-08-12"), nil, entries)
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-12"), nil, entries)
 	if err != nil {
 		t.Fatalf("erster CreateRun: %v", err)
 	}
@@ -83,7 +79,7 @@ func TestCreateRunBrichtBeiVorhandenemVerzeichnisAb(t *testing.T) {
 		t.Fatalf("run.json lesen: %v", err)
 	}
 
-	if _, err := CreateRun(localDir, day(t, "2026-08-12"), nil, entries); err == nil {
+	if _, err := CreateRun(resultsDir, day(t, "2026-08-12"), nil, entries); err == nil {
 		t.Fatal("zweiter Lauf am selben Tag wurde nicht abgewiesen")
 	}
 
@@ -100,8 +96,8 @@ func TestCreateRunBrichtBeiVorhandenemVerzeichnisAb(t *testing.T) {
 // Verzeichnis herausführen.
 func TestCreateRunWeistUnzulaessigeNamenAb(t *testing.T) {
 	for _, name := range []string{"../böse", "mit/schrägstrich", "", ".versteckt"} {
-		localDir := newLocalDir(t)
-		_, err := CreateRun(localDir, day(t, "2026-08-12"), nil, []Entry{{Name: name, Kind: KindTool}})
+		resultsDir := newResultsDir(t)
+		_, err := CreateRun(resultsDir, day(t, "2026-08-12"), nil, []Entry{{Name: name, Kind: KindTool}})
 		if err == nil {
 			t.Errorf("Name %q wurde angenommen", name)
 		}
@@ -109,17 +105,17 @@ func TestCreateRunWeistUnzulaessigeNamenAb(t *testing.T) {
 }
 
 func TestCreateRunWeistUnbekannteArtAb(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	if _, err := CreateRun(localDir, day(t, "2026-08-12"), nil, []Entry{{Name: "semgrep", Kind: "magie"}}); err == nil {
+	if _, err := CreateRun(resultsDir, day(t, "2026-08-12"), nil, []Entry{{Name: "semgrep", Kind: "magie"}}); err == nil {
 		t.Error("unbekannte Art wurde angenommen")
 	}
 }
 
 func TestCreateRunWeistDoppelteEintraegeAb(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	_, err := CreateRun(localDir, day(t, "2026-08-12"), nil, []Entry{
+	_, err := CreateRun(resultsDir, day(t, "2026-08-12"), nil, []Entry{
 		{Name: "semgrep", Kind: KindTool},
 		{Name: "semgrep", Kind: KindTool},
 	})
@@ -129,30 +125,34 @@ func TestCreateRunWeistDoppelteEintraegeAb(t *testing.T) {
 }
 
 func TestCreateRunOhneAuswahl(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 
-	if _, err := CreateRun(localDir, day(t, "2026-08-12"), nil, nil); err == nil {
+	if _, err := CreateRun(resultsDir, day(t, "2026-08-12"), nil, nil); err == nil {
 		t.Error("leere Auswahl wurde angenommen")
 	}
 }
 
-// Fehlt results/, wird es nicht stillschweigend angelegt: dann stimmt an der
-// projekteigenen Struktur etwas nicht, und das gehört gemeldet.
-func TestCreateRunOhneResultsVerzeichnis(t *testing.T) {
-	if _, err := CreateRun(t.TempDir(), day(t, "2026-08-12"), nil, []Entry{{Name: "semgrep", Kind: KindTool}}); err == nil {
-		t.Error("fehlendes results/ wurde nicht gemeldet")
+// Fehlt das Ergebnisverzeichnis, wird es nicht stillschweigend angelegt: Das
+// gehört gemeldet.
+func TestCreateRunOhneErgebnisverzeichnis(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "fehlt")
+	if _, err := CreateRun(missing, day(t, "2026-08-12"), nil, []Entry{{Name: "semgrep", Kind: KindTool}}); err == nil {
+		t.Error("das fehlende Ergebnisverzeichnis wurde nicht gemeldet")
+	}
+	if _, err := os.Stat(missing); !os.IsNotExist(err) {
+		t.Errorf("das Ergebnisverzeichnis wurde angelegt (Stat: %v)", err)
 	}
 }
 
 func TestListRunsJuengsterZuerst(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 	for _, name := range []string{"2026-08-10", "2026-08-12", "2026-08-11"} {
-		if _, err := CreateRun(localDir, day(t, name), nil, []Entry{{Name: "semgrep", Kind: KindTool}}); err != nil {
+		if _, err := CreateRun(resultsDir, day(t, name), nil, []Entry{{Name: "semgrep", Kind: KindTool}}); err != nil {
 			t.Fatalf("CreateRun %s: %v", name, err)
 		}
 	}
 
-	runs, err := ListRuns(localDir)
+	runs, err := ListRuns(resultsDir)
 	if err != nil {
 		t.Fatalf("ListRuns: %v", err)
 	}
@@ -170,18 +170,18 @@ func TestListRunsJuengsterZuerst(t *testing.T) {
 	}
 }
 
-// Unter results/ liegen auch Verzeichnisse aus der Zeit vor diesem Modell. Sie
+// Im Ergebnisverzeichnis liegen auch Verzeichnisse aus der Zeit vor diesem Modell. Sie
 // sollen sichtbar bleiben, statt stillschweigend zu fehlen.
 func TestListRunsZeigtVerzeichnisseOhneRunDatei(t *testing.T) {
-	localDir := newLocalDir(t)
-	if err := os.Mkdir(filepath.Join(ResultsDir(localDir), "dependency-cve"), 0o755); err != nil {
+	resultsDir := newResultsDir(t)
+	if err := os.Mkdir(filepath.Join(resultsDir, "dependency-cve"), 0o755); err != nil {
 		t.Fatalf("Altverzeichnis anlegen: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(ResultsDir(localDir), "README.md"), []byte("# results\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(resultsDir, "README.md"), []byte("# results\n"), 0o644); err != nil {
 		t.Fatalf("README anlegen: %v", err)
 	}
 
-	runs, err := ListRuns(localDir)
+	runs, err := ListRuns(resultsDir)
 	if err != nil {
 		t.Fatalf("ListRuns: %v", err)
 	}
@@ -196,19 +196,19 @@ func TestListRunsZeigtVerzeichnisseOhneRunDatei(t *testing.T) {
 // Buchstaben liegen beim Sortieren über Ziffern. Ein reines Absteigend-nach-
 // Namen schöbe die Ergebnisfamilien von früher vor die eigentlichen Läufe.
 func TestListRunsSortiertLaeufeVorAltverzeichnisse(t *testing.T) {
-	localDir := newLocalDir(t)
+	resultsDir := newResultsDir(t)
 	for _, name := range []string{"dependency-cve", "secret-scanning"} {
-		if err := os.Mkdir(filepath.Join(ResultsDir(localDir), name), 0o755); err != nil {
+		if err := os.Mkdir(filepath.Join(resultsDir, name), 0o755); err != nil {
 			t.Fatalf("Altverzeichnis %s: %v", name, err)
 		}
 	}
 	for _, name := range []string{"2026-08-10", "2026-08-12"} {
-		if _, err := CreateRun(localDir, day(t, name), nil, []Entry{{Name: "ruff", Kind: KindTool}}); err != nil {
+		if _, err := CreateRun(resultsDir, day(t, name), nil, []Entry{{Name: "ruff", Kind: KindTool}}); err != nil {
 			t.Fatalf("CreateRun %s: %v", name, err)
 		}
 	}
 
-	runs, err := ListRuns(localDir)
+	runs, err := ListRuns(resultsDir)
 	if err != nil {
 		t.Fatalf("ListRuns: %v", err)
 	}
@@ -237,8 +237,8 @@ func TestListRunsOhneResultsVerzeichnis(t *testing.T) {
 // Die Schlüssel sind englisch und stabil: sie stehen in der Doku und werden von
 // den Einträgen gelesen.
 func TestRunJSONSchluessel(t *testing.T) {
-	localDir := newLocalDir(t)
-	runDir, err := CreateRun(localDir, day(t, "2026-08-12"), []string{"python"}, []Entry{{Name: "ruff", Kind: KindTool}})
+	resultsDir := newResultsDir(t)
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-12"), []string{"python"}, []Entry{{Name: "ruff", Kind: KindTool}})
 	if err != nil {
 		t.Fatalf("CreateRun: %v", err)
 	}

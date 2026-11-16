@@ -20,9 +20,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
-// alteAgentsVorlage ist eine AGENTS.md, wie das Binary sie bis zum Briefing
-// schrieb: Wrapper-Anstoß plus beide Zusatzblöcke, dahinter eigene Prosa ohne
-// Überschrift.
+// alteAgentsVorlage ist eine AGENTS.md mit dem Wrapper-Anstoß, wie das Binary
+// ihn früher schrieb, dahinter eigene Prosa ohne Überschrift.
 const alteAgentsVorlage = `# AGENTS.md
 
 <!-- k-playbook:anstoss -->
@@ -35,34 +34,6 @@ Für dieses Projekt gilt k-playbook. Rufe zu Beginn
 auf und lies die Dateien aus ` + "`instructions`" + ` in der angegebenen Reihenfolge,
 bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
 die effektiven Kataloge für Regeln, Reviews und Checks.
-
-<!-- k-playbook:session-memory -->
-## Projektwissen zuerst
-
-Die autoritative Projektdokumentation beginnt bei
-` + "`k-playbook-local/docs/README.md`" + `. Lies diesen Index zuerst, bevor du den
-Code analysierst. Erst wenn die Dokumentation fehlt, nicht passt oder ein
-konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
-
-<!-- k-playbook:befunde -->
-## Befunde festhalten
-
-Wenn du Code analysierst, einer Ursache nachgehst oder eine These durch einen
-Test prüfst, ist die Arbeit erst abgeschlossen, wenn der Befund geschrieben ist.
-Er gehört nach ` + "`k-playbook-local/material/befunde/`" + `, eine Datei je Thema; neue
-Erkenntnisse werden angehängt. Nenne in deiner Antwort die geschriebene Datei.
-
-Knapp festhalten, sobald etwas belegt ist. Ausführlicher, sobald ein Problem
-erkannt und gelöst wurde — dann auch, welche Wege du ausgeschlossen hast. Jeder
-Eintrag nennt Befund, Beleg (` + "`pfad:zeile`" + ` oder Testausgabe) und Sicherheit
-(bestaetigt, unbestaetigt oder widerlegt). Das vollständige Format steht in
-` + "`k-playbook/rules/befunde.md`" + `.
-
-Nicht festgehalten werden Zwischenschritte und alles, was der Code selbst sagt.
-
-Am Ende einer Sitzung schließt **/k-danke** die Arbeit ab: er legt die Befunde
-vor, befördert Bestätigtes in die Dokumentation und prüft, ob die Doku
-nachzuziehen ist.
 
 Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.
 `
@@ -197,7 +168,6 @@ func TestUpgradeCheckMeldetUndSchreibtNicht(t *testing.T) {
 	for _, erwartet := range []string{
 		"Programm-Stand: nichts zu tun",
 		"veraltete Anstoß in AGENTS.md würde auf k-playbook briefing gebracht",
-		"Session-Memory-Block und Befunde-Block würden aus AGENTS.md entfernt",
 		"Verlinkung würde eingerichtet",
 	} {
 		if !strings.Contains(stdout, erwartet) {
@@ -216,84 +186,38 @@ func TestUpgradeCheckMeldetUndSchreibtNicht(t *testing.T) {
 	}
 }
 
-// Ein Block, dessen Ende sich nicht bestimmen lässt, bleibt bei einem Lauf
-// stehen — und --check sagt genau das: nur der Hinweis, kein „würde
-// ersetzt/entfernt". Einmal für den Befunde-Block (Fixture wie
-// TestAbgewandelterZusatzblockBleibtMitHinweis in internal/project), einmal
-// für den Anstoß.
+// Ein veralteter Anstoß, dessen Ende sich nicht bestimmen lässt, bleibt bei
+// einem Lauf stehen — und --check sagt genau das: nur der Hinweis, kein „würde
+// ersetzt".
 func TestUpgradeCheckMeldetUnbestimmbarenBlockNurAlsHinweis(t *testing.T) {
-	t.Run("Zusatzblock", func(t *testing.T) {
-		root := upgradeProjectDir(t, "v0.16.8")
-		setOwnVersion(t, "v0.16.8")
-		agents := filepath.Join(root, project.RootInstructionsFile)
-		// Die Vorlage in der Briefing-Fassung kommt vom Binary selbst, dahinter
-		// ein abgewandelter Befunde-Block mit Prosa ohne Überschrift.
-		if err := os.Remove(agents); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := project.ApplyRootInstructions(root); err != nil {
-			t.Fatalf("Vorlage anlegen: %v", err)
-		}
-		vorlage, err := os.ReadFile(agents)
-		if err != nil {
-			t.Fatal(err)
-		}
-		eigen := string(vorlage) + "\n<!-- k-playbook:befunde -->\n## Befunde festhalten\n\n" +
-			"Bei uns umformuliert, und dahinter steht Prosa ohne Überschrift.\n"
-		if err := os.WriteFile(agents, []byte(eigen), 0o644); err != nil {
-			t.Fatal(err)
-		}
+	root := upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	agents := filepath.Join(root, project.RootInstructionsFile)
+	eigen := "# AGENTS.md\n\n<!-- k-playbook:anstoss -->\n## k-playbook\n\n" +
+		"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn\n\n" +
+		"    k-playbook context\n\n" +
+		"auf und lies die Dateien aus `instructions`.\n\n" +
+		"Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n"
+	if err := os.WriteFile(agents, []byte(eigen), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-		stdout := captureStdout(t, func() {
-			if err := runUpgrade([]string{"--check"}); err != nil {
-				t.Errorf("upgrade --check: %v", err)
-			}
-		})
-		for _, erwartet := range []string{"von Hand:", "Befunde-Block", "der Block bleibt stehen"} {
-			if !strings.Contains(stdout, erwartet) {
-				t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
-			}
-		}
-		for _, verboten := range []string{"würden aus AGENTS.md entfernt", "würde auf k-playbook briefing gebracht"} {
-			if strings.Contains(stdout, verboten) {
-				t.Errorf("--check verspricht %q, obwohl ein Lauf den Block stehen ließe:\n%s", verboten, stdout)
-			}
-		}
-		if content, _ := os.ReadFile(agents); string(content) != eigen {
-			t.Error("--check hat AGENTS.md verändert")
+	stdout := captureStdout(t, func() {
+		if err := runUpgrade([]string{"--check"}); err != nil {
+			t.Errorf("upgrade --check: %v", err)
 		}
 	})
-
-	t.Run("Anstoß", func(t *testing.T) {
-		root := upgradeProjectDir(t, "v0.16.8")
-		setOwnVersion(t, "v0.16.8")
-		agents := filepath.Join(root, project.RootInstructionsFile)
-		eigen := "# AGENTS.md\n\n<!-- k-playbook:anstoss -->\n## k-playbook\n\n" +
-			"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn\n\n" +
-			"    k-playbook context\n\n" +
-			"auf und lies die Dateien aus `instructions`.\n\n" +
-			"Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n"
-		if err := os.WriteFile(agents, []byte(eigen), 0o644); err != nil {
-			t.Fatal(err)
+	for _, erwartet := range []string{"von Hand:", "Anstoßblocks", "bleibt unangetastet"} {
+		if !strings.Contains(stdout, erwartet) {
+			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
 		}
-
-		stdout := captureStdout(t, func() {
-			if err := runUpgrade([]string{"--check"}); err != nil {
-				t.Errorf("upgrade --check: %v", err)
-			}
-		})
-		for _, erwartet := range []string{"von Hand:", "Anstoßblocks", "bleibt unangetastet"} {
-			if !strings.Contains(stdout, erwartet) {
-				t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
-			}
-		}
-		if strings.Contains(stdout, "würde auf k-playbook briefing gebracht") {
-			t.Errorf("--check verspricht den Ersatz, obwohl ein Lauf den Anstoß stehen ließe:\n%s", stdout)
-		}
-		if content, _ := os.ReadFile(agents); string(content) != eigen {
-			t.Error("--check hat AGENTS.md verändert")
-		}
-	})
+	}
+	if strings.Contains(stdout, "würde auf k-playbook briefing gebracht") {
+		t.Errorf("--check verspricht den Ersatz, obwohl ein Lauf den Anstoß stehen ließe:\n%s", stdout)
+	}
+	if content, _ := os.ReadFile(agents); string(content) != eigen {
+		t.Error("--check hat AGENTS.md verändert")
+	}
 }
 
 // Der Lauf zieht das Projekt nach — AGENTS.md auf die neue Vorlage, Prosa
@@ -311,7 +235,6 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 	for _, erwartet := range []string{
 		"Programm-Stand: nichts zu tun",
 		"veraltete Anstoß in AGENTS.md wurde auf k-playbook briefing gebracht",
-		"Session-Memory-Block und Befunde-Block aus AGENTS.md entfernt",
 		"Verlinkung eingerichtet",
 		// Ohne Anbindung des Testprojekts: der README-Schritt nur als Hinweis.
 		"Projekt: README unter keph:/docs/: nicht versucht, Kephalaion ist für dieses Projekt nicht bereit",
@@ -330,8 +253,6 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "\n    k-playbook briefing\n") ||
 		strings.Contains(string(content), "k-playbook context") ||
-		strings.Contains(string(content), "k-playbook:session-memory") ||
-		strings.Contains(string(content), "k-playbook:befunde") ||
 		!strings.HasSuffix(string(content), "Was du sonst brauchst, erreichst du über die Verweise darin.\n\nDiese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n") {
 		t.Errorf("AGENTS.md nach dem Lauf:\n%s", content)
 	}
@@ -549,113 +470,13 @@ func TestUpgradeJSON(t *testing.T) {
 			t.Errorf("upgrade --check --json: %v", err)
 		}
 	})
-	for _, erwartet := range []string{`"schemaVersion": "3"`, `"check": true`, `"hasOutdatedAnstoss": true`, `"Session-Memory-Block"`, `"messages": [`} {
+	for _, erwartet := range []string{`"schemaVersion": "3"`, `"check": true`, `"hasOutdatedAnstoss": true`, `"messages": [`} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
 		}
 	}
 	if strings.Contains(stdout, "Programm-Stand") && !strings.HasPrefix(strings.TrimSpace(stdout), "{") {
 		t.Errorf("JSON-Modus schreibt Klartext davor:\n%s", stdout)
-	}
-}
-
-// Der Projektschritt zieht die Anbindung aus der alten
-// k-playbook-local/K-PLAYBOOK.local.yaml um (Task 138): --check schreibt
-// nichts, ein Lauf schreibt Hub und Collection in den Block kephalaion: von
-// K-PLAYBOOK.yaml — nie den Account — und nennt ihn, wenn Kephalaion für den
-// Hub keinen wählt. Ein vorhandener Block bleibt.
-func TestUpgradeZiehtAnbindungUm(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.16.8")
-	setOwnVersion(t, "v0.16.8")
-	legacy := filepath.Join(project.LocalDir(root), kephalaion.LegacyFileName)
-	if err := os.WriteFile(legacy, []byte("# Kopf\nkephalaion:\n  hub: vm\n  collection: omni\n  account: kamran-wsl\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	tokens := filepath.Join(t.TempDir(), "tokens")
-	kephtest.NewFakeClient(t).SetInfo(t, kephtest.Info("http://127.0.0.1:1/mcp", tokens, kephalaion.ClientHub{
-		Alias: "vm", Choice: kephalaion.ChoiceMissing, Candidates: []string{"a", "b"}, Pending: []string{}, Notes: []string{}}))
-	before, err := os.ReadFile(project.ConfigPath(root))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	check := captureStdout(t, func() {
-		if err := runUpgrade([]string{"--check"}); err != nil {
-			t.Errorf("upgrade --check: %v", err)
-		}
-	})
-	for _, want := range []string{
-		"Projekt: Anbindung — ein Lauf schriebe hub vm, collection omni aus k-playbook-local/K-PLAYBOOK.local.yaml in den Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml.",
-		"Projekt: Account — die alte Datei nannte für den Hub vm den Account kamran-wsl; Kephalaion wählt dort keinen.",
-		"kephalaion node account default vm kamran-wsl",
-	} {
-		if !strings.Contains(check, want) {
-			t.Errorf("--check: %q fehlt in:\n%s", want, check)
-		}
-	}
-	if after, _ := os.ReadFile(project.ConfigPath(root)); string(after) != string(before) {
-		t.Fatalf("--check hat geschrieben:\n%s", after)
-	}
-
-	run := captureStdout(t, func() {
-		if err := runUpgrade(nil); err != nil {
-			t.Errorf("upgrade: %v", err)
-		}
-	})
-	for _, want := range []string{
-		"Projekt: Anbindung umgezogen — hub vm, collection omni steht jetzt im Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml",
-		project.KephalaionCommitHint,
-		"kephalaion node account default vm kamran-wsl",
-	} {
-		if !strings.Contains(run, want) {
-			t.Errorf("Lauf: %q fehlt in:\n%s", want, run)
-		}
-	}
-	after, _ := os.ReadFile(project.ConfigPath(root))
-	if !strings.HasPrefix(string(after), string(before)) || !strings.Contains(string(after), "  hub: vm\n  collection: omni\n") ||
-		strings.Contains(string(after), "account") || strings.Contains(string(after), "kamran-wsl") {
-		t.Fatalf("K-PLAYBOOK.yaml nach dem Lauf:\n%s", after)
-	}
-	if _, err := os.Stat(legacy); err != nil {
-		t.Fatal("die alte Datei löscht /k-upgrade, nicht k-playbook upgrade")
-	}
-
-	// Der zweite Lauf: Der Block steht und bleibt; die Zeile sagt das.
-	second := captureStdout(t, func() {
-		if err := runUpgrade(nil); err != nil {
-			t.Errorf("zweiter Lauf: %v", err)
-		}
-	})
-	if !strings.Contains(second, "Projekt: Anbindung — der Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml steht (hub vm, collection omni)") {
-		t.Errorf("zweiter Lauf:\n%s", second)
-	}
-
-	// Ein abweichender Block bleibt; die Meldung nennt beide Werte. Wählt
-	// Kephalaion einen anderen Account, steht auch der da.
-	changed := strings.Replace(string(after), "collection: omni", "collection: anders", 1)
-	if err := os.WriteFile(project.ConfigPath(root), []byte(changed), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	other := filepath.Join(tokens, "vm", "zweit.token")
-	account := "zweit"
-	kephtest.NewFakeClient(t).SetInfo(t, kephtest.Info("http://127.0.0.1:1/mcp", tokens, kephalaion.ClientHub{
-		Alias: "vm", Account: &account, Choice: kephalaion.ChoiceDefault, TokenFile: &other,
-		Candidates: []string{"kamran-wsl", "zweit"}, Pending: []string{}, Notes: []string{}}))
-	third := captureStdout(t, func() {
-		if err := runUpgrade(nil); err != nil {
-			t.Errorf("dritter Lauf: %v", err)
-		}
-	})
-	for _, want := range []string{
-		"steht (hub vm, collection anders) und bleibt; k-playbook-local/K-PLAYBOOK.local.yaml nennt anderes (hub vm, collection omni)",
-		"Kephalaion wählt dort zweit (Standard)",
-	} {
-		if !strings.Contains(third, want) {
-			t.Errorf("abweichend: %q fehlt in:\n%s", want, third)
-		}
-	}
-	if final, _ := os.ReadFile(project.ConfigPath(root)); string(final) != changed {
-		t.Fatalf("vorhandener Block verändert:\n%s", final)
 	}
 }
 

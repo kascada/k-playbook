@@ -298,7 +298,7 @@ textarea {
 }
 
 /* Die Seiten eines Bereichs stehen eingerückt unter ihm und eine Spur leiser:
-   Workflows ist der Bereich, Tasks, Reviews und Todos sind seine Seiten. Der
+   Workflows ist der Bereich, Reviews und Todos sind seine Seiten. Der
    Einzug ist der einzige Träger dieser Rangfolge — deshalb steht er in der
    Breite eines Wortes und nicht in ein paar Pixeln. */
 .area-nav-subitem {
@@ -1172,68 +1172,6 @@ button.attention-highlight {
   white-space: pre;
 }
 
-/* Tasks stehen untereinander: die Zeile trägt Dateiname und Titel, das liest
-   sich nebeneinander schlecht. */
-.task-list {
-  display: grid;
-  gap: var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  background: var(--inset-bg);
-}
-
-.task-list.empty {
-  padding: var(--space-8);
-  color: var(--muted);
-  font-size: var(--text-md);
-}
-
-.task-link {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-7);
-  width: 100%;
-  border-radius: var(--radius-sm);
-  padding: var(--space-4) var(--space-6);
-  color: var(--ink);
-  background: transparent;
-  text-align: left;
-}
-
-.task-link.active,
-.task-link:hover {
-  color: var(--accent-strong);
-  background: var(--accent-wash);
-}
-
-.task-name {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-}
-
-.task-link .task-title {
-  flex: 1;
-  color: var(--muted);
-  font-weight: var(--weight-medium);
-  overflow-wrap: anywhere;
-}
-
-/* Rechts am Rand: ob der Task schon gegengelesen wurde. Ungeprüft ist kein
-   Fehler, aber der Grund, warum /k-task-run vor der Ausführung nachfragt. */
-.task-review {
-  flex-shrink: 0;
-  color: var(--muted);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-}
-
-.task-review.open {
-  color: var(--warn);
-}
-
 /* Eine schmale Liste von Beispielformulierungen im Kopf der Todos-Seite —
    keine eigene Karte wert, aber mehr als ein Fließtextsatz. */
 .example-list {
@@ -1247,8 +1185,8 @@ button.attention-highlight {
   margin-bottom: var(--space-2);
 }
 
-/* Todos stehen wie Tasks untereinander, aber ohne Klick-Ziel: der Eintrag
-   selbst ist der Inhalt, keine Detailseite dahinter. */
+/* Todos stehen untereinander, ohne Klick-Ziel: der Eintrag selbst ist der
+   Inhalt, keine Detailseite dahinter. */
 .todo-list {
   display: grid;
   gap: var(--space-2);

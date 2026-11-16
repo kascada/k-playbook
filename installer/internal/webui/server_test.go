@@ -61,7 +61,7 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		// markiert ist der Eintrag des aktiven Bereichs, samt aria-current:
 		// "page" nur auf der offenen Seite selbst.
 		markiert string
-		// unterpunkt ist der markierte Eintrag unter dem Bereich. Nur die drei
+		// unterpunkt ist der markierte Eintrag unter dem Bereich. Nur die
 		// Seiten von Workflows haben einen; leer heißt: keiner ist markiert.
 		unterpunkt string
 		// fileIndex sagt, ob das Blockmenü den Dateiindex trägt und deshalb
@@ -71,13 +71,8 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 		{path: "/", markiert: `<a class="area-nav-item active" href="/" aria-current="page">`},
 		{path: "/setup", markiert: `<a class="area-nav-item active" href="/setup" aria-current="page">`},
 		{path: "/workflows", markiert: `<a class="area-nav-item active" href="/workflows" aria-current="page">`},
-		// Die drei Seiten des Bereichs: Workflows ist aktiv, seine Übersicht
-		// ist aber nicht offen — offen ist der Unterpunkt.
-		{
-			path:       "/workflows/tasks",
-			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
-			unterpunkt: `<a class="area-nav-subitem active" href="/workflows/tasks" aria-current="page">`,
-		},
+		// Die Seiten des Bereichs: Workflows ist aktiv, seine Übersicht ist
+		// aber nicht offen — offen ist der Unterpunkt.
 		{
 			path:       "/workflows/reviews",
 			markiert:   `<a class="area-nav-item active" href="/workflows" aria-current="true">`,
@@ -161,10 +156,10 @@ func TestSeitenTragenDieLinkeSpalte(t *testing.T) {
 			if count := strings.Count(body, "area-nav-subitem active"); count != erwarteteUnterpunkte {
 				t.Errorf("markierte Unterpunkte = %d, erwartet %d", count, erwarteteUnterpunkte)
 			}
-			// Die drei Seiten des Workflows-Bereichs und der Unterpunkt von Setup
+			// Die Seiten des Workflows-Bereichs und der Unterpunkt von Setup
 			// stehen im Umschalter jeder Seite: von Setup aus soll der Weg zu den
-			// Tasks nicht erst über die Übersicht führen, und umgekehrt.
-			for _, sub := range []string{"/mcp-servers", "/workflows/tasks", "/workflows/reviews", "/workflows/todos"} {
+			// Todos nicht erst über die Übersicht führen, und umgekehrt.
+			for _, sub := range []string{"/mcp-servers", "/workflows/reviews", "/workflows/todos"} {
 				if !strings.Contains(body, `href="`+sub+`"`) {
 					t.Errorf("der Unterpunkt %s fehlt im Umschalter", sub)
 				}
@@ -189,7 +184,6 @@ func TestHilfeVerweiseZeigenInDieDoku(t *testing.T) {
 
 	for path, dateien := range map[string][]string{
 		"/workflows":         {"commands.md"},
-		"/workflows/tasks":   {"task-flow.md"},
 		"/workflows/reviews": {"code-review.md", "review-runs.md"},
 		"/workflows/todos":   {"commands.md"},
 	} {
@@ -211,7 +205,8 @@ func TestHilfeVerweiseZeigenInDieDoku(t *testing.T) {
 // Der Kopf nennt keine Installation im Projekt mehr (Task 157): kein Eintrag
 // „Installation:“, auch wenn ein liegengebliebener Clone k-playbook/ daliegt,
 // und GET /api/context trägt weder unter context noch unter display ein Feld
-// playbook.
+// playbook. Auch ein Feld local gibt es dort nicht (Task 159): die einzige
+// Wurzel ist project.
 func TestKopfUndKontextNennenKeineInstallation(t *testing.T) {
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {
@@ -255,14 +250,16 @@ func TestKopfUndKontextNennenKeineInstallation(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("/api/context: %v", err)
 	}
-	if !response.Available || response.Context["local"] == nil || response.Display["local"] == nil {
+	if !response.Available || response.Context["project"] == nil || response.Display["projectDir"] == nil {
 		t.Fatalf("/api/context: %s", recorder.Body.String())
 	}
-	if _, ok := response.Context["playbook"]; ok {
-		t.Errorf("context trägt playbook: %s", recorder.Body.String())
-	}
-	if _, ok := response.Display["playbook"]; ok {
-		t.Errorf("display trägt playbook: %s", recorder.Body.String())
+	for _, absent := range []string{"playbook", "local"} {
+		if _, ok := response.Context[absent]; ok {
+			t.Errorf("context trägt %s: %s", absent, recorder.Body.String())
+		}
+		if _, ok := response.Display[absent]; ok {
+			t.Errorf("display trägt %s: %s", absent, recorder.Body.String())
+		}
 	}
 }
 
@@ -280,7 +277,7 @@ func TestSeitenTragenDieVersion(t *testing.T) {
 	before := buildinfo.Version
 	t.Cleanup(func() { buildinfo.Version = before })
 
-	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/tasks", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/docs", "/handbook", "/inventory", "/mcp", "/mcp-servers"} {
+	for _, path := range []string{"/", "/setup", "/workflows", "/workflows/reviews", "/workflows/todos", "/chat", "/chat/ses_abc123", "/docs", "/handbook", "/inventory", "/mcp", "/mcp-servers"} {
 		t.Run(path, func(t *testing.T) {
 			buildinfo.Version = "v1.2.3"
 			status, body := getPage(t, path)

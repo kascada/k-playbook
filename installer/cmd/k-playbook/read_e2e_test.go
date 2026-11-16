@@ -32,7 +32,6 @@ func readProject(t *testing.T) string {
 		"test-defaults/commands/k-upgrade.md":                      "# k-upgrade\n\nText aus defaults.\n",
 		"test-defaults/commands/k-gui.md":                          "# k-gui\n\nText aus defaults.\n",
 		".k-playbook/commands/k-gui.md":                            "# k-gui\n\nlokal\n",
-		"k-playbook-local/commands/k-upgrade.md":                   "# am alten Ort, nicht mehr gelesen\n",
 	}
 	for rel, content := range files {
 		full := filepath.Join(root, filepath.FromSlash(rel))
@@ -232,8 +231,8 @@ func TestReadLiestCommandTextAusDefaults(t *testing.T) {
 func TestReadLiestProjektdatei(t *testing.T) {
 	root := readProject(t)
 	for rel, content := range map[string]string{
-		"scripts/123.sh":                  "#!/bin/sh\necho hallo\n",
-		"k-playbook-local/docs/README.md": "# Doku\n",
+		"scripts/123.sh":         "#!/bin/sh\necho hallo\n",
+		"notizen/docs/README.md": "# Doku\n",
 	} {
 		full := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -248,7 +247,7 @@ func TestReadLiestProjektdatei(t *testing.T) {
 	if err != nil || stdout != "#!/bin/sh\necho hallo\n" || stderr != "" {
 		t.Fatalf("read project: %v — stdout %q, stderr %q", err, stdout, stderr)
 	}
-	stdout, _, err = runReadCaptured(t, "project:/k-playbook-local/docs/README.md", "--json")
+	stdout, _, err = runReadCaptured(t, "project:/notizen/docs/README.md", "--json")
 	if err != nil {
 		t.Fatalf("read --json: %v", err)
 	}

@@ -85,9 +85,8 @@ var candidatePatterns = map[CandidateKind]map[string][]string{
 // **relativ zum Bezugspunkt**, mit / getrennt.
 //
 // Über den Pfad und nicht über den Namen, und das ist der Punkt: unter
-// installer/cmd/k-playbook/ steht Code dieses Projekts, unter results/
-// womöglich in jedem anderen. Eine Regel über den bloßen Namen fräße beides
-// mit — genau der Fehler aus Task 004, wo ein Ausschlussmuster ohne Anker in
+// installer/cmd/k-playbook/ steht Code dieses Projekts. Eine Regel über den
+// bloßen Namen fräße ihn mit — genau der Fehler aus Task 004, wo ein Ausschlussmuster ohne Anker in
 // einem Projekt namens k-playbook die ganze Projektwurzel traf und der Lauf
 // stumm nichts mehr fand. Verankert trifft der Ausschluss nur den einen Ort,
 // den er meint; liegt dort nichts, fällt auch nichts aus.
@@ -103,25 +102,21 @@ var candidatePatterns = map[CandidateKind]map[string][]string{
 // node_modules/ ist die eine Ausnahme davon und steht deshalb nicht hier,
 // sondern in candidateExcludedByName — die Begründung dort.
 //
-// Was bleibt, sind die beiden generischen Ausschlüsse, die jeder Job in
-// scanners.tsv mitführt.
+// Was bleibt, ist der generische Ausschluss, den jeder Job in scanners.tsv
+// mitführt.
 var candidateExcluded = map[string]bool{
 	// Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem früheren
 	// Modell. Sein ausgeliefertes Beispielmaterial ist kein Code
 	// des Projekts.
 	"k-playbook": true,
-	// Die Ergebnisse früherer Läufe. Ohne den Ausschluss zählten die
-	// Secret-Sucher die SARIF-Dateien des vorigen Laufs als Gegenstand mit.
-	"k-playbook-local/results": true,
 }
 
 // candidateExcludedByName sind die Verzeichnisse, die kein Job sieht, **über
 // ihren Namen** und damit auf jeder Ebene — anders als candidateExcluded, das
 // den Pfad ab dem Bezugspunkt verankert.
 //
-// Die Verankerung dort hat ihren Grund: results/ und k-playbook/ meinen genau
-// einen Ort, und eine Regel über den bloßen Namen fräße gleichnamige
-// Verzeichnisse mit. Bei node_modules/ ist es umgekehrt — gemeint ist jedes,
+// Die Verankerung dort hat ihren Grund: k-playbook/ meint genau einen Ort,
+// und eine Regel über den bloßen Namen fräße gleichnamige Verzeichnisse mit. Bei node_modules/ ist es umgekehrt — gemeint ist jedes,
 // auf jeder Ebene, denn npm legt sie geschachtelt an.
 //
 // Warum node_modules/ überhaupt herausfällt, obwohl der Block über

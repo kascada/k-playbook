@@ -176,15 +176,10 @@ func TestDefaultsSourceLesefehlerIstNichtErreichbar(t *testing.T) {
 // ist not_found, eine nicht bereite Collection kephalaion_unavailable — auch
 // wenn die lokale Ebene den Eintrag hat. Geprüft an commands/, dessen lokale
 // Ebene auf der Platte liegt (.k-playbook/commands/). guidelines/ hat keine
-// lokale Ebene (Task 148): Eine Datei unter k-playbook-local/guidelines/
-// gewinnt nicht.
+// lokale Ebene (Task 148) und kommt aus der mitgelieferten.
 func TestDefaultsSourceHinterVerweisen(t *testing.T) {
 	root := t.TempDir()
 	writeDocTree(t, filepath.Join(root, ProjectDirName), map[string]string{"commands/b.md": "# B lokal\n\nText.\n"})
-	writeDocTree(t, filepath.Join(root, "k-playbook-local"), map[string]string{
-		"guidelines/g.md":     "# G lokal\n\nText.\n",
-		"guidelines/eigen.md": "# Eigen\n\nText.\n",
-	})
 	store := defaultsStore(map[string]string{"commands/a.md": "# A\n", "commands/b.md": "# B\n", "guidelines/g.md": "# G\n"})
 	calls := 0
 	layers := DocLayers{Dist: NewKephDefaultsSource(openStore(store, &calls)), Local: NewProjectLocalDocSource(root)}
@@ -203,9 +198,6 @@ func TestDefaultsSourceHinterVerweisen(t *testing.T) {
 	g, err := ResolveDocRef(layers, "k-playbook:/guidelines/g.md")
 	if err != nil || g.Content != "# G\n" || g.Parts[0].Origin != DocOriginDist {
 		t.Errorf("g: %+v, %v", g, err)
-	}
-	if _, err := ResolveDocRef(layers, "k-playbook:/guidelines/eigen.md"); DocRefErrorCode(err) != DocCodeNotFound {
-		t.Errorf("nur lokale Guideline: %v, erwartet not_found", err)
 	}
 
 	down := DocLayers{
@@ -336,7 +328,7 @@ func TestBriefingOhneMitgelieferteEbeneScheitert(t *testing.T) {
 // lokale Ebene allein zu zeigen, und nennt den Grund in catalogsProblem.
 func TestBuildContextOhneMitgelieferteEbene(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(LocalDir(root), "reviews", "review-eigen.md"), "# Eigene\n\nText.\n")
+	write(t, filepath.Join(root, testCollectionDir, "k-playbook", "reviews", "review-eigen.md"), "# Eigene\n\nText.\n")
 	stubDefaultsStore(t, func(string) (DefaultsStore, string, error) {
 		return nil, "vm:k-playbook", docRefErrorf(DocCodeKephalaionUnavailable, "nicht bereit")
 	})

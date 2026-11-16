@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -28,34 +27,6 @@ import (
 // Wird das Todo mit der höchsten Nummer gelöscht, bekommt das nächste neue
 // dieselbe Nummer. Das ist hingenommen.
 
-// TodoDataDirName ist das frühere Verzeichnis der Maschinendateien unter
-// k-playbook-local/. Es trug die frühere Ablage data/todos.json; das
-// Einrichten legt es nicht mehr an (Task 107).
-const TodoDataDirName = "data"
-
-// TodoFileName ist die frühere Ablage der Todos, eine JSON-Datei unter data/.
-// Außer `k-playbook todo migrate` liest sie niemand mehr; die übrigen Wege
-// prüfen nur, ob sie besteht (TodoNotice.Hint, TodoCodeNotMigrated).
-const TodoFileName = "todos.json"
-
-// TodoMigratedFileName ist der Name, unter dem migrate die frühere Ablage
-// nach der ersten vollständigen Übernahme ablegt. Er wird nie überschrieben,
-// die Datei nie mehr gelesen; migrate prüft nur, ob sie liegt.
-const TodoMigratedFileName = TodoFileName + ".migriert"
-
-// LegacyTodoFileName ist die noch frühere Ablage als Markdown-Checkliste. Sie
-// wird nicht mehr übernommen, nur noch gemeldet (TodoNotice.Hint).
-const LegacyTodoFileName = "TODO.md"
-
-// TodoSchemaVersion ist die Fassung von data/todos.json, die migrate liest.
-const TodoSchemaVersion = 1
-
-// TodoCodeNotMigrated: data/todos.json besteht noch. Anlegen, Ändern und
-// Löschen sind gesperrt, bis `k-playbook todo migrate` die Einträge
-// übernommen hat — sonst belegte ein neues Todo eine Nummer, die ein alter
-// Eintrag behalten soll.
-const TodoCodeNotMigrated = "todos_not_migrated"
-
 // todoShortNameWords ist die Zahl der Wörter, aus denen der Kurzname im
 // Dateinamen gebildet wird, todoMaxShortName seine Höchstlänge.
 const (
@@ -78,29 +49,6 @@ type Todo struct {
 	DoneMigrated bool `json:"doneMigrated,omitempty"`
 	// Origin ist die optionale Herkunftsnotiz, etwa "Task 026".
 	Origin string `json:"origin,omitempty"`
-}
-
-// TodoNotice trägt, was ein Zugriff nebenbei zu melden hat — kein Fehler.
-type TodoNotice struct {
-	// Hint meldet eine zurückgebliebene TODO.md oder ein nicht übernommenes
-	// data/todos.json. Er gehört nie nach message: dort gilt er als Fehler
-	// und die Liste verschwände.
-	Hint string `json:"hint,omitempty"`
-}
-
-// TodoDataDir ist das frühere Verzeichnis der Maschinendateien eines Projekts.
-func TodoDataDir(projectDir string) string {
-	return filepath.Join(LocalDir(projectDir), TodoDataDirName)
-}
-
-// TodoFile ist die frühere Ablage eines Projekts: data/todos.json.
-func TodoFile(projectDir string) string {
-	return filepath.Join(TodoDataDir(projectDir), TodoFileName)
-}
-
-// LegacyTodoFile ist die frühere Markdown-Ablage eines Projekts.
-func LegacyTodoFile(projectDir string) string {
-	return filepath.Join(LocalDir(projectDir), LegacyTodoFileName)
 }
 
 // TodoStore sind die Aufrufe an Kephalaion, die die Todos brauchen.
@@ -221,35 +169,6 @@ func newTodoEntry(number int, name string, done bool, read kephalaion.ReadResult
 	return entry
 }
 
-// todoNotice prüft die frühere Ablage auf der Platte; gelesen wird dabei
-// nichts.
-func todoNotice(projectDir string) TodoNotice {
-	var hints []string
-	if fileExists(TodoFile(projectDir)) {
-		hints = append(hints, fmt.Sprintf("%s/%s/%s ist noch nicht in die Collection übernommen: "+
-			"`k-playbook todo migrate` übernimmt die Einträge. Bis dahin zeigt die Liste nur, was schon in der Collection liegt, "+
-			"und Anlegen, Ändern und Löschen sind gesperrt (%s).",
-			LocalDirName, TodoDataDirName, TodoFileName, TodoCodeNotMigrated))
-	}
-	if fileExists(LegacyTodoFile(projectDir)) {
-		hints = append(hints, fmt.Sprintf("%s/%s liegt noch da und wird nicht übernommen; "+
-			"ihre Einträge bei Bedarf von Hand als neue Todos übertragen und die Datei danach entfernen.",
-			LocalDirName, LegacyTodoFileName))
-	}
-	return TodoNotice{Hint: strings.Join(hints, " ")}
-}
-
-// requireMigrated lehnt einen schreibenden Zugriff ab, solange
-// data/todos.json besteht.
-func requireMigrated(projectDir string) error {
-	if !fileExists(TodoFile(projectDir)) {
-		return nil
-	}
-	return docRefErrorf(TodoCodeNotMigrated, "%s/%s/%s ist noch nicht übernommen — erst `k-playbook todo migrate`; "+
-		"bis dahin wird kein Todo angelegt, geändert oder gelöscht, damit keine Nummer belegt wird, die ein bisheriger Eintrag behalten soll",
-		LocalDirName, TodoDataDirName, TodoFileName)
-}
-
 // todoKephError übersetzt einen Fehler von Kephalaion wie kephError, mit
 // dem Ausweg der Todo-Werkzeuge bei offenem Ausgang.
 func todoKephError(err error) error {
@@ -267,15 +186,14 @@ func todoKephError(err error) error {
 
 // listTodos ist der gemeinsame Weg der Listen: Hinweis von der Platte,
 // Einträge aus der Collection, gefiltert.
-func listTodos(ctx context.Context, projectDir string, keep func(todoEntry) bool) ([]Todo, TodoNotice, error) {
-	notice := todoNotice(projectDir)
+func listTodos(ctx context.Context, projectDir string, keep func(todoEntry) bool) ([]Todo, error) {
 	access, err := openTodos(projectDir)
 	if err != nil {
-		return nil, notice, err
+		return nil, err
 	}
 	entries, err := access.loadAll(ctx)
 	if err != nil {
-		return nil, notice, err
+		return nil, err
 	}
 	todos := []Todo{}
 	for _, entry := range entries {
@@ -283,22 +201,22 @@ func listTodos(ctx context.Context, projectDir string, keep func(todoEntry) bool
 			todos = append(todos, entry.todo)
 		}
 	}
-	return todos, notice, nil
+	return todos, nil
 }
 
 // ListTodos sammelt die offenen Einträge nach Kennung — neue Einträge kommen
 // hinten an, der älteste steht oben.
-func ListTodos(ctx context.Context, projectDir string) ([]Todo, TodoNotice, error) {
+func ListTodos(ctx context.Context, projectDir string) ([]Todo, error) {
 	return listTodos(ctx, projectDir, func(e todoEntry) bool { return !e.done })
 }
 
 // ListDoneTodos sammelt die abgehakten Einträge, ebenfalls nach Kennung.
-func ListDoneTodos(ctx context.Context, projectDir string) ([]Todo, TodoNotice, error) {
+func ListDoneTodos(ctx context.Context, projectDir string) ([]Todo, error) {
 	return listTodos(ctx, projectDir, func(e todoEntry) bool { return e.done })
 }
 
 // ListAllTodos liefert den ganzen Bestand, offene und erledigte.
-func ListAllTodos(ctx context.Context, projectDir string) ([]Todo, TodoNotice, error) {
+func ListAllTodos(ctx context.Context, projectDir string) ([]Todo, error) {
 	return listTodos(ctx, projectDir, func(todoEntry) bool { return true })
 }
 
@@ -306,7 +224,7 @@ func ListAllTodos(ctx context.Context, projectDir string) ([]Todo, TodoNotice, e
 // wenn sein Text query enthält, ohne Rücksicht auf Groß- und
 // Kleinschreibung. Kephalaion hat keine Suche; gefiltert wird hier, für alle
 // Zugriffswege gleich. Ein leerer query passt auf alles.
-func SearchTodos(ctx context.Context, projectDir, query string) ([]Todo, TodoNotice, error) {
+func SearchTodos(ctx context.Context, projectDir, query string) ([]Todo, error) {
 	needle := strings.ToLower(strings.TrimSpace(query))
 	return listTodos(ctx, projectDir, func(e todoEntry) bool {
 		return strings.Contains(strings.ToLower(e.todo.Text), needle)
@@ -334,30 +252,26 @@ func todoShortName(text string) string {
 // AddTodo legt ein Todo an, mit der nächsten Nummer aus todos/ samt done/.
 // Ist der Name belegt, versucht es die nächste Nummer (wie doc_create); ein
 // offener Ausgang zieht nie die nächste Nummer.
-func AddTodo(ctx context.Context, projectDir, text, origin string) (Todo, TodoNotice, error) {
-	notice := todoNotice(projectDir)
+func AddTodo(ctx context.Context, projectDir, text, origin string) (Todo, error) {
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return Todo{}, notice, docRefErrorf(DocCodeInvalidInput, "leerer Text: ein Todo braucht einen Inhalt")
-	}
-	if err := requireMigrated(projectDir); err != nil {
-		return Todo{}, notice, err
+		return Todo{}, docRefErrorf(DocCodeInvalidInput, "leerer Text: ein Todo braucht einen Inhalt")
 	}
 	access, err := openTodos(projectDir)
 	if err != nil {
-		return Todo{}, notice, err
+		return Todo{}, err
 	}
 	doc := todoDoc{Text: text, Origin: strings.TrimSpace(origin)}
 	created, hubDoc, err := access.docs.createNumbered(ctx, access.kind, access.kind.Dir, todoShortName(text),
 		composeTodoDoc(doc), todoKephError)
 	if err != nil {
-		return Todo{}, notice, err
+		return Todo{}, err
 	}
 	todo := Todo{ID: created.Number, Text: doc.Text, Origin: doc.Origin, Created: today()}
 	if hubDoc.Created != nil {
 		todo.Created = stampDate(hubDoc.Created.At)
 	}
-	return todo, notice, nil
+	return todo, nil
 }
 
 // find sucht ein Todo nach Kennung, offen oder erledigt.
@@ -403,28 +317,24 @@ func (a *todoAccess) todoNames(name string) (open, done string) {
 // (etwa outcome_unknown); der erste bleibt stehen und wird beim Lesen
 // übergangen. Jedes Schreiben bereinigt dabei ein übrig gebliebenes oder
 // fehlendes done:.
-func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, done *bool) (Todo, TodoNotice, error) {
-	notice := todoNotice(projectDir)
+func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, done *bool) (Todo, error) {
 	var newText string
 	if text != nil {
 		newText = strings.TrimSpace(*text)
 		if newText == "" {
-			return Todo{}, notice, docRefErrorf(DocCodeInvalidInput, "leerer Text: ein Todo braucht einen Inhalt")
+			return Todo{}, docRefErrorf(DocCodeInvalidInput, "leerer Text: ein Todo braucht einen Inhalt")
 		}
 	}
 	if text == nil && done == nil {
-		return Todo{}, notice, docRefErrorf(DocCodeInvalidInput, "nichts zu ändern: erwartet wird text oder done")
-	}
-	if err := requireMigrated(projectDir); err != nil {
-		return Todo{}, notice, err
+		return Todo{}, docRefErrorf(DocCodeInvalidInput, "nichts zu ändern: erwartet wird text oder done")
 	}
 	access, err := openTodos(projectDir)
 	if err != nil {
-		return Todo{}, notice, err
+		return Todo{}, err
 	}
 	entry, err := access.find(ctx, id)
 	if err != nil {
-		return Todo{}, notice, err
+		return Todo{}, err
 	}
 
 	doc := entry.doc
@@ -463,25 +373,25 @@ func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, do
 	case toDone && !entry.done:
 		// Erst das Datum, dann verschieben.
 		if err := writeIfChanged(); err != nil {
-			return Todo{}, notice, err
+			return Todo{}, err
 		}
 		if _, err := access.store.Rename(ctx, entry.name, doneName); err != nil {
-			return Todo{}, notice, todoMoveError(err, "done: ist geschrieben, das Verschieben nach done/ nicht")
+			return Todo{}, todoMoveError(err, "done: ist geschrieben, das Verschieben nach done/ nicht")
 		}
 	case !toDone && entry.done:
 		// Erst zurück, dann das Feld entfernen.
 		moved, err := access.store.Rename(ctx, entry.name, openName)
 		if err != nil {
-			return Todo{}, notice, todoKephError(err)
+			return Todo{}, todoKephError(err)
 		}
 		if content != composeTodoDoc(entry.doc) {
 			if _, err := access.store.Write(ctx, openName, content, moved.Revision); err != nil {
-				return Todo{}, notice, todoMoveError(err, "das Todo ist zurück unter todos/, done: ist noch nicht entfernt (wird beim Lesen übergangen)")
+				return Todo{}, todoMoveError(err, "das Todo ist zurück unter todos/, done: ist noch nicht entfernt (wird beim Lesen übergangen)")
 			}
 		}
 	default:
 		if err := writeIfChanged(); err != nil {
-			return Todo{}, notice, err
+			return Todo{}, err
 		}
 	}
 
@@ -490,7 +400,7 @@ func UpdateTodo(ctx context.Context, projectDir string, id int, text *string, do
 		todo.Done = doc.Done
 		todo.DoneMigrated = doc.DoneMigrated
 	}
-	return todo, notice, nil
+	return todo, nil
 }
 
 // todoMoveError ist der Fehler des zweiten Schritts von Abhaken oder
@@ -503,23 +413,19 @@ func todoMoveError(err error, state string) error {
 
 // DeleteTodo entfernt einen Eintrag (Löschmarke in Kephalaion). Die Nummer
 // kann danach wieder vergeben werden, wenn sie die höchste war.
-func DeleteTodo(ctx context.Context, projectDir string, id int) (Todo, TodoNotice, error) {
-	notice := todoNotice(projectDir)
-	if err := requireMigrated(projectDir); err != nil {
-		return Todo{}, notice, err
-	}
+func DeleteTodo(ctx context.Context, projectDir string, id int) (Todo, error) {
 	access, err := openTodos(projectDir)
 	if err != nil {
-		return Todo{}, notice, err
+		return Todo{}, err
 	}
 	entry, err := access.find(ctx, id)
 	if err != nil {
-		return Todo{}, notice, err
+		return Todo{}, err
 	}
 	if _, err := access.store.Delete(ctx, entry.name, entry.revision); err != nil {
-		return Todo{}, notice, todoKephError(err)
+		return Todo{}, todoKephError(err)
 	}
-	return entry.todo, notice, nil
+	return entry.todo, nil
 }
 
 func today() string {

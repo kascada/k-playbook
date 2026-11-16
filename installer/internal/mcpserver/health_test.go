@@ -11,7 +11,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/health"
-	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 func callHealth(t *testing.T, projectDir string) (healthEnvelope, map[string]any, *mcp.CallToolResult) {
@@ -64,13 +64,13 @@ func TestHealthWerkzeugLiefertDenReport(t *testing.T) {
 		t.Errorf("error steht in einer guten Antwort: %v", fields)
 	}
 
-	// Ein zweiter Eintrag kommt dazu — die alte Quellenkonfiguration unter
-	// k-playbook-local/ ist Altbestand (Task 144); der Umschlag bleibt ok.
-	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
+	// Ein zweiter Eintrag kommt dazu — ein Basis-Werkzeug der Matrix fehlt im
+	// PATH, eine Warnung; der Umschlag bleibt ok.
+	path := filepath.Join(sharetest.Dir(t), "scripts", "base-tools.tsv")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("name\tgroup\trole\tguarded\tmethods\tapt_package\tgithub_repo\tasset_ref\tasset_pattern\nk-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	envelope, _, result = callHealth(t, root)

@@ -134,9 +134,6 @@ func TestInventarStatusOhneInventarUndOhneKonfiguration(t *testing.T) {
 	if response.Sources.Path != versionsources.DocRef || response.Sources.DisplayPath != versionsources.DocRef {
 		t.Errorf("Ort der Quellenkonfiguration = %q / %q", response.Sources.Path, response.Sources.DisplayPath)
 	}
-	if response.Sources.Legacy != "" {
-		t.Errorf("ohne alte Datei kein Altbestand: %q", response.Sources.Legacy)
-	}
 	_ = root
 
 	var file inventoryFileResponse
@@ -332,10 +329,9 @@ func TestInventarSchreibfehlerBrichtSichtbarAb(t *testing.T) {
 // Ohne bereite Kephalaion-Anbindung gibt es kein Inventar: GET zeigt den
 // Zustand „nicht erreichbar“ mit dem Grund — nicht „fehlt“ —, der Anstoß
 // bricht mit kephalaion_unavailable ab, ohne eine Quelle zu lesen, und die
-// Ansicht sagt, warum nichts da ist. Einen Rückfall auf die Platte gibt es
-// nicht.
+// Ansicht sagt, warum nichts da ist.
 func TestInventarOhneKephalaionIstEinSichtbarerZustand(t *testing.T) {
-	root, _ := newInventoryProject(t)
+	newInventoryProject(t)
 	inventoryUnavailable(t, realOpenInventoryStore)
 
 	var state inventoryResponse
@@ -356,9 +352,6 @@ func TestInventarOhneKephalaionIstEinSichtbarerZustand(t *testing.T) {
 	}
 	if response.Outcome.Written || response.Outcome.Path != inventory.DocRef || !response.Status.Unavailable {
 		t.Errorf("Outcome = %+v, Status = %+v", response.Outcome, response.Status)
-	}
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), "docs")); !os.IsNotExist(err) {
-		t.Error("ohne Kephalaion darf nichts auf der Platte entstehen")
 	}
 
 	var file inventoryFileResponse
@@ -384,7 +377,7 @@ func TestInventarStatusBeiNichtAntwortendemNode(t *testing.T) {
 // Die konfigurierten Zusatzquellen und Ausschlüsse erscheinen als Zahlen —
 // gelesen mit demselben Leser wie im Sammler. Ein Formular gibt es nicht.
 func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
-	root, store := newInventoryProject(t)
+	_, store := newInventoryProject(t)
 	putVersionSources(store, "schema_version: 3\nsources:\n"+
 		"  - path: deploy/values.yaml\n    kind: helm\n    env: deployment\n"+
 		"  - path: docs/extra.txt\n    kind: python\n    env: lokal\n    optional: true\n"+
@@ -398,20 +391,6 @@ func TestInventarZeigtDieQuellenkonfigurationNurAn(t *testing.T) {
 	}
 	if state.Sources.State != project.VersionSourcesPresent || state.Sources.Sources != 2 || state.Sources.Exclude != 1 || state.Sources.HelmValues != 1 {
 		t.Errorf("Zahlen = %+v, erwartet 2 Quellen, 1 Ausschluss, 1 Helm-Wert", state.Sources)
-	}
-
-	// Die alte Datei ist Altbestand: Die Anzeige nennt sie, gelesen wird sie
-	// nicht — die Zahlen bleiben die aus der Collection.
-	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte("schema_version: 1\nexclude:\n  - a/**\n  - b/**\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	getJSON(t, "/api/inventory", &state)
-	if !strings.Contains(state.Sources.Legacy, "/k-upgrade") || state.Sources.Exclude != 1 {
-		t.Errorf("Altbestand = %+v", state.Sources)
 	}
 }
 

@@ -7,30 +7,24 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
-// reviewsResponse ist die Liste der bisherigen Läufe. Gestartet wird ein Lauf
-// nicht mehr über die Oberfläche — dafür sind /k-audit und /k-review im
-// Assistenten zuständig, beide über den MCP-Server. Diese Seite zeigt nur,
-// was bereits vorliegt.
+// reviewsResponse ist die Antwort der Seite Reviews. Solange die Review-Wege
+// pausieren (review.Paused), trägt sie keine Läufe, sondern die Meldung der
+// Sperre: Paused ist wahr und Message der eine Satz mit dem Grund. Gestartet
+// wird ein Lauf ohnehin nicht über die Oberfläche — dafür sind /k-audit und
+// /k-review im Assistenten zuständig, beide über den MCP-Server.
 type reviewsResponse struct {
-	Available bool             `json:"available"`
-	Runs      []review.Summary `json:"runs"`
-	Message   string           `json:"message"`
+	Available bool   `json:"available"`
+	Paused    bool   `json:"paused"`
+	Message   string `json:"message"`
 }
 
+// reviewsHandler liest nichts: Die Sperre gilt auch für die Oberfläche, und
+// einen Ort der Ergebnisse kennt das Programm bis zur Entscheidung nicht.
 func reviewsHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, reviewsResponse{})
 		return
 	}
-
-	response := reviewsResponse{Available: true}
-
-	runs, err := review.ListRuns(project.LocalDir(environment.ProjectDir))
-	if err != nil {
-		response.Message = err.Error()
-	}
-	response.Runs = runs
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, reviewsResponse{Available: true, Paused: true, Message: review.PausedMessage})
 }

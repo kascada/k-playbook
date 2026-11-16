@@ -196,7 +196,7 @@ func TestMatchExcludeVergleichtSegmentweise(t *testing.T) {
 		{"k-playbook/**", "k-playbook/installer/go.mod", true},
 		{"k-playbook/**", "k-playbook/go.mod", true},
 		// Ein Nachbar mit gleichem Präfix ist nicht gemeint.
-		{"k-playbook/**", "k-playbook-local/go.mod", false},
+		{"k-playbook/**", "k-playbook-notizen/go.mod", false},
 		{"k-playbook/**", "installer/k-playbook/go.mod", false},
 		// Ohne Wildcard trifft das Muster den Pfad selbst und alles darunter.
 		{"testdata", "testdata/projekt/go.mod", true},

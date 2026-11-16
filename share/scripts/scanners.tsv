@@ -35,9 +35,8 @@
 #            Bezugspunkt ist der des Jobs: bei workdir module das Modul, sonst {target}.
 #            Gezählt wird je Bezugspunkt und Sorte einmal im ganzen Lauf. Die Zahl ist
 #            eine Obergrenze und keine Abdeckungsmessung: die werkzeugeigenen Ausschlüsse
-#            aus args kennt die Zählung nicht, die generischen (k-playbook/,
-#            k-playbook-local/results/) schon — verankert am Bezugspunkt, sonst fiele
-#            installer/cmd/k-playbook/ mit heraus.
+#            aus args kennt die Zählung nicht, den generischen (k-playbook/) schon —
+#            verankert am Bezugspunkt, sonst fiele installer/cmd/k-playbook/ mit heraus.
 #            Warum eine eigene Spalte: die Sorte steht in keiner vorhandenen. languages
 #            ist der Sprachfilter des Laufs, ihr * heißt „sprachunabhängig" und gerade
 #            nicht „alle Dateien". Im Go-Code stünde die Zuordnung als Sonderfall je
@@ -142,7 +141,7 @@
 #
 # Dasselbe gilt für die Kandidatenzählung hinter candidates: auch ihre Ausschlüsse stehen
 # im Go-Code (installer/internal/review/candidates.go). Sie ruft ebenfalls kein Werkzeug
-# auf, und sie kann nur die generischen Ausschlüsse anwenden — die werkzeugeigenen aus
+# auf, und sie kann nur den generischen Ausschluss anwenden — die werkzeugeigenen aus
 # args sind ihr nicht zugänglich. Deshalb gilt: Kandidaten ≥ tatsächlich geprüfte
 # Dateien.
 #
@@ -150,9 +149,6 @@
 #   k-playbook/                Altbestand: ein liegengebliebener Clone des Werkzeugs aus
 #                              dem früheren Modell (/k-upgrade löscht ihn). Sein
 #                              ausgeliefertes Beispielmaterial ist kein Code des Projekts.
-#   k-playbook-local/results/  die Ergebnisse früherer Läufe. Ohne den Ausschluss
-#                              fänden gitleaks und trufflehog im nächsten Lauf die
-#                              Funde des vorigen in dessen eigenem SARIF wieder.
 # Dazu für Python S101 (assert) und die Testverzeichnisse: an ~/dev/Aiva/kascada
 # gemessen 97,3 % der Befunde, siehe defaults/docs/handbook/migration.md, „Gemessen".
 #
@@ -179,15 +175,15 @@
 job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
 gitleaks-git	gitleaks	*	any	native	file	10m		target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
 gitleaks-dir	gitleaks	*	any	native	file	10m		target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-ruff	ruff	python	source	native	file	10m		target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook,k-playbook-local/results --output-format sarif --output-file {out} {target}
-semgrep	semgrep	python,go,javascript,typescript	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=k-playbook-local/results --exclude=node_modules --exclude=tests --exclude=test {target}
-trivy-fs	trivy	*	manifest	native	file	15m		target	fs --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
-trivy-config	trivy	*	none	native	file	15m		target	config --format sarif --output {out} --skip-dirs k-playbook,k-playbook-local/results {target}
+ruff	ruff	python	source	native	file	10m		target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook --output-format sarif --output-file {out} {target}
+semgrep	semgrep	python,go,javascript,typescript	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=node_modules --exclude=tests --exclude=test {target}
+trivy-fs	trivy	*	manifest	native	file	15m		target	fs --format sarif --output {out} --skip-dirs k-playbook {target}
+trivy-config	trivy	*	none	native	file	15m		target	config --format sarif --output {out} --skip-dirs k-playbook {target}
 gosec	gosec	go	source	native	file	15m		module	-fmt=sarif -out={out} ./...
 govulncheck	govulncheck	go	manifest	native	stdout	15m		module	-format sarif ./...
 njsscan	njsscan	javascript,typescript	source	native	file	15m		target	--sarif -o {out} -c {scripts}/njsscan.yaml .
-osv-scanner	osv-scanner	python,go,javascript,typescript	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --experimental-exclude k-playbook --experimental-exclude k-playbook-local/results --format sarif --output-file {out} {target}
-grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/** --exclude ./k-playbook-local/results/**
+osv-scanner	osv-scanner	python,go,javascript,typescript	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --experimental-exclude k-playbook --format sarif --output-file {out} {target}
+grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/**
 golangci-lint	golangci-lint	go	source	native	file	15m		module	run --output.sarif.path {out} --output.text.path stderr ./...
 trufflehog-git	trufflehog	*	any	convert	stdout	15m		target	git file://{target} --json --no-update
 pip-audit	pip-audit	python	manifest	convert	stdout	15m		module-file	--format json --progress-spinner off -r {module}

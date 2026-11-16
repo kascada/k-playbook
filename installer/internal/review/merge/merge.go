@@ -21,7 +21,7 @@ import (
 type Options struct {
 	// ProjectDir ist das Hauptverzeichnis mit K-PLAYBOOK.yaml.
 	ProjectDir string
-	// RunName ist der Name unter k-playbook-local/results/.
+	// RunName ist der Name des Laufs im Ergebnisverzeichnis.
 	RunName string
 	// RunDir ist das Laufverzeichnis mit run.json, entries/ und raw/.
 	RunDir string
@@ -30,9 +30,9 @@ type Options struct {
 	// SeverityMappingPath ist der optionale Pfad zur Fallback-Tabelle für
 	// abgeleitete Schwere. Fehlt er, bleibt nur SARIF-/Metadaten-Ableitung.
 	SeverityMappingPath string
-	// LocalDir ist k-playbook-local; dort liegt die projektweite
+	// DecisionsDir ist das Verzeichnis mit der projektweiten
 	// known-decisions.md.
-	LocalDir string
+	DecisionsDir string
 	// Now liefert die Erzeugungszeit. Fehlt es, wird time.Now verwendet.
 	Now func() time.Time
 }
@@ -278,7 +278,7 @@ func Build(options Options) (Result, error) {
 		now = options.Now
 	}
 
-	decisions, loadReport, err := knowndecisions.Load(options.LocalDir)
+	decisions, loadReport, err := knowndecisions.Load(options.DecisionsDir)
 	if err != nil {
 		return Result{}, err
 	}

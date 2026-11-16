@@ -176,13 +176,9 @@ func TestApplyRootInstructionsLegtDateiAn(t *testing.T) {
 	if !strings.Contains(content, anstossAufruf) {
 		t.Errorf("Anstoß fehlt:\n%s", content)
 	}
-	// Die Vorlage ist der Anstoß und sonst nichts: Session-Memory- und
-	// Befunde-Block kommen mit dem Briefing.
+	// Die Vorlage ist der Anstoß und sonst nichts.
 	if content != rootInstructionsTemplate() {
 		t.Errorf("die Datei ist nicht die Vorlage:\n%s", content)
-	}
-	if hasObsoleteRootBlocks(content) {
-		t.Errorf("die Vorlage trägt noch einen abgelösten Zusatzblock:\n%s", content)
 	}
 }
 
@@ -207,9 +203,6 @@ func TestApplyRootInstructionsErgaenztVorhandene(t *testing.T) {
 	}
 	if !strings.Contains(string(content), anstossAufruf) {
 		t.Errorf("Anstoß fehlt:\n%s", content)
-	}
-	if hasObsoleteRootBlocks(string(content)) {
-		t.Errorf("ein abgelöster Zusatzblock wurde angehängt:\n%s", content)
 	}
 }
 
@@ -239,9 +232,6 @@ func TestApplyRootInstructionsIstIdempotent(t *testing.T) {
 	if strings.Count(string(second), instructionsMarker) != 1 {
 		t.Errorf("Anstoß steht mehrfach:\n%s", second)
 	}
-	if hasObsoleteRootBlocks(string(second)) {
-		t.Errorf("ein abgelöster Zusatzblock wurde angehängt:\n%s", second)
-	}
 }
 
 // Der Anstoß eines Bestandsprojekts nennt noch den abgelösten Wrapper. Weil der
@@ -268,17 +258,13 @@ func TestApplyRootInstructionsErsetztVeraltetenBlock(t *testing.T) {
 	if strings.Count(content, instructionsMarker) != 1 {
 		t.Errorf("der Anstoß steht mehrfach:\n%s", content)
 	}
-	if hasObsoleteRootBlocks(content) {
-		t.Errorf("ein abgelöster Zusatzblock wurde angehängt:\n%s", content)
-	}
 }
 
 // Ersetzt wird der Block, nicht die Datei: was ein Projekt davor und dahinter
-// geschrieben hat, bleibt stehen. Der Session-Memory-Block dazwischen ist
-// abgelöst und geht; die Überschrift des Projekts dahinter bleibt.
+// geschrieben hat, bleibt stehen.
 func TestErsetzenLaesstProjektinhaltStehen(t *testing.T) {
 	root := t.TempDir()
-	eigen := veralteterAnstoss + "\n" + sessionMemoryBlock() + `
+	eigen := veralteterAnstoss + `
 ## Unsere eigenen Regeln
 
 Die hier gehören uns.
@@ -303,9 +289,6 @@ Die hier gehören uns.
 	}
 	if hasLegacyInstructionsCommand(content) {
 		t.Errorf("der abgelöste Wrapper steht noch drin:\n%s", content)
-	}
-	if hasObsoleteRootBlocks(content) {
-		t.Errorf("ein abgelöster Zusatzblock steht noch drin:\n%s", content)
 	}
 	if erwartet := rootInstructionsTemplate() + "\n## Unsere eigenen Regeln\n\nDie hier gehören uns.\n"; content != erwartet {
 		t.Errorf("Absätze stimmen nicht:\n%q\nerwartet:\n%q", content, erwartet)
@@ -404,13 +387,9 @@ func TestRepairRootInstructionsIstEngUndIdempotent(t *testing.T) {
 		if hasLegacyInstructionsCommand(content) {
 			t.Errorf("der abgelöste Wrapper steht noch drin:\n%s", content)
 		}
-		// Eng: ergänzt wird nichts. Der Session-Memory-Block gehört zum
-		// Einrichten, nicht zum Auffangweg.
-		if strings.Contains(content, sessionMemoryMarker) {
+		// Eng: ergänzt wird nichts. Aus der alten Vorlage wird genau die neue.
+		if content != rootInstructionsTemplate() {
 			t.Errorf("der Auffangweg hat etwas ergänzt:\n%s", content)
-		}
-		if strings.Contains(content, findingsMarker) {
-			t.Errorf("der Auffangweg hat den Befunde-Block ergänzt:\n%s", content)
 		}
 
 		vorher := content
@@ -598,238 +577,11 @@ func readInstructions(t *testing.T, root string) string {
 	return string(content)
 }
 
-// Der häufigste Fall in der Praxis: ein Bestandsprojekt trägt den
-// `k-playbook context`-Anstoß und beide Zusatzblöcke — genau die Vorlage, wie
-// das Binary sie bis zum Briefing schrieb —, dazwischen und dahinter eigenen
-// Text. Früher reichte dieser Test den Befunde-Block nach; seit dem Briefing
-// werden beide Blöcke entfernt, denn ihr Inhalt kommt als
-// `instructions/always/100-…` und `200-…`.
-//
-// Erwartet wird: der Anstoß ist die Briefing-Fassung, beide Blöcke sind samt
-// Marker weg, kein doppelter Absatz bleibt, der Text des Projekts steht
-// unverändert da, und der zweite Lauf schreibt nichts mehr.
-func TestZusatzbloeckeWerdenBestandsprojektEntfernt(t *testing.T) {
+// Eine leere Datei: es gibt nichts, wovor der Anstoß stünde — er beginnt die
+// Datei, ohne leeren Absatz davor.
+func TestLeereDateiWirdZumAnstoss(t *testing.T) {
 	root := t.TempDir()
-	bestand := veralteterKontextAnstoss + "\n" + sessionMemoryBlock() +
-		"\n## Dazwischen\n\nEigener Text zwischen den Blöcken.\n\n" + findingsBlock() +
-		"\n## Unsere eigenen Regeln\n\nDie hier gehören uns.\n"
-	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(bestand), 0o644); err != nil {
-		t.Fatalf("AGENTS.md anlegen: %v", err)
-	}
-	if state := CheckRootInstructions(root); !state.HasOutdatedAnstoss || !state.AnstossRefreshable ||
-		len(state.ObsoleteBlocks) != 2 || len(state.RemovableBlocks) != 2 || state.Hint != "" {
-		t.Errorf("die Prüfung meldet den Bestand nicht: %+v", state)
-	}
-
-	state, err := ApplyRootInstructions(root)
-	if err != nil {
-		t.Fatalf("ApplyRootInstructions: %v", err)
-	}
-	if state.NeedsRefresh() {
-		t.Errorf("nach dem Lauf ist noch etwas nachzuziehen: %+v", state)
-	}
-
-	content := readInstructions(t, root)
-	erwartet := rootInstructionsTemplate() +
-		"\n## Dazwischen\n\nEigener Text zwischen den Blöcken.\n" +
-		"\n## Unsere eigenen Regeln\n\nDie hier gehören uns.\n"
-	if content != erwartet {
-		t.Errorf("Datei nach dem Lauf:\n%q\nerwartet:\n%q", content, erwartet)
-	}
-
-	// Der zweite Lauf hat nichts mehr zu tun.
-	if _, err := ApplyRootInstructions(root); err != nil {
-		t.Fatalf("zweiter Lauf: %v", err)
-	}
-	if readInstructions(t, root) != content {
-		t.Error("der zweite Lauf hat die Datei verändert")
-	}
-}
-
-// Ein lokal abgewandelter Zusatzblock — Marker da, Text anders — ohne
-// Folgeabschnitt hat keine Grenze. Er bleibt stehen, der Lauf meldet es, und
-// die Prüfung trägt den Hinweis.
-func TestAbgewandelterZusatzblockBleibtMitHinweis(t *testing.T) {
-	root := t.TempDir()
-	eigen := rootInstructionsTemplate() + "\n" + findingsMarker + `
-## Befunde festhalten
-
-Bei uns umformuliert, und dahinter steht Prosa ohne Überschrift.
-`
-	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
-		t.Fatalf("AGENTS.md anlegen: %v", err)
-	}
-
-	state, err := ApplyRootInstructions(root)
-	if err == nil {
-		t.Fatal("der abgewandelte Block wurde nicht gemeldet")
-	}
-	if !strings.Contains(err.Error(), "Befunde-Block") {
-		t.Errorf("der Hinweis nennt den Block nicht: %v", err)
-	}
-	if readInstructions(t, root) != eigen {
-		t.Error("die Datei wurde verändert")
-	}
-	if len(state.ObsoleteBlocks) != 1 || state.ObsoleteBlocks[0] != "Befunde-Block" || state.Hint == "" {
-		t.Errorf("die Prüfung trägt den Block oder den Hinweis nicht: %+v", state)
-	}
-	// Ein Lauf entfernte ihn nicht — das sagt die Prüfung getrennt vom Bestand.
-	if len(state.RemovableBlocks) != 0 || state.AnstossRefreshable {
-		t.Errorf("die Prüfung verspricht, was ein Lauf nicht täte: %+v", state)
-	}
-
-	// Der Start sagt dasselbe und schreibt ebenfalls nicht.
-	repaired, err := RepairRootInstructions(root)
-	if err == nil || repaired.Changed() {
-		t.Errorf("der Start hat geschrieben oder nicht gemeldet: %+v, %v", repaired, err)
-	}
-}
-
-// Eine Datei, die nur die Zusatzblöcke trägt, aber keinen Anstoßmarker: das
-// Einrichten hängt den Anstoß an und entfernt die Blöcke in einem Lauf; der
-// Start fasst eine Datei ohne Anstoß nicht an und meldet nur.
-func TestZusatzbloeckeOhneAnstossmarker(t *testing.T) {
-	eigen := "# Unser Projekt\n\nEigene Regeln.\n\n" + sessionMemoryBlock() + "\n" + findingsBlock()
-
-	t.Run("Start meldet nur", func(t *testing.T) {
-		root := t.TempDir()
-		if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
-			t.Fatalf("AGENTS.md anlegen: %v", err)
-		}
-
-		repaired, err := RepairRootInstructions(root)
-		if err != nil {
-			t.Fatalf("RepairRootInstructions: %v", err)
-		}
-		if repaired.Changed() || !repaired.BlocksWithoutAnstoss {
-			t.Errorf("der Start hat geschrieben oder nicht gemeldet: %+v", repaired)
-		}
-		if readInstructions(t, root) != eigen {
-			t.Error("der Start hat die Datei verändert")
-		}
-	})
-
-	t.Run("Einrichten hängt an und entfernt", func(t *testing.T) {
-		root := t.TempDir()
-		if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
-			t.Fatalf("AGENTS.md anlegen: %v", err)
-		}
-
-		if _, err := ApplyRootInstructions(root); err != nil {
-			t.Fatalf("ApplyRootInstructions: %v", err)
-		}
-		content := readInstructions(t, root)
-		if erwartet := "# Unser Projekt\n\nEigene Regeln.\n\n" + instructionsBlock(); content != erwartet {
-			t.Errorf("Datei nach dem Lauf:\n%q\nerwartet:\n%q", content, erwartet)
-		}
-	})
-}
-
-// Ein abgewandelter Zusatzblock mit Prosa ohne Überschrift dahinter in einer
-// Datei ohne Anstoßmarker: Der Anstoß wird angehängt, der Block bleibt samt
-// Prosa stehen, der Hinweis kommt — und die Prüfung sagt genau das. Der in
-// diesem Lauf angehängte Anstoßmarker darf nie zur Grenze des Blocks werden;
-// sonst verschwände die Prosa mit dem Block.
-func TestAbgewandelterZusatzblockOhneAnstossmarkerBehaeltProsa(t *testing.T) {
-	eigen := "# Unser Projekt\n\n" + findingsMarker + `
-## Befunde festhalten
-
-Bei uns umformuliert, und dahinter steht Prosa ohne Überschrift.
-`
-	erwartet := strings.TrimRight(eigen, "\n") + "\n\n" + instructionsBlock()
-
-	t.Run("Prüfung meldet Anhängen und stehenden Block", func(t *testing.T) {
-		root := t.TempDir()
-		if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
-			t.Fatalf("AGENTS.md anlegen: %v", err)
-		}
-
-		state := CheckRootInstructions(root)
-		if state.HasMarker || state.HasOutdatedAnstoss || state.AnstossRefreshable {
-			t.Errorf("die Prüfung sieht einen Anstoß, den es nicht gibt: %+v", state)
-		}
-		if len(state.ObsoleteBlocks) != 1 || state.ObsoleteBlocks[0] != "Befunde-Block" {
-			t.Errorf("die Prüfung trägt den Block nicht: %+v", state)
-		}
-		if len(state.RemovableBlocks) != 0 || !strings.Contains(state.Hint, "Befunde-Block") {
-			t.Errorf("die Prüfung verspricht Entfernen oder nennt den Block nicht im Hinweis: %+v", state)
-		}
-	})
-
-	t.Run("Einrichten hängt an und lässt Block samt Prosa stehen", func(t *testing.T) {
-		root := t.TempDir()
-		if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
-			t.Fatalf("AGENTS.md anlegen: %v", err)
-		}
-		vorher := CheckRootInstructions(root)
-
-		state, err := ApplyRootInstructions(root)
-		if err == nil || !strings.Contains(err.Error(), "Befunde-Block") {
-			t.Errorf("der Lauf meldet den stehenden Block nicht: %v", err)
-		}
-		content := readInstructions(t, root)
-		if content != erwartet {
-			t.Errorf("Datei nach dem Lauf:\n%q\nerwartet:\n%q", content, erwartet)
-		}
-		if !strings.Contains(content, "Bei uns umformuliert, und dahinter steht Prosa ohne Überschrift.") {
-			t.Error("die Prosa hinter dem Block ist verloren")
-		}
-		if !strings.Contains(content, anstossAufruf) {
-			t.Error("der Anstoß fehlt")
-		}
-
-		// Der Lauf tat genau das, was die Prüfung vorher ankündigte: Anstoß
-		// angehängt, nichts entfernt, der Hinweis bleibt.
-		if !state.HasMarker || len(state.ObsoleteBlocks) != 1 || len(state.RemovableBlocks) != 0 || state.Hint == "" {
-			t.Errorf("Zustand nach dem Lauf: %+v", state)
-		}
-		if len(vorher.RemovableBlocks) != 0 || vorher.Hint != state.Hint {
-			t.Errorf("Prüfung und Lauf sagen Verschiedenes: vorher %+v, nachher %+v", vorher, state)
-		}
-
-		// Der zweite Lauf ändert nichts mehr und meldet weiter: Der jetzt
-		// angehängte Anstoß ist für den Block keine Grenze.
-		if _, err := ApplyRootInstructions(root); err == nil {
-			t.Error("der zweite Lauf meldet den stehenden Block nicht mehr")
-		}
-		if readInstructions(t, root) != erwartet {
-			t.Error("der zweite Lauf hat die Datei verändert")
-		}
-
-		// Der Start sieht den Marker und repariert — den Block samt Prosa
-		// fasst auch er nicht an.
-		repaired, err := RepairRootInstructions(root)
-		if err == nil || repaired.Changed() {
-			t.Errorf("der Start hat nach dem Lauf geschrieben oder nicht gemeldet: %+v, %v", repaired, err)
-		}
-		if readInstructions(t, root) != erwartet {
-			t.Error("der Start hat die Datei nach dem Lauf verändert")
-		}
-	})
-
-	t.Run("Start meldet nur", func(t *testing.T) {
-		root := t.TempDir()
-		if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
-			t.Fatalf("AGENTS.md anlegen: %v", err)
-		}
-
-		repaired, err := RepairRootInstructions(root)
-		if err != nil || repaired.Changed() || !repaired.BlocksWithoutAnstoss {
-			t.Errorf("der Start hat geschrieben oder nicht gemeldet: %+v, %v", repaired, err)
-		}
-		if readInstructions(t, root) != eigen {
-			t.Error("der Start hat die Datei verändert")
-		}
-	})
-}
-
-// Eine Datei, die nur die Zusatzblöcke trägt und sonst nichts: nach dem
-// Entfernen bleibt nichts, wovor der Anstoß stünde — er beginnt die Datei,
-// ohne leeren Absatz davor.
-func TestNurZusatzbloeckeWerdenZumAnstoss(t *testing.T) {
-	root := t.TempDir()
-	eigen := sessionMemoryBlock() + "\n" + findingsBlock()
-	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(eigen), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte("\n"), 0o644); err != nil {
 		t.Fatalf("AGENTS.md anlegen: %v", err)
 	}
 
@@ -838,32 +590,5 @@ func TestNurZusatzbloeckeWerdenZumAnstoss(t *testing.T) {
 	}
 	if content := readInstructions(t, root); content != instructionsBlock() {
 		t.Errorf("Datei nach dem Lauf:\n%q\nerwartet:\n%q", content, instructionsBlock())
-	}
-}
-
-// Der Start entfernt die Zusatzblöcke genauso wie das Einrichten — sie sind
-// Inhalt, den k-playbook selbst geschrieben hat — und meldet, was er entfernt
-// hat. Aus der vollständigen alten Vorlage wird so die neue.
-func TestRepairRootInstructionsEntferntZusatzbloecke(t *testing.T) {
-	root := t.TempDir()
-	alteVorlage := veralteterAnstoss + "\n" + sessionMemoryBlock() + "\n" + findingsBlock()
-	if err := os.WriteFile(filepath.Join(root, RootInstructionsFile), []byte(alteVorlage), 0o644); err != nil {
-		t.Fatalf("AGENTS.md anlegen: %v", err)
-	}
-
-	repaired, err := RepairRootInstructions(root)
-	if err != nil {
-		t.Fatalf("RepairRootInstructions: %v", err)
-	}
-	if !repaired.Refreshed || len(repaired.RemovedBlocks) != 2 {
-		t.Errorf("der Start meldet nicht, was er getan hat: %+v", repaired)
-	}
-	if content := readInstructions(t, root); content != rootInstructionsTemplate() {
-		t.Errorf("aus der alten Vorlage wurde nicht die neue:\n%q", content)
-	}
-
-	repaired, err = RepairRootInstructions(root)
-	if err != nil || repaired.Changed() {
-		t.Errorf("der zweite Lauf hat geschrieben: %+v, %v", repaired, err)
 	}
 }

@@ -15,27 +15,22 @@ import (
 // todoListOutput ist die Antwort von `todo list`.
 //
 // Die Ausgabe ist JSON auf stdout wie bei `context`: /k-todo soll sie lesen
-// können, ohne Fließtext zu deuten. hint steht daneben, weil ein nicht
-// übernommenes data/todos.json oder eine zurückgebliebene TODO.md ein
-// Hinweis ist und kein Fehler.
+// können, ohne Fließtext zu deuten.
 type todoListOutput struct {
 	Todos []project.Todo `json:"todos"`
-	Hint  string         `json:"hint,omitempty"`
 }
 
 // todoEntryOutput ist die Antwort von `todo add`, `todo update` und
 // `todo delete`: der betroffene Eintrag.
 type todoEntryOutput struct {
 	Todo project.Todo `json:"todo"`
-	Hint string       `json:"hint,omitempty"`
 }
 
 // runTodo führt die Todo-Verwaltung aus.
 //
 // Ohne Unterbefehl und mit --help gibt es nur die Kurzhilfe: dieser Aufruf
-// fasst ausdrücklich keine Daten an — weder die Collection noch
-// data/todos.json —, damit er als Rauchtest nach einem Release folgenlos
-// bleibt.
+// fasst ausdrücklich keine Daten an, damit er als Rauchtest nach einem
+// Release folgenlos bleibt.
 func runTodo(args []string) error {
 	if len(args) == 0 {
 		printTodoUsage(os.Stdout)
@@ -54,8 +49,6 @@ func runTodo(args []string) error {
 		return runTodoUpdate(args[1:])
 	case "delete":
 		return runTodoDelete(args[1:])
-	case "migrate":
-		return runTodoMigrate(args[1:])
 	default:
 		printTodoUsage(os.Stderr)
 		return fmt.Errorf("unbekannter Unterbefehl: todo %s", args[0])
@@ -90,11 +83,10 @@ func runTodoList(args []string) error {
 
 	ctx := context.Background()
 	var todos []project.Todo
-	var notice project.TodoNotice
 	switch {
 	case strings.TrimSpace(search) != "":
 		var found []project.Todo
-		found, notice, err = project.SearchTodos(ctx, projectDir, search)
+		found, err = project.SearchTodos(ctx, projectDir, search)
 		todos = []project.Todo{}
 		for _, todo := range found {
 			if all || (todo.Done != "") == done {
@@ -102,26 +94,17 @@ func runTodoList(args []string) error {
 			}
 		}
 	case all:
-		todos, notice, err = project.ListAllTodos(ctx, projectDir)
+		todos, err = project.ListAllTodos(ctx, projectDir)
 	case done:
-		todos, notice, err = project.ListDoneTodos(ctx, projectDir)
+		todos, err = project.ListDoneTodos(ctx, projectDir)
 	default:
-		todos, notice, err = project.ListTodos(ctx, projectDir)
+		todos, err = project.ListTodos(ctx, projectDir)
 	}
 	if err != nil {
-		return todoError(err, notice)
+		return docError(err)
 	}
 
-	return printTodoJSON(todoListOutput{Todos: todos, Hint: notice.Hint})
-}
-
-// todoError meldet einen Fehler der Fachlogik mit seinem Code; ein Hinweis
-// daneben geht nach stderr, stdout bleibt leer.
-func todoError(err error, notice project.TodoNotice) error {
-	if notice.Hint != "" {
-		fmt.Fprintf(os.Stderr, "Hinweis: %s\n", notice.Hint)
-	}
-	return docError(err)
+	return printTodoJSON(todoListOutput{Todos: todos})
 }
 
 func runTodoAdd(args []string) error {
@@ -150,11 +133,11 @@ func runTodoAdd(args []string) error {
 		return err
 	}
 
-	todo, notice, err := project.AddTodo(context.Background(), projectDir, text, origin)
+	todo, err := project.AddTodo(context.Background(), projectDir, text, origin)
 	if err != nil {
-		return todoError(err, notice)
+		return docError(err)
 	}
-	return printTodoJSON(todoEntryOutput{Todo: todo, Hint: notice.Hint})
+	return printTodoJSON(todoEntryOutput{Todo: todo})
 }
 
 func runTodoUpdate(args []string) error {
@@ -203,11 +186,11 @@ func runTodoUpdate(args []string) error {
 		return err
 	}
 
-	todo, notice, err := project.UpdateTodo(context.Background(), projectDir, id, text, done)
+	todo, err := project.UpdateTodo(context.Background(), projectDir, id, text, done)
 	if err != nil {
-		return todoError(err, notice)
+		return docError(err)
 	}
-	return printTodoJSON(todoEntryOutput{Todo: todo, Hint: notice.Hint})
+	return printTodoJSON(todoEntryOutput{Todo: todo})
 }
 
 func runTodoDelete(args []string) error {
@@ -225,36 +208,15 @@ func runTodoDelete(args []string) error {
 		return err
 	}
 
-	todo, notice, err := project.DeleteTodo(context.Background(), projectDir, id)
-	if err != nil {
-		return todoError(err, notice)
-	}
-	return printTodoJSON(todoEntryOutput{Todo: todo, Hint: notice.Hint})
-}
-
-// runTodoMigrate übernimmt data/todos.json in die Collection. Die Ausgabe
-// nennt angelegte und übersprungene Einträge — auch bei einem Abbruch, dann
-// mit dem Fehler auf stderr.
-func runTodoMigrate(args []string) error {
-	if len(args) != 0 {
-		return fmt.Errorf("erwartet wird todo migrate ohne Argumente")
-	}
-	projectDir, err := todoProjectDir()
-	if err != nil {
-		return err
-	}
-	result, err := project.MigrateTodos(context.Background(), projectDir)
-	if printErr := printTodoJSON(result); printErr != nil && err == nil {
-		err = printErr
-	}
+	todo, err := project.DeleteTodo(context.Background(), projectDir, id)
 	if err != nil {
 		return docError(err)
 	}
-	return nil
+	return printTodoJSON(todoEntryOutput{Todo: todo})
 }
 
 // todoProjectDir löst das Projekt auf. Wie bei inventory wird nur der Anker
-// gebraucht: die Anbindung an die Collection steht unter k-playbook-local/,
+// gebraucht: Die Anbindung an die Collection steht in der Projektkonfiguration,
 // nicht im Katalog der Installation.
 func todoProjectDir() (string, error) {
 	environment := project.Detect()
@@ -302,9 +264,6 @@ Unterbefehle:
             Ändert den Text, hakt ab (--done) oder öffnet wieder (--reopen).
   delete <id>
             Entfernt einen Eintrag.
-  migrate   Übernimmt k-playbook-local/data/todos.json in die Collection und
-            benennt die Datei danach um. Solange sie besteht, sind add, update
-            und delete gesperrt (todos_not_migrated).
 
 Ohne Unterbefehl und mit --help steht hier nur diese Übersicht: der Aufruf
 liest und schreibt dabei nichts.

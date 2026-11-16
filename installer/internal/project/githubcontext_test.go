@@ -337,7 +337,7 @@ func TestContextForDirFuelltGitHub(t *testing.T) {
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured})
 	run(t, root, "git", "init", "-b", "main")
 	run(t, root, "git", "remote", "add", "origin", "git@github-kamranbycloud:kascada/k-playbook.git")
-	nested := filepath.Join(root, "k-playbook-local")
+	nested := filepath.Join(root, "unterprojekt")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
 	}

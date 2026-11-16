@@ -28,32 +28,6 @@ func TestTestTokenHasTokenForm(t *testing.T) {
 	}
 }
 
-func TestReadLegacyBindingStates(t *testing.T) {
-	dir := t.TempDir()
-	if _, present, err := ReadLegacyBinding(dir); present || err != nil {
-		t.Fatalf("fehlende Datei: present=%v err=%v", present, err)
-	}
-
-	writeFile(t, LegacyFilePath(dir), "# nur ein Kommentar\nother:\n  key: value\n")
-	if _, present, err := ReadLegacyBinding(dir); present || err != nil {
-		t.Fatalf("fehlender Block: present=%v err=%v", present, err)
-	}
-
-	writeFile(t, LegacyFilePath(dir), "# Kopf\n\nkephalaion:\n  # Hub\n  hub: vm\n  collection: k-playbook\n  account: kamran-wsl\n")
-	b, present, err := ReadLegacyBinding(dir)
-	if err != nil || !present {
-		t.Fatalf("Block: present=%v err=%v", present, err)
-	}
-	if b != (LegacyBinding{Hub: "vm", Collection: "k-playbook", Account: "kamran-wsl"}) {
-		t.Fatalf("gelesen: %+v", b)
-	}
-
-	writeFile(t, LegacyFilePath(dir), "kephalaion:\n  hub: [unbalanciert\n")
-	if _, _, err := ReadLegacyBinding(dir); err == nil {
-		t.Fatal("kaputtes YAML: Fehler erwartet")
-	}
-}
-
 func TestValidateBindingRejectsNamesOutsideTheRule(t *testing.T) {
 	good := Binding{Hub: "vm", Collection: "k-playbook"}
 	if err := ValidateBinding(good); err != nil || good.Address() != "vm:k-playbook" {
@@ -104,35 +78,6 @@ func TestReadTokenChecksForm(t *testing.T) {
 		}
 		if strings.Contains(err.Error(), "keph_") {
 			t.Errorf("Fehler nennt den Inhalt: %v", err)
-		}
-	}
-}
-
-// Ein erkennbares Token als Zeilentext in der alten K-PLAYBOOK.local.yaml —
-// als nackte Zeile, eingerückt, in einem Flow-Wert: Der Fehler nennt höchstens
-// Zeilennummer und Art, nie den Inhalt.
-func TestLegacyFileContentNeverLeaks(t *testing.T) {
-	leaked := func(text string) bool {
-		return strings.Contains(text, testToken) || strings.Contains(text, "TOKENLEAKCANARY")
-	}
-	locals := []string{
-		testToken + "\n",
-		"kephalaion:\n  hub: vm\n" + testToken + "\n  account: kamran-wsl\n",
-		"# Kopf\nkephalaion:\n  hub: vm\n  collection: k-playbook\n  account: kamran-wsl\n\n" + testToken + "\n",
-		"kephalaion:\n  hub: [" + testToken + "\n",
-		"kephalaion: {" + testToken + "}\n",
-		"kephalaion: [a, b] " + testToken + "\n",
-	}
-	for i, content := range locals {
-		local := t.TempDir()
-		writeFile(t, LegacyFilePath(local), content)
-		_, _, err := ReadLegacyBinding(local)
-		if err == nil {
-			t.Errorf("Datei %d: Fehler erwartet", i)
-			continue
-		}
-		if leaked(err.Error()) || !strings.Contains(err.Error(), "Zeile ") {
-			t.Errorf("Datei %d: Fehler %q", i, err)
 		}
 	}
 }

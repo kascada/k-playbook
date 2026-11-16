@@ -91,22 +91,19 @@ func TestCountCandidatesManifeste(t *testing.T) {
 	}
 }
 
-// Die Ausschlüsse: die Installationskopie und die Ergebnisse früherer Läufe —
-// beide an ihrem Ort und nicht über den bloßen Namen —, dazu alles mit
-// führendem Punkt.
+// Die Ausschlüsse: die Installationskopie — an ihrem Ort und nicht über den
+// bloßen Namen —, dazu alles mit führendem Punkt.
 func TestCountCandidatesUeberspringtAusschluesse(t *testing.T) {
 	root := dateiBaum(t,
 		"haupt.go",
 		"k-playbook/installer/beispiel.go",
-		"k-playbook-local/results/2026-08-16/raw/gosec.sarif",
-		"k-playbook-local/tasks/notiz.go",
+		"notizen/notiz.go",
 		".git/objects/etwas.go",
 		"unten/.venv/lib/paket.go",
 	)
 
-	// Übrig bleiben haupt.go und k-playbook-local/tasks/notiz.go: von
-	// k-playbook-local nimmt jeder Job nur results/ aus, und was die Jobs
-	// sehen, muss die Zählung mitzählen.
+	// Übrig bleiben haupt.go und notizen/notiz.go: Was die Jobs sehen, muss
+	// die Zählung mitzählen.
 	if got := zähle(t, root, CandidateSource, "go"); got != 2 {
 		t.Errorf("Quelldateien = %d, erwartet 2", got)
 	}
@@ -122,7 +119,7 @@ func TestCountCandidatesAusschlussIstVerankert(t *testing.T) {
 	root := dateiBaum(t,
 		"k-playbook/beispiel.go",
 		"installer/cmd/k-playbook/haupt.go",
-		"dienste/k-playbook-local/results/eigen.go",
+		"dienste/k-playbook/eigen.go",
 	)
 
 	if got := zähle(t, root, CandidateSource, "go"); got != 2 {

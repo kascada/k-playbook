@@ -90,14 +90,6 @@ auf und lies die Dateien aus `+"`instructions`"+` in der angegebenen Reihenfolge
 bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
 die effektiven Kataloge für Regeln, Reviews und Checks.
 
-<!-- k-playbook:session-memory -->
-## Projektwissen zuerst
-
-Die autoritative Projektdokumentation beginnt bei
-`+"`k-playbook-local/docs/README.md`"+`. Lies diesen Index zuerst, bevor du den
-Code analysierst. Erst wenn die Dokumentation fehlt, nicht passt oder ein
-konkreter Fix den aktuellen Code verlangt, ist eine Code-Recherche nötig.
-
 ## Unsere Regeln
 
 Bleiben.
@@ -109,13 +101,11 @@ Bleiben.
 	if !strings.Contains(content, "\n    k-playbook briefing\n") || strings.Contains(content, "k-playbook context") {
 		t.Errorf("der Anstoß wurde nicht ersetzt:\n%s", content)
 	}
-	if strings.Contains(content, "k-playbook:session-memory") || !strings.Contains(content, "## Unsere Regeln\n\nBleiben.\n") {
-		t.Errorf("der Block wurde nicht entfernt oder Projekttext ging verloren:\n%s", content)
+	if !strings.Contains(content, "## Unsere Regeln\n\nBleiben.\n") {
+		t.Errorf("Projekttext ging verloren:\n%s", content)
 	}
-	for _, erwartet := range []string{"k-playbook briefing", "Session-Memory-Block aus AGENTS.md entfernt"} {
-		if !strings.Contains(message, erwartet) {
-			t.Errorf("%q fehlt im Antworttext: %s", erwartet, message)
-		}
+	if !strings.Contains(message, "k-playbook briefing") {
+		t.Errorf("%q fehlt im Antworttext: %s", "k-playbook briefing", message)
 	}
 }
 

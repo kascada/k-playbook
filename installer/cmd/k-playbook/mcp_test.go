@@ -121,8 +121,6 @@ func newProject(t *testing.T) string {
 	root := t.TempDir()
 	for _, dir := range []string{
 		filepath.Join(root, defaultstest.DefaultsDir, "reviews"),
-		filepath.Join(root, "k-playbook-local", "reviews"),
-		filepath.Join(root, "k-playbook-local", "guidelines"),
 	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("%s anlegen: %v", dir, err)
@@ -375,9 +373,9 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 }
 
 // Die Review-Werkzeuge über das Protokoll, so wie ein Client sie zurzeit
-// bekommt (Task 147): status liest, die vier schreibenden antworten mit
-// reviews_paused, als Fehler markiert — und am vorhandenen Lauf ändert sich
-// nichts, auch ein Lauf für einen neuen Tag entsteht nicht.
+// bekommt (Task 147): Alle fünf antworten mit reviews_paused, als Fehler
+// markiert — und am vorhandenen Lauf ändert sich nichts, auch ein Lauf für
+// einen neuen Tag entsteht nicht.
 func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	root := newMCPReviewProject(t)
 	runDir := mustCreateMCPRun(t, root)
@@ -395,19 +393,19 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 		t.Fatalf("tools/list meldet nicht achtundzwanzig Werkzeuge: %v", responses[1])
 	}
 
-	resultsDir := filepath.Join(project.LocalDir(root), review.ResultsDirName)
-	before := listTree(t, resultsDir)
+	resultsDir := mcpReviewResultsDir(root)
+	before := listTree(t, root)
 
 	for id, call := range []struct {
-		name   string
-		args   map[string]any
-		paused bool
+		name string
+		args map[string]any
 	}{
 		{name: "k_playbook_review_status", args: map[string]any{"projectDir": root}},
-		{name: "k_playbook_review_create", args: map[string]any{"projectDir": root, "day": "2026-08-20"}, paused: true},
-		{name: "k_playbook_review_scan", args: map[string]any{"projectDir": root, "run": "2026-08-19"}, paused: true},
-		{name: "k_playbook_review_write_ai_entry", args: map[string]any{"projectDir": root, "run": "2026-08-19", "entry": "tech", "state": "done", "result": "review-tech.md"}, paused: true},
-		{name: "k_playbook_review_merge", args: map[string]any{"projectDir": root, "run": "2026-08-19"}, paused: true},
+		{name: "k_playbook_review_status", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
+		{name: "k_playbook_review_create", args: map[string]any{"projectDir": root, "day": "2026-08-20"}},
+		{name: "k_playbook_review_scan", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
+		{name: "k_playbook_review_write_ai_entry", args: map[string]any{"projectDir": root, "run": "2026-08-19", "entry": "tech", "state": "done", "result": "review-tech.md"}},
+		{name: "k_playbook_review_merge", args: map[string]any{"projectDir": root, "run": "2026-08-19"}},
 	} {
 		initID := 10 + id*2
 		callID := initID + 1
@@ -416,12 +414,6 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 		var envelope toolEnvelope
 		if err := json.Unmarshal([]byte(toolText(t, responses[1])), &envelope); err != nil {
 			t.Fatalf("%s Antwort ist kein Envelope-JSON: %v", call.name, err)
-		}
-		if !call.paused {
-			if !envelope.OK {
-				t.Fatalf("%s schlug fehl: %+v", envelope.Tool, envelope.Error)
-			}
-			continue
 		}
 		if isError := result(t, responses[1])["isError"]; isError != true {
 			t.Errorf("%s: Ergebnis nicht als Fehler markiert: %v", call.name, responses[1])
@@ -435,8 +427,11 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 		}
 	}
 
-	if after := listTree(t, resultsDir); !slices.Equal(before, after) {
-		t.Errorf("die gesperrten Werkzeuge haben %s verändert:\nvorher:  %v\nnachher: %v", resultsDir, before, after)
+	if after := listTree(t, root); !slices.Equal(before, after) {
+		t.Errorf("die gesperrten Werkzeuge haben %s verändert:\nvorher:  %v\nnachher: %v", root, before, after)
+	}
+	if _, err := os.Stat(filepath.Join(resultsDir, "2026-08-20")); !os.IsNotExist(err) {
+		t.Errorf("ein Lauf für den neuen Tag ist entstanden (Stat: %v)", err)
 	}
 }
 
@@ -475,17 +470,14 @@ func listTree(t *testing.T, root string) []string {
 // scan und merge sind gesperrt wie die MCP-Werkzeuge (Task 147): Sie enden vor
 // jedem Lesen mit der Sperre und einem Exit-Code ungleich 0 — mit und ohne
 // Argumente, mit einem vorhandenen Lauf und in einem Projekt ohne
-// k-playbook-local/, das dabei nicht entsteht.
+// Ergebnisverzeichnis, in dem dabei nichts entsteht.
 func TestScanUndMergeSindGesperrt(t *testing.T) {
 	root := newMCPReviewProject(t)
 	mustCreateMCPRun(t, root)
-	resultsDir := filepath.Join(project.LocalDir(root), review.ResultsDirName)
-	before := listTree(t, resultsDir)
+	before := listTree(t, root)
 
 	bare := newProject(t)
-	if err := os.RemoveAll(project.LocalDir(bare)); err != nil {
-		t.Fatalf("%s entfernen: %v", project.LocalDirName, err)
-	}
+	bareBefore := listTree(t, bare)
 
 	for _, dir := range []string{root, bare} {
 		t.Chdir(dir)
@@ -506,47 +498,11 @@ func TestScanUndMergeSindGesperrt(t *testing.T) {
 		}
 	}
 
-	if after := listTree(t, resultsDir); !slices.Equal(before, after) {
-		t.Errorf("scan oder merge haben %s verändert:\nvorher:  %v\nnachher: %v", resultsDir, before, after)
+	if after := listTree(t, root); !slices.Equal(before, after) {
+		t.Errorf("scan oder merge haben %s verändert:\nvorher:  %v\nnachher: %v", root, before, after)
 	}
-	if _, err := os.Stat(project.LocalDir(bare)); !os.IsNotExist(err) {
-		t.Errorf("%s ist entstanden (Stat: %v)", project.LocalDirName, err)
-	}
-}
-
-func TestReviewStatusMeldetAuditModulUndFiltertAuditRezepte(t *testing.T) {
-	root := newMCPReviewProject(t)
-	mustWriteMCPFile(t, filepath.Join(sharetest.Dir(t), "commands", "_audit", "review-scan-triage.md"), "# Triage\n\nAktiv.\n")
-	mustWriteMCPFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-review-only.md"), "---\ntitle: Review Only\naudit:\n  enabled: false\nreview:\n  enabled: true\n---\n# Review Only\n")
-
-	stdout := speak(t, root, 2,
-		initialize(1),
-		initialized,
-		callTool(2, "k_playbook_review_status", map[string]any{"projectDir": root, "mode": "available"}),
-	)
-	responses := decodeResponses(t, stdout, 1, 2)
-	envelope := map[string]any{}
-	if err := json.Unmarshal([]byte(toolText(t, responses[1])), &envelope); err != nil {
-		t.Fatalf("Status-Antwort ist kein JSON: %v", err)
-	}
-	if envelope["ok"] != true {
-		t.Fatalf("Status fehlgeschlagen: %v", envelope)
-	}
-	data := envelope["data"].(map[string]any)
-	selection := data["selection"].(map[string]any)
-	candidates := selection["candidates"].([]any)
-	if !candidateNamed(candidates, "scan-triage") {
-		t.Fatalf("scan-triage fehlt in Kandidaten: %v", candidates)
-	}
-	if candidateNamed(candidates, "review-only") {
-		t.Fatalf("audit-deaktiviertes Rezept ist Audit-Kandidat: %v", candidates)
-	}
-	triage := candidateMap(t, candidates, "scan-triage")
-	if origin := triage["recipeOrigin"]; origin != "dist" {
-		t.Fatalf("scan-triage Origin = %v, erwartet dist", origin)
-	}
-	if path := triage["recipePath"].(string); filepath.Base(filepath.Dir(path)) != "_audit" {
-		t.Fatalf("scan-triage Pfad = %s, erwartet _audit", path)
+	if after := listTree(t, bare); !slices.Equal(bareBefore, after) {
+		t.Errorf("scan oder merge haben %s verändert:\nvorher:  %v\nnachher: %v", bare, bareBefore, after)
 	}
 }
 
@@ -624,8 +580,8 @@ func withProjectDir(arguments map[string]any, projectDir any) map[string]any {
 
 // projectDirCalls sind je Familie ein lesendes und ein schreibendes Werkzeug,
 // mit Argumenten, die bis auf projectDir dem Schema genügen. Die Familie der
-// Review-Werkzeuge stellt nur das lesende: die schreibenden sind gesperrt und
-// antworten vor jeder Prüfung von projectDir mit reviews_paused
+// Review-Werkzeuge fehlt: Alle fünf sind gesperrt und antworten vor jeder
+// Prüfung von projectDir mit reviews_paused
 // (TestReviewWerkzeugeUeberMCPProtokoll).
 var projectDirCalls = []struct {
 	name string
@@ -635,7 +591,6 @@ var projectDirCalls = []struct {
 	{name: "k_playbook_docs_exclude_add", args: map[string]any{"patterns": []any{"ohne-projectdir/"}}},
 	{name: "k_playbook_todo_list", args: map[string]any{}},
 	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
-	{name: "k_playbook_review_status", args: map[string]any{}},
 	{name: "k_playbook_doc_read", args: map[string]any{"ref": "k-playbook:/instructions/always/"}},
 	{name: "k_playbook_doc_create", args: map[string]any{"kind": "tasks", "name": "ohne-projectdir"}},
 }
@@ -844,14 +799,20 @@ func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 	}
 }
 
+// mcpReviewResultsDir ist das Ergebnisverzeichnis eines Testprojekts. Das
+// Programm kennt keinen Ort der Review-Ergebnisse; die Tests legen Läufe
+// direkt dort an.
+func mcpReviewResultsDir(root string) string {
+	return filepath.Join(root, "ergebnisse")
+}
+
 func newMCPReviewProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	for _, dir := range []string{
 		filepath.Join(sharetest.Dir(t), "scripts"),
 		filepath.Join(root, defaultstest.DefaultsDir, "reviews"),
-		filepath.Join(root, "k-playbook-local", "reviews"),
-		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
+		mcpReviewResultsDir(root),
 	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("%s anlegen: %v", dir, err)
@@ -881,7 +842,7 @@ JSON
 func mustCreateMCPRun(t *testing.T, root string) string {
 	t.Helper()
 	required := true
-	runDir, err := review.CreateRun(project.LocalDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, []review.Entry{
+	runDir, err := review.CreateRun(mcpReviewResultsDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, []review.Entry{
 		{Name: "mockscan", Kind: review.KindTool},
 		{Name: "tech", Kind: review.KindAI, RecipeKey: "tech", RecipePath: filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), RecipeOrigin: "dist", Title: "Technischer Review", ResultRequired: &required, DefaultResult: "review-tech.md", Scope: &review.Scope{Tools: []string{"mockscan"}}},
 	})
@@ -899,26 +860,4 @@ func mustWriteMCPFile(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("%s schreiben: %v", path, err)
 	}
-}
-
-func candidateNamed(candidates []any, name string) bool {
-	for _, raw := range candidates {
-		candidate := raw.(map[string]any)
-		if candidate["name"] == name {
-			return true
-		}
-	}
-	return false
-}
-
-func candidateMap(t *testing.T, candidates []any, name string) map[string]any {
-	t.Helper()
-	for _, raw := range candidates {
-		candidate := raw.(map[string]any)
-		if candidate["name"] == name {
-			return candidate
-		}
-	}
-	t.Fatalf("kein Kandidat %s in %v", name, candidates)
-	return nil
 }

@@ -40,8 +40,8 @@ func TestDeriveEntryState(t *testing.T) {
 }
 
 func TestWriteEntryStatusSchreibtSchluesselUndBleibtLesbar(t *testing.T) {
-	localDir := newLocalDir(t)
-	runDir, err := CreateRun(localDir, day(t, "2026-08-16"), []string{"python"}, []Entry{{Name: "trivy", Kind: KindTool}})
+	resultsDir := newResultsDir(t)
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-16"), []string{"python"}, []Entry{{Name: "trivy", Kind: KindTool}})
 	if err != nil {
 		t.Fatalf("CreateRun: %v", err)
 	}
@@ -112,8 +112,8 @@ func TestEntryStateOhneDatei(t *testing.T) {
 }
 
 func TestDeriveRunState(t *testing.T) {
-	localDir := newLocalDir(t)
-	runDir, err := CreateRun(localDir, day(t, "2026-08-16"), []string{"python"}, []Entry{
+	resultsDir := newResultsDir(t)
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-16"), []string{"python"}, []Entry{
 		{Name: "ruff", Kind: KindTool},
 		{Name: "review-secret-scanning", Kind: KindAI},
 	})
@@ -156,8 +156,8 @@ func TestDeriveRunState(t *testing.T) {
 // Weichen run.json und entries/ voneinander ab, gilt entries/. Das Anlegen
 // schreibt created; danach fasst niemand die Datei mehr an.
 func TestListRunsNimmtZustandAusEntries(t *testing.T) {
-	localDir := newLocalDir(t)
-	runDir, err := CreateRun(localDir, day(t, "2026-08-16"), nil, []Entry{{Name: "ruff", Kind: KindTool}})
+	resultsDir := newResultsDir(t)
+	runDir, err := CreateRun(resultsDir, day(t, "2026-08-16"), nil, []Entry{{Name: "ruff", Kind: KindTool}})
 	if err != nil {
 		t.Fatalf("CreateRun: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestListRunsNimmtZustandAusEntries(t *testing.T) {
 		t.Fatalf("WriteEntryStatus: %v", err)
 	}
 
-	runs, err := ListRuns(localDir)
+	runs, err := ListRuns(resultsDir)
 	if err != nil {
 		t.Fatalf("ListRuns: %v", err)
 	}

@@ -52,13 +52,6 @@ func runInventory(args []string) error {
 	}
 	options := inventory.Options{ProjectDir: environment.ProjectDir}
 
-	// Liegt die alte Datei noch, steht das vor allem anderen — auch vor einem
-	// Abbruch: Sie gilt nicht mehr, und wer ihre Einstellungen vermisst,
-	// findet hier den Grund.
-	if message := project.LegacyVersionSourcesMessage(environment.ProjectDir); message != "" {
-		fmt.Fprintf(os.Stdout, "Altbestand: %s\n\n", message)
-	}
-
 	result, outcome, readme, err := project.RunInventory(context.Background(), environment.ProjectDir, store, options)
 	if err != nil {
 		return docError(err)

@@ -21,16 +21,13 @@ const maxTodoRequest = 1 << 16
 // einer Suche.
 //
 // Message ist das Feld des Fehlerfalls: die Seite blendet bei jedem nichtleeren
-// Message die Liste aus. Code ist dessen Code (kephalaion_unavailable,
-// todos_not_migrated, …), damit die Seite den Zustand benennen kann. Hint ist
-// daneben der Hinweis eines Zugriffs — etwa ein noch nicht übernommenes
-// data/todos.json — und lässt Liste und Zählpille stehen.
+// Message die Liste aus. Code ist dessen Code (kephalaion_unavailable, …),
+// damit die Seite den Zustand benennen kann.
 type todosResponse struct {
 	Available bool           `json:"available"`
 	Todos     []project.Todo `json:"todos"`
 	Message   string         `json:"message"`
 	Code      string         `json:"code,omitempty"`
-	Hint      string         `json:"hint"`
 }
 
 // todoResponse ist die Antwort eines schreibenden Endpunkts: der betroffene
@@ -40,7 +37,6 @@ type todoResponse struct {
 	Todo    *project.Todo `json:"todo,omitempty"`
 	Message string        `json:"message,omitempty"`
 	Code    string        `json:"code,omitempty"`
-	Hint    string        `json:"hint,omitempty"`
 }
 
 // todoErrorCode ist der Code eines Fehlers der Fachlogik, sonst failed.
@@ -53,30 +49,30 @@ func todoErrorCode(err error) string {
 
 // writeTodoList ruft eine Liste der Fachlogik und schreibt die Antwort.
 func writeTodoList(w http.ResponseWriter, r *http.Request,
-	list func(projectDir string) ([]project.Todo, project.TodoNotice, error)) {
+	list func(projectDir string) ([]project.Todo, error)) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, todosResponse{})
 		return
 	}
-	todos, notice, err := list(environment.ProjectDir)
+	todos, err := list(environment.ProjectDir)
 	if err != nil {
-		writeJSON(w, http.StatusOK, todosResponse{Available: true, Message: err.Error(), Code: todoErrorCode(err), Hint: notice.Hint})
+		writeJSON(w, http.StatusOK, todosResponse{Available: true, Message: err.Error(), Code: todoErrorCode(err)})
 		return
 	}
-	writeJSON(w, http.StatusOK, todosResponse{Available: true, Todos: todos, Hint: notice.Hint})
+	writeJSON(w, http.StatusOK, todosResponse{Available: true, Todos: todos})
 }
 
 func todosHandler(w http.ResponseWriter, r *http.Request) {
-	writeTodoList(w, r, func(dir string) ([]project.Todo, project.TodoNotice, error) {
+	writeTodoList(w, r, func(dir string) ([]project.Todo, error) {
 		return project.ListTodos(r.Context(), dir)
 	})
 }
 
 // doneTodosHandler liefert die abgehakten Todos. Eigener Endpunkt, damit die
-// Seite sie erst beim Aufklappen holt — wie bei den erledigten Tasks.
+// Seite sie erst beim Aufklappen holt.
 func doneTodosHandler(w http.ResponseWriter, r *http.Request) {
-	writeTodoList(w, r, func(dir string) ([]project.Todo, project.TodoNotice, error) {
+	writeTodoList(w, r, func(dir string) ([]project.Todo, error) {
 		return project.ListDoneTodos(r.Context(), dir)
 	})
 }
@@ -84,7 +80,7 @@ func doneTodosHandler(w http.ResponseWriter, r *http.Request) {
 // searchTodosHandler sucht über offene und erledigte Todos (?q=…).
 func searchTodosHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
-	writeTodoList(w, r, func(dir string) ([]project.Todo, project.TodoNotice, error) {
+	writeTodoList(w, r, func(dir string) ([]project.Todo, error) {
 		return project.SearchTodos(r.Context(), dir, query)
 	})
 }
@@ -92,18 +88,18 @@ func searchTodosHandler(w http.ResponseWriter, r *http.Request) {
 // writeTodoChange führt einen schreibenden Vorgang aus und schreibt die
 // Antwort. Ein Fehler der Fachlogik ist eine Antwort mit ok false und Code,
 // kein HTTP-Fehler: die Seite zeigt ihn an der Eingabe.
-func writeTodoChange(w http.ResponseWriter, change func(projectDir string) (project.Todo, project.TodoNotice, error)) {
+func writeTodoChange(w http.ResponseWriter, change func(projectDir string) (project.Todo, error)) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, todoResponse{Message: "Keine Projektkonfiguration gefunden.", Code: "project_not_found"})
 		return
 	}
-	todo, notice, err := change(environment.ProjectDir)
+	todo, err := change(environment.ProjectDir)
 	if err != nil {
-		writeJSON(w, http.StatusOK, todoResponse{Message: err.Error(), Code: todoErrorCode(err), Hint: notice.Hint})
+		writeJSON(w, http.StatusOK, todoResponse{Message: err.Error(), Code: todoErrorCode(err)})
 		return
 	}
-	writeJSON(w, http.StatusOK, todoResponse{OK: true, Todo: &todo, Hint: notice.Hint})
+	writeJSON(w, http.StatusOK, todoResponse{OK: true, Todo: &todo})
 }
 
 // addTodoHandler legt ein Todo an: {"text": "…", "origin": "…"}.
@@ -116,7 +112,7 @@ func addTodoHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, todoResponse{Message: "Anfrage nicht lesbar.", Code: "invalid_input"})
 		return
 	}
-	writeTodoChange(w, func(dir string) (project.Todo, project.TodoNotice, error) {
+	writeTodoChange(w, func(dir string) (project.Todo, error) {
 		return project.AddTodo(r.Context(), dir, request.Text, request.Origin)
 	})
 }
@@ -131,7 +127,7 @@ func setTodoDone(w http.ResponseWriter, r *http.Request, done bool) {
 		writeJSON(w, http.StatusBadRequest, todoResponse{Message: "Keine gültige Kennung.", Code: "invalid_input"})
 		return
 	}
-	writeTodoChange(w, func(dir string) (project.Todo, project.TodoNotice, error) {
+	writeTodoChange(w, func(dir string) (project.Todo, error) {
 		return project.UpdateTodo(r.Context(), dir, id, nil, &done)
 	})
 }

@@ -886,262 +886,13 @@ func TestDefaultsOverlaySkillIstHuelleUndText(t *testing.T) {
 	}
 }
 
-// /k-upgrade 3.2 räumt seit Task 109 die alte Code-Doku ab (löschen, nicht
-// verschieben) und sucht in AGENTS.md und opencode.json[c] nach dem ganzen
-// Präfix k-playbook-local/docs/; vorgeschlagen wird immer entfernen.
-func TestDefaultsKUpgradeDokuUmstellungCode(t *testing.T) {
-	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.2 — "), strings.Index(file, "### 3.3 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.2 nicht gefunden")
-	}
-	section := file[start:end]
-	for _, needle := range []string{
-		"| `code/` | `keph:/docs/generated/code/` | Erzeuger `/k-docs-code` schreibt nach Kephalaion: Plattendateien löschen",
-		"| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt nach Kephalaion: Plattendateien löschen; neu erzeugen mit `/k-docs-tools`",
-		"nennen das Präfix\n`k-playbook-local/docs/`",
-		"Der Vorschlag ist immer\n**entfernen**, nie umschreiben",
-		"`pfad:von-bis`",
-		"code/00-overview.md          [löschen]",
-		"AGENTS.md:254-264            [entfernen]",
-		"opencode.json:8              [entfernen]",
-		"Die Umstellung ist wiederholbar",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.2 nennt %q nicht", needle)
-		}
-	}
-	for _, stale := range []string{"`/k-docs-code` schreibt noch auf die Platte", "code/, libs/", "Skill `ai-session-memory` schreiben"} {
-		if strings.Contains(section, stale) {
-			t.Errorf("3.2 trägt noch %q", stale)
-		}
-	}
-}
-
-// /k-upgrade 3.2 räumt seit Task 120 auch libs/ ab wie code/: löschen, neu
-// erzeugen mit /k-docs-tools. Kein Bereich bleibt mehr liegen, weil sein
-// Erzeuger noch auf die Platte schreibt; alter Index, Aufräumen leerer
-// Verzeichnisse und das Beispiel ziehen libs/ mit.
-func TestDefaultsKUpgradeDokuUmstellungLibs(t *testing.T) {
-	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.2 — "), strings.Index(file, "### 3.3 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.2 nicht gefunden")
-	}
-	section := squashSpace(file[start:end])
-	for _, needle := range []string{
-		"| `libs/` | `keph:/docs/generated/libs/` | Erzeuger `/k-docs-tools` schreibt nach Kephalaion: Plattendateien löschen; neu erzeugen mit `/k-docs-tools`. Kein Verschieben",
-		"Für die Erzeuger (`versions/`, `code/` und `libs/`)",
-		"Jede Datei unter `code/` und `libs/` wird einzeln zum Löschen vorgeschlagen",
-		"`keph:/docs/generated/libs/` noch leer ist",
-		"`/k-docs-tools` nach dem Inventar",
-		"Einträge zu `manual/`, `versions/`, `code/`, `libs/` und losen Dateien abgeräumt sind",
-		"alle Zeilen zu `manual/`, `versions/`, `code/`, `libs/` und losen Dateien ausgeführt sind",
-		"(`manual/`, `versions/`, `code/`, `libs/`, `extracted/`), löschst du mit",
-		"libs/celery.md [löschen] Erzeuger /k-docs-tools schreibt nach keph:/docs/generated/libs/",
-		"auch für solche auf `libs/`.",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.2 nennt %q nicht", needle)
-		}
-	}
-	for _, stale := range []string{
-		"schreibt noch auf die Platte", "heute nur `libs/`", "auch wenn `libs/` noch liegt", "libs/ [bleibt]",
-		"bis `/k-docs-tools` umgestellt ist", "`libs/` bleibt liegen", "umgestellten Erzeuger", "ändert dessen Task seine Zeile",
-	} {
-		if strings.Contains(section, stale) {
-			t.Errorf("3.2 trägt noch %q", stale)
-		}
-	}
-}
-
-// /k-upgrade 3.4 räumt seit Task 129 auch commands/ und skills/ unter
-// k-playbook-local/ ab: leer wird gelöscht, sonst je Eintrag mit Ziel unter
-// .k-playbook/ genannt; umgezogen wird nur auf ausdrücklichen Zuruf. rules/
-// (Task 135) und checks/ (Task 134) haben keinen Nachfolger und werden nur
-// gemeldet, wenn sie bleiben. tmp/ hat das Einrichten nie angelegt — ein
-// handgemachter Schmierzettel aus der Zeit der Wissensablage —, es wird wie
-// rules/ und checks/ behandelt. guidelines/ löscht 3.4 immer, auch mit
-// Inhalt, und nennt jede Datei: projekteigene Guidelines liegen unter
-// keph:/docs/guidelines/ (Todo #40). results/ löscht 3.4 seit Task 146
-// ebenso, auch mit Inhalt: Review-Ergebnisse sind aus dem Code wiederholbar;
-// weil der Inhalt in der Regel nicht versioniert ist, übernimmt der Text den
-// Satz zur Git-Geschichte dafür nicht. Die Hülle nennt alle Verzeichnisse in
-// ihrer description.
-func TestDefaultsKUpgradeAufraeumenCommandsSkills(t *testing.T) {
-	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.4 — "), strings.Index(file, "## Schritt 4 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.4 nicht gefunden")
-	}
-	section := squashSpace(file[start:end])
-	for _, needle := range []string{
-		"legt die Verzeichnisse der Liste unten unter `<context.local.dir>/` nicht mehr an",
-		"`priv/` noch bis Task 147",
-		"`<context.project.dir>/.k-playbook/commands/` und `<context.project.dir>/.k-playbook/skills/`",
-		"- `material/` - `commands/` - `skills/` - `instructions/` - `includes/` - `reviews/` - `rules/` - `checks/` - `guidelines/` - `results/` - `priv/` - `tmp/`",
-		"priv/ gelöscht: README.md, .gitignore",
-		"**Ausnahme für `guidelines/`.** Es wird gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
-		"nennt die Meldung jede gelöschte Datei, ohne die Grenze von fünf Pfaden",
-		"guidelines/ gelöscht: README.md, stil.md",
-		"`guidelines/` und `results/` löscht sie immer, auch mit Inhalt.",
-		"**Ausnahme für `results/`.** Es wird wie `guidelines/` gelöscht, ob leer oder nicht, ohne Rückfrage und ohne Umzug",
-		"Review-Ergebnisse sind aus dem Code wiederholbar: Sie sind ein Stand von einem Rechner und kein Projektwissen.",
-		"ihre neue Ablage kommt mit dem Review-Umbau",
-		"ist der Inhalt in der Regel nicht versioniert",
-		"lässt sich nach dem Löschen nicht aus Git zurückholen",
-		"`guidelines/` und `results/` gehören immer zu den ersten",
-		"`guidelines/` und `results/` prüfst du nicht noch einmal auf leer, sondern listest jedes unmittelbar vor dem Löschen erneut",
-		"Für `results/` gibt es ebenfalls nur die Zeile `gelöscht:`. Sie nennt jede Datei, auch über fünf und auch in Unterverzeichnissen",
-		"results/ gelöscht: README.md, .gitignore, log.md, known-decisions.md",
-		"Dazu kommt `tmp/`, das das Einrichten nie angelegt hat",
-		"dort niemand liest und niemand aufräumt",
-		"tmp/ gelöscht: README.md",
-		"Der Inhalt von `rules/` hat keinen Nachfolger in der Collection",
-		"dass diese Regeln nicht mehr gelesen werden",
-		"Auch der Inhalt von `checks/` hat keinen Nachfolger",
-		"dass diese Checks nicht mehr laufen",
-		"checks/ gelöscht: README.md",
-		"Erst das neue Programm nimmt Einträge aus `.k-playbook/<sorte>/`",
-		"diese Dateien mit diesem Programm nicht mehr wirken",
-		"`.k-playbook/<sorte>/<gleicher pfad>`",
-		"Liegt am Ziel schon etwas, steht `Ziel belegt` hinter der Zeile.",
-		"Dateien mit dem Namen `README.md` und die verwaltete `.gitignore` ziehen nicht um",
-		"k-gui.md → .k-playbook/commands/k-gui.md Ziel belegt",
-		"forelle/ → .k-playbook/skills/forelle/",
-		"Umgebaut wird von Hand oder auf ausdrücklichen Zuruf des Nutzers in derselben Sitzung",
-		"gehören in den nächsten Commit des Projekts",
-		"`git mv`",
-		"Ein Eintrag mit `Ziel belegt` bleibt liegen und wird genannt; zusammengeführt wird nicht.",
-		"Briefing neu (`k-playbook briefing`; der Katalog hat sich geändert), das die Verlinkung nachzieht",
-		"führst c) und d) für `commands/` und `skills/` noch einmal aus",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.4 nennt %q nicht", needle)
-		}
-	}
-	for _, stale := range []string{"fünf Verzeichnisse", "sieben Verzeichnisse", "acht Verzeichnisse", "neun Verzeichnisse", "zehn Verzeichnisse", "elf Verzeichnisse", "zwölf Verzeichnisse"} {
-		if strings.Contains(section, stale) {
-			t.Errorf("3.4 zählt noch %s", stale)
-		}
-	}
-	// Der Satz zur Git-Geschichte gilt nur für guidelines/: Der Inhalt von
-	// results/ ist in der Regel nicht versioniert.
-	_, exception, found := strings.Cut(section, "**Ausnahme für `results/`.**")
-	exception, _, closed := strings.Cut(exception, "Alles andere heißt")
-	if !found || !closed {
-		t.Fatal("Ausnahme für results/ nicht gefunden")
-	}
-	if strings.Contains(exception, "bleibt in der Git-Geschichte") {
-		t.Error("die Ausnahme für results/ verspricht die Git-Geschichte")
-	}
-	if general := squashSpace(file[:start]); !strings.Contains(general, "die Verzeichnisse, die 3.4 löscht — die leeren, dazu `guidelines/` und `results/` auch mit Inhalt") {
-		t.Error("die Regel zur Bestätigung in Schritt 3 nimmt guidelines/ und results/ nicht aus")
-	}
-
-	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, needle := range []string{"(docs, tasks, data, material, commands, skills, rules, checks, priv) oder nie angelegt hat (tmp)", "mit seinem Ziel unter .k-playbook/", "k-playbook-local/guidelines/ löscht er ohne Rückfrage auch mit Inhalt",
-		"ebenso k-playbook-local/results/, weil Review-Ergebnisse aus dem Code wiederholbar sind",
-		"dazu instructions, includes und reviews, die k-playbook nicht mehr liest",
-		"jede Datei in instructions, includes oder reviews mit ihrem Ziel unter keph:/k-playbook/<sorte>/ in der Projekt-Collection, das der Nutzer beim Umzug ändern kann"} {
-		if !strings.Contains(string(hull), needle) {
-			t.Errorf("Hülle von /k-upgrade nennt %q nicht", needle)
-		}
-	}
-}
-
-// /k-upgrade 3.7 löscht seit Task 150 k-playbook-local/ selbst ohne
-// Rückfrage, wenn darin direkt nur .gitignore (Inhalt egal) und README.md
-// liegen, dazu Unterverzeichnisse ohne jede Datei; sonst eine Zeile mit
-// höchstens fünf Pfaden. Ein Symlink wird nie gelöscht, und wie 3.4 wartet
-// 3.7 auf den Binärwechsel — auch wenn 3.4 deshalb zu Schritt 4 springt.
-// Schritt 3 nimmt 3.7 von der Bestätigung aus, Einleitung und Hülle nennen es;
-// seit Task 156 läuft 3.8 danach, und „zuletzt“ meint dort 3.8.
-func TestDefaultsKUpgradeLocalDirLoeschen(t *testing.T) {
-	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.7 — "), strings.Index(file, "### 3.8 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.7 nicht vor 3.8 gefunden")
-	}
-	if six := strings.Index(file, "### 3.6 — "); six < 0 || six > start {
-		t.Fatal("3.7 steht nicht nach 3.6")
-	}
-	section := squashSpace(file[start:end])
-	for _, needle := range []string{
-		"**Anlass:** `<context.local.dir>` liegt, als Verzeichnis oder als Symlink.",
-		"`Programm-Stand: nichts zu tun — …`",
-		"Ist `<context.local.dir>` selbst ein Symlink, löschst du nichts, weder den Link noch sein Ziel",
-		"`.gitignore` (Inhalt egal, anders als in 3.4)",
-		"einem Symlink folgst du nicht, er zählt als Inhalt",
-		"find . -mindepth 1 ! -type d",
-		`test -L "<context.local.dir>" && echo SYMLINK`,
-		`(cd "<context.local.dir>" && find .`,
-		`rm -rf -- "<context.local.dir>"`,
-		"Leer ist es nur, wenn die Suche mit Exit-Status 0 endet und nichts ausgibt.",
-		"gilt es als nicht leer, auch bei leerer Ausgabe",
-		"derselben Regel, Exit-Status 0 und keine Ausgabe",
-		"oder schlägt die zweite Suche fehl, gilt „Sonst“",
-		"`k-playbook-local/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`",
-		"unmittelbar davor noch einmal",
-		"ohne Vorlage und ohne Rückfrage",
-		"Committet wird nicht",
-		"`k-playbook-local/ gelöscht`",
-		"`k-playbook-local/ ist noch nicht leer: <pfade>`",
-		"höchstens fünf; sind es mehr, dazu ihre Gesamtzahl",
-		"`k-playbook-local/ löschen wartet auf den Binärwechsel`",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.7 nennt %q nicht", needle)
-		}
-	}
-	// Kein Befehl der Vorlage darf den Platzhalter ungequotet einsetzen: Ein
-	// Projektpfad mit Leerzeichen zerfiele sonst in mehrere Argumente.
-	for _, bare := range []string{"test -L <context.local.dir>", "cd <context.local.dir>", "rm -rf -- <context.local.dir>"} {
-		if strings.Contains(section, bare) {
-			t.Errorf("3.7 setzt den Pfad ungequotet ein: %q", bare)
-		}
-	}
-	general := squashSpace(file[:strings.Index(file, "### 3.0 — ")])
-	for _, needle := range []string{
-		"Ausgenommen sind vier Fälle, und nur sie",
-		"`k-playbook-local/` selbst, das 3.7 löscht, wenn es leer ist, und der Clone `k-playbook/`, den 3.8 löscht",
-		"Alle vier löschen und ändern ohne Vorlage",
-		"in 3.4, 3.7 und 3.8, die nichts vorlegen, steht es in der Meldung",
-		"dann das Löschen von `k-playbook-local/` selbst",
-	} {
-		if !strings.Contains(general, needle) {
-			t.Errorf("Einleitung oder Schritt 3 nennt %q nicht", needle)
-		}
-	}
-	if four := squashSpace(file[strings.Index(file, "## Schritt 4 — "):]); !strings.Contains(four, "Für 3.7 die Zeile aus Schritt 3") || !strings.Contains(four, "wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist") {
-		t.Error("Schritt 4 wiederholt die Zeile von 3.7 nicht samt Sprung aus 3.4")
-	}
-	if four := squashSpace(file[strings.Index(file, "### 3.4 — "):start]); !strings.Contains(four, "nennst du dabei auch die Wartezeile von 3.7") {
-		t.Error("der Sprung aus 3.4 nennt die Wartezeile von 3.7 nicht")
-	}
-	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	description := string(hull)
-	if !strings.Contains(description, "Danach löscht er k-playbook-local/ ohne Rückfrage, wenn darin nur noch .gitignore, README.md und leere Unterverzeichnisse liegen.") {
-		t.Error("die Hülle nennt 3.7 nicht")
-	}
-	if n := strings.Count(strings.ToLower(description), "zuletzt"); n != 1 {
-		t.Errorf("die Hülle nennt %d-mal „zuletzt“, erwartet einmal", n)
-	}
-}
-
 // /k-upgrade 3.8 löscht seit Task 156 einen alten Clone k-playbook/ ganz und
 // ohne Rückfrage — nur ein echtes Verzeichnis mit eigenem .git-Verzeichnis,
 // nach dem Nennen dessen, was nicht vom Repo kam — und streicht danach die
-// Zeilen, die k-playbook/ oder k-playbook-local/ ausnehmen, aus jeder
-// .gitignore vom Projektverzeichnis bis zur Repo-Wurzel, sobald ihr Verzeichnis
-// weg ist. Die Vorbedingung ist enger als in 3.4 und 3.7: Die Zeile zum
-// Programm-Stand muss „neuestes Release“ nennen. 3.8 läuft als letzte;
+// Zeilen, die k-playbook/ ausnehmen, aus jeder .gitignore vom
+// Projektverzeichnis bis zur Repo-Wurzel, sobald das Verzeichnis weg ist. Die
+// Vorbedingung steht für sich: Die Zeile zum Programm-Stand muss „neuestes
+// Release“ nennen. 3.8 ist die einzige Umstellung und behält ihre Nummer;
 // Schritt 3, Schritt 4, Einleitung und Hülle nennen sie.
 func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
@@ -1149,15 +900,13 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 	if start < 0 || end < start {
 		t.Fatal("Abschnitt 3.8 nicht vor Schritt 4 gefunden")
 	}
-	if seven := strings.Index(file, "### 3.7 — "); seven < 0 || seven > start {
-		t.Fatal("3.8 steht nicht nach 3.7")
+	if count := strings.Count(file, "\n### 3."); count != 1 {
+		t.Fatalf("erwartet genau eine Umstellung unter Schritt 3, gefunden %d", count)
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"Sie läuft als letzte, nach 3.7, damit zählt, ob `k-playbook-local/` dann noch liegt",
 		"**Anlass:** `<context.project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder eine `.gitignore` von `context.project.dir` bis `context.project.repoRoot` trägt eine der Zeilen",
-		"**Vorbedingung**, enger als in 3.4 und 3.7",
-		"`Programm-Stand: nichts zu tun — …` ausgegeben, und sie nennt `neuestes Release`",
+		"**Vorbedingung:** Schritt 2 hat die Zeile `Programm-Stand: nichts zu tun — …` ausgegeben, und sie nennt `neuestes Release`",
 		"So schreibt sie erst ein Programm ab v0.16.39",
 		"Fehlt die Zeile oder nennt sie stattdessen `Installation`, löschst und änderst du nichts",
 		"`k-playbook/ löschen wartet auf den Binärwechsel`",
@@ -1178,7 +927,6 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 		`rm -rf -- "<context.project.dir>/k-playbook"`,
 		"von `context.project.dir` aufwärts bis `context.project.repoRoot`, beide eingeschlossen",
 		"`k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, `**/k-playbook` und `**/k-playbook/`",
-		"dasselbe mit `k-playbook-local`",
 		"`<projektpfad>/k-playbook/`, mit und ohne `/` vorn, mit und ohne `/` hinten",
 		"Kommentare und alle anderen Muster bleiben stehen",
 		"Existiert es nicht oder nicht mehr, gleich wer es gelöscht hat, fällt die Zeile.",
@@ -1201,25 +949,21 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 			t.Errorf("3.8 setzt den Pfad ungequotet ein oder nennt das alte Feld: %q", bare)
 		}
 	}
-	general := squashSpace(file[:strings.Index(file, "### 3.0 — ")])
+	general := squashSpace(file[:start])
 	for _, needle := range []string{
-		"Ausgenommen sind vier Fälle, und nur sie",
-		"und der Clone `k-playbook/`, den 3.8 löscht, samt der Zeilen, die 3.8 streicht, auch in einer versionierten `.gitignore`",
-		"und zuletzt das Löschen eines alten Clones `k-playbook/` samt der Zeilen, die `k-playbook/` oder `k-playbook-local/` in einer `.gitignore` ausnehmen",
+		"Ausgenommen ist ein Fall, und nur er: der Clone `k-playbook/`, den 3.8 löscht, samt der Zeilen, die 3.8 streicht, auch in einer versionierten `.gitignore`",
+		"das Löschen eines alten Clones `k-playbook/` samt der Zeilen, die `k-playbook/` in einer `.gitignore` ausnehmen",
 		"wenn das laufende älter ist als das neueste Release",
+		"sie behält ihre Nummer",
 	} {
 		if !strings.Contains(general, needle) {
 			t.Errorf("Einleitung oder Schritt 3 nennt %q nicht", needle)
 		}
 	}
-	if seven := squashSpace(file[strings.Index(file, "### 3.7 — "):start]); strings.Contains(seven, "Sie läuft als letzte") {
-		t.Error("3.7 nennt sich noch die letzte Umstellung")
-	}
 	four := squashSpace(file[end:])
 	for _, needle := range []string{
 		"Für 3.8 die Zeilen aus Schritt 3",
 		"`k-playbook/ löschen wartet auf den Binärwechsel`",
-		"Auch die Wartezeile von 3.8 steht, wenn 3.4 wegen der fehlenden Vorbedingung direkt zu Schritt 4 gesprungen ist",
 	} {
 		if !strings.Contains(four, needle) {
 			t.Errorf("Schritt 4 nennt %q nicht", needle)
@@ -1233,8 +977,8 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 	for _, needle := range []string{
 		"Zieht Kephalaion, Programm und Projekt nach",
 		"wenn es älter ist als das neueste Release",
-		"Zuletzt (3.8) löscht er ohne Rückfrage einen alten Clone k-playbook/ ganz",
-		"streicht aus jeder .gitignore vom Projektverzeichnis bis zur Repo-Wurzel die Zeilen, die k-playbook/ oder k-playbook-local/ ausnehmen, sobald das jeweilige Verzeichnis weg ist",
+		"(3.8) — er löscht ohne Rückfrage einen alten Clone k-playbook/ ganz",
+		"streicht aus jeder .gitignore vom Projektverzeichnis bis zur Repo-Wurzel die Zeilen, die k-playbook/ ausnehmen, sobald das Verzeichnis weg ist",
 	} {
 		if !strings.Contains(description, needle) {
 			t.Errorf("die Hülle nennt %q nicht", needle)
@@ -1242,89 +986,6 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 	}
 	if strings.Contains(description, "älter ist als die Installation") {
 		t.Error("die Hülle vergleicht das Programm noch mit der Installation")
-	}
-}
-
-// /k-upgrade 3.4 räumt seit Task 143 instructions/, includes/ und reviews/
-// unter k-playbook-local/ ab: leer gelöscht, sonst je Datei mit ihrem Ziel in
-// der Projekt-Collection unter keph:/k-playbook/<sorte>/ genannt und nur auf
-// Zuruf umgezogen — über Kephalaion create, gelöscht erst danach; das Ziel ist
-// ein Vorschlag.
-func TestDefaultsKUpgradeAufraeumenProjektebene(t *testing.T) {
-	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.4 — "), strings.Index(file, "### 3.5 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.4 nicht gefunden")
-	}
-	section := squashSpace(file[start:end])
-	for _, needle := range []string{
-		"`keph:/k-playbook/instructions/`, `keph:/k-playbook/includes/` und `keph:/k-playbook/reviews/`",
-		"`instructions/`, `includes/` und `reviews/` auf der Platte wertet k-playbook nicht mehr aus",
-		"Ein älteres Programm liest sie noch von der Platte und nicht aus der Collection",
-		"diese Dateien mit diesem Programm nicht mehr gelesen werden",
-		"`keph:/k-playbook/<sorte>/<gleicher pfad>`",
-		"Eine leere Datei zieht mit um und nennt dazu `schaltet ab`",
-		"Das genannte Ziel ist ein Vorschlag: Der Nutzer kann beim Umzug ein anderes nennen.",
-		"on-demand/release.md → keph:/k-playbook/instructions/on-demand/release.md",
-		"always/500-eigen.md → keph:/k-playbook/instructions/always/500-eigen.md Ziel belegt",
-		"reviews/ gelöscht: README.md",
-		"Bleibt `commands/`, `skills/`, `instructions/`, `includes/` oder `reviews/`",
-		"mit Kephalaion `create` ein Dokument am Ziel an",
-		"Erst wenn `create` das Dokument bestätigt hat, löschst du die Datei auf der Platte",
-		"Meldet `create` `name_taken`, bleibt die Datei liegen und wird mit `Ziel belegt` genannt",
-		"führst c) und d) für diese drei Verzeichnisse noch einmal aus",
-		"e) zieht nicht um",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.4 nennt %q nicht", needle)
-		}
-	}
-}
-
-// /k-upgrade 3.5 löscht seit Task 138 die alte K-PLAYBOOK.local.yaml — nach
-// Bestätigung und nur, wenn eine Zeile von k-playbook upgrade sagt, dass der
-// Block kephalaion: in K-PLAYBOOK.yaml steht; einen dort genannten Account
-// wiederholt die Rückfrage samt kephalaion node account default. Die Zeilen
-// sind der Vertrag mit KephalaionMigration.Messages.
-func TestDefaultsKUpgradeAlteAnbindung(t *testing.T) {
-	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.5 — "), strings.Index(file, "## Schritt 4 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.5 nicht gefunden")
-	}
-	section := squashSpace(file[start:end])
-	for _, needle := range []string{
-		"`<context.local.dir>/K-PLAYBOOK.local.yaml`",
-		"`Projekt: Anbindung umgezogen`",
-		"`Projekt: Anbindung — der Block kephalaion:`",
-		"`Projekt: Anbindung nicht umgezogen`",
-		"`context.kephalaion` taugt hier nicht als Beleg",
-		"`Projekt: Account — …`",
-		"`kephalaion node account default <hub> <account>`",
-		"Gelöscht wird erst nach Bestätigung",
-		"Den Befehl für den Account führst du nicht aus",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.5 nennt %q nicht", needle)
-		}
-	}
-
-	// Die Zeilen, auf die 3.5 wartet, schreibt der Umzug genau so.
-	written := strings.Join(KephalaionMigration{Legacy: true, Written: true, Old: kephalaion.LegacyBinding{Hub: "vm", Collection: "c"}}.Messages(), "\n")
-	standing := strings.Join(KephalaionMigration{Legacy: true, Block: ConfigKephalaion{Present: true, Hub: "vm", Collection: "c"}}.Messages(), "\n")
-	failed := strings.Join(KephalaionMigration{Legacy: true, Error: "kaputt"}.Messages(), "\n")
-	if !strings.HasPrefix("Projekt: "+written, "Projekt: Anbindung umgezogen") ||
-		!strings.HasPrefix("Projekt: "+standing, "Projekt: Anbindung — der Block kephalaion:") ||
-		!strings.HasPrefix("Projekt: "+failed, "Projekt: Anbindung nicht umgezogen") {
-		t.Errorf("Zeilen des Umzugs:\n%s\n%s\n%s", written, standing, failed)
-	}
-
-	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(hull), "löscht er nach Rückfrage die alte k-playbook-local/K-PLAYBOOK.local.yaml") {
-		t.Error("Hülle von /k-upgrade nennt die alte Anbindung nicht")
 	}
 }
 

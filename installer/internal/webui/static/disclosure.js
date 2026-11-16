@@ -1,12 +1,12 @@
 "use strict";
 
-// Der zugeklappte Block, den es auf mehreren Seiten gibt: die erledigten Tasks
-// und die abgehakten Todos. Beide werden nie weniger, für beide wird jede
-// Datei einmal gelesen — geholt wird deshalb erst beim Aufklappen.
+// Der zugeklappte Block der abgehakten Todos. Sie werden nie weniger, und
+// jedes Dokument wird einmal gelesen — geholt wird deshalb erst beim
+// Aufklappen.
 //
-// Steht in einer eigenen Datei, weil beide Seiten dasselbe Verhalten brauchen
-// und keine der beiden es der anderen leihen kann: jede Seite lädt nur ihr
-// eigenes Skript.
+// Steht in einer eigenen Datei, damit eine weitere Seite mit einem solchen
+// Block dasselbe Verhalten einbinden kann: jede Seite lädt nur ihr eigenes
+// Skript.
 
 // Der Merkspeicher ist eine Bequemlichkeit, kein Zustand der Anwendung: ist er
 // gesperrt, arbeitet die Seite ohne ihn weiter.

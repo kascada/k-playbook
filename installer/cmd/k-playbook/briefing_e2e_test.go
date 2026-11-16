@@ -11,6 +11,7 @@ import (
 
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"github.com/kascada/k-playbook/installer/internal/project"
+	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
 // briefingProject legt ein Projekt mit beiden Ebenen in allen Sorten an und
@@ -22,7 +23,6 @@ func briefingProject(t *testing.T) string {
 	files := map[string]string{
 		"test-defaults/reviews/review-code.md":               "---\nname: review-code\ntitle: Code-Review\n---\n# Code\n",
 		"test-defaults/guidelines/betrieb.md":                "# Betrieb\n\nText.\n",
-		"k-playbook-local/guidelines/stil.md":                "# Stil\n\nText.\n",
 		"test-collection/k-playbook/reviews/review-eigen.md": "# Eigenes Review\n\nText.\n",
 	}
 	for rel, content := range files {
@@ -87,8 +87,8 @@ func TestBriefingKlartext(t *testing.T) {
 			"  k-playbook:/instructions/on-demand/thema.md  [dist]  Thema — D\n",
 		"Reviews:\n  k-playbook:/reviews/review-code.md  [dist]  Code-Review\n" +
 			"  k-playbook:/reviews/review-eigen.md  [local keph:/k-playbook/reviews/review-eigen.md]  Eigenes Review\n",
-		// Nur mitgeliefert: k-playbook-local/guidelines/stil.md zählt nicht
-		// (Task 148), die nächste Zeile ist schon der nächste Abschnitt.
+		// Leitlinien sind nur mitgeliefert (Task 148): die nächste Zeile ist
+		// schon der nächste Abschnitt.
 		"Leitlinien:\n  k-playbook:/guidelines/betrieb.md  [dist]  Betrieb\nEigene Arbeit: ",
 		"Eigene Arbeit: Kephalaion nicht nutzbar — ",
 		"Projektdoku: keph:/docs/\n",
@@ -121,12 +121,10 @@ func TestBriefingKlartext(t *testing.T) {
 		}
 	}
 	// Die abgedeckten Felder fehlen im Rest; catalogs fällt ganz, seit es
-	// neben reviews keinen Katalog mehr gibt (Task 155). Ein Feld playbook
-	// gibt es nicht mehr (Task 157): die Wurzeln sind project und local.
-	if !strings.Contains(contextPart, "\n  local:\n    dir: "+project.LocalDir(root)+"\n") {
-		t.Errorf("Rest enthält local.dir nicht:\n%s", contextPart)
-	}
-	for _, absent := range []string{"\n  guidelines", "    rules:", "    reviews:", "\n  catalogs:", "checks", "\n  playbook:", "playbook.dir"} {
+	// neben reviews keinen Katalog mehr gibt (Task 155). Die Felder playbook
+	// (Task 157) und local (Task 159) gibt es nicht mehr: die einzige Wurzel
+	// ist project.
+	for _, absent := range []string{"\n  guidelines", "    rules:", "    reviews:", "\n  catalogs:", "checks", "\n  playbook:", "playbook.dir", "\n  local:"} {
 		if strings.Contains(contextPart, absent) {
 			t.Errorf("Rest enthält %q:\n%s", absent, contextPart)
 		}
@@ -180,6 +178,9 @@ func TestBriefingJSON(t *testing.T) {
 	if _, ok := briefing.Context.Field("playbook"); ok {
 		t.Errorf("context trägt playbook: %+v", briefing.Context)
 	}
+	if _, ok := briefing.Context.Field("local"); ok {
+		t.Errorf("context trägt local: %+v", briefing.Context)
+	}
 	// Die JSON-Ausgabe trägt die Listen auch leer als Listen, nie als null.
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
@@ -206,14 +207,14 @@ func TestBriefingOptionen(t *testing.T) {
 // der immer geltenden Anweisungen und vor „Auf Abruf“ — so liest die Sitzung
 // ihn, bevor sie etwas tut. Im Testprojekt ist die Anbindung nicht
 // eingetragen: ein Fehler (die mitgelieferte Ebene kommt hier aus dem Store
-// des Tests, defaultstest); mit unlesbarer Quellenkonfiguration ein zweiter,
+// des Tests, defaultstest); mit einem fehlenden Basis-Werkzeug ein zweiter,
 // und das Subkommando endet trotzdem mit 0 — das Briefing meldet, es urteilt
 // nicht.
 func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
 	accesstest.Empty(t)
-	root := briefingProject(t)
+	briefingProject(t)
 
 	stdout, err := runBriefingCaptured(t)
 	if err != nil {
@@ -228,17 +229,20 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 		t.Errorf("Umgebung (%d) steht nicht vor Auf Abruf (%d):\n%s", umgebung, abruf, stdout)
 	}
 
-	// Die alte Quellenkonfiguration ist Altbestand (Task 144): eine Warnung,
-	// gelesen wird sie nicht.
-	path := filepath.Join(project.LocalDir(root), project.LegacyVersionSourcesFileName)
-	if err := os.WriteFile(path, []byte(": ungültig\n"), 0o644); err != nil {
+	// Ein Basis-Werkzeug der Matrix fehlt im PATH: eine Warnung neben dem
+	// Fehler.
+	path := filepath.Join(sharetest.Dir(t), "scripts", "base-tools.tsv")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("name\tgroup\trole\tguarded\tmethods\tapt_package\tgithub_repo\tasset_ref\tasset_pattern\nk-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	stdout, err = runBriefingCaptured(t)
 	if err != nil {
-		t.Fatalf("briefing mit Altbestand: %v", err)
+		t.Fatalf("briefing mit Warnung: %v", err)
 	}
-	if !strings.Contains(stdout, "\n  [warning] versionSources: "+project.LegacyVersionSourcesDisplay+" liegt noch") {
+	if !strings.Contains(stdout, "\n  [warning] baseTools: Das Basis-Werkzeug k-weg fehlt im PATH") {
 		t.Errorf("Warnung fehlt:\n%s", stdout)
 	}
 
@@ -250,7 +254,7 @@ func TestBriefingKlartextTraegtUmgebungsblock(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &briefing); err != nil {
 		t.Fatalf("kein JSON: %v", err)
 	}
-	if briefing.SchemaVersion != "7" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
+	if briefing.SchemaVersion != "8" || briefing.Health.OK || len(briefing.Health.Problems) != 2 {
 		t.Errorf("health im JSON: %q %+v", briefing.SchemaVersion, briefing.Health)
 	}
 }

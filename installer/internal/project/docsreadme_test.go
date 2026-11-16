@@ -62,22 +62,6 @@ func TestDocRefSorteDocsNurMitgeliefert(t *testing.T) {
 	}
 }
 
-// Über die Ebenen eines Projekts: eine Datei unter k-playbook-local/docs/
-// gewinnt nicht; die Vorlage kommt aus <hub>:k-playbook/defaults/docs/.
-func TestDocRefDocsLokaleDateiGewinntNicht(t *testing.T) {
-	root := t.TempDir()
-	writeDocTree(t, filepath.Join(root, testDefaultsDir), map[string]string{
-		"docs/manual/README.md": "---\ntitle: \"Manual\"\n---\n\nmitgeliefert\n",
-	})
-	writeDocTree(t, LocalDir(root), map[string]string{
-		"docs/manual/README.md": "---\ntitle: lokal\n---\n\nlokal\n",
-	})
-	got := mustResolveDoc(t, ProjectDocLayers(root), "k-playbook:/docs/manual/README.md")
-	if !strings.Contains(got.Content, "mitgeliefert") || got.Parts[0].Origin != DocOriginDist {
-		t.Errorf("lokale Datei gewinnt: %+v", got)
-	}
-}
-
 // ListDocsTemplates nennt die Verzeichnisse mit README.md unter docs/,
 // sortiert; docs/README.md oben und andere Dateien zählen nicht. Ohne docs/
 // ist die Liste leer, kein Fehler.

@@ -28,7 +28,6 @@
 # liegt dort ein Link auf die neue Datei, damit das alte das Projekt findet;
 # das neue entfernt den Link beim ersten Aufruf.
 /K-PLAYBOOK.yaml
-/k-playbook/
 
 # Registrierung des MCP-Servers. Ihr Kommando ist relativ und hängt damit am
 # Arbeitsverzeichnis des Clients — was hier passt, passt anderswo nicht. Dazu

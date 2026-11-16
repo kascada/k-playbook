@@ -33,15 +33,18 @@ func runMerge(args []string) error {
 			project.ConfigFileName, project.DisplayPath(environment.SearchedFrom))
 	}
 
-	localDir := project.LocalDir(environment.ProjectDir)
-	runDir := review.RunDir(localDir, runName)
+	resultsDir, err := review.ResultsDir()
+	if err != nil {
+		return err
+	}
+	runDir := review.RunDir(resultsDir, runName)
 	result, output, err := merge.Run(merge.Options{
 		ProjectDir:          environment.ProjectDir,
 		RunName:             runName,
 		RunDir:              runDir,
 		KPlaybookVersion:    kPlaybookVersion(),
 		SeverityMappingPath: merge.SeverityCatalog(project.SharedDir()),
-		LocalDir:            localDir,
+		DecisionsDir:        resultsDir,
 	})
 	if err != nil {
 		return err

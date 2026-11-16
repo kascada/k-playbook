@@ -42,6 +42,14 @@ func TestReviewStatusAvailable(t *testing.T) {
 	if !hasCandidate(candidates, scanTriageEntry) {
 		t.Fatalf("scan-triage fehlt in candidates: %v", candidates)
 	}
+	// Ohne projekteigene Fassung kommt das Audit-Modul aus dem Mitgelieferten.
+	triage := candidateByName(t, candidates, scanTriageEntry)
+	if triage["recipeOrigin"] != "dist" {
+		t.Fatalf("scan-triage Origin = %v, erwartet dist", triage["recipeOrigin"])
+	}
+	if path := triage["recipePath"].(string); filepath.Base(filepath.Dir(path)) != "_audit" {
+		t.Fatalf("scan-triage Pfad = %s, erwartet _audit", path)
+	}
 	if defaults := selection["defaultEntries"].([]any); len(defaults) != 3 {
 		t.Fatalf("defaultEntries = %v", defaults)
 	}
@@ -211,7 +219,7 @@ func TestReviewCreateDryRunUndEcht(t *testing.T) {
 	if !envelope.OK {
 		t.Fatalf("dry-run fehlgeschlagen: %#v", envelope.Error)
 	}
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(reviewResultsDir(root), "2026-08-19")); !os.IsNotExist(err) {
 		t.Fatalf("dry-run hat Lauf angelegt")
 	}
 
@@ -222,7 +230,7 @@ func TestReviewCreateDryRunUndEcht(t *testing.T) {
 	if envelope = decodeReviewEnvelope(t, result); !envelope.OK {
 		t.Fatalf("create fehlgeschlagen: %#v", envelope.Error)
 	}
-	written, err := review.ReadRun(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19"))
+	written, err := review.ReadRun(filepath.Join(reviewResultsDir(root), "2026-08-19"))
 	if err != nil {
 		t.Fatalf("run.json lesen: %v", err)
 	}
@@ -232,7 +240,7 @@ func TestReviewCreateDryRunUndEcht(t *testing.T) {
 	if written.Entries[2].Scope == nil || len(written.Entries[2].Scope.Tools) != 1 || written.Entries[2].Scope.Tools[0] != "mockscan" {
 		t.Fatalf("Scope-Snapshot = %#v", written.Entries[2].Scope)
 	}
-	if _, err := os.Stat(review.EntryFile(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19"), scanTriageEntry)); err != nil {
+	if _, err := os.Stat(review.EntryFile(filepath.Join(reviewResultsDir(root), "2026-08-19"), scanTriageEntry)); err != nil {
 		t.Fatalf("scan-triage Entry fehlt: %v", err)
 	}
 }
@@ -301,7 +309,7 @@ func TestReviewCreateAkzeptiertScanTriageAuswahl(t *testing.T) {
 	if !envelope.OK {
 		t.Fatalf("create fehlgeschlagen: %#v", envelope.Error)
 	}
-	runDir := filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19")
+	runDir := filepath.Join(reviewResultsDir(root), "2026-08-19")
 	written, err := review.ReadRun(runDir)
 	if err != nil {
 		t.Fatalf("run.json lesen: %v", err)
@@ -366,7 +374,7 @@ func TestReviewScan(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("entries = %v", entries)
 	}
-	if _, err := os.Stat(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19", review.RawDirName, "mockscan.sarif")); err != nil {
+	if _, err := os.Stat(filepath.Join(reviewResultsDir(root), "2026-08-19", review.RawDirName, "mockscan.sarif")); err != nil {
 		t.Fatalf("SARIF fehlt: %v", err)
 	}
 }
@@ -663,7 +671,7 @@ func TestReviewWriteAIEntryFehler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if test.input.Result == "empty.md" {
-				mustWriteFile(t, filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19", "empty.md"), "")
+				mustWriteFile(t, filepath.Join(reviewResultsDir(root), "2026-08-19", "empty.md"), "")
 			}
 			test.input.reviewBaseInput = reviewBaseInput{ProjectDir: root}
 			result, _, err := reviewWriteAIEntryTool(context.Background(), nil, test.input)
@@ -675,6 +683,21 @@ func TestReviewWriteAIEntryFehler(t *testing.T) {
 	}
 }
 
+// reviewResultsDir ist das Ergebnisverzeichnis eines Testprojekts.
+func reviewResultsDir(root string) string {
+	return filepath.Join(root, "ergebnisse")
+}
+
+// setReviewResultsDir setzt die Naht review.ResultsDirOverride für die Dauer
+// des Tests: Das Programm kennt keinen Ort der Review-Ergebnisse, die Handler
+// hinter der Sperre bekommen ihn hier.
+func setReviewResultsDir(t *testing.T, dir string) {
+	t.Helper()
+	before := review.ResultsDirOverride
+	review.ResultsDirOverride = dir
+	t.Cleanup(func() { review.ResultsDirOverride = before })
+}
+
 func newReviewProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -683,14 +706,14 @@ func newReviewProject(t *testing.T) string {
 		filepath.Join(root, "k-playbook", "commands", "_audit"),
 		filepath.Join(root, defaultstest.DefaultsDir, "reviews"),
 		filepath.Join(root, project.ProjectDirName, "commands", "_audit"),
-		filepath.Join(root, "k-playbook-local", "reviews"),
-		filepath.Join(root, "k-playbook-local", review.ResultsDirName),
+		reviewResultsDir(root),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("%s anlegen: %v", dir, err)
 		}
 	}
+	setReviewResultsDir(t, reviewResultsDir(root))
 	mustWriteFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
 	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
@@ -751,7 +774,7 @@ func fmtDurationSeconds(duration time.Duration) string {
 
 func mustCreateRun(t *testing.T, root string, entries []review.Entry) string {
 	t.Helper()
-	runDir, err := review.CreateRun(project.LocalDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, entries)
+	runDir, err := review.CreateRun(reviewResultsDir(root), time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC), []string{"go"}, entries)
 	if err != nil {
 		t.Fatalf("Lauf anlegen: %v", err)
 	}
@@ -1073,7 +1096,7 @@ func TestReviewCreateFriertModusUndPfadScopeEin(t *testing.T) {
 		t.Fatalf("create fehlgeschlagen: %#v", envelope.Error)
 	}
 
-	written, err := review.ReadRun(filepath.Join(project.LocalDir(root), review.ResultsDirName, "2026-08-19"))
+	written, err := review.ReadRun(filepath.Join(reviewResultsDir(root), "2026-08-19"))
 	if err != nil {
 		t.Fatalf("run.json lesen: %v", err)
 	}

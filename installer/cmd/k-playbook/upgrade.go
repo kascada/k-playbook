@@ -52,12 +52,9 @@ import (
 // und nennt es nicht (Task 156): Das Löschen eines alten Clones ist Sache von
 // /k-upgrade.
 //
-// (2) das Projekt — zuerst der Umzug der Anbindung aus der alten
-// k-playbook-local/K-PLAYBOOK.local.yaml in den Block kephalaion: von
-// K-PLAYBOOK.yaml (project.MigrateKephalaionBinding, Task 138), dann
-// ApplyAssistantSetup, also
-// Einordnen von CLAUDE.md/AGENTS.md, Anstoß ersetzen und Zusatzblöcke
-// entfernen, Verlinkung; danach immer die MCP-Einträge
+// (2) das Projekt — ApplyAssistantSetup, also Einordnen von
+// CLAUDE.md/AGENTS.md, Anstoß ersetzen, Verlinkung; danach immer die
+// MCP-Einträge
 // (project.RepairMCPReport im Umfang des Starts,
 // MCPWriteOutdatedAndUnversioned).
 // Am Ende der Hinweis auf den Neustart der Sitzung, wenn das Binary
@@ -204,10 +201,6 @@ type upgradeKephalaionReport struct {
 // upgradeProjectReport ist Schritt (2).
 type upgradeProjectReport struct {
 	Root project.RootInstructionsState `json:"root"`
-	// Kephalaion ist der Umzug der Anbindung aus der alten
-	// k-playbook-local/K-PLAYBOOK.local.yaml (Task 138); fehlt ohne alte
-	// Datei.
-	Kephalaion *project.KephalaionMigration `json:"kephalaion,omitempty"`
 	// Setup ist das Ergebnis von ApplyAssistantSetup (nicht bei --check).
 	Setup *project.AssistantSetup `json:"setup,omitempty"`
 	// Links ist die Bilanz der Verlinkung: bei --check, was ein Lauf täte,
@@ -682,12 +675,6 @@ func describeKephalaionCheckFailed(check program.KephalaionCheck) []string {
 // wenn die Zieldatei nicht von git erfasst ist.
 func upgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
-	// Zuerst die Anbindung: Ohne Block kephalaion: ist Kephalaion nicht
-	// bereit, und die Schritte danach (READMEs unter keph:/docs/) brauchen
-	// sie.
-	if migration := project.MigrateKephalaionBinding(projectDir, false); migration.Legacy {
-		report.Kephalaion = &migration
-	}
 	before := project.CheckLinks(projectDir)
 	pending := project.PendingLinkChanges(before)
 
@@ -704,8 +691,7 @@ func upgradeProject(projectDir string) upgradeProjectReport {
 	report.LinksCreated = !project.LinksOK(before) && pending.Empty() && project.LinksOK(setup.Links)
 	report.Changed = setup.RootCreated || setup.RootExtended || setup.RootRefreshed ||
 		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated ||
-		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed() ||
-		(report.Kephalaion != nil && report.Kephalaion.Written)
+		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed()
 
 	repair := project.RepairMCPReport(projectDir, project.MCPWriteOutdatedAndUnversioned)
 	report.MCPRepaired, report.MCPRepairedPortable, report.MCPMessage = repair.Repaired, repair.Portable, repair.Message
@@ -724,11 +710,6 @@ func (r upgradeProjectReport) messages() []string {
 		}
 		return lines
 	}
-	if r.Kephalaion != nil {
-		for _, line := range r.Kephalaion.Messages() {
-			lines = append(lines, "Projekt: "+line)
-		}
-	}
 	if r.Setup != nil {
 		setup := r.Setup
 		if detail := setup.Instructions.Detail; detail != "" && (setup.Instructions.Renamed || setup.Instructions.RemovedLink || setup.Instructions.Outcome == project.InstructionsConflict) {
@@ -740,11 +721,8 @@ func (r upgradeProjectReport) messages() []string {
 		case setup.RootExtended:
 			lines = append(lines, "Projekt: der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
 		}
-		if setup.RootAnstossRefreshed {
+		if setup.RootRefreshed {
 			lines = append(lines, "Projekt: der veraltete Anstoß in "+project.RootInstructionsFile+" wurde auf "+project.InstalledCommandName+" briefing gebracht.")
-		}
-		if len(setup.RootBlocksRemoved) > 0 {
-			lines = append(lines, "Projekt: "+strings.Join(setup.RootBlocksRemoved, " und ")+" aus "+project.RootInstructionsFile+" entfernt; der Inhalt kommt mit dem Briefing.")
 		}
 		if len(setup.ConfigBlocksRemoved) > 0 {
 			lines = append(lines, "Projekt: "+project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
@@ -791,11 +769,6 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	root := project.CheckRootInstructions(projectDir)
 	report.Root = root
 
-	if migration := project.MigrateKephalaionBinding(projectDir, true); migration.Legacy {
-		report.Kephalaion = &migration
-		report.Pending = append(report.Pending, migration.Messages()...)
-	}
-
 	switch {
 	case !root.Present:
 		report.Pending = append(report.Pending, project.RootInstructionsFile+" fehlt; ein Lauf legte sie aus der Vorlage an, sofern die Einordnung von "+
@@ -803,14 +776,11 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	case !root.HasMarker:
 		report.Pending = append(report.Pending, "der Anstoß würde an "+project.RootInstructionsFile+" angehängt.")
 	}
-	// Gemeldet wird nur, was ein Lauf wirklich täte: ein Block, dessen Ende
-	// sich nicht bestimmen ließ, steht zwar in HasOutdatedAnstoss bzw.
-	// ObsoleteBlocks, bleibt aber stehen — er kommt allein über den Hinweis.
+	// Gemeldet wird nur, was ein Lauf wirklich täte: ein Anstoß, dessen Ende
+	// sich nicht bestimmen ließ, steht zwar in HasOutdatedAnstoss, bleibt
+	// aber stehen — er kommt allein über den Hinweis.
 	if root.AnstossRefreshable {
 		report.Pending = append(report.Pending, "der veraltete Anstoß in "+project.RootInstructionsFile+" würde auf "+project.InstalledCommandName+" briefing gebracht.")
-	}
-	if len(root.RemovableBlocks) > 0 {
-		report.Pending = append(report.Pending, strings.Join(root.RemovableBlocks, " und ")+" würden aus "+project.RootInstructionsFile+" entfernt; der Inhalt kommt mit dem Briefing.")
 	}
 	if root.Hint != "" {
 		report.Pending = append(report.Pending, "von Hand: "+root.Hint)
@@ -952,12 +922,11 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      laufenden Programm. Hat das Binary gewechselt, führt das neu
      installierte Programm Schritt 2 aus.
   2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen, einen veralteten
-     Anstoß auf k-playbook briefing bringen, die abgelösten Session-Memory-
-     und Befunde-Blöcke entfernen), CLAUDE.md als Include-Datei, die
-     Verlinkung der Commands und Skills, danach immer die MCP-Einträge: ein
-     veralteter wird ersetzt, ein fehlender ergänzt, wenn die Zieldatei nicht
-     von git erfasst ist. Projekt-Prosa in AGENTS.md und k-playbook-local/
-     bleiben unangetastet.
+     Anstoß auf k-playbook briefing bringen), CLAUDE.md als Include-Datei,
+     die Verlinkung der Commands und Skills, danach immer die MCP-Einträge:
+     ein veralteter wird ersetzt, ein fehlender ergänzt, wenn die Zieldatei
+     nicht von git erfasst ist. Projekt-Prosa in AGENTS.md bleibt
+     unangetastet.
 
 Am Ende der Hinweis, die Sitzung neu zu starten: wenn das Binary gewechselt
 hat — der MCP-Server der Sitzung behält das alte Programm —, und wenn

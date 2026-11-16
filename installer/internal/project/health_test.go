@@ -286,33 +286,16 @@ func TestHealthVersionSourcesNichtErreichbar(t *testing.T) {
 	}
 }
 
-// Die alte Datei unter k-playbook-local/ ist Altbestand: eine Warnung mit
-// dem Hinweis auf /k-upgrade, gelesen wird sie nicht — auch eine unlesbare
-// macht keinen Fehler.
-func TestHealthVersionSourcesAltbestandIstWarnung(t *testing.T) {
-	root := healthProject(t)
-	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), ": ungültig\n")
-
-	problems := healthVersionSources(context.Background(), root)
-	if len(problems) != 1 {
-		t.Fatalf("Problems = %+v", problems)
-	}
-	got := problems[0]
-	if got.Level != health.LevelWarning || !strings.Contains(got.Message, LegacyVersionSourcesDisplay) ||
-		!strings.Contains(got.Message, versionsources.DocRef) || !strings.Contains(got.Hint, "/k-upgrade") {
-		t.Errorf("Eintrag: %+v", got)
-	}
-	if report := health.Check(context.Background(), root); !report.OK {
-		t.Errorf("eine Warnung lässt OK wahr: %+v", report)
-	}
-}
-
 // Alle Quellen auf einmal: der Report trägt sie sortiert nach Bereich.
 func TestHealthCheckSammeltAlleQuellen(t *testing.T) {
 	root := healthProject(t)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
 	write(t, filepath.Join(shipped(t), "scripts", "base-tools.tsv"), baseMatrixHeader+"k-weg\t-\tFehlt\tnein\tapt\tpaket\t-\t-\t-\n")
-	write(t, filepath.Join(LocalDir(root), LegacyVersionSourcesFileName), ": ungültig\n")
+	original := OpenVersionSourcesReader
+	t.Cleanup(func() { OpenVersionSourcesReader = original })
+	store := kephtest.New()
+	store.Fail["read"] = os.ErrDeadlineExceeded
+	OpenVersionSourcesReader = func(string, kephalaion.Status) (versionsources.Reader, error) { return store, nil }
 
 	report := health.Check(context.Background(), root)
 	if report.OK {

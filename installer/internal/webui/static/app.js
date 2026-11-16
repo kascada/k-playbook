@@ -277,9 +277,9 @@ function renderOutdatedConfig(data) {
 
   const legacy = data.legacyContent || [];
   if (legacy.length > 0) {
-    // Der Umzug geht vor: k-playbook/ ist der Ort des früheren Clones, den
+    // Das Sichern geht vor: k-playbook/ ist der Ort des früheren Clones, den
     // /k-upgrade löscht, und was dort liegt, wäre danach weg.
-    addFact(elements.configFacts, "Zuerst umziehen nach k-playbook-local/", legacy.join(", "));
+    addFact(elements.configFacts, "Zuerst außerhalb von k-playbook/ sichern", legacy.join(", "));
     setBlockState(elements.configPill, elements.configCreate, "blocked", RESET_LABELS);
     elements.configPill.textContent = "Veraltet";
     return;
@@ -360,17 +360,13 @@ async function applyAssistant() {
 }
 
 // Der Zustand der Wurzeldatei in einem Halbsatz. Ein Anstoß mit abgelöstem
-// Aufruf und die abgelösten Zusatzblöcke sind kein Fehler — „Einrichten“ zieht
-// sie nach —, gehören aber sichtbar daneben; was sich nicht von selbst
-// nachziehen lässt, sagt der Hinweis.
+// Aufruf ist kein Fehler — „Einrichten“ zieht ihn nach —, gehört aber sichtbar
+// daneben; was sich nicht von selbst nachziehen lässt, sagt der Hinweis.
 function describeRootInstructions(root) {
   if (!root.present) return "nicht vorhanden";
   if (!root.hasMarker) return "vorhanden, Anstoß fehlt";
-  const pending = [];
-  if (root.hasOutdatedAnstoss) pending.push("Anstoß veraltet");
-  for (const block of root.obsoleteBlocks || []) pending.push(`${block} abgelöst`);
-  let detail = pending.length
-    ? `enthält den Anstoß; nachzuziehen: ${pending.join(", ")}`
+  let detail = root.hasOutdatedAnstoss
+    ? "enthält den Anstoß; nachzuziehen: Anstoß veraltet"
     : "enthält den Anstoß";
   if (root.hint) detail += ` — ${root.hint}`;
   return detail;
@@ -1047,7 +1043,6 @@ function renderContext(data) {
   addFact(elements.contextFacts, "Repository", display.repoRoot || context.project.repoRoot);
   addFact(elements.contextFacts, "VCS", context.project.vcs || "keines");
   addFact(elements.contextFacts, "Konfiguration", display.config || context.project.config);
-  addFact(elements.contextFacts, "Projekteigen", display.local || context.local.dir);
   addFact(elements.contextFacts, "Umgang mit Befunden", context.remediation.mode || "unbekannt");
 
   // Pfade werden gegen das Projektverzeichnis gekürzt: der gemeinsame Anfang

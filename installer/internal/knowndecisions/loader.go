@@ -17,15 +17,6 @@ import (
 
 const fileName = "known-decisions.md"
 
-// legacyResultsDirName ist der alte Ort: k-playbook-local/results/known-decisions.md.
-// Die Datei ist eine handgepflegte Eingabe und kein Review-Ergebnis, deshalb liegt
-// sie jetzt eine Ebene höher, direkt in k-playbook-local/.
-//
-// Der alte Ort wird nur übergangsweise weiter gelesen. Diese Konstante, resolvePath
-// und die beiden Warnungen darin werden zum 2027-02-28 ersatzlos entfernt; der
-// Ausbau steht als Todo des Projekts (/k-todo).
-const legacyResultsDirName = "results"
-
 var validCategories = map[string]bool{
 	"false-positive": true,
 	"accepted-risk":  true,
@@ -122,15 +113,18 @@ type sourceDecision struct {
 	path     string
 }
 
-// Load liest die projektweite known-decisions.md aus k-playbook-local/.
+// Load liest die projektweite known-decisions.md aus dir. Ohne dir gibt es
+// keine Quelle: Der Report nennt sie dann als fehlend.
 //
 // Sources bleibt eine Liste, obwohl heute nur eine Quelle darin steht: der
 // Report ist auf mehrere Quellen ausgelegt und soll das bleiben.
-func Load(localDir string) ([]Decision, LoadReport, error) {
-	projectPath, transitionWarnings := resolvePath(localDir)
+func Load(dir string) ([]Decision, LoadReport, error) {
+	projectPath := ""
+	if dir != "" {
+		projectPath = filepath.Join(dir, fileName)
+	}
 	report := LoadReport{
-		Sources:  []SourceReport{{Path: projectPath, Scope: "project"}},
-		Warnings: transitionWarnings,
+		Sources: []SourceReport{{Path: projectPath, Scope: "project"}},
 	}
 
 	byID := map[string]sourceDecision{}
@@ -173,39 +167,6 @@ func Load(localDir string) ([]Decision, LoadReport, error) {
 		return report.Decisions[left].ID < report.Decisions[right].ID
 	})
 	return decisions, report, nil
-}
-
-// resolvePath wählt den zu lesenden Ort und meldet den Umzug.
-//
-// Übergangscode bis 2027-02-28: existiert nur der alte Ort, wird er gelesen und
-// der Umzug gemeldet. Existieren beide, gewinnt der neue Ort und der alte wird
-// als ignoriert gemeldet. Der Warntext nennt bewusst kein Datum — durchsetzbar
-// ist die Frist nicht, und ein sichtbares Datum würde zur Falschaussage, sobald
-// der Ausbau verrutscht.
-func resolvePath(localDir string) (string, []string) {
-	if localDir == "" {
-		return "", nil
-	}
-	current := filepath.Join(localDir, fileName)
-	legacy := filepath.Join(localDir, legacyResultsDirName, fileName)
-
-	currentExists := fileExists(current)
-	legacyExists := fileExists(legacy)
-	switch {
-	case currentExists && legacyExists:
-		return current, []string{fmt.Sprintf(
-			"%s wird gelesen; %s liegt am alten Ort und wird ignoriert.", current, legacy)}
-	case legacyExists:
-		return legacy, []string{fmt.Sprintf(
-			"%s liegt am alten Ort und wird künftig nicht mehr gelesen. Verschiebe die Datei nach %s.", legacy, current)}
-	default:
-		return current, nil
-	}
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
 
 func loadFile(path string, source string) ([]Decision, bool, []string, error) {

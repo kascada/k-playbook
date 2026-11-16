@@ -3,7 +3,6 @@ package knowndecisions
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -68,7 +67,7 @@ func TestLoadLiestProjektweiteDatei(t *testing.T) {
 // gelesen noch als Quelle gemeldet.
 func TestLoadIgnoriertLaufverzeichnis(t *testing.T) {
 	root := t.TempDir()
-	runDir := filepath.Join(root, "results", "2026-08-21")
+	runDir := filepath.Join(root, "2026-08-21")
 	writeKnownDecision(t, filepath.Join(root, fileName), "kd-shared", "wontfix", "project/**")
 	writeKnownDecision(t, filepath.Join(runDir, fileName), "kd-run", "accepted-risk", "run/**")
 
@@ -85,51 +84,6 @@ func TestLoadIgnoriertLaufverzeichnis(t *testing.T) {
 		if source.Path == filepath.Join(runDir, fileName) {
 			t.Fatalf("Laufverzeichnis steht noch im Quellenbericht: %+v", report.Sources)
 		}
-	}
-}
-
-// Übergang: liegt die Datei nur noch am alten Ort, wird sie gelesen und der
-// Umzug gemeldet. Entfällt mit dem Ausbau zum 2027-02-28.
-func TestLoadLiestAltenOrtUndMeldetUmzug(t *testing.T) {
-	root := t.TempDir()
-	legacy := filepath.Join(root, "results", fileName)
-	writeKnownDecision(t, legacy, "kd-alt", "wontfix", "project/**")
-
-	decisions, report, err := Load(root)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if len(decisions) != 1 || decisions[0].ID != "kd-alt" {
-		t.Fatalf("Decision vom alten Ort nicht geladen: %+v", decisions)
-	}
-	if report.Sources[0].Path != legacy || !report.Sources[0].Loaded {
-		t.Fatalf("alter Ort nicht als Quelle gemeldet: %+v", report.Sources)
-	}
-	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], filepath.Join(root, fileName)) {
-		t.Fatalf("Umzugswarnung nennt den neuen Ort nicht: %+v", report.Warnings)
-	}
-}
-
-// Übergang: liegen beide Orte vor, gewinnt der neue; der alte wird als ignoriert
-// gemeldet. Entfällt mit dem Ausbau zum 2027-02-28.
-func TestLoadBevorzugtNeuenOrtUndMeldetAlten(t *testing.T) {
-	root := t.TempDir()
-	legacy := filepath.Join(root, "results", fileName)
-	writeKnownDecision(t, filepath.Join(root, fileName), "kd-neu", "wontfix", "project/**")
-	writeKnownDecision(t, legacy, "kd-alt", "accepted-risk", "alt/**")
-
-	decisions, report, err := Load(root)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if len(decisions) != 1 || decisions[0].ID != "kd-neu" {
-		t.Fatalf("neuer Ort gewinnt nicht: %+v", decisions)
-	}
-	if report.Sources[0].Path != filepath.Join(root, fileName) {
-		t.Fatalf("falsche Quelle: %+v", report.Sources)
-	}
-	if len(report.Warnings) != 1 || !strings.Contains(report.Warnings[0], legacy) {
-		t.Fatalf("alter Ort nicht als ignoriert gemeldet: %+v", report.Warnings)
 	}
 }
 

@@ -1,28 +1,30 @@
 "use strict";
 
-// Die Zahlen der drei Workflow-Karten: wie viel in jeder Sorte liegt. Die
+// Der Stand der Workflow-Karten Reviews und Todos: die Zahl der offenen Todos
+// und, solange die Review-Wege pausieren, die Sperre statt einer Zahl der
+// Läufe. Die
 // Karten selbst stehen im Fragment workflow-cards.html, das /workflows und die
 // Statusseite einbinden; beide rufen loadWorkflowCounts() auf.
 //
 // Geholt wird hier nur die Zahl. Sie stammt aus derselben Antwort, aus der die
 // jeweilige Seite ihre Liste baut — einen Aggregat-Endpunkt gibt es nicht, er
-// wäre die Doppelung dieser drei Zahlen.
+// wäre die Doppelung dieser Zahlen.
 //
 // Die Datei tut beim Laden nichts: Blockmenü und Lebenszeichen gehören der
 // Seite. Zweimal gerufen, entstünde das Menü doppelt und es liefen zwei
 // Lebenszeichen. Klassisches Skript, kein Modul — jeder Name auf oberster
 // Ebene teilt sich den Namensraum mit den übrigen Skripten der Seite.
 
-// Die drei Vorräte in der Reihenfolge der Karten. Jeder nennt seinen
-// Endpunkt, das Feld mit den Einträgen und die Beschriftung seiner Zahl:
-// Läufe sammeln sich an, Tasks und Todos sind offen oder nicht.
+// Die Vorräte in der Reihenfolge der Karten. Jeder nennt seinen
+// Endpunkt, das Feld mit den Einträgen und die Beschriftung seiner Zahl.
+// Reviews tragen kein Feld: /api/reviews liefert keine Läufe, sondern die
+// Sperre; note ist das Element der Karte für ihren Satz.
 const stocks = [
-  { pill: "tasks-pill", url: "/api/tasks", field: "tasks", label: (count) => (count === 1 ? "1 offen" : `${count} offen`) },
-  { pill: "reviews-pill", url: "/api/reviews", field: "runs", label: (count) => (count === 1 ? "1 Lauf" : `${count} Läufe`) },
+  { pill: "reviews-pill", url: "/api/reviews", note: "reviews-paused" },
   { pill: "todos-pill", url: "/api/todos", field: "todos", label: (count) => (count === 1 ? "1 offen" : `${count} offen`) },
 ];
 
-// Füllt die drei Zahlen. message ist das Element, in das Fehler und Hinweise
+// Füllt die Zahlen. message ist das Element, in das Fehler und Hinweise
 // gehen; es steht auf der Seite und nicht im Fragment der Karten.
 function loadWorkflowCounts(message) {
   for (const stock of stocks) {
@@ -50,6 +52,20 @@ function renderCount(pill, stock, data, message) {
     return;
   }
 
+  // Die Review-Wege pausieren: Statt einer Zahl steht die Sperre da, mit
+  // ihrem Satz in der Karte. Das ist kein Fehler und gehört deshalb nicht ins
+  // Meldungsziel der Seite.
+  if (data.paused) {
+    pill.className = "pill muted";
+    pill.textContent = "Pausiert";
+    const note = stock.note ? document.getElementById(stock.note) : null;
+    if (note) {
+      note.textContent = data.message || "";
+      note.hidden = !data.message;
+    }
+    return;
+  }
+
   // Eine Meldung in der Antwort heißt: gelesen wurde nicht. Die Zahl daneben
   // wäre dann keine Auskunft, sondern eine falsche.
   if (data.message) {
@@ -57,12 +73,6 @@ function renderCount(pill, stock, data, message) {
     pill.textContent = "Nicht lesbar";
     message.textContent = data.message;
     return;
-  }
-
-  // Ein hint ist das Gegenteil: gelesen wurde, es gibt nur etwas dazu zu sagen.
-  // Er darf die Zahl deshalb nicht auf "Nicht lesbar" kippen.
-  if (data.hint) {
-    message.textContent = data.hint;
   }
 
   const count = (data[stock.field] || []).length;

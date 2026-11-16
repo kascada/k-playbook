@@ -404,8 +404,7 @@ Unterkommandos:
             installiert); dann das Release-Binary des neuesten Tags direkt
             von GitHub, geprüft gegen die SHA256SUMS des Tags — nur wenn das
             laufende Programm älter ist als der neueste Release-Tag; dann
-            AGENTS.md (Anstoß, abgelöste Blöcke), CLAUDE.md, Verlinkung und
-            MCP-Einträge. Je
+            AGENTS.md (Anstoß), CLAUDE.md, Verlinkung und MCP-Einträge. Je
             Schritt eine Meldung, am Ende der Hinweis auf den Neustart der
             Sitzung, wenn das Binary gewechselt hat. --check schreibt nichts
             und meldet, was ein Lauf täte. Das Gegenstück zu /k-upgrade.

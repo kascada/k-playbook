@@ -17,13 +17,16 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
-// pausedReviewCalls sind die vier gesperrten Werkzeuge mit Argumenten, die dem
-// Schema genügen und ohne die Sperre schrieben: create legte den Lauf eines
-// neuen Tages an, scan führte mockscan aus, merge schriebe review-input.*, und
-// write_ai_entry setzte den Eintrag tech auf done.
+// pausedReviewCalls sind die fünf gesperrten Werkzeuge mit Argumenten, die dem
+// Schema genügen und ohne die Sperre läsen oder schrieben: status läse die
+// Auswahlbasis und einen Lauf, create legte den Lauf eines neuen Tages an,
+// scan führte mockscan aus, merge schriebe review-input.*, und write_ai_entry
+// setzte den Eintrag tech auf done.
 func pausedReviewCalls(root string) []*mcp.CallToolParams {
 	base := reviewBaseInput{ProjectDir: root}
 	return []*mcp.CallToolParams{
+		{Name: reviewToolStatus, Arguments: reviewStatusInput{reviewBaseInput: base, Mode: "available"}},
+		{Name: reviewToolStatus, Arguments: reviewStatusInput{reviewBaseInput: base, Run: "2026-08-19"}},
 		{Name: reviewToolCreate, Arguments: reviewCreateInput{reviewBaseInput: base, Day: "2026-08-20"}},
 		{Name: reviewToolScan, Arguments: reviewScanInput{reviewBaseInput: base, Run: "2026-08-19"}},
 		{Name: reviewToolMerge, Arguments: reviewMergeInput{reviewBaseInput: base, Run: "2026-08-19"}},
@@ -32,6 +35,9 @@ func pausedReviewCalls(root string) []*mcp.CallToolParams {
 		}},
 	}
 }
+
+// pausedReviewTools sind die Namen der fünf gesperrten Werkzeuge.
+var pausedReviewTools = []string{reviewToolStatus, reviewToolCreate, reviewToolScan, reviewToolMerge, reviewToolWriteAIEntry}
 
 // reviewSession verbindet einen Client mit einem Server, der die
 // Review-Werkzeuge so anmeldet wie der echte: über addReviewTools.
@@ -109,9 +115,9 @@ func assertSameTree(t *testing.T, label string, before map[string]string, after 
 	}
 }
 
-// Die vier schreibenden Review-Werkzeuge antworten mit reviews_paused und dem
-// Satz mit dem Grund, als Fehler markiert — und an einem vorhandenen Lauf
-// ändert sich nichts.
+// Alle fünf Review-Werkzeuge antworten mit reviews_paused und dem Satz mit
+// dem Grund, als Fehler markiert — und an einem vorhandenen Lauf ändert sich
+// nichts. Der Umschlag nennt nur das übergebene projectDir.
 func TestGesperrteReviewWerkzeugeAntwortenMitSperre(t *testing.T) {
 	root := newReviewProject(t)
 	runDir := mustCreateRun(t, root, []review.Entry{{Name: "mockscan", Kind: review.KindTool}, aiEntry("tech")})
@@ -119,7 +125,9 @@ func TestGesperrteReviewWerkzeugeAntwortenMitSperre(t *testing.T) {
 	session := reviewSession(t)
 
 	before := treeSnapshot(t, root)
+	called := map[string]bool{}
 	for _, params := range pausedReviewCalls(root) {
+		called[params.Name] = true
 		result, err := session.CallTool(context.Background(), params)
 		if err != nil {
 			t.Fatalf("%s: CallTool: %v", params.Name, err)
@@ -139,17 +147,21 @@ func TestGesperrteReviewWerkzeugeAntwortenMitSperre(t *testing.T) {
 			t.Errorf("%s: Umschlag = %+v", params.Name, envelope)
 		}
 	}
+	for _, name := range pausedReviewTools {
+		if !called[name] {
+			t.Errorf("%s wurde nicht geprüft", name)
+		}
+	}
 	assertSameTree(t, "vorhandener Lauf", before, treeSnapshot(t, root))
 }
 
-// In einem Projekt ohne k-playbook-local/ entsteht durch die gesperrten
-// Werkzeuge nichts: kein Verzeichnis, kein results/. Die Sperre greift vor dem
-// Auflösen des Projekts — auch ein projectDir ohne Projekt, ein leeres oder
-// ein fehlendes bekommt sie.
+// Durch die gesperrten Werkzeuge entsteht nichts, auch kein
+// Ergebnisverzeichnis. Die Sperre greift vor dem Auflösen des Projekts — auch
+// ein projectDir ohne Projekt, ein leeres oder ein fehlendes bekommt sie.
 func TestGesperrteReviewWerkzeugeLegenNichtsAn(t *testing.T) {
 	root := newReviewProject(t)
-	if err := os.RemoveAll(project.LocalDir(root)); err != nil {
-		t.Fatalf("%s entfernen: %v", project.LocalDirName, err)
+	if err := os.RemoveAll(reviewResultsDir(root)); err != nil {
+		t.Fatalf("Ergebnisverzeichnis entfernen: %v", err)
 	}
 	session := reviewSession(t)
 
@@ -163,79 +175,51 @@ func TestGesperrteReviewWerkzeugeLegenNichtsAn(t *testing.T) {
 			assertToolErrorCode(t, result, review.PausedCode)
 		}
 	}
-	assertSameTree(t, "ohne "+project.LocalDirName, before, treeSnapshot(t, root))
-	if _, err := os.Stat(project.LocalDir(root)); !os.IsNotExist(err) {
-		t.Errorf("%s ist entstanden (Stat: %v)", project.LocalDirName, err)
-	}
+	assertSameTree(t, "ohne Ergebnisverzeichnis", before, treeSnapshot(t, root))
 }
 
-// Die Werkzeugliste nennt die Sperre vorn in der Beschreibung der vier
-// gesperrten Werkzeuge; status bleibt offen, liest und legt nichts an.
+// Die Werkzeugliste nennt die Sperre vorn in der Beschreibung aller fünf
+// Review-Werkzeuge; ein offenes Statuswerkzeug gibt es nicht.
 func TestReviewWerkzeuglisteNenntDieSperre(t *testing.T) {
-	root := newReviewProject(t)
-	if err := os.RemoveAll(project.LocalDir(root)); err != nil {
-		t.Fatalf("%s entfernen: %v", project.LocalDirName, err)
-	}
 	session := reviewSession(t)
 
 	listed, err := session.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("ListTools: %v", err)
 	}
-	paused := map[string]bool{reviewToolCreate: true, reviewToolScan: true, reviewToolMerge: true, reviewToolWriteAIEntry: true}
+	paused := map[string]bool{}
+	for _, name := range pausedReviewTools {
+		paused[name] = true
+	}
 	seen := 0
 	for _, tool := range listed.Tools {
-		starts := strings.HasPrefix(tool.Description, "Vorübergehend nicht verfügbar")
-		switch {
-		case paused[tool.Name]:
-			seen++
-			if !starts || !strings.Contains(tool.Description, review.PausedCode) {
-				t.Errorf("%s: Beschreibung nennt die Sperre nicht vorn: %q", tool.Name, tool.Description)
-			}
-		case tool.Name == reviewToolStatus:
-			seen++
-			if starts {
-				t.Errorf("%s gilt als gesperrt: %q", tool.Name, tool.Description)
-			}
+		if !paused[tool.Name] {
+			continue
+		}
+		seen++
+		if !strings.HasPrefix(tool.Description, "Vorübergehend nicht verfügbar") || !strings.Contains(tool.Description, review.PausedCode) {
+			t.Errorf("%s: Beschreibung nennt die Sperre nicht vorn: %q", tool.Name, tool.Description)
 		}
 	}
 	if seen != 5 {
 		t.Errorf("Werkzeugliste nennt %d von 5 Review-Werkzeugen", seen)
 	}
-
-	before := treeSnapshot(t, root)
-	for _, input := range []reviewStatusInput{
-		{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"},
-		{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Run: "2026-08-19"},
-	} {
-		result, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: reviewToolStatus, Arguments: input})
-		if err != nil {
-			t.Fatalf("status: CallTool: %v", err)
-		}
-		if envelope := decodeReviewEnvelope(t, result); envelope.Error != nil && envelope.Error.Code == review.PausedCode {
-			t.Errorf("status ist gesperrt: %+v", envelope.Error)
-		}
-	}
-	assertSameTree(t, "status ohne "+project.LocalDirName, before, treeSnapshot(t, root))
 }
 
-// Ohne den Clone <projekt>/k-playbook/ antwortet k_playbook_review_status
-// wie sonst, statt mit „k-playbook-Installation fehlt“; der Umschlag trägt
-// kein playbookDir mehr. Die vier gesperrten Werkzeuge antworten auch dort
-// weiter mit reviews_paused (Task 154).
+// Ohne den Clone <projekt>/k-playbook/ antwortet der Handler hinter
+// k_playbook_review_status wie sonst, statt mit „k-playbook-Installation
+// fehlt“; der Umschlag trägt weder playbookDir noch localDir oder
+// reviewRunsDir. Über die Werkzeugliste antworten alle fünf Werkzeuge auch
+// dort mit reviews_paused (Task 154).
 func TestReviewWerkzeugeOhneClone(t *testing.T) {
 	root := newReviewProject(t)
 	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
 		t.Fatalf("%s entfernen: %v", project.PlaybookDirName, err)
 	}
-	session := reviewSession(t)
 
-	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      reviewToolStatus,
-		Arguments: reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"},
-	})
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
-		t.Fatalf("%s: CallTool: %v", reviewToolStatus, err)
+		t.Fatalf("%s: %v", reviewToolStatus, err)
 	}
 	envelope := decodeReviewEnvelope(t, result)
 	if !envelope.OK {
@@ -255,11 +239,14 @@ func TestReviewWerkzeugeOhneClone(t *testing.T) {
 		if err := json.Unmarshal([]byte(text.Text), &raw); err != nil {
 			t.Fatalf("Antwort nicht lesbar: %v", err)
 		}
-		if _, found := raw.Project["playbookDir"]; found {
-			t.Errorf("Umschlag trägt noch playbookDir: %v", raw.Project)
+		for _, key := range []string{"playbookDir", "localDir", "reviewRunsDir"} {
+			if _, found := raw.Project[key]; found {
+				t.Errorf("Umschlag trägt noch %s: %v", key, raw.Project)
+			}
 		}
 	}
 
+	session := reviewSession(t)
 	for _, params := range pausedReviewCalls(root) {
 		result, err := session.CallTool(context.Background(), params)
 		if err != nil {
@@ -267,4 +254,24 @@ func TestReviewWerkzeugeOhneClone(t *testing.T) {
 		}
 		assertToolErrorCode(t, result, review.PausedCode)
 	}
+}
+
+// Ohne die Naht kennt das Programm keinen Ort der Review-Ergebnisse: Der
+// Handler hinter der Sperre endet beim Auflösen der Umgebung mit
+// results_dir_undecided und dem Satz von review.ErrResultsDirUndecided, und
+// im Projekt entsteht nichts.
+func TestReviewHandlerOhneOrtMeldetUnentschieden(t *testing.T) {
+	root := newReviewProject(t)
+	setReviewResultsDir(t, "")
+
+	before := treeSnapshot(t, root)
+	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
+	if err != nil {
+		t.Fatalf("%s: %v", reviewToolStatus, err)
+	}
+	assertToolErrorCode(t, result, resultsDirUndecidedCode)
+	if envelope := decodeReviewEnvelope(t, result); envelope.Error == nil || envelope.Error.Message != review.ErrResultsDirUndecided.Error() {
+		t.Errorf("Fehler = %+v", envelope.Error)
+	}
+	assertSameTree(t, "ohne Ort", before, treeSnapshot(t, root))
 }

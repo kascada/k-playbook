@@ -8,16 +8,11 @@
 # {target}: bei absolutem Ziel träfe `k-playbook/` in einem Projekt, das selbst
 # so heißt, den kompletten Pfad, und der Job fände überhaupt nichts mehr. Genau
 # die Falle, die dort für gitleaks beschrieben ist.
-#
-# `k-playbook/` trifft `k-playbook-local/` nicht: dort folgt auf den Namen ein
-# `-` und kein `/`. Beide Einträge stehen deshalb einzeln da.
 ignore-paths:
   # Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem früheren Modell
   # (/k-upgrade löscht ihn). Sein ausgeliefertes JavaScript unter
   # installer/internal/webui/static/ ist kein Code des Projekts.
   - k-playbook/
-  # Die Ergebnisse früherer Läufe.
-  - k-playbook-local/results/
 
 # node_modules, bower_components und .git stehen bewusst nicht hier: njsscan
 # führt sie in seinen eigenen Voreinstellungen (settings.py, IGNORE_PATHS).

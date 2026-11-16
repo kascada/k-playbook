@@ -33,7 +33,6 @@ type Context struct {
 	// ein geratenes Datum in einem Protokoll ist schlechter als keines.
 	Now         ContextNow     `json:"now"`
 	Project     ContextProject `json:"project"`
-	Local       ContextDir     `json:"local"`
 	Remediation Remediation    `json:"remediation"`
 	// Docs ist der Block docs: — was die Docs-Erzeuger beim Code-Scan
 	// zusätzlich auslassen (exclude) und welche Einträge verworfen wurden
@@ -115,10 +114,6 @@ type ContextProject struct {
 	// Manifesten, sonst DefaultLanguages — der Wert ist also immer belegt und
 	// muss nicht ausgelegt werden.
 	Languages []string `json:"languages"`
-}
-
-type ContextDir struct {
-	Dir string `json:"dir"`
 }
 
 // ContextNow ist der Zeitpunkt des Aufrufs in der Zeitzone des Rechners.
@@ -219,8 +214,8 @@ func catalogKindNamed(name string) catalogKind {
 // guidelinesKind ist die Sorte guidelines/ für ResolveDocRef und das
 // Briefing: nur mitgeliefert, aus <hub>:k-playbook unter
 // defaults/guidelines/. Eine lokale Ebene hat sie seit Task 148 nicht mehr
-// (docDistOnlyKinds) — k-playbook-local/guidelines/ liest nichts, projekteigene
-// Guidelines liegen unter keph:/docs/guidelines/ (Todo #40). Bewusst nicht in
+// (docDistOnlyKinds); projekteigene Guidelines liegen unter
+// keph:/docs/guidelines/ (Todo #40). Bewusst nicht in
 // catalogKinds(): Die Kontextausgabe nennt keine Guidelines, das Briefing
 // liefert sie unter documents.guidelines.
 var guidelinesKind = catalogKind{name: "guidelines", dirName: docGuidelinesRoot, suffix: ".md"}
@@ -284,8 +279,6 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 		return Context{}, err
 	}
 
-	localDir := LocalDir(projectDir)
-
 	context := Context{
 		SchemaVersion: config.SchemaVersion,
 		Now:           buildNow(),
@@ -296,7 +289,6 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 			Config:    ConfigPath(projectDir),
 			Languages: languages,
 		},
-		Local:       ContextDir{Dir: localDir},
 		Remediation: remediation,
 		Docs:        contextDocs(config),
 		GH:          DetectGH(),

@@ -278,10 +278,10 @@ func TestStripSkillsBlock(t *testing.T) {
 
 func TestHasPlaybookSegment(t *testing.T) {
 	tests := map[string]bool{
-		"/home/x/dev/k-playbook/commands":       true,
-		"/home/x/projekt/k-playbook/skills":     true,
-		"/home/x/dev/k-playbook-local/commands": false,
-		"/home/x/dev/eigenes/commands":          false,
+		"/home/x/dev/k-playbook/commands":         true,
+		"/home/x/projekt/k-playbook/skills":       true,
+		"/home/x/dev/k-playbook-notizen/commands": false,
+		"/home/x/dev/eigenes/commands":            false,
 	}
 
 	for path, want := range tests {

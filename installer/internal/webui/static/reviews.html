@@ -14,8 +14,7 @@
       <div class="layout">
 {{template "sidebar" .}}
         <div class="blocks">
-          <!-- Gestartet wird ein Review nicht hier, sondern im Assistenten: die
-               Oberfläche zeigt nur, was bereits vorliegt. -->
+          <!-- Gestartet wird ein Review nicht hier, sondern im Assistenten. -->
           <section class="card" id="reviews-intro-card">
             <div class="section-head">
               <div>
@@ -44,20 +43,17 @@
               Argument zeigt der Befehl die Auswahl der aktivierten Rezepte.
             </p>
             <p class="hint">
-              Die Befunde eines Laufs werden mit <code>/k-remediation</code> zu Tasks — die
-              Umsetzung steht auf der <a href="/workflows/tasks">Task-Seite</a>.
+              Die Befunde eines Laufs werden mit <code>/k-remediation</code> zu Tasks.
             </p>
           </section>
 
           <section class="card" id="runs-card">
             <div class="section-head">
               <div>
-                <h2>Bisherige Läufe</h2>
+                <h2>Läufe</h2>
               </div>
               <span id="runs-pill" class="pill muted">Laden...</span>
             </div>
-            <p class="hint">Aus <code>k-playbook-local/results/</code>.</p>
-            <dl id="runs-list" class="facts"></dl>
             <p id="runs-message" class="message"></p>
           </section>
         </div>

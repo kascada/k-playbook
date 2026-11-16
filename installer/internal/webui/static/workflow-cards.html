@@ -1,6 +1,8 @@
 {{define "workflow-cards"}}
-          <!-- Die drei Karten der Workflows: Tasks, Reviews, Todos, jede mit
-               ihrer Zahl und dem Weg zu ihrer Seite. Gemeinsames Fragment von
+          <!-- Die drei Karten der Workflows: Tasks, Reviews, Todos. Reviews
+               und Todos tragen ihren Stand und den Weg zu ihrer Seite — Todos
+               ihre Zahl, Reviews die Sperre, solange die Review-Wege
+               pausieren; Tasks haben in der Oberfläche keine Seite. Gemeinsames Fragment von
                /workflows und der Statusseite; die Zahlen holt
                loadWorkflowCounts() aus workflows.js, das Meldungsziel gibt die
                Seite mit — es gehört nicht zu den Karten. -->
@@ -9,7 +11,6 @@
               <div>
                 <h2>Tasks</h2>
               </div>
-              <span id="tasks-pill" class="pill muted">Laden...</span>
             </div>
             <p class="hint">
               Tasks sind die Umsetzung. <code>/k-remediation</code> überführt Review-Befunde in
@@ -18,9 +19,6 @@
               trivialen Einzelschritt hinausgeht, wird eine Task und bleibt nicht als Plan im
               Gespräch stehen.
             </p>
-            <div class="link-row">
-              <a class="button-link secondary" href="/workflows/tasks">Offene und erledigte Tasks</a>
-            </div>
           </section>
 
           <section class="card" id="reviews-card">
@@ -32,11 +30,11 @@
             </div>
             <p class="hint">
               Reviews messen den Bestand: <code>/k-audit</code> führt einen vollständigen Sweep
-              an oder setzt ihn fort, <code>/k-review</code> ein einzelnes Rezept. Ihre Befunde
-              landen als Ergebnisdatei unter <code>k-playbook-local/results/</code>.
+              an oder setzt ihn fort, <code>/k-review</code> ein einzelnes Rezept.
             </p>
+            <p id="reviews-paused" class="hint" hidden></p>
             <div class="link-row">
-              <a class="button-link secondary" href="/workflows/reviews">Bisherige Läufe</a>
+              <a class="button-link secondary" href="/workflows/reviews">Zur Seite Reviews</a>
             </div>
           </section>
 

@@ -21,12 +21,10 @@ const elements = {
   todosPill: document.getElementById("todos-pill"),
   todosList: document.getElementById("todos-list"),
   todosMessage: document.getElementById("todos-message"),
-  todosHint: document.getElementById("todos-hint"),
   doneCard: document.getElementById("todos-done-card"),
   donePill: document.getElementById("todos-done-pill"),
   doneList: document.getElementById("todos-done-list"),
   doneMessage: document.getElementById("todos-done-message"),
-  doneHint: document.getElementById("todos-done-hint"),
   addForm: document.getElementById("todo-add-form"),
   addText: document.getElementById("todo-add-text"),
   addButton: document.getElementById("todo-add-button"),
@@ -40,7 +38,6 @@ const elements = {
 
 // Codes der Fachlogik, die einen Zustand benennen statt eines Lesefehlers.
 const codeUnavailable = "kephalaion_unavailable";
-const codeNotMigrated = "todos_not_migrated";
 
 // Ab dieser Zeichenzahl wird ein Eintrag gekürzt angezeigt — über /k-todo
 // kommt oft ein einziger, langer Fließtextsatz hinzu. Rund zwei Zeilen.
@@ -75,7 +72,6 @@ async function load() {
 function render(data) {
   elements.todosList.replaceChildren();
   elements.todosMessage.textContent = data.message || "";
-  showHint(elements.todosHint, data.hint);
   const usable = Boolean(data.available) && data.code !== codeUnavailable;
   elements.addText.disabled = !usable;
   elements.addButton.disabled = !usable;
@@ -115,18 +111,6 @@ function render(data) {
   fillList(elements.todosList, todos, elements.todosMessage);
   elements.todosPill.className = "pill ok";
   elements.todosPill.textContent = todos.length === 1 ? "1 offen" : `${todos.length} offen`;
-}
-
-// showHint zeigt einen Hinweis über der Liste — etwa ein noch nicht
-// übernommenes data/todos.json oder eine zurückgebliebene TODO.md. Er ist
-// ausdrücklich kein Fehler: Liste und Zählpille bleiben stehen.
-// Der Fehlerfall ist data.message, und nur der blendet die Liste aus.
-function showHint(element, hint) {
-  if (!element) {
-    return;
-  }
-  element.textContent = hint || "";
-  element.hidden = !hint;
 }
 
 // fillList baut die Zeilen einer Liste. Ein langer Eintrag steht zunächst
@@ -185,9 +169,6 @@ async function postTodo(url, body) {
 
 // describeFailure macht aus einer abgelehnten Änderung einen Satz.
 function describeFailure(data) {
-  if (data.code === codeNotMigrated) {
-    return "Noch nicht übernommen: Erst k-playbook todo migrate übernimmt data/todos.json in die Collection; bis dahin wird nichts angelegt oder geändert.";
-  }
   if (data.code === codeUnavailable) {
     return "Kephalaion ist nicht erreichbar; nichts wurde geändert. " + (data.message || "");
   }
@@ -361,7 +342,6 @@ async function loadDone() {
 function renderDone(data) {
   elements.doneList.replaceChildren();
   elements.doneMessage.textContent = data.message || "";
-  showHint(elements.doneHint, data.hint);
 
   if (!data.available) {
     elements.doneList.classList.add("empty");

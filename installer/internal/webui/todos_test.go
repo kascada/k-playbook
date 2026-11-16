@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -18,9 +17,6 @@ func todoGUIProject(t *testing.T) (string, *kephtest.Store) {
 	t.Helper()
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(project.LocalDir(root), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	chdir(t, root)
@@ -94,24 +90,7 @@ func TestTodoEndpunkteAnlegenAbhakenSuchen(t *testing.T) {
 }
 
 func TestTodoEndpunkteMeldenZustaende(t *testing.T) {
-	root, store := todoGUIProject(t)
-	if err := os.MkdirAll(project.TodoDataDir(root), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(project.TodoFile(root), []byte(`{"todos":[]}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	list := decodeJSONBody[todosResponse](t, serveTodos(t, http.MethodGet, "/api/todos", ""))
-	if list.Message != "" || !strings.Contains(list.Hint, "k-playbook todo migrate") {
-		t.Fatalf("Liste vor der Übernahme: %+v", list)
-	}
-	rejected := decodeJSONBody[todoResponse](t, serveTodos(t, http.MethodPost, "/api/todos", `{"text":"neu"}`))
-	if rejected.OK || rejected.Code != project.TodoCodeNotMigrated || rejected.Hint == "" {
-		t.Fatalf("anlegen vor der Übernahme: %+v", rejected)
-	}
-	if len(store.Names()) != 0 {
-		t.Fatalf("trotz Sperre angelegt: %v", store.Names())
-	}
+	root, _ := todoGUIProject(t)
 
 	project.OpenTodoStore = func(string) (project.TodoStore, string, error) {
 		_, err := project.OpenUserDocs(root)

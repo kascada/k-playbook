@@ -13,7 +13,7 @@
 // unsauberem Ende neu vergeben sein.
 //
 // Die Datei liegt im Laufzeitverzeichnis des Nutzers, nicht im Projekt: Sie
-// gehört zu diesem Rechner, und k-playbook-local/ gehört dem Projekt.
+// gehört zu diesem Rechner, nicht zum Projekt.
 package guiproc
 
 import (

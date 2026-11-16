@@ -44,8 +44,7 @@ const githubContextTimeout = 5 * time.Second
 
 // contextGitHub baut das Feld github. gitDir ist das Verzeichnis, ab dem git
 // das Repo sucht — das Startverzeichnis des Aufrufs, damit ein eigenes Repo
-// unterhalb des Projekts (etwa k-playbook-local/) sein eigenes Remote
-// bekommt. Kein Netz, kein Token-Wert, keine Datei geschrieben; die Kosten
+// unterhalb des Projekts sein eigenes Remote bekommt. Kein Netz, kein Token-Wert, keine Datei geschrieben; die Kosten
 // sind Judge (gh-Konfiguration, Dateien, `ssh -G` je ssh host, Frist 3 s je
 // Host), drei bis vier git-Aufrufe und höchstens ein weiteres `ssh -G` für einen
 // Remote-Alias, den die Datei nicht nennt.

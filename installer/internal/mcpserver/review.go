@@ -152,11 +152,9 @@ func (m aiRecipeMetadata) auditContract() review.AuditContract {
 }
 
 type reviewProjectEnvelope struct {
-	InputDir      string   `json:"inputDir"`
-	Root          string   `json:"root,omitempty"`
-	LocalDir      string   `json:"localDir,omitempty"`
-	ReviewRunsDir string   `json:"reviewRunsDir,omitempty"`
-	Languages     []string `json:"languages,omitempty"`
+	InputDir  string   `json:"inputDir"`
+	Root      string   `json:"root,omitempty"`
+	Languages []string `json:"languages,omitempty"`
 }
 
 type reviewErrorEnvelope struct {
@@ -183,11 +181,13 @@ type reviewToolError struct {
 func (e reviewToolError) Error() string { return e.Message }
 
 type reviewEnvironment struct {
-	InputDir  string
-	Root      string
-	LocalDir  string
-	TargetDir string
-	Languages []string
+	InputDir string
+	Root     string
+	// ResultsDir ist das Ergebnisverzeichnis aus review.ResultsDir: Darunter
+	// liegen die Läufe und die known-decisions.md.
+	ResultsDir string
+	TargetDir  string
+	Languages  []string
 }
 
 const (
@@ -203,6 +203,11 @@ const (
 	reviewInputMarkdown    = "review-input.md"
 )
 
+// resultsDirUndecidedCode ist der Fehlercode, wenn review.ResultsDir keinen Ort
+// kennt. Hinter der Sperre erreicht ihn kein Aufruf; er steht für den Tag, an
+// dem die Sperre fällt, bevor der Ort entschieden ist.
+const resultsDirUndecidedCode = "results_dir_undecided"
+
 // reviewPausedPrefix steht vorn in der Beschreibung der gesperrten Werkzeuge,
 // damit ein Assistent die Sperre schon in der Werkzeugliste sieht.
 const reviewPausedPrefix = "Vorübergehend nicht verfügbar: Die Ablage der Review-Ergebnisse wird umgebaut; " +
@@ -210,18 +215,20 @@ const reviewPausedPrefix = "Vorübergehend nicht verfügbar: Die Ablage der Revi
 
 // addReviewTools meldet die fünf Review-Werkzeuge an.
 //
-// Vier davon sind gesperrt, solange die Review-Wege pausieren (review.Paused,
-// Task 147): create, scan, merge und write_ai_entry bleiben mit Namen und
-// Schema in der Werkzeugliste, antworten aber über pausedReviewTool mit
-// reviews_paused, ohne das Projekt aufzulösen oder etwas zu schreiben. Ihre
-// Handler bleiben stehen und werden hier nur durchgereicht — fällt die Sperre,
-// fällt allein die Hülle. k_playbook_review_status liest nur (Läufe,
-// Eintragszustände, Auswahlbasis) und legt nichts an; es bleibt offen.
+// Alle fünf sind gesperrt, solange die Review-Wege pausieren (review.Paused,
+// Task 147): status, create, scan, merge und write_ai_entry bleiben mit Namen
+// und Schema in der Werkzeugliste, antworten aber über pausedReviewTool mit
+// reviews_paused, ohne das Projekt aufzulösen, etwas zu lesen oder zu
+// schreiben. Ihre Handler bleiben stehen und werden hier nur durchgereicht.
+// Wer die Sperre aufhebt, braucht zusätzlich den Ort der Ergebnisse
+// (review.ResultsDir liefert bis zur Entscheidung nur einen Fehler) und einen
+// Ausschluss dieses Orts für die Scanner, damit sie Rohausgaben früherer
+// Läufe nicht lesen.
 func addReviewTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolStatus,
-		Description: "Liest den Status eines Review-Laufs oder berechnet die Auswahlbasis für einen neuen Lauf. Schreibt nichts.",
-	}, reviewStatusTool)
+		Description: reviewPausedPrefix + "Liest den Status eines Review-Laufs oder berechnet die Auswahlbasis für einen neuen Lauf. Schreibt nichts.",
+	}, pausedReviewTool(reviewToolStatus, reviewStatusTool))
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        reviewToolCreate,
 		Description: reviewPausedPrefix + "Legt einen Review-Lauf an oder gibt im Dry-Run die validierte run.json-Struktur zurück.",
@@ -359,9 +366,9 @@ func reviewAvailableStatus(env reviewEnvironment) (map[string]any, reviewToolErr
 	if toolErr.Code != "" {
 		return nil, toolErr
 	}
-	runs, err := review.ListRuns(env.LocalDir)
+	runs, err := review.ListRuns(env.ResultsDir)
 	if err != nil {
-		return nil, wrapError(err, "read_failed", "Review-Läufe sind nicht lesbar.", map[string]any{"path": review.ResultsDir(env.LocalDir)})
+		return nil, wrapError(err, "read_failed", "Review-Läufe sind nicht lesbar.", map[string]any{"path": env.ResultsDir})
 	}
 	today := time.Now().Format(review.DateLayout)
 	todayExists := false
@@ -430,7 +437,7 @@ func createReviewRun(env reviewEnvironment, input reviewCreateInput) (map[string
 			Details: map[string]any{"run": runName, "runDir": runDirFor(env, runName)},
 		}
 	}
-	runDir, err := review.CreateRun(env.LocalDir, day, env.Languages, selected)
+	runDir, err := review.CreateRun(env.ResultsDir, day, env.Languages, selected)
 	if err != nil {
 		code := "write_failed"
 		message := "Review-Lauf konnte nicht angelegt werden."
@@ -521,7 +528,7 @@ func mergeReviewRun(env reviewEnvironment, input reviewMergeInput) (map[string]a
 		RunDir:              runDir,
 		KPlaybookVersion:    mcpKPlaybookVersion(),
 		SeverityMappingPath: merge.SeverityCatalog(project.SharedDir()),
-		LocalDir:            env.LocalDir,
+		DecisionsDir:        env.ResultsDir,
 	})
 	if err != nil {
 		code := "merge_failed"
@@ -2174,22 +2181,28 @@ func resolveReviewEnvironment(inputDir string) (reviewEnvironment, reviewToolErr
 	}
 
 	root := environment.ProjectDir
+	resultsDir, err := review.ResultsDir()
+	if err != nil {
+		return reviewEnvironment{}, reviewToolError{
+			Code:    resultsDirUndecidedCode,
+			Message: err.Error(),
+			Details: map[string]any{},
+		}
+	}
 	return reviewEnvironment{
-		InputDir:  inputDir,
-		Root:      root,
-		LocalDir:  project.LocalDir(root),
-		TargetDir: project.RepoRootDir(root, config),
-		Languages: languages,
+		InputDir:   inputDir,
+		Root:       root,
+		ResultsDir: resultsDir,
+		TargetDir:  project.RepoRootDir(root, config),
+		Languages:  languages,
 	}, reviewToolError{}
 }
 
 func (env reviewEnvironment) projectEnvelope() reviewProjectEnvelope {
 	return reviewProjectEnvelope{
-		InputDir:      env.InputDir,
-		Root:          env.Root,
-		LocalDir:      env.LocalDir,
-		ReviewRunsDir: review.ResultsDir(env.LocalDir),
-		Languages:     append([]string{}, env.Languages...),
+		InputDir:  env.InputDir,
+		Root:      env.Root,
+		Languages: append([]string{}, env.Languages...),
 	}
 }
 
@@ -2244,7 +2257,7 @@ func reviewResult(envelope reviewEnvelope, toolError bool) *mcp.CallToolResult {
 }
 
 func runDirFor(env reviewEnvironment, runName string) string {
-	return review.RunDir(env.LocalDir, runName)
+	return review.RunDir(env.ResultsDir, runName)
 }
 
 func runExists(runDir string) bool {
