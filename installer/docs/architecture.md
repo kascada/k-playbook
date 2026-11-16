@@ -1961,8 +1961,8 @@ dazu, dass die Auswahl aus den Manifesten erkannt und noch nicht gespeichert ist
 **Keine Rekursion.** Geprüft wird nur die oberste Ebene von `project.repo_root` und,
 falls verschieden, die oberste Ebene des Hauptverzeichnisses. Ein rekursiver Lauf träfe
 `node_modules/`, `vendor/` und Monorepo-Rauschen und liefe bei jedem `k-playbook context`
-mit; eine Ausschlussliste braucht es so nicht, denn die beiden k-playbook-Verzeichnisse
-sind Verzeichnisse, keine Manifeste.
+mit; eine Ausschlussliste braucht es so nicht, denn auch ein liegengebliebener Clone
+`<projekt>/k-playbook/` ist ein Verzeichnis, kein Manifest.
 
 **Begrenzt auf die Tool-Matrix.** Das Ergebnis wird auf die Sprachen beschnitten, die
 `ReadToolLanguages()` aus `scripts/security-tools.tsv` liest — dieselbe Funktion, aus der

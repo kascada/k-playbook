@@ -50,9 +50,9 @@ var languageManifests = []languageManifest{
 // und, falls verschieden, die oberste Ebene des Hauptverzeichnisses: ein
 // rekursiver Lauf träfe node_modules/, vendor/ und Monorepo-Rauschen und
 // liefe bei jedem `k-playbook context` mit. Eine Ausschlussliste braucht es
-// so nicht — die beiden k-playbook-Verzeichnisse sind Verzeichnisse, keine
-// Manifeste. Ist die Konfiguration nicht lesbar, gilt das Hauptverzeichnis
-// allein.
+// so nicht — auch ein liegengebliebener Clone <projekt>/k-playbook/ ist ein
+// Verzeichnis, kein Manifest. Ist die Konfiguration nicht lesbar, gilt das
+// Hauptverzeichnis allein.
 //
 // Die Begrenzung auf die Tool-Matrix hat einen Grund: eine Sprache, für die
 // kein Tool zuständig ist, wäre in der Auswahl der Oberfläche eine tote

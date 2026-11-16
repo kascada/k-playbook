@@ -57,7 +57,8 @@ oder weil Kephalaion aktualisiert bzw. sein Node neu gestartet wurde —, endet 
 mit genau diesem Hinweis: Der laufende MCP-Server behält das alte Binary, bis der Assistent ihn
 neu startet, und die Verbindung zu einem neu gestarteten Node ist danach nicht verlässlich.
 Füge hinzu, dass die Umstellungen aus Schritt 3 danach mit einem zweiten Lauf von `/k-upgrade`
-folgen; sie brauchen die Werkzeuge des neuen Programms und einen erreichbaren Node.
+folgen; 3.8 setzt voraus, dass Schritt 2 das laufende Programm als neuestes Release meldet,
+und das tut nach einem Programmwechsel erst der zweite Lauf.
 
 ## Schritt 3 — Umstellungen
 
@@ -141,9 +142,9 @@ fehlt —, löschst du nichts, meldest
 Fehlermeldung, gekürzt auf eine Zeile — und gehst zu d).
 
 Gibt der erste Befehl etwas aus oder ist die Zahl größer als 0, nennst du das, bevor du
-löschst: jede Zeile des ersten Befehls, ohne die Grenze von fünf Pfaden, und die Zahl der
-Commits. Das ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage
-gibt es auch dann nicht.
+löschst: jede Zeile des ersten Befehls, auch wenn es viele sind, und die Zahl der Commits. Das
+ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage gibt es auch
+dann nicht.
 
 **c) Löschen.** Frühere Versionen haben dem Clone den Schreibzugriff entzogen; deshalb gibst du
 ihn zuerst frei und löschst dann das Verzeichnis samt Inhalt im Dateisystem:

@@ -935,7 +935,7 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 		`git -C "<context.project.dir>/k-playbook" status --porcelain --ignored`,
 		`git -C "<context.project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes`,
 		"`k-playbook/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`",
-		"ohne die Grenze von fünf Pfaden",
+		"jede Zeile des ersten Befehls, auch wenn es viele sind, und die Zahl der Commits",
 		"Das ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage gibt es auch dann nicht.",
 		`chmod -R u+w -- "<context.project.dir>/k-playbook"`,
 		`rm -rf -- "<context.project.dir>/k-playbook"`,
