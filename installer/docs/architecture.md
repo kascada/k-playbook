@@ -24,8 +24,8 @@ nicht der Aufruf.
 ## Acht Einstiege
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory`, `todo`, `docs`, `upgrade`, `vscode`,
-`version` und `stop`. `troubleshooting` steht nur in der Hilfe: bis zu seinem eigenen Task
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `docs`, `upgrade`, `maintain` (siehe
+„Wartungslauf (maintain)“), `vscode`, `version` und `stop`. `troubleshooting` steht nur in der Hilfe: bis zu seinem eigenen Task
 ein Platzhalter (siehe „Umgebungsprüfung: `health`“). Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
 es gibt nur diese Übersicht aus.
 
@@ -2677,6 +2677,46 @@ daran erkennt Kephalaion seine Mahnung, die es nur in ein Verzeichnis ohne `READ
 - **Restlücke.** Läuft das Einrichten, bevor Kephalaion bereit ist, steht bis zum nächsten
   Upgrade oder `/k-docs alle` Kephalaions Mahnung da; k-playbook ersetzt sie dann als
   abweichend.
+
+## Wartungslauf (maintain)
+
+`k-playbook maintain` (Task 161) ist der Einstieg für die Wartung eines Projekts: benannte
+Schritte ohne KI und ohne Rückfrage, damit ihn später ein Cron-Job aufrufen kann. Vertrag:
+`defaults/docs/handbook/k-playbook-format.md`, Abschnitt `maintenance`.
+
+- **Schritte.** `maintenanceSteps` (`project/maintenance.go`) ist die eine Liste mit Name,
+  Kurzbeschreibung und Funktion; ihre Reihenfolge ist die des Laufs. `--only`,
+  `maintenance.daily`, die Vorgabe `DefaultMaintenanceDaily` und die Hilfe beziehen die
+  Namen von dort. `RunMaintenance` prüft vor jedem Schreiben Konfiguration, Fassung, den
+  lesbaren Block und alle Namen (`MaintenanceSelectionError` → Exit 2); danach liefert jeder
+  Schritt `erfolgreich`, `übersprungen` oder `Fehler` mit Grund. Ein späterer Schritt — etwa
+  die Queues mit KI — ist ein weiterer Eintrag.
+- **Block `maintenance:`.** `project/maintenance_config.go` liest ihn zeilenweise als Baum
+  (`parseMaintenanceTree`), ohne YAML-Bibliothek. Dieselbe Struktur trägt das Ergänzen:
+  `planMaintenanceBlock` setzt fehlende Felder hinter die letzte Zeile ihres Elternknotens
+  ein, an derselben Stelle das tiefer Eingerückte zuerst, und schreibt nichts, wenn der Aufbau
+  nicht eindeutig ist. `ApplyAssistantSetup` ruft `EnsureMaintenanceBlock`, damit erben
+  `k-playbook upgrade` und Einrichten/Aktualisieren in der Oberfläche den Schritt;
+  `upgrade --check` fragt `PlanMaintenanceBlock`. `CreateConfig` schreibt den Block mit.
+- **Ziel.** `ResolveMaintenanceTarget` wertet Symlinks aus (für ein fehlendes Ziel auf dem
+  nächsten vorhandenen Vorfahren) und prüft gegen `project.repoRoot`, Hauptverzeichnis, `.git`,
+  `.k-playbook/` und `k-playbook-local/`. Dasselbe geprüfte Ziel landet über `contextDocs` als
+  verankerter Eintrag in `context.docs.exclude`, nie in der Datei.
+- **Export.** `runDocsBackup` (`project/maintenance_backup.go`) ruft
+  `kephalaion node dir pull` als Prozess mit Argumentliste, ohne Shell und ohne Eingabe, in
+  eigener Prozessgruppe. Ein SIGINT oder SIGTERM an `maintain` geht genau einmal an
+  Kephalaion weiter, das zwischen zwei Vorgängen endet (Exit 3); `maintain` läuft weiter,
+  meldet den Abbruch und committet nicht. `maintenanceExport` ist die Naht für Tests.
+- **Sperre.** `flock` auf eine Datei je Ziel unter `~/.cache/k-playbook/locks/` (nicht im
+  Repository, damit nichts im Arbeitsbaum auftaucht), nicht blockierend: Ein zweiter Lauf auf
+  dasselbe Ziel wird abgelehnt statt zu warten. Die Sperrdatei bleibt liegen; sie zu löschen
+  öffnete ein Fenster für zwei Läufe auf verschiedenen Dateien. Nur Linux und macOS, wie
+  `internal/procgroup`.
+- **Commit.** `git add -A` und `git commit --only`, beide mit `--literal-pathspecs` auf das
+  Ziel beschränkt: Vorgemerktes außerhalb bleibt vorgemerkt und kommt nicht in den Commit,
+  auch im Repository ohne ersten Commit. `check-ignore` auf die Markierung erkennt ein
+  ignoriertes Ziel. Kein Reset, kein Stash, kein Push; Hooks laufen, ihr Scheitern ist ein
+  gemeldeter Git-Fehler.
 
 ## GitHub CLI
 

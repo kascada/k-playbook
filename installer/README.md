@@ -15,6 +15,8 @@ k-playbook config create
                                      # legt .k-playbook/K-PLAYBOOK.yaml im aktuellen Verzeichnis an
 k-playbook briefing                 # was für dieses Projekt gilt und was ansteht — der Einstieg jeder Sitzung
 k-playbook upgrade [--check]        # Programm aktualisieren und das Projekt nachziehen
+k-playbook maintain [--only …] [--dry-run] [--commit]
+                                     # Wartungslauf ohne KI und Rückfrage, etwa die Doku-Sicherung
 k-playbook context                  # gibt den aufgelösten Arbeitsstand als JSON aus (wird abgebaut)
 k-playbook stop                     # beendet den Hintergrunddienst dieses Projekts
 k-playbook help
@@ -47,7 +49,11 @@ das Briefing umziehen. Beide räumen bewusst nichts auf — deren Ausgabe würde
 Antwort stören. `upgrade` zieht Kephalaion, Programm und Projekt nach: das Binary nur,
 wenn das laufende älter ist als der neueste Release-Tag auf GitHub — dann direkt aus dem
 Release, geprüft gegen die `SHA256SUMS` des Tags —; dann `AGENTS.md`, `CLAUDE.md`,
-Verlinkung und MCP-Einträge; `--check` meldet nur, was ein Lauf täte.
+Verlinkung, die fehlenden Felder des Blocks `maintenance:` (Sicherung aus, vorhandene Werte
+bleiben) und MCP-Einträge; `--check` meldet nur, was ein Lauf täte. `maintain` führt die
+Wartungsschritte aus — heute `docs-backup`, die Sicherung von `keph:/docs/` in einen Ordner
+des Repositorys, auf Wunsch mit Commit nur dieses Ordners (Vertrag:
+`defaults/docs/handbook/k-playbook-format.md`, Abschnitt `maintenance`).
 
 Es gibt genau zwei Versionsquellen: die eigene Version im Binary und den neuesten
 Release-Tag. `k-playbook version` nennt die erste, `k-playbook version --all` zusätzlich

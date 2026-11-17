@@ -201,7 +201,9 @@ func TestDocsExcludeAddToolAblauf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
-	if len(built.Docs.Exclude) != 1 || built.Docs.Exclude[0] != "docs/" {
+	// Dahinter das Sicherungsziel aus dem Block maintenance: der neuen Datei
+	// (Task 161); es steht nicht in docs.exclude der Datei.
+	if len(built.Docs.Exclude) != 2 || built.Docs.Exclude[0] != "docs/" || built.Docs.Exclude[1] != "/keph-backup/docs/" {
 		t.Errorf("context.docs.exclude = %v", built.Docs.Exclude)
 	}
 

@@ -68,7 +68,7 @@ tools:
 # Umschalten der Branches.
 git:
   switch: unknown
-`
+` + "\n" + maintenanceBlock() // ergänzt seit Task 161
 	if got := readFile(t, ConfigPath(root)); got != want {
 		t.Errorf("K-PLAYBOOK.yaml nach dem Einrichten:\n%s\nerwartet:\n%s", got, want)
 	}
@@ -112,7 +112,7 @@ remediation:
 # docs:
 #   exclude:
 #     - docs/
-`
+` + "\n" + maintenanceBlock() // ergänzt seit Task 161
 	if got := readFile(t, ConfigPath(root)); got != want {
 		t.Errorf("K-PLAYBOOK.yaml nach dem Einrichten:\n%s\nerwartet:\n%s", got, want)
 	}
@@ -125,7 +125,8 @@ remediation:
 // und das Feld bleibt leer.
 func TestApplyAssistantSetupOhneGHBlockUnberuehrt(t *testing.T) {
 	root := newProject(t)
-	content := "schema_version: 3\n\ntools:\n  mcp:\n    required: []\n"
+	// Mit Block maintenance:, sonst ergänzte das Einrichten ihn (Task 161).
+	content := "schema_version: 3\n\ntools:\n  mcp:\n    required: []\n\n" + maintenanceBlock()
 	writeFile(t, ConfigPath(root), content)
 	before, err := os.Stat(ConfigPath(root))
 	if err != nil {

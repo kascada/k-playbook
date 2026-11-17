@@ -34,11 +34,19 @@ type ContextDocs struct {
 	Problems []DocsExcludeProblem `json:"problems"`
 }
 
-// contextDocs baut den Abschnitt aus der gelesenen Konfiguration.
-func contextDocs(config Config) ContextDocs {
+// contextDocs baut den Abschnitt aus der gelesenen Konfiguration. Nennt der
+// Block maintenance: ein gültiges Sicherungsziel, kommt es als verankerter
+// Eintrag relativ zu project.repoRoot dazu (maintenanceDocsExclude), gleich ob
+// die Sicherung eingeschaltet ist: Der Export ist kein Quelltext, und eine
+// Änderung darin löst so auch keinen Doku-Auftrag aus. In docs.exclude der
+// Datei wird er nicht geschrieben.
+func contextDocs(projectDir string, config Config) ContextDocs {
 	docs := ContextDocs{Exclude: []string{}, Problems: []DocsExcludeProblem{}}
 	docs.Exclude = append(docs.Exclude, config.DocsExclude...)
 	docs.Problems = append(docs.Problems, config.DocsProblems...)
+	if entry, ok := maintenanceDocsExclude(projectDir, config); ok && !containsString(docs.Exclude, entry) {
+		docs.Exclude = append(docs.Exclude, entry)
+	}
 	return docs
 }
 

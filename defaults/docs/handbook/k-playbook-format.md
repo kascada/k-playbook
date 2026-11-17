@@ -463,9 +463,27 @@ remediation:
 #   exclude:
 #     - docs/
 #     - vendor/
+
+maintenance:
+  # Maintenance run `k-playbook maintain`: daily is the daily programme without --only.
+  # backup mirrors keph:/docs/ into target (relative to the project root, a
+  # folder in the repository reserved for it). Applies to all users; with
+  # several people git.commit stays false, and only the person in charge
+  # runs `k-playbook maintain --commit`.
+  daily:
+    - docs-backup
+  backup:
+    enabled: false
+    source: docs
+    target: keph-backup/docs
+    git:
+      commit: false
 ```
 
-The `docs:` block is written as a comment only: without it nothing changes.
+The `docs:` block is written as a comment only: without it nothing changes. The
+`maintenance:` block is written with the backup switched off (section
+[`maintenance`](#maintenance)). The comments in the file the tool writes are German; they are
+translated here.
 
 ## Complete example
 
@@ -493,6 +511,16 @@ docs:
 kephalaion:
   hub: vm
   collection: app
+
+maintenance:
+  daily:
+    - docs-backup
+  backup:
+    enabled: true
+    source: docs
+    target: keph-backup/docs
+    git:
+      commit: false
 
 tools:
   mcp:
@@ -694,6 +722,14 @@ quoted entry.
 
 `k-playbook context` and the briefing carry the list as `context.docs.exclude` and the
 rejected entries as `context.docs.problems`. Commands read it from there, never from the file.
+`context.docs.exclude` also carries the backup target of the [`maintenance`](#maintenance)
+block whenever that block is present and its target passes the checks, enabled or not: as an
+entry anchored at `project.repo_root` and marked as a directory, for example
+`/keph-backup/docs/` or `/sub/keph-backup/docs/` when the project root lies below the
+repository root. The export is not source code, so it stays out of the code scan, and a
+change inside it queues no documentation job. This entry is computed and never written into
+`docs.exclude` of the file; the leading `/` that the file rejects as absolute is intended
+here.
 `/k-docs-code` applies it to every scan, including additional sources from `hints`; a path
 given explicitly as the argument is scanned anyway. Without the block, `exclude` is empty and
 nothing changes.
@@ -744,6 +780,96 @@ comment; every other line stays byte for byte, and no account is ever written. A
 value in its header line, the block twice, or `hub:`/`collection:` twice is not rewritten.
 The file is versioned, so the change wants to be committed.
 
+### `maintenance`
+
+The maintenance run `k-playbook maintain` (task 161): the daily programme and the backup of
+the project documentation from Kephalaion into a folder of the repository. Optional; a new
+file carries it with the backup switched off, and `k-playbook upgrade` adds what is missing.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `daily` | list of step names | `docs-backup` | the steps a run without `--only` executes |
+| `backup.enabled` | `true`/`false` | `false` | whether `docs-backup` exports at all |
+| `backup.source` | string | `docs` | what is exported; only `docs` (everything under `keph:/docs/`, recursively) |
+| `backup.target` | path | `keph-backup/docs` | the folder, relative to the project root (`project.dir`) |
+| `backup.git.commit` | `true`/`false` | `false` | commit the target after a complete export, as if `--commit` were given |
+
+Hub and collection come from the [`kephalaion`](#kephalaion) block; there is no second
+address. Queues, tasks, workbench and other collection content are not exported. The backup
+is a mirror of the documentation in Git, not a backup of the collection and no replacement for
+database or hub backups.
+
+The block is read line by line like `docs:`. Only the block list is read for `daily`, one
+`- <step>` per line; a one-line value such as `daily: [docs-backup]` is reported, not read as
+empty, and `daily: []` is the empty programme. Without `daily` the fixed default
+`docs-backup` applies. A value other than `true`/`false`, a `source` other than `docs`, a
+mapping written on one line (`git: {commit: true}`), a key twice, tabs in the indentation or
+children in different columns are reported with their line; a maintenance run then starts no
+step. Unknown keys stay and are ignored.
+
+`enabled` and `git.commit` hold for everybody who works on the project, like the whole file.
+In a project with several people `git.commit` stays `false`, and only the person in charge
+(or their cron job) runs `k-playbook maintain --commit`. With `enabled: true` everybody who
+runs `maintain` exports; whoever does not commit then has changed versioned files under the
+target in their working tree, and a later `git pull` of the backup commit may fail on them.
+
+**The target** is resolved against the project root. After resolving symlinks (for a target
+that does not exist yet, on its nearest existing ancestor) it must lie below
+`project.repo_root`. It must not be `project.repo_root`, the project root, `.git`,
+`.k-playbook/` or `k-playbook-local/`, must not be an ancestor of any of them and must not
+lie inside `.git`, `.k-playbook/` or `k-playbook-local/`; an absolute path or one starting
+with `~` is rejected. The folder is reserved for the export: the first run takes place only
+if the target is missing or empty and then creates the marker file `.k-playbook-backup` in
+it. Every later run requires the marker, and every export passes
+`--exclude .k-playbook-backup`, so `--delete` never removes it. A non-empty target without
+marker stops the step before the export.
+
+**`k-playbook maintain [--only <step>[,<step>…]] [--dry-run] [--commit]`** runs the steps
+without AI and without asking, so a cron job can call it later; without a terminal it
+behaves the same. The steps run in the fixed order the code keeps, whatever order `--only`
+or `daily` names them in; today there is only `docs-backup`. An unknown name in `--only` or
+`daily` is rejected before anything is written, and the message names the valid ones. Each
+step reports `erfolgreich`, `übersprungen` or `Fehler` with a reason, then the overall result;
+the exit code is 0 without a failed step (skipped is no failure), 1 once a step fails, 2 for
+an invalid call or an unknown step.
+
+`docs-backup` does nothing and reports `übersprungen` when the backup is off or the block is
+missing. Otherwise it needs `kephalaion.ok` as in `k-playbook context`, checks the target and
+its marker, locks the target against a parallel run (a second run on the same target is
+rejected) and calls, without a shell,
+
+```sh
+kephalaion node dir pull <hub>:<collection> docs <target> --delete --exclude .k-playbook-backup
+```
+
+as a client of the local node with this machine's default account. `--dry-run` passes
+`--dry-run` on, creates no marker, writes no file, configuration or Git state and says
+whether a commit would be requested. The exit code of the export decides:
+
+| Code | Kephalaion | Report of the step |
+|---|---|---|
+| 0 | done, complete | success; a commit may follow |
+| 1 | error (preflight, node unreachable, forbidden, not readable) | error with Kephalaion's message, no commit |
+| 2 | wrong call | "Kephalaion zu alt oder falscher Aufruf → /k-upgrade", no commit |
+| 3 | incomplete (aborted, timeout, reported conflicts) | "partiell, erneut ausführen, kein Commit" |
+
+Every code other than 0, an interruption (SIGINT or SIGTERM is passed on to Kephalaion once)
+and an open outcome may leave a partly updated target; the step says so and never commits.
+After exit 0 it commits only if `--commit` or `git.commit: true` asks for it: `git add -A`
+and `git commit --only`, both limited to the target, so changes and deletions in the target
+are committed while changes already staged elsewhere stay staged and the rest of the working
+tree is untouched. No change means no commit; there is no push, reset or stash. Without Git,
+or when Git ignores the target, a requested commit is a reported error, and the export has
+run anyway. A failing commit (a hook, for instance) leaves the target's changes staged.
+
+**Upgrade.** `k-playbook upgrade` (and setting up in the interface) adds the block with the
+defaults above when it is missing, and only the missing fields when it is partly there. It
+never overwrites a value, an explicit `enabled: false` included, keeps foreign keys and
+comments byte for byte and changes nothing on a second run. A block it cannot place
+unambiguously (see the reported forms above) is reported, not written.
+`k-playbook upgrade --check` reports the addition as `würde ergänzt` and writes nothing. The
+file is versioned, so the addition wants to be committed.
+
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
@@ -753,6 +879,7 @@ The file is versioned, so the change wants to be committed.
 - The interface writes nothing under `tools:`; `tools.mcp` and `git` are only read. The one exception is removing the obsolete block `tools.gh` while setting up (section `tools.gh` (removed)); other blocks under `tools:` and their comments stay, and an empty `tools:` is removed. A new file has no `tools:` line.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
 - `docs.exclude` is written only by `k-playbook docs exclude add` and `k_playbook_docs_exclude_add`, after the user confirmed; only lines for new entries are inserted into the `docs:` block, nothing in it is rendered again, and a form that cannot be extended safely is refused (`unsupported`). A missing block is appended; unindented comments before the next block belong to what follows and stay, such as the commented `docs:` example of a new file.
+- The `maintenance:` block is only added to: setup and `k-playbook upgrade` insert missing fields with their defaults (backup off) behind the last line of their parent, never overwrite a value and write nothing when the block cannot be placed unambiguously; a missing block is appended. `k-playbook maintain` never writes the file.
 - Unknown top-level fields remain and are not changed unprompted. Writing occurs line by line so comments and order remain intact.
 - Host-local installation states do not belong in this file. The Kephalaion binding is not
   one of them: hub alias and collection are the same for every machine and live in the

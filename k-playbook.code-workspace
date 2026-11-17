@@ -12,5 +12,7 @@
 			"uri": "keph://vm/k-playbook-dev"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"terminal.integrated.cwd": "${workspaceFolder:k-playbook}"
+	}
 }

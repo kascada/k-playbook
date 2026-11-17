@@ -290,7 +290,7 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 			Languages: languages,
 		},
 		Remediation: remediation,
-		Docs:        contextDocs(config),
+		Docs:        contextDocs(projectDir, config),
 		GH:          DetectGH(),
 		MCP:         MCPRequirements{Required: requiredMCP, Configured: mcpConfigured},
 		Git:         gitSettings,

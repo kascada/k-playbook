@@ -213,8 +213,10 @@ missing from the `PATH`, otherwise updated through `kephalaion upgrade --auto` w
 Kephalaion considers that safe, with its node restarted; a hub, a global installation or an
 older `kephalaion` without `--auto` are only reported), then the release binary when the
 running program is older than the newest release tag, then
-`AGENTS.md`, `CLAUDE.md`, linking and MCP entries (a stale entry is replaced, a missing one
-added when the file is not tracked by Git), and last the `README.md` of the
+`AGENTS.md`, `CLAUDE.md`, linking, the missing fields of the `maintenance:` block in
+`K-PLAYBOOK.yaml` (with the backup switched off; existing values stay) and MCP entries (a
+stale entry is replaced, a missing one added when the file is not tracked by Git), and last
+the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
 as a hint) —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
@@ -228,6 +230,25 @@ The linking for the assistants catches up by itself afterwards — on the next
 assistant block of the interface. It follows the project's catalog, not the path by which
 the program was updated. For the new commands to arrive, the assistant has to be
 restarted once; it reads its list at startup.
+
+## Maintenance
+
+`k-playbook maintain` is the project's maintenance run: named steps, without AI and without
+asking, so a cron job can call it later. Without `--only` it runs the daily programme from
+`maintenance.daily` in `K-PLAYBOOK.yaml`; `--only <step>[,<step>…]` picks steps, `--dry-run`
+shows what would happen without writing, `--commit` asks for a Git commit after a complete
+export. Today there is one step, `docs-backup`: when `maintenance.backup.enabled` is `true` it
+mirrors `keph:/docs/` through `kephalaion node dir pull … --delete` into a folder of the
+repository reserved for it (`keph-backup/docs` by default, marked with `.k-playbook-backup`)
+and, when asked, commits only that folder — never a push. The backup is off until switched
+on; in a project with several people `git.commit` stays `false` and only the person in charge
+runs `--commit`. Fields, target checks, exit codes and the upgrade behaviour:
+[`k-playbook-format.md`](./defaults/docs/handbook/k-playbook-format.md#maintenance).
+
+```bash
+k-playbook maintain --dry-run
+k-playbook maintain --only docs-backup --commit
+```
 
 ## Building it yourself
 

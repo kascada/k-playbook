@@ -691,7 +691,7 @@ func upgradeProject(projectDir string) upgradeProjectReport {
 	report.LinksCreated = !project.LinksOK(before) && pending.Empty() && project.LinksOK(setup.Links)
 	report.Changed = setup.RootCreated || setup.RootExtended || setup.RootRefreshed ||
 		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated ||
-		len(setup.ConfigBlocksRemoved) > 0 || setup.Readmes.Changed()
+		len(setup.ConfigBlocksRemoved) > 0 || setup.Maintenance.Changed || setup.Readmes.Changed()
 
 	repair := project.RepairMCPReport(projectDir, project.MCPWriteOutdatedAndUnversioned)
 	report.MCPRepaired, report.MCPRepairedPortable, report.MCPMessage = repair.Repaired, repair.Portable, repair.Message
@@ -726,6 +726,9 @@ func (r upgradeProjectReport) messages() []string {
 		}
 		if len(setup.ConfigBlocksRemoved) > 0 {
 			lines = append(lines, "Projekt: "+project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
+		}
+		if note := project.DescribeMaintenanceBlock(setup.Maintenance, false); note != "" {
+			lines = append(lines, "Projekt: "+note)
 		}
 	}
 	switch {
@@ -787,6 +790,11 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	}
 	if project.LegacyGHBlockPresent(projectDir) {
 		report.Pending = append(report.Pending, "der abgelöste Block "+project.LegacyGHBlockName+" würde aus "+project.ConfigFileName+" entfernt.")
+	}
+	if maintenance, err := project.PlanMaintenanceBlock(projectDir); err != nil {
+		report.Pending = append(report.Pending, "der Block "+project.MaintenanceBlockName+" ist nicht prüfbar — "+err.Error())
+	} else if note := project.DescribeMaintenanceBlock(maintenance, true); note != "" {
+		report.Pending = append(report.Pending, note)
 	}
 
 	statuses := project.CheckLinks(projectDir)
@@ -923,7 +931,9 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      installierte Programm Schritt 2 aus.
   2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen, einen veralteten
      Anstoß auf k-playbook briefing bringen), CLAUDE.md als Include-Datei,
-     die Verlinkung der Commands und Skills, danach immer die MCP-Einträge:
+     die Verlinkung der Commands und Skills, in K-PLAYBOOK.yaml die fehlenden
+     Felder des Blocks maintenance mit den Vorgaben (Doku-Sicherung aus,
+     vorhandene Werte bleiben), danach immer die MCP-Einträge:
      ein veralteter wird ersetzt, ein fehlender ergänzt, wenn die Zieldatei
      nicht von git erfasst ist. Projekt-Prosa in AGENTS.md bleibt
      unangetastet.

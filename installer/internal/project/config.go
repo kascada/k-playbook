@@ -28,6 +28,10 @@ type Config struct {
 	// Kephalaion ist der Block kephalaion: — Hub-Alias und Collection der
 	// Anbindung (kephalaion_block.go). Ohne Block ist er leer.
 	Kephalaion ConfigKephalaion `json:"kephalaion"`
+	// Maintenance ist der Block maintenance: — Tagesprogramm und Doku-Sicherung
+	// des Wartungslaufs (maintenance_config.go). Ohne Block gelten die
+	// Vorgaben, Present ist false.
+	Maintenance ConfigMaintenance `json:"maintenance"`
 }
 
 // SchemaStatus benennt, wie die gefundene schema_version zum Werkzeug steht.
@@ -109,8 +113,9 @@ const resetHint = "`k-playbook gui` starten, der Block „Projektkonfiguration\"
 // ReadConfig liest die Konfiguration eines Projekts.
 //
 // Bewusst kein YAML-Parser: gelesen werden nur wenige Skalare, die Liste
-// docs.exclude (parseDocsExclude) und der Block kephalaion:
-// (parseKephalaionBlock), beide ebenfalls zeilenweise, und der
+// docs.exclude (parseDocsExclude), der Block kephalaion:
+// (parseKephalaionBlock) und der Block maintenance: (parseMaintenanceBlock),
+// alle ebenfalls zeilenweise, und der
 // zeilenweise Zugriff lässt Kommentare, Reihenfolge und unbekannte Blöcke
 // unangetastet, wenn später zurückgeschrieben wird.
 func ReadConfig(projectDir string) (Config, error) {
@@ -152,6 +157,7 @@ func ReadConfig(projectDir string) (Config, error) {
 	}
 	config.DocsExclude, config.DocsProblems = parseDocsExclude(string(data))
 	config.Kephalaion = parseKephalaionBlock(string(data))
+	config.Maintenance = parseMaintenanceBlock(string(data))
 	return config, nil
 }
 
@@ -322,8 +328,9 @@ project:
   vcs: %s
 
 %s
+%s
 %s`, SchemaVersion, repoRoot, vcs,
-		remediationBlock(DefaultRemediationMode), docsBlockExample)
+		remediationBlock(DefaultRemediationMode), docsBlockExample, maintenanceBlock())
 }
 
 func pathExists(path string) bool {

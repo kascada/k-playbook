@@ -25,6 +25,10 @@ type AssistantSetup struct {
 	// RootRefreshed ist das eine Änderung an einer Projektdatei und steht
 	// deshalb in der Antwort, nicht nur im Log.
 	ConfigBlocksRemoved []string `json:"configBlocksRemoved,omitempty"`
+	// Maintenance ist das Ergänzen des Blocks maintenance: (Task 161): was
+	// fehlte und mit den Vorgaben (Sicherung aus) ergänzt wurde, oder warum
+	// nichts ergänzt wurde. Auch das ist eine Änderung an einer Projektdatei.
+	Maintenance MaintenanceBlockResult `json:"maintenance"`
 	// Readmes ist der README-Schritt (Task 137): die README.md unter
 	// keph:/docs/ aus den Vorlagen. Ein eigenes Feld, kein Teil des
 	// Fehlerwerts — ohne bereites Kephalaion, bei einem langsamen Hub oder
@@ -35,7 +39,8 @@ type AssistantSetup struct {
 
 // ApplyAssistantSetup richtet einen Assistenten vollständig ein: Einordnen und
 // Auflösen der Instruktionsdateien, dann der Anstoß, dann die Verlinkung,
-// zuletzt das Entfernen abgelöster Blöcke aus K-PLAYBOOK.yaml.
+// dann das Entfernen abgelöster Blöcke aus K-PLAYBOOK.yaml und das Ergänzen
+// des Blocks maintenance:.
 //
 // Die Reihenfolge steckt bewusst hier und nicht in ApplyLinks. Im
 // Einrichten-Pfad läuft ApplyLinks nach ApplyRootInstructions — dann hätte die
@@ -96,6 +101,15 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	if removed {
 		setup.ConfigBlocksRemoved = append(setup.ConfigBlocksRemoved, LegacyGHBlockName)
 	}
+
+	// Der Block maintenance: wird ergänzt, nie überschrieben: Fehlende Felder
+	// kommen mit den Vorgaben dazu (Sicherung aus), vorhandene Werte und
+	// fremde Inhalte bleiben. Wie das Entfernen oben nur im Schreibweg.
+	maintenance, err := EnsureMaintenanceBlock(projectDir)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	setup.Maintenance = maintenance
 
 	setup.Readmes = setupDocsReadmes(projectDir)
 

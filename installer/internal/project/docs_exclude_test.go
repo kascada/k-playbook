@@ -28,7 +28,7 @@ func TestReadConfigOhneDocsBlock(t *testing.T) {
 		t.Errorf("DocsExclude = %v, DocsProblems = %v, erwartet beide leer", config.DocsExclude, config.DocsProblems)
 	}
 
-	data, err := json.Marshal(contextDocs(config))
+	data, err := json.Marshal(contextDocs("", config))
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -214,8 +214,10 @@ func TestCreateConfigSchreibtDocsAlsKommentar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
-	if built.Docs.Exclude == nil || len(built.Docs.Exclude) != 0 {
-		t.Errorf("context.docs.exclude = %#v, erwartet []", built.Docs.Exclude)
+	// Die neue Datei trägt den Block maintenance: (Task 161); sein Ziel ist
+	// der einzige Eintrag, docs.exclude der Datei bleibt leer.
+	if want := []string{"/keph-backup/docs/"}; !reflect.DeepEqual(built.Docs.Exclude, want) {
+		t.Errorf("context.docs.exclude = %#v, erwartet %v", built.Docs.Exclude, want)
 	}
 }
 

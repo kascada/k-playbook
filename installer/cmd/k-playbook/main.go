@@ -10,7 +10,7 @@
 // Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
 // Umgebung des Projekts, `github` liest und prüft die persönliche
 // GitHub-Zugangsdatei, `upgrade` aktualisiert das Programm und zieht
-// das Projekt nach,
+// das Projekt nach, `maintain` führt den Wartungslauf aus (Doku-Sicherung),
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
 // Adresse der Oberfläche, ohne sie anzufassen, `stop` beendet den
@@ -144,6 +144,11 @@ func run(args []string) error {
 		// und seine Ausgabe wird von /k-upgrade wörtlich wiedergegeben — eine
 		// Bereinigungsmeldung dazwischen gehörte nicht dazu.
 		return runUpgrade(args[1:])
+	case "maintain":
+		// Ohne Wirt-Pflege: der Wartungslauf soll genau seine Schritte tun
+		// und nichts daneben — und er läuft später aus einem Cron-Job, dessen
+		// Ausgabe gelesen wird.
+		return runMaintain(args[1:])
 	case "vscode":
 		// Ohne Wirt-Pflege: der ausdrückliche Weg zur VS-Code-Erweiterung
 		// soll genau das tun, wonach er gefragt wurde, und nichts daneben.
@@ -408,6 +413,17 @@ Unterkommandos:
             Schritt eine Meldung, am Ende der Hinweis auf den Neustart der
             Sitzung, wenn das Binary gewechselt hat. --check schreibt nichts
             und meldet, was ein Lauf täte. Das Gegenstück zu /k-upgrade.
+  maintain  Wartungslauf des Projekts, ohne KI und ohne Rückfrage, auch für
+            einen Cron-Job: k-playbook maintain [--only <schritt>[,…]]
+            [--dry-run] [--commit]. Ohne --only das Tagesprogramm aus
+            maintenance.daily von K-PLAYBOOK.yaml (ohne Feld docs-backup).
+            Schritt docs-backup: spiegelt keph:/docs/ über kephalaion node
+            dir pull nach maintenance.backup.target, nur wenn
+            maintenance.backup.enabled true ist; mit --commit oder
+            maintenance.backup.git.commit danach ein Commit nur dieses
+            Ziels, nie ein Push. Je Schritt Status und Grund; Exit-Code 0
+            ohne Fehler, 1 mit Fehler, 2 bei Aufruffehlern. Mehr:
+            k-playbook maintain --help.
   vscode    Die VS-Code-Erweiterung „k-playbook Workspace Tools“, die in
             diesem Programm steckt: k-playbook vscode install|status|
             vsix -o <datei>. Beim Start der Oberfläche wird sie selbsttätig
