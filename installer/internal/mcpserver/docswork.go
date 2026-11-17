@@ -113,7 +113,8 @@ func addDocsWorkTools(server *mcp.Server) {
 		Name:        docsToolCheckout,
 		InputSchema: docsProducerSchema[docsCheckoutInput](),
 		Description: "Holt erzeugte Doku eines Erzeugers (" + producers + ") aus der Projekt-Collection in ein lokales " +
-			"Arbeitsverzeichnis: alle .md unter keph:/docs/generated/<erzeuger>/ außer README.md, rekursiv, nach " +
+			"Arbeitsverzeichnis: alle .md unter keph:/docs/generated/<erzeuger>/ außer README.md und index.md (auf jeder " +
+			"Ebene; die index.md schreibt Kephalaion selbst), rekursiv, nach " +
 			"<projectDir>/.k-playbook/work/docs/<erzeuger>/ mit gleichem relativem Pfad; daneben die Merkdatei " +
 			"<erzeuger>.checkout.json (Revision, Inhalts-Hash, hints je Dokument), an der publish misst. Dort bearbeitest " +
 			"du mit den Datei-Werkzeugen und veröffentlichst mit k_playbook_docs_publish. Antwort: state checked_out " +
@@ -132,6 +133,8 @@ func addDocsWorkTools(server *mcp.Server) {
 			"Vorher geprüft, eine Ablehnung schreibt nichts: nur .md, keine README.md (invalid_input); jedes Dokument " +
 			"mit Frontmatter title und description (invalid_input); hints unverändert, und kein Dokument mit hints " +
 			"gelöscht oder neu angelegt — sonst hints_changed, außer mit allow_hints nach Bestätigung durch den Nutzer. " +
+			"Eine index.md (schreibt Kephalaion) wird übergangen, nicht abgelehnt: weder geschrieben noch gelöscht, auch " +
+			"wenn die Merkdatei eines älteren checkout sie führt. " +
 			"Ein Dokument, das seit dem checkout in Kephalaion geändert, angelegt oder gelöscht wurde, wird nicht " +
 			"geschrieben, sondern als conflict gemeldet. Danach schreibt publish die README.md des Verzeichnisses aus ihrer " +
 			"Vorlage k-playbook:/docs/generated/<erzeuger>/README.md, wenn sie fehlt oder abweicht; fehlt die Vorlage auf " +

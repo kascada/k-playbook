@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -866,5 +867,162 @@ func TestDocsPublishOhneCheckout(t *testing.T) {
 	}
 	if len(store.Calls) != calls {
 		t.Errorf("Kephalaion gefragt: %v", store.Calls[calls:])
+	}
+}
+
+// indexFixture legt für einen Erzeuger zwei Dokumente und die index.md an,
+// die Kephalaion beim Indizieren je Verzeichnis selbst schreibt — oben leer,
+// im Unterverzeichnis mit Inhalt (Task 163).
+func indexFixture(t *testing.T, store *kephtest.Store, producer string) {
+	t.Helper()
+	dir := "docs/generated/" + producer
+	store.Put(dir+"/01-a.md", docsDoc("A"))
+	store.Put(dir+"/sub/02-b.md", docsDoc("B"))
+	store.Put(dir+"/index.md", "")
+	store.Put(dir+"/sub/index.md", "---\ntitle: sub\n---\n\n- 02-b.md\n")
+}
+
+// docsIndexPaths sind die index.md, die indexFixture anlegt.
+var docsIndexPaths = []string{"index.md", "sub/index.md"}
+
+// Checkout übergeht die index.md auf jeder Ebene wie README.md: nicht
+// geholt, nicht in der Merkdatei — für beide Erzeuger (Task 163).
+func TestDocsCheckoutUebergehtIndex(t *testing.T) {
+	for _, producer := range DocsProducerNames() {
+		t.Run(producer, func(t *testing.T) {
+			root, store, work := docsWorkFixture(t)
+			indexFixture(t, store, producer)
+
+			result, err := work.Checkout(context.Background(), producer, DocsCheckoutOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var paths []string
+			for _, doc := range result.Docs {
+				paths = append(paths, doc.Path)
+			}
+			if !reflect.DeepEqual(paths, []string{"01-a.md", "sub/02-b.md"}) {
+				t.Errorf("geholt: %v", paths)
+			}
+			record, _, _ := readDocsRecord(result.Record)
+			for _, rel := range docsIndexPaths {
+				if _, err := os.Stat(filepath.Join(DocsWorkDir(root, producer), filepath.FromSlash(rel))); !os.IsNotExist(err) {
+					t.Errorf("%s im Arbeitsverzeichnis", rel)
+				}
+				if _, ok := record.find(rel); ok {
+					t.Errorf("%s in der Merkdatei", rel)
+				}
+			}
+		})
+	}
+}
+
+// oldIndexCheckout stellt ein Arbeitsverzeichnis aus der Zeit vor Task 163
+// her: Die Merkdatei führt die index.md mit ihrer Revision, und mit inWork
+// liegen sie auch im Arbeitsverzeichnis. Die Merkdatei wird roh geschrieben,
+// weil writeDocsRecord Systemdateien nicht mehr führt.
+func oldIndexCheckout(t *testing.T, root string, store *kephtest.Store, producer string, inWork bool) {
+	t.Helper()
+	recordFile := DocsRecordFile(root, producer)
+	record, ok, err := readDocsRecord(recordFile)
+	if err != nil || !ok {
+		t.Fatalf("Merkdatei: %v, %v", ok, err)
+	}
+	for _, rel := range docsIndexPaths {
+		content, _ := store.Content("docs/generated/" + producer + "/" + rel)
+		record.set(docsRecordItem{Path: rel, Revision: store.Docs["docs/generated/"+producer+"/"+rel].Revision, Hash: docsHash([]byte(content))})
+		if inWork {
+			writeWorkFileFor(t, root, producer, rel, content)
+		}
+	}
+	data, err := json.MarshalIndent(record, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(recordFile, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Publish mit einer Merkdatei, die index.md führt: Ob die index.md im
+// Arbeitsverzeichnis liegt oder fehlt, publish lehnt nicht ab, schreibt sie
+// nicht und plant keine Löschung; die neuen Dokumente gehen durch, und in
+// Kephalaion bleibt die index.md unverändert (Task 163).
+func TestDocsPublishUebergehtIndex(t *testing.T) {
+	for _, producer := range DocsProducerNames() {
+		for _, inWork := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/im-Arbeitsverzeichnis=%v", producer, inWork), func(t *testing.T) {
+				root, store, work := docsWorkFixture(t)
+				indexFixture(t, store, producer)
+				if _, err := work.Checkout(context.Background(), producer, DocsCheckoutOptions{}); err != nil {
+					t.Fatal(err)
+				}
+				oldIndexCheckout(t, root, store, producer, inWork)
+				before := map[string]string{}
+				for _, rel := range docsIndexPaths {
+					before[rel], _ = store.Content("docs/generated/" + producer + "/" + rel)
+				}
+				writeWorkFileFor(t, root, producer, "03-neu.md", docsDoc("Neu"))
+				writeWorkFileFor(t, root, producer, "sub/04-neu.md", docsDoc("Neu im Unterverzeichnis"))
+				calls := len(store.Calls)
+
+				result, err := work.Publish(context.Background(), producer, DocsPublishOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				dir := "docs/generated/" + producer
+				if got := writeCalls(store, calls); !reflect.DeepEqual(got, []string{
+					"create " + dir + "/03-neu.md", "create " + dir + "/sub/04-neu.md", "create " + dir + "/README.md",
+				}) {
+					t.Errorf("Aufrufe: %v", got)
+				}
+				want := map[string]string{"01-a.md": DocsUnchanged, "sub/02-b.md": DocsUnchanged,
+					"03-neu.md": DocsCreated, "sub/04-neu.md": DocsCreated}
+				if got := statuses(result); !reflect.DeepEqual(got, want) {
+					t.Errorf("Zustände: %v", got)
+				}
+				for _, rel := range docsIndexPaths {
+					if content, ok := store.Content(dir + "/" + rel); !ok || content != before[rel] {
+						t.Errorf("%s in Kephalaion verändert: %q, %v", rel, content, ok)
+					}
+				}
+				if !result.Cleaned || len(result.Open) != 0 || len(result.HintsChanged) != 0 {
+					t.Errorf("Antwort: %+v", result)
+				}
+			})
+		}
+	}
+}
+
+// Bleibt nach publish etwas offen, wird die Merkdatei fortgeschrieben — ohne
+// die index.md, die eine alte Merkdatei noch führte (Task 163).
+func TestDocsPublishMerkdateiOhneIndex(t *testing.T) {
+	root, store, work := docsWorkFixture(t)
+	indexFixture(t, store, "code")
+	if _, err := work.Checkout(context.Background(), "code", DocsCheckoutOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	oldIndexCheckout(t, root, store, "code", true)
+	writeWorkFile(t, root, "01-a.md", docsDoc("A lokal"))
+	store.Put("docs/generated/code/01-a.md", docsDoc("A fremd"))
+
+	result, err := work.Publish(context.Background(), "code", DocsPublishOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Cleaned || !reflect.DeepEqual(result.Open, []string{"01-a.md"}) {
+		t.Fatalf("Antwort: %+v", result)
+	}
+	record, ok, err := readDocsRecord(DocsRecordFile(root, "code"))
+	if err != nil || !ok {
+		t.Fatalf("Merkdatei: %v, %v", ok, err)
+	}
+	for _, rel := range docsIndexPaths {
+		if _, found := record.find(rel); found {
+			t.Errorf("%s noch in der Merkdatei", rel)
+		}
+	}
+	if _, found := record.find("01-a.md"); !found {
+		t.Errorf("Merkdatei ohne 01-a.md: %+v", record.Docs)
 	}
 }

@@ -30,7 +30,9 @@ import (
 // mit dieser Revision. Was inzwischen in Kephalaion geändert ist, wird
 // gemeldet, nicht überschrieben. Die README des Verzeichnisses schreibt
 // publish aus ihrer Vorlage k-playbook:/docs/generated/<erzeuger>/README.md
-// (DocsReadmes, Task 137); die KI schreibt sie nie.
+// (DocsReadmes, Task 137); die KI schreibt sie nie. Die index.md, die
+// Kephalaion beim Indizieren je Verzeichnis selbst anlegt, fassen checkout und
+// publish nicht an (Task 163).
 //
 // Ohne bereite Anbindung gibt es keinen Lauf und keinen Rückfall auf die
 // Platte.
@@ -70,6 +72,25 @@ const docsGeneratedRoot = "docs/generated"
 // docsReadmeName ist die README eines Erzeuger-Verzeichnisses, geschrieben
 // von publish aus ihrer Vorlage.
 const docsReadmeName = "README.md"
+
+// docsIndexName ist die index.md, die Kephalaion beim Indizieren je
+// Verzeichnis unter docs/ selbst schreibt (created.by: system); create lehnt
+// sie mit generated_file ab. k-playbook schreibt und löscht sie deshalb nie.
+const docsIndexName = "index.md"
+
+// docsSystemFile sagt, ob ein Pfad (Schrägstriche) auf eine Systemdatei
+// zeigt, die checkout und publish auf jeder Ebene übergehen: README.md
+// (schreibt publish aus der Vorlage) und index.md (schreibt Kephalaion).
+// Verglichen wird der letzte Pfadteil ohne Groß-/Kleinschreibung.
+func docsSystemFile(rel string) bool {
+	base := path.Base(rel)
+	return strings.EqualFold(base, docsReadmeName) || strings.EqualFold(base, docsIndexName)
+}
+
+// docsIndexFile sagt, ob ein Pfad auf die index.md von Kephalaion zeigt.
+func docsIndexFile(rel string) bool {
+	return strings.EqualFold(path.Base(rel), docsIndexName)
+}
 
 // docsWorkRoot ist das Arbeitsverzeichnis unter ProjectDirName;
 // docsIgnoreLine nimmt es aus der Versionskontrolle.
@@ -252,6 +273,13 @@ func (r *docsRecord) remove(rel string) {
 	r.Docs = slices.DeleteFunc(r.Docs, func(item docsRecordItem) bool { return item.Path == rel })
 }
 
+// dropSystemFiles streicht die Einträge für Systemdateien (docsSystemFile).
+// Merkdateien älterer Checkouts führen die index.md noch; fortgeschrieben
+// wird die Merkdatei ohne sie (Task 163).
+func (r *docsRecord) dropSystemFiles() {
+	r.Docs = slices.DeleteFunc(r.Docs, func(item docsRecordItem) bool { return docsSystemFile(item.Path) })
+}
+
 // readDocsRecord liest die Merkdatei; ok ist false, wenn sie fehlt.
 func readDocsRecord(file string) (docsRecord, bool, error) {
 	data, err := os.ReadFile(file)
@@ -268,8 +296,10 @@ func readDocsRecord(file string) (docsRecord, bool, error) {
 	return record, true, nil
 }
 
-// writeDocsRecord schreibt die Merkdatei.
+// writeDocsRecord schreibt die Merkdatei, ohne Einträge für Systemdateien.
 func writeDocsRecord(file string, record docsRecord) error {
+	record.Docs = slices.Clone(record.Docs)
+	record.dropSystemFiles()
 	if record.Docs == nil {
 		record.Docs = []docsRecordItem{}
 	}
@@ -482,8 +512,8 @@ const (
 	DocsStateExisting   = "existing"
 )
 
-// Checkout holt docs/generated/<erzeuger>/ (alle .md außer README.md,
-// rekursiv) in das Arbeitsverzeichnis und schreibt die Merkdatei daneben,
+// Checkout holt docs/generated/<erzeuger>/ (alle .md außer README.md und
+// index.md auf jeder Ebene, rekursiv) in das Arbeitsverzeichnis und schreibt die Merkdatei daneben,
 // auch für ein leeres Verzeichnis. Liegt Arbeitsverzeichnis oder Merkdatei
 // schon da, wird nichts geholt und nichts überschrieben, außer mit Discard:
 // dann wird erst vollständig gelesen und danach das Vorhandene ersetzt —
@@ -517,7 +547,7 @@ func (w *DocsWork) Checkout(ctx context.Context, name string, opts DocsCheckoutO
 	var docs []fetched
 	for _, entry := range entries {
 		rel, ok := strings.CutPrefix(entry.Name, producer.dir()+"/")
-		if !ok || !strings.HasSuffix(rel, ".md") || strings.EqualFold(path.Base(rel), docsReadmeName) {
+		if !ok || !strings.HasSuffix(rel, ".md") || docsSystemFile(rel) {
 			continue
 		}
 		if problem := docsRelPath(rel); problem != "" {
@@ -704,7 +734,8 @@ type docsPlanned struct {
 // gelöscht → delete mit dieser Revision, unverändert → nichts. Vorher wird
 // alles geprüft (nur .md, keine README.md, Frontmatter mit title und
 // description, hints unverändert außer mit AllowHints); eine Ablehnung
-// schreibt nichts. Danach schreibt publish die README des Verzeichnisses aus
+// schreibt nichts. Eine index.md — im Arbeitsverzeichnis oder in der
+// Merkdatei — wird übergangen: weder geschrieben noch gelöscht. Danach schreibt publish die README des Verzeichnisses aus
 // ihrer Vorlage, wenn sie fehlt oder abweicht. Arbeitsverzeichnis und Merkdatei
 // werden nur entfernt, wenn nichts in Konflikt oder fehlgeschlagen ist;
 // sonst trägt die Merkdatei danach den Stand des Veröffentlichten, und ein
@@ -808,6 +839,12 @@ func (w *DocsWork) planPublish(producer DocsProducer, dir string, record docsRec
 			problems = append(problems, rel+": keine gewöhnliche Datei")
 			return nil
 		}
+		if docsIndexFile(rel) {
+			// Die index.md schreibt Kephalaion; alte Checkouts haben sie im
+			// Arbeitsverzeichnis liegen. Übergangen, nicht abgelehnt, damit
+			// niemand von Hand aufräumen muss. README.md lehnt docsRelPath ab.
+			return nil
+		}
 		if problem := docsRelPath(rel); problem != "" {
 			problems = append(problems, rel+": "+problem)
 			return nil
@@ -849,7 +886,8 @@ func (w *DocsWork) planPublish(producer DocsProducer, dir string, record docsRec
 		plan = append(plan, step)
 	}
 	for _, old := range record.Docs {
-		if _, ok := files[old.Path]; ok {
+		if _, ok := files[old.Path]; ok || docsSystemFile(old.Path) {
+			// Systemdateien aus älteren Merkdateien: keine Löschung planen.
 			continue
 		}
 		plan = append(plan, docsPlanned{rel: old.Path, action: DocsDeleted, base: old.Revision, hints: old.Hints})

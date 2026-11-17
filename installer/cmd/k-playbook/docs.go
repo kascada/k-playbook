@@ -373,10 +373,11 @@ Aufruf:
 Erzeuger: %s. Jeder hat ein Verzeichnis keph:/docs/generated/<erzeuger>/ in
 der Projekt-Collection.
 
-  checkout  Holt alle .md des Verzeichnisses außer README.md, rekursiv, nach
-            .k-playbook/work/docs/<erzeuger>/ und schreibt daneben die
-            Merkdatei <erzeuger>.checkout.json (Revision, Inhalts-Hash und
-            hints je Dokument). /work kommt in .k-playbook/.gitignore. Liegt
+  checkout  Holt alle .md des Verzeichnisses außer README.md und index.md
+            (auf jeder Ebene; die index.md schreibt Kephalaion selbst),
+            rekursiv, nach .k-playbook/work/docs/<erzeuger>/ und schreibt
+            daneben die Merkdatei <erzeuger>.checkout.json (Revision,
+            Inhalts-Hash und hints je Dokument). /work kommt in .k-playbook/.gitignore. Liegt
             Arbeitsverzeichnis oder Merkdatei schon da, wird nichts geholt und
             nichts überschrieben: die Ausgabe nennt Alter und Anzahl Dateien.
             --discard verwirft beides und holt neu.
@@ -387,7 +388,9 @@ der Projekt-Collection.
             title und description; hints unverändert — sonst, und wenn ein
             Dokument mit hints gelöscht oder neu angelegt wird, nur mit
             --allow-hints (nach Bestätigung durch den Nutzer). Eine Ablehnung
-            schreibt nichts. Was inzwischen in Kephalaion geändert ist, wird
+            schreibt nichts. Eine index.md wird übergangen, nicht abgelehnt:
+            weder geschrieben noch gelöscht, auch wenn die Merkdatei eines
+            älteren checkout sie führt. Was inzwischen in Kephalaion geändert ist, wird
             als conflict gemeldet, nicht geschrieben. Danach schreibt publish
             die README.md des Verzeichnisses aus ihrer Vorlage, wenn sie
             fehlt oder abweicht (wie docs readme). Arbeitsverzeichnis und
