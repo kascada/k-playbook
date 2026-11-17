@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kascada/k-playbook/installer/internal/buildinfo"
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
@@ -68,7 +69,21 @@ func upgradeProjectDir(t *testing.T, latest string) string {
 		return program.KephalaionResult{Path: "/opt/bin/kephalaion"}, nil
 	})
 	stubKephalaionUpgrade(t, kephalaionAutoAktuell, kephalaionCheckAktuell)
+	// Kein Test fragt das echte OpenCode: ein Reload träfe den Dienst des
+	// Rechners. Wer OpenCode braucht, ersetzt das mit stubOpenCode.
+	stubOpenCode(t, func() (string, bool) { return "", false }, func(_ context.Context, _ string, _ time.Duration, args ...string) (openCodeRun, error) {
+		t.Errorf("opencode %v aufgerufen, obwohl es nicht im PATH liegt", args)
+		return openCodeRun{}, nil
+	})
 	return root
+}
+
+// stubOpenCode ersetzt die Suche nach opencode und seinen Aufruf.
+func stubOpenCode(t *testing.T, find func() (string, bool), run func(context.Context, string, time.Duration, ...string) (openCodeRun, error)) {
+	t.Helper()
+	beforeFind, beforeRun := upgradeFindOpenCode, upgradeRunOpenCode
+	t.Cleanup(func() { upgradeFindOpenCode, upgradeRunOpenCode = beforeFind, beforeRun })
+	upgradeFindOpenCode, upgradeRunOpenCode = find, run
 }
 
 func kephalaionAutoAktuell(string) (program.KephalaionAuto, error) {
@@ -1111,5 +1126,296 @@ func TestUpgradeNenntDasPlaybookVerzeichnisNicht(t *testing.T) {
 				t.Errorf("VERSION im alten Clone: %q, %v", content, err)
 			}
 		})
+	}
+}
+
+// --- OpenCode-2-Dienst nach dem Binary-Tausch neu laden (Task 165) ---
+
+const (
+	openCodeNeuGeladen   = "OpenCode: alle MCP-Server des Dienstes neu geladen (opencode reload)."
+	neustartAllgemein    = "Das Programm hat gewechselt: die Sitzung neu starten —"
+	neustartClaudeCode   = "Das Programm hat gewechselt: in Claude Code die Sitzung neu starten bzw. /mcp —"
+	openCodeStatusUnklar = "OpenCode: Dienststatus unklar ("
+)
+
+// openCodeBinaerwechsel baut ein Projekt, in dem der Lauf das Binary tauscht
+// (v0.16.8 → v0.17.0) und das neue Programm den Projektschritt meldet.
+func openCodeBinaerwechsel(t *testing.T) {
+	t.Helper()
+	t.Setenv(viaCommandEnv, "")
+	root := upgradeProjectDir(t, "v0.17.0")
+	installTargetInPath(t)
+	setOwnVersion(t, "v0.16.8")
+	stubInstall(t, filepath.Join(root, "k-playbook-neu"))
+}
+
+// openCodeAntworten spielt opencode: status antwortet mit statusRun, reload
+// mit reloadRun. Die Aufrufe hält es fest.
+func openCodeAntworten(t *testing.T, statusRun, reloadRun openCodeRun) *[]string {
+	t.Helper()
+	calls := []string{}
+	stubOpenCode(t, func() (string, bool) { return "/opt/bin/opencode", true },
+		func(_ context.Context, binary string, _ time.Duration, args ...string) (openCodeRun, error) {
+			if binary != "/opt/bin/opencode" {
+				t.Errorf("aufgerufen wird %q, erwartet das gefundene opencode", binary)
+			}
+			call := strings.Join(args, " ")
+			calls = append(calls, call)
+			switch call {
+			case "service status":
+				return statusRun, nil
+			case "reload":
+				return reloadRun, nil
+			}
+			t.Errorf("unerwarteter Aufruf opencode %s", call)
+			return openCodeRun{exitCode: 2}, nil
+		})
+	return &calls
+}
+
+// Nach dem Binary-Tausch: status zuerst, reload nur nach einer URL; jeder
+// Fehler ist eine Zeile, kein Abbruch, und das Feld openCode ist da, sobald
+// opencode im PATH liegt.
+func TestUpgradeLaedtOpenCodeNeu(t *testing.T) {
+	for _, fall := range []struct {
+		name          string
+		status        openCodeRun
+		reload        openCodeRun
+		calls         []string
+		report        *upgradeOpenCodeReport
+		zeile         string
+		ohneZeile     []string
+		neustartZeile string
+	}{
+		{
+			name:          "URL und Reload gelingt",
+			status:        openCodeRun{stdout: "http://0.0.0.0:4096\n"},
+			calls:         []string{"service status", "reload"},
+			report:        &upgradeOpenCodeReport{Status: "url", URL: "http://0.0.0.0:4096", Reloaded: true},
+			zeile:         openCodeNeuGeladen,
+			neustartZeile: neustartClaudeCode,
+		},
+		{
+			name:          "URL und Reload scheitert",
+			status:        openCodeRun{stdout: "https://localhost:4096\n"},
+			reload:        openCodeRun{exitCode: 1, stderr: "Error: connection refused\nmehr\n"},
+			calls:         []string{"service status", "reload"},
+			report:        &upgradeOpenCodeReport{Status: "url", URL: "https://localhost:4096", Error: "Exit-Code 1: Error: connection refused"},
+			zeile:         "OpenCode: Neuladen der MCP-Server gescheitert (Exit-Code 1: Error: connection refused); von Hand: opencode service status, dann opencode reload.",
+			neustartZeile: neustartAllgemein,
+		},
+		{
+			name:          "stopped",
+			status:        openCodeRun{stdout: "stopped\n"},
+			calls:         []string{"service status"},
+			report:        &upgradeOpenCodeReport{Status: "stopped"},
+			ohneZeile:     []string{"OpenCode:"},
+			neustartZeile: neustartAllgemein,
+		},
+		{
+			name:          "Status mit Exit ungleich 0",
+			status:        openCodeRun{exitCode: 1, stderr: "Unknown command: service\n"},
+			calls:         []string{"service status"},
+			report:        &upgradeOpenCodeReport{Status: "unknown", Error: "Exit-Code 1: Unknown command: service"},
+			zeile:         "OpenCode: Dienststatus unklar (Exit-Code 1: Unknown command: service) — nicht neu geladen; von Hand: opencode service status, dann opencode reload.",
+			neustartZeile: neustartAllgemein,
+		},
+		{
+			name:          "Status mit unbekannter Ausgabe",
+			status:        openCodeRun{stdout: "running somewhere\n"},
+			calls:         []string{"service status"},
+			report:        &upgradeOpenCodeReport{Status: "unknown", Error: `unerwartete Ausgabe "running somewhere"`},
+			zeile:         openCodeStatusUnklar + `unerwartete Ausgabe "running somewhere") — nicht neu geladen`,
+			neustartZeile: neustartAllgemein,
+		},
+		{
+			name:          "Status ohne Ausgabe",
+			status:        openCodeRun{},
+			calls:         []string{"service status"},
+			report:        &upgradeOpenCodeReport{Status: "unknown", Error: "keine Ausgabe"},
+			zeile:         openCodeStatusUnklar + "keine Ausgabe) — nicht neu geladen",
+			neustartZeile: neustartAllgemein,
+		},
+		{
+			name:          "Zeitablauf beim Status",
+			status:        openCodeRun{timedOut: true},
+			calls:         []string{"service status"},
+			report:        &upgradeOpenCodeReport{Status: "unknown", Error: "keine Antwort nach 10s"},
+			zeile:         openCodeStatusUnklar + "keine Antwort nach 10s) — nicht neu geladen",
+			neustartZeile: neustartAllgemein,
+		},
+		{
+			name:          "Zeitablauf beim Reload",
+			status:        openCodeRun{stdout: "http://0.0.0.0:4096\n"},
+			reload:        openCodeRun{timedOut: true},
+			calls:         []string{"service status", "reload"},
+			report:        &upgradeOpenCodeReport{Status: "url", URL: "http://0.0.0.0:4096", Error: "keine Antwort nach 30s"},
+			zeile:         "OpenCode: Neuladen der MCP-Server gescheitert (keine Antwort nach 30s)",
+			neustartZeile: neustartAllgemein,
+		},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			openCodeBinaerwechsel(t)
+			calls := openCodeAntworten(t, fall.status, fall.reload)
+
+			// runUpgradeJSON prüft, dass upgrade ohne Fehler endet — derselbe
+			// Ausgang wie ohne OpenCode.
+			report := runUpgradeJSON(t)
+			if !reflect.DeepEqual(*calls, fall.calls) {
+				t.Errorf("Aufrufe = %q, erwartet %q", *calls, fall.calls)
+			}
+			if !reflect.DeepEqual(report.OpenCode, fall.report) {
+				t.Errorf("openCode = %+v, erwartet %+v", report.OpenCode, fall.report)
+			}
+			if !report.RestartRequired {
+				t.Error("restartRequired = false nach Binärwechsel")
+			}
+			messages := strings.Join(report.Messages, "\n")
+			if fall.zeile != "" {
+				assertOrder(t, messages, "Projekt: nachgezogen vom neuen Programm.", fall.zeile, fall.neustartZeile)
+			}
+			for _, fehlt := range fall.ohneZeile {
+				if strings.Contains(messages, fehlt) {
+					t.Errorf("%q steht in:\n%s", fehlt, messages)
+				}
+			}
+			if !strings.Contains(messages, fall.neustartZeile) {
+				t.Errorf("%q fehlt in:\n%s", fall.neustartZeile, messages)
+			}
+			if fall.neustartZeile == neustartAllgemein && strings.Contains(messages, neustartClaudeCode) {
+				t.Errorf("ohne Reload trotzdem auf Claude Code bezogen:\n%s", messages)
+			}
+			if strings.Count(messages, "OpenCode:") > 1 {
+				t.Errorf("mehr als eine OpenCode-Zeile:\n%s", messages)
+			}
+
+			// Im Klartext stehen dieselben Zeilen; das Programm endet
+			// ohne Fehler.
+			*calls = (*calls)[:0]
+			stdout := runUpgradeText(t)
+			if fall.zeile != "" && !strings.Contains(stdout, fall.zeile) {
+				t.Errorf("%q fehlt im Klartext:\n%s", fall.zeile, stdout)
+			}
+		})
+	}
+}
+
+// Ohne opencode im PATH: kein Aufruf, keine Zeile, kein Feld openCode.
+func TestUpgradeOhneOpenCodeImPath(t *testing.T) {
+	openCodeBinaerwechsel(t)
+	report := runUpgradeJSON(t)
+	if report.OpenCode != nil {
+		t.Errorf("openCode = %+v, erwartet kein Feld", report.OpenCode)
+	}
+	messages := strings.Join(report.Messages, "\n")
+	if strings.Contains(messages, "OpenCode:") {
+		t.Errorf("Zeile zu OpenCode ohne opencode im PATH:\n%s", messages)
+	}
+	if !strings.Contains(messages, neustartAllgemein) {
+		t.Errorf("%q fehlt in:\n%s", neustartAllgemein, messages)
+	}
+}
+
+// Ohne Binary-Tausch, bei --check und bei --project-only fragt der Lauf
+// opencode gar nicht, und das Feld openCode fehlt.
+func TestUpgradeRuftOpenCodeNurNachBinaerwechsel(t *testing.T) {
+	for _, fall := range []struct {
+		name string
+		own  string
+		args []string
+	}{
+		{"ohne Binary-Tausch", "v0.17.0", nil},
+		{"--check", "v0.16.8", []string{"--check"}},
+		{"--project-only", "v0.16.8", []string{"--project-only"}},
+	} {
+		t.Run(fall.name, func(t *testing.T) {
+			root := upgradeProjectDir(t, "v0.17.0")
+			installTargetInPath(t)
+			setOwnVersion(t, fall.own)
+			tags := stubInstall(t, filepath.Join(root, "k-playbook-neu"))
+			stubOpenCode(t, func() (string, bool) {
+				t.Error("nach opencode gesucht")
+				return "/opt/bin/opencode", true
+			}, func(_ context.Context, _ string, _ time.Duration, args ...string) (openCodeRun, error) {
+				t.Errorf("opencode %v aufgerufen", args)
+				return openCodeRun{}, nil
+			})
+
+			stdout := captureStdout(t, func() {
+				if err := runUpgrade(append(fall.args, "--json")); err != nil {
+					t.Errorf("upgrade %v: %v", fall.args, err)
+				}
+			})
+			var report upgradeReport
+			if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+				t.Fatalf("Bericht ist kein JSON: %v\n%s", err, stdout)
+			}
+			if report.OpenCode != nil || strings.Contains(stdout, `"openCode"`) {
+				t.Errorf("Feld openCode da:\n%s", stdout)
+			}
+			if len(*tags) != 0 {
+				t.Errorf("installiert: %v", *tags)
+			}
+		})
+	}
+}
+
+// Der echte Aufruf mit Frist: Ein opencode, das nicht antwortet, wird nach der
+// Frist beendet; der Lauf meldet „keine Antwort“ und ruft reload nicht auf.
+func TestUpgradeOpenCodeZeitablaufMitEchtemAufruf(t *testing.T) {
+	openCodeBinaerwechsel(t)
+	dir := t.TempDir()
+	log := filepath.Join(dir, "aufrufe")
+	binary := filepath.Join(dir, "opencode")
+	script := "#!/bin/sh\n" +
+		"echo \"$*\" >> " + log + "\n" +
+		"[ \"$1\" = service ] && exec sleep 30\n" +
+		"exit 0\n"
+	if err := os.WriteFile(binary, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stubOpenCode(t, func() (string, bool) { return binary, true }, runOpenCode)
+	beforeTimeout, beforeGrace := openCodeStatusTimeout, openCodeStopGrace
+	t.Cleanup(func() { openCodeStatusTimeout, openCodeStopGrace = beforeTimeout, beforeGrace })
+	openCodeStatusTimeout, openCodeStopGrace = 200*time.Millisecond, 500*time.Millisecond
+
+	start := time.Now()
+	report := runUpgradeJSON(t)
+	if elapsed := time.Since(start); elapsed > 10*time.Second {
+		t.Errorf("der Lauf wartete %s, die Frist ist 200ms", elapsed)
+	}
+	want := &upgradeOpenCodeReport{Status: "unknown", Error: "keine Antwort nach 200ms"}
+	if !reflect.DeepEqual(report.OpenCode, want) {
+		t.Errorf("openCode = %+v, erwartet %+v", report.OpenCode, want)
+	}
+	calls, _ := os.ReadFile(log)
+	if string(calls) != "service status\n" {
+		t.Errorf("Aufrufe = %q, erwartet nur service status", calls)
+	}
+}
+
+// Der echte Aufruf: URL, dann reload mit genau diesem Argument, ohne --server.
+func TestUpgradeOpenCodeReloadMitEchtemAufruf(t *testing.T) {
+	openCodeBinaerwechsel(t)
+	dir := t.TempDir()
+	log := filepath.Join(dir, "aufrufe")
+	binary := filepath.Join(dir, "opencode")
+	script := "#!/bin/sh\n" +
+		"echo \"$*\" >> " + log + "\n" +
+		"[ \"$1\" = service ] && echo http://0.0.0.0:4096\n" +
+		"exit 0\n"
+	if err := os.WriteFile(binary, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stubOpenCode(t, func() (string, bool) { return binary, true }, runOpenCode)
+
+	report := runUpgradeJSON(t)
+	want := &upgradeOpenCodeReport{Status: "url", URL: "http://0.0.0.0:4096", Reloaded: true}
+	if !reflect.DeepEqual(report.OpenCode, want) {
+		t.Errorf("openCode = %+v, erwartet %+v", report.OpenCode, want)
+	}
+	calls, _ := os.ReadFile(log)
+	if string(calls) != "service status\nreload\n" {
+		t.Errorf("Aufrufe = %q, erwartet service status, dann reload", calls)
 	}
 }

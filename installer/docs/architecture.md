@@ -82,7 +82,9 @@ Abbruchs, ein gescheiterter Download oder Install eine eigene — mit der Erstin
 (`curl … | bash`, `project.FirstInstallCommand`) als Weg im Terminal, denn `upgrade` selbst
 ist dann gescheitert; am Ende, wenn das Binary
 gewechselt hat, der Hinweis, die Sitzung neu zu starten, denn der MCP-Server der Sitzung
-behält das alte Programm, und ein eigener, wenn Kephalaion aktualisiert oder sein Node neu
+behält das alte Programm — davor lädt der Lauf einen laufenden OpenCode-2-Dienst neu und
+bezieht den Hinweis nach einem erfolgreichen Reload auf Claude Code (§„Direktinstallation“,
+OpenCode-2-Dienst) —, und ein eigener, wenn Kephalaion aktualisiert oder sein Node neu
 gestartet wurde. Hat der Lauf das Binary
 gewechselt, sagt die letzte Zeile, dass /k-upgrade in einer neuen Sitzung die
 Umstellungen nachzieht — der Hinweis hängt allein am Binärwechsel; `--check` gibt dafür eine
@@ -1659,6 +1661,38 @@ Kephalaion folgt erst im zweiten `/k-upgrade`, den der Programmwechsel ohnehin v
 Installation als Abhilfe, solange `kephalaion` fehlt und die Anbindung nicht ok ist; bei ok
 schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein.
 
+**OpenCode-2-Dienst nach dem Binärwechsel** (Task 165, `cmd/k-playbook/upgrade_opencode.go`).
+OpenCode 2 hat je Benutzer einen gemeinsamen Hintergrunddienst (`opencode serve --service`),
+der die stdio-MCP-Server startet, auch `k-playbook mcp`; nach dem Tausch des Binarys liefe
+dort weiter das alte Programm. Hat der Programmschritt das Binary ersetzt
+(`programReport.Installed`), ruft der aufrufende Prozess nach dem Projektschritt
+`reloadOpenCode()`: Liegt `opencode` im PATH (`exec.LookPath`), fragt er
+`opencode service status` (Frist `openCodeStatusTimeout`, 10 s). Die Ausgabe ist die URL des
+Dienstes oder `stopped`, in beiden Fällen mit Exit 0 (gemessen an OpenCode 2.3.0). Nur nach
+einer URL folgt `opencode reload` ohne `--server` (Frist `openCodeReloadTimeout`, 30 s); bei
+Fristablauf SIGTERM und nach `openCodeStopGrace` SIGKILL, wie bei `kephalaion upgrade`. Nie
+`reload` ohne Status davor: `reload` startet einen Dienst, wenn keiner läuft — auf dem Host
+ohne die LiteLLM-Umgebung und die Speichergrenze der systemd-Unit —, `service status`
+startet nichts. Bei `stopped` geschieht nichts und erscheint keine Zeile (so im DevContainer,
+wo `upgrade` beim Start vor dem Dienst läuft). Exit ≠ 0, Fristablauf oder eine unbekannte
+Ausgabe heißen „Dienststatus unklar“, ein gescheiterter Reload „Neuladen gescheitert“; beides
+ist eine Zeile mit dem Kurzgrund und dem Weg von Hand, kein Abbruch, und der Exit-Code des
+Laufs bleibt. Nach einem erfolgreichen Reload meldet der Lauf „OpenCode: alle MCP-Server des
+Dienstes neu geladen (opencode reload).“ und bezieht die Zeile zum Programmwechsel
+ausdrücklich auf Claude Code (Sitzung neu starten bzw. `/mcp`); `restartRequired` bleibt
+`true`, weil `upgrade` nicht weiß, welcher Client fragt. `reload` startet alle MCP-Server des
+Dienstes neu, auch die anderer Projekte und Sitzungen desselben Benutzers und fremde wie
+Kephalaion; der Dienst behält seine PID, die Sitzungen laufen weiter. Das ist bewusst in Kauf
+genommen. Eine Prüfung auf OpenCode 1 gibt es nicht — es wird überall auf Version 2
+umgestellt; ein OpenCode 1 landet bei „Dienststatus unklar“, ein hängendes fängt die Frist ab.
+Einen Neustart von Kephalaion (`kephalaion.restartRequired`) lädt k-playbook nicht nach: Das
+erledigt `kephalaion upgrade` selbst. Wechseln in einem Lauf beide Binarys, wird zweimal neu
+geladen, was unschädlich ist. Der Update-Knopf der Oberfläche lädt den Dienst nicht neu. Im
+JSON steht das Feld `openCode` mit `status` (`url`, `stopped`, `unknown`), `url`, `reloaded`
+und `error`; es fehlt ohne Binärwechsel, bei `--check` und `--project-only` und ohne
+`opencode` im PATH, sonst ist es da, auch mit `stopped`. Weil nur ein Feld hinzukommt und
+keines entfällt, bleibt `schemaVersion` `3`.
+
 **Kindprozesse enden mit dem Aufruf** (Task 152, `internal/procgroup`). `exec.CommandContext`
 beendet bei Fristablauf nur den direkten Kindprozess; was der startet — beim `install.sh` von
 Kephalaion der Download —, liefe weiter, und `WaitDelay` gäbe nur die Pipe frei.
@@ -1684,7 +1718,8 @@ laufender Werkzeugaufrufe selbst ab. Nicht abgedeckt ist SIGKILL an den Aufrufer
 dagegen hülfe nur `Pdeathsig`, nur unter Linux und nur für das direkte Kind. `kephalaion
 upgrade` behält seinen eigenen Weg (SIGTERM, dann nach `KephalaionStopGrace` SIGKILL), und
 die übrigen `exec`-Stellen — etwa `ReadVersion()`, der Aufruf des neuen Programms für den
-Projektschritt, `vscodeext.Install()` — starten weiter ohne eigene Gruppe.
+Projektschritt, `vscodeext.Install()`, die Aufrufe von `opencode` nach dem Binärwechsel —
+starten weiter ohne eigene Gruppe.
 
 `bin/install` ist die Erstinstallation und eigenständig: über
 `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`

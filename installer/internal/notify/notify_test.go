@@ -163,6 +163,14 @@ func TestSendWSLPowerShellResolution(t *testing.T) {
 	}
 }
 
+func TestWSLWithoutPowerShellUsesLinuxDesktop(t *testing.T) {
+	calls := install(t, fakeHost{wsl: true, programs: map[string]bool{"notify-send": true}, env: map[string]string{"DISPLAY": ":0"}})
+	result, err := Send(context.Background(), Request{Title: "Fertig"})
+	if err != nil || result.Channel != ChannelLinuxDesktop || len(*calls) != 1 || (*calls)[0].name != "notify-send" {
+		t.Fatalf("Ergebnis = %+v, Fehler = %v, Aufrufe = %+v", result, err, *calls)
+	}
+}
+
 func TestWindowsPowerShellUsesResolvedPath(t *testing.T) {
 	calls := install(t, fakeHost{wsl: true})
 	lookPath = func(name string) (string, error) { return "/custom/" + name, nil }

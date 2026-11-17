@@ -61,6 +61,11 @@ import (
 // gewechselt hat — der MCP-Server der Sitzung behält das alte Programm — und
 // ein eigener, wenn Kephalaion aktualisiert oder sein Node neu gestartet
 // wurde.
+// Hat das Binary gewechselt, lädt der Lauf davor die MCP-Server eines
+// laufenden OpenCode-2-Dienstes neu (reloadOpenCode, Task 165): erst
+// `opencode service status`, und nur nach einer URL `opencode reload`. Nach
+// einem erfolgreichen Reload bezieht sich der Neustart-Hinweis ausdrücklich
+// auf Claude Code.
 //
 // Hat Schritt (1) das Binary ersetzt, führt dieser — noch alte — Prozess
 // Schritt (2) nicht selbst aus: er hätte alte Vorlagen und alte Erkennung.
@@ -144,6 +149,10 @@ type upgradeReport struct {
 	// Project ist Schritt (2): upgradeProjectReport, oder — nach einem
 	// Binärwechsel — die Antwort des neuen Programms, so wie sie kam.
 	Project any `json:"project,omitempty"`
+	// OpenCode ist das Neuladen des OpenCode-2-Dienstes nach einem
+	// Binärwechsel (upgrade_opencode.go); fehlt ohne Binärwechsel, bei
+	// --check und --project-only und ohne opencode im PATH.
+	OpenCode *upgradeOpenCodeReport `json:"openCode,omitempty"`
 	// RestartRequired: das Binary hat gewechselt, oder Kephalaion wurde
 	// aktualisiert bzw. sein Node neu gestartet — die Sitzung muss neu
 	// gestartet werden.
@@ -348,8 +357,20 @@ func upgrade(ctx context.Context, environment project.Environment, options upgra
 	}
 
 	if programReport.Installed {
+		// Der OpenCode-2-Dienst hält das alte Programm in seinen MCP-Servern;
+		// ein laufender Dienst wird neu geladen, ein gestoppter nie gestartet.
+		openCode, lines := reloadOpenCode(ctx)
+		report.OpenCode = openCode
+		report.Messages = append(report.Messages, lines...)
+		emit(lines)
+
+		// restartRequired bleibt true: upgrade weiß nicht, welcher Client
+		// fragt, und in Claude Code behält die Sitzung das alte Programm.
 		report.RestartRequired = true
 		line := "Das Programm hat gewechselt: die Sitzung neu starten — der MCP-Server der Sitzung behält das alte Programm, bis der Assistent ihn neu startet."
+		if openCode != nil && openCode.Reloaded {
+			line = "Das Programm hat gewechselt: in Claude Code die Sitzung neu starten bzw. /mcp — der MCP-Server der Sitzung behält das alte Programm, bis der Assistent ihn neu startet."
+		}
 		report.Messages = append(report.Messages, line)
 		emit([]string{line})
 	}
@@ -938,8 +959,15 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      nicht von git erfasst ist. Projekt-Prosa in AGENTS.md bleibt
      unangetastet.
 
+Hat das Binary gewechselt und liegt opencode im PATH, fragt der Lauf
+opencode service status; meldet der eine URL, lädt opencode reload alle
+MCP-Server des OpenCode-Dienstes neu (auch die anderer Projekte und
+Sitzungen). Einen gestoppten Dienst startet der Lauf nie. Ein unklarer
+Status oder ein gescheiterter Reload ist eine Meldung, kein Abbruch.
+
 Am Ende der Hinweis, die Sitzung neu zu starten: wenn das Binary gewechselt
-hat — der MCP-Server der Sitzung behält das alte Programm —, und wenn
+hat — der MCP-Server der Sitzung behält das alte Programm; nach einem
+erfolgreichen Reload bezogen auf Claude Code —, und wenn
 Kephalaion aktualisiert oder sein Node neu gestartet wurde; das kann auch
 andere offene Sitzungen an diesem Node treffen. Hat der Lauf das Binary
 ersetzt, sagt die letzte Zeile, dass /k-upgrade in einer Sitzung die
@@ -951,7 +979,7 @@ laufenden Programms gegenüber dem neuesten Release-Tag und, was ein Lauf am
 Projekt täte. Holte ein Lauf Neues, sagt
 eine letzte Zeile, dass danach /k-upgrade die Umstellungen nachzieht. --json
 gibt den Bericht als JSON aus (schemaVersion, check, kephalaion, program,
-project, restartRequired, messages).
+project, openCode, restartRequired, messages).
 
 Mit K_PLAYBOOK_VIA_COMMAND=1 — so rufen Hülle und Ersatzaufruf von
 /k-upgrade das Programm auf — entfallen beide Hinweise auf /k-upgrade.

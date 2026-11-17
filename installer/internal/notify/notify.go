@@ -141,7 +141,7 @@ type channel struct {
 func channels() []channel {
 	return []channel{
 		{
-			name:      ChannelWindowsToast,
+			name: ChannelWindowsToast,
 			available: func() bool {
 				if !isWSL() {
 					return false
@@ -149,7 +149,7 @@ func channels() []channel {
 				_, err := windowsPowerShell()
 				return err == nil
 			},
-			send:      sendWindowsToast,
+			send: sendWindowsToast,
 		},
 		{
 			name:      ChannelMacOS,

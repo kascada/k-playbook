@@ -5,14 +5,20 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/kascada/k-playbook/installer/internal/hostenv"
 )
 
 // Beide Wege, eine Antwort: `k-playbook notify` und k_playbook_notify kommen
 // aus notify.Send. Geprüft wird der eine Fall, der auf jedem Rechner gleich
 // ausgeht, ohne dort etwas anzuzeigen: kein Kanal. Dafür bekommt der
 // Testprozess einen leeren PATH, kein Display und die Container-Marke — der
-// MCP-Server erbt die Umgebung, die CLI läuft im selben Prozess.
+// MCP-Server erbt die Umgebung, die CLI läuft im selben Prozess. Unter WSL
+// bleibt der absolute Windows-Pfad erreichbar: dort würde der Test Toasts senden.
 func TestNotifyCLIUndMCPGebenDasselbe(t *testing.T) {
+	if hostenv.IsWSL() {
+		t.Skip("WSL bietet auch ohne Windows-PATH einen echten Benachrichtigungskanal")
+	}
 	root := newProject(t)
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv("DISPLAY", "")

@@ -1447,6 +1447,10 @@ the machine has no way to the user -- `error.message` names the reason, such as
 that should have shown the notification failed; its stderr is in `error.message`.
 `no_channel` is information about the machine, not a reason to retry.
 
+Notifications are additional hints and may remain invisible or be suppressed. Even `ok: true`
+does not confirm that the user saw or heard anything: never infer acknowledgment or consent.
+Questions and results must still appear in full in the chat.
+
 What is deliberately not there yet: a per-machine switch to turn the sound off, hooks in
 the assistants that call `k-playbook notify` when a turn ends, and a way from a devcontainer
 to the desktop in front of it.
