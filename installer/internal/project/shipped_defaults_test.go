@@ -1235,3 +1235,71 @@ func TestDefaultsFrontmatterTitelQuotiert(t *testing.T) {
 		}
 	}
 }
+
+// /k-befunde-einordnen (Task 166) ist Hülle plus Text: Die Hülle nennt nur den
+// Verweis, erlaubt die Werkzeuge der Vorprüfung, der Ziele und des Löschens
+// und nimmt die Obergrenze als Argument. Der Text beginnt mit dem ersten
+// Schritt, liest die Projekterweiterung befunde-einordnen.md (not_found ist
+// dort kein Fehler), hält die Reihenfolge schreiben → gegenlesen → löschen →
+// protokollieren und bindet _shared/docs.md nicht ein, sondern liest nur dessen
+// Abschnitt „Der Kopf“. k-playbook liefert unter dem Namen der Erweiterung
+// selbst nichts.
+func TestDefaultsKBefundeEinordnenIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-befunde-einordnen.md"
+
+	hullData, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-befunde-einordnen.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(hullData)
+	if !strings.Contains(hull, "`"+ref+"`") || !strings.Contains(hull, "argument-hint: [anzahl]") {
+		t.Errorf("Hülle ohne Verweis auf den Text oder ohne Argument:\n%s", hull)
+	}
+	for _, tool := range []string{"mcp__k-playbook__k_playbook_findings_check", "mcp__k-playbook__k_playbook_doc_create",
+		"mcp__k-playbook__k_playbook_doc_append", "mcp__k-playbook__k_playbook_todo_add", "mcp__kephalaion__delete",
+		"mcp__kephalaion__rename", "mcp__kephalaion__write", "mcp__kephalaion__create", "mcp__kephalaion__search"} {
+		if !strings.Contains(hull, tool) {
+			t.Errorf("Hülle erlaubt %s nicht", tool)
+		}
+	}
+
+	file := readRepoDefault(t, "commands/k-befunde-einordnen.md")
+	if !strings.Contains(file, "\ninclude: _shared/erster-schritt.md\n") ||
+		strings.Index(file, "include: _shared/erster-schritt.md") > strings.Index(file, "## Schritt 2") {
+		t.Error("k-befunde-einordnen.md beginnt nicht mit dem ersten Schritt")
+	}
+	if strings.Contains(file, "include: _shared/docs.md") {
+		t.Error("k-befunde-einordnen.md bindet die Docs-Ablage ein; gelesen wird nur „Der Kopf“")
+	}
+	for _, needle := range []string{
+		"`k-playbook:/instructions/on-demand/befunde-einordnen.md`", "**Das ist kein Fehler.**",
+		"`k-playbook:/instructions/always/010-verweise.md`", "`k_playbook_findings_check`",
+		"`k-playbook findings check --json`", "`check.byUser`", "Standard 25", "`kind: einordnung`",
+		"`<voller Name> | übersprungen (<reason>)`", "`base_revision`", "`request_id`", "`replayed`",
+		"**(a) Ziel schreiben.**", "**(b) Gegenlesen:**", "**(c) Löschen bzw. verschieben,**",
+		"**(d) Erst dann die Protokollzeile**", "`stale_revision`", "`übersprungen (anderer Lauf)`",
+		"`übersprungen (Ausgang unklar)`", "`übersprungen (Rückfrage)`", "`queue/unclear/<dateiname>`", "`frage`",
+		"nie ein Muster, nie ein Verzeichnis", "`section: \"### Der Kopf\"`", "**Ziele nennen den Befund nicht.**",
+		"`git symbolic-ref --short refs/remotes/origin/HEAD`", "git fetch origin <hauptbranch>", "`FETCH_HEAD`",
+		"wie viele Befunde noch in\n  `keph:/queue/findings/` offen sind",
+	} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-befunde-einordnen.md nennt %q nicht", needle)
+		}
+	}
+	// Nichts Projektspezifisches aus dem Entwurf.
+	for _, stale := range []string{"origin/development", "stage", "master", "prod", "readgate", "k-playbook context"} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-befunde-einordnen.md trägt %q", stale)
+		}
+	}
+	got := mustResolveDoc(t, layers, ref)
+	if len(got.Problems) != 0 || len(got.Includes) != 1 {
+		t.Errorf("Text: problems %v, includes %+v", got.Problems, got.Includes)
+	}
+	// Die Erweiterung liefert k-playbook selbst nicht.
+	if _, err := os.Stat(filepath.Join("..", "..", "..", "defaults", "instructions", "on-demand", "befunde-einordnen.md")); err == nil {
+		t.Error("defaults/instructions/on-demand/befunde-einordnen.md liegt im Lieferumfang")
+	}
+}

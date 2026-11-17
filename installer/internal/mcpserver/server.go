@@ -74,6 +74,7 @@ func Run(ctx context.Context) error {
 	addGitHubTestTool(server)
 	addGUITools(server)
 	addNotifyTool(server)
+	addFindingsTool(server)
 
 	// Die Kennung des Binaries wird vor dem ersten Aufruf festgehalten. Danach
 	// meldet dieselbe Funktion, was unter dem Pfad **jetzt** liegt: os.Executable()

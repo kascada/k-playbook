@@ -6,7 +6,7 @@
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `docs` holt erzeugte
 // Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo` verwaltet die
-// Todos, `read` löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
+// Todos, `findings check` prüft die Befund-Queue vor ihrer Einordnung, `read` löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
 // Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
 // Umgebung des Projekts, `github` liest und prüft die persönliche
 // GitHub-Zugangsdatei, `upgrade` aktualisiert das Programm und zieht
@@ -124,6 +124,11 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege wie doc: die Ausgabe ist je Dokument eine Zeile
 		// oder JSON und sonst nichts.
 		return runDocs(args[1:])
+	case "findings":
+		// Ohne Wirt-Pflege wie health: die Ausgabe ist das Ergebnis der
+		// Vorprüfung, als Klartext oder JSON, und ein Skript liest den
+		// Exit-Code.
+		return runFindings(args[1:])
 	case "briefing":
 		// Ohne Wirt-Pflege wie context: die Ausgabe ist das Briefing, als
 		// Klartext oder JSON, und sonst nichts.
@@ -344,6 +349,16 @@ Unterkommandos:
             (include: <verweis>) werden eingesetzt, --raw lässt sie stehen.
             Hinweise stehen auf stderr. Dasselbe wie das MCP-Werkzeug
             k_playbook_doc_read.
+  findings  Die Vorprüfung der Befund-Queue vor /k-befunde-einordnen:
+            k-playbook findings check [--json]. Gleicht die Replica ab
+            (kephalaion node sync), prüft die Rechte read, write und
+            supersede, jeden Eintrag unter keph:/queue/findings/ auf das
+            Namensmuster eines Befunds und liest jeden Befund; leere und
+            kürzlich geänderte werden übersprungen. Ergebnis: bereit oder
+            nicht, mit allen Gründen, dazu der Bestand je Nutzer. Schreibt
+            nichts. Exit-Code 0 bereit, 1 nicht bereit, 2 bei
+            Aufruffehlern. Dasselbe wie das MCP-Werkzeug
+            k_playbook_findings_check.
   briefing  Gibt aus, was für dieses Projekt gilt und was ansteht:
             k-playbook briefing [--json]. Vorweg der Text der immer
             geltenden Anweisungen k-playbook:/instructions/always/, dann

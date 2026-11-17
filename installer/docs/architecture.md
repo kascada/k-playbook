@@ -24,7 +24,8 @@ nicht der Aufruf.
 ## Acht Einstiege
 
 Ohne Argument die Oberfläche, dazu die Subkommandos `config create`, `context`,
-`mcp`, `scan`, `merge`, `inventory`, `todo`, `docs`, `upgrade`, `maintain` (siehe
+`mcp`, `scan`, `merge`, `inventory`, `todo`, `docs`, `findings` (siehe „Vorprüfung der
+Befund-Queue: `findings check`“), `upgrade`, `maintain` (siehe
 „Wartungslauf (maintain)“), `vscode`, `version` und `stop`. `troubleshooting` steht nur in der Hilfe: bis zu seinem eigenen Task
 ein Platzhalter (siehe „Umgebungsprüfung: `health`“). Die Aufzählung unten geht sie in dieser Reihenfolge durch; `help` zählt nicht mit,
 es gibt nur diese Übersicht aus.
@@ -233,7 +234,7 @@ beim Testen. Vertrag: [`../../defaults/docs/handbook/mcp.md`](../../defaults/doc
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
-ist (`tasks`, `workbench`, `findings`, `docs`, `todos`: Ablage, Userbereich, Zählbereich, `done/`,
+ist (`tasks`, `workbench`, `findings`, `docs`, `einordnung`, `todos`: Ablage, Userbereich, Zählbereich, `done/`,
 Startnummer, eigene Werkzeuge), steht allein in der Tabelle `project.DocKinds` (`project/userdocs.go`); eine neue
 Sorte ist ein neuer Eintrag, die erlaubten Werte von `kind` in CLI und MCP-Schema kommen
 daraus — ohne die Sorten mit `OwnTools` (`todos`), die nur über `k-playbook todo` und
@@ -247,7 +248,7 @@ Revision nach dem Verschieben. Vertrag:
 was k-playbook von Kephalaion erwartet: [`../../defaults/docs/handbook/kephalaion-client.md`](../../defaults/docs/handbook/kephalaion-client.md).
 
 `doc append|replace|set [--since N] [--json]` ändert ein Dokument der Sorten ohne eigene
-Werkzeuge (`tasks`, `workbench`, `findings`, `docs`, offen oder unter `done/`, bei Userbereich nur
+Werkzeuge (`tasks`, `workbench`, `findings`, `docs`, `einordnung`, offen oder unter `done/`, bei Userbereich nur
 eigene), ohne dass der Inhalt durch die Sitzung läuft (Task 104); `append` und `replace` auch
 ein Dokument der Handdoku unter `docs/manual/`, beliebig tief, ohne Userbereich — die Bereiche
 außerhalb der Sorten stehen in der Tabelle `project.DocEditAreas` (`project/docedit.go`), je
@@ -323,6 +324,8 @@ installer/
 │   │                            (--discard, --allow-hints, --json)
 │   ├── health.go                Subkommando health: Umgebungsprüfung als Klartext oder
 │   │                            --json, Exit 0/1/2 (exitError); healthText auch im Briefing
+│   ├── findings.go              Subkommando findings check: Vorprüfung der Befund-Queue
+│   │                            als Klartext oder --json, Exit 0/1/2 (Task 166)
 │   ├── github.go                Subkommando github: init, check, show und test [<dienst>]
 │   │                            der persönlichen GitHub-Zugangsdatei, --json, Exit 0/1/2;
 │   │                            init legt die Vorlage an (allein, Task 121), check und show
@@ -493,6 +496,9 @@ installer/
 │   ├── userdocs.go              Sorten-Tabelle DocKinds, UserDocs: nummerierte Dokumente;
 │   │                            Zugänge OpenKephDocs, OpenInventoryStore
 │   │                            in der Kephalaion-Collection anlegen, listen, verschieben
+│   ├── findingscheck.go         CheckFindings: Vorprüfung der Befund-Queue vor
+│   │                            /k-befunde-einordnen — Abgleich, Rechte, Namen, Lesen
+│   │                            (Task 166)
 │   ├── docswork.go              Erzeugertabelle DocsProducers, DocsWork: checkout und
 │   │                            publish von docs/generated/<erzeuger>/ über
 │   │                            .k-playbook/work/docs/<erzeuger>/ und die Merkdatei
@@ -609,7 +615,9 @@ installer/
 │   │                            einzige Werkzeug mit Netz, nur auf Aufruf)
 │   ├── gui.go                   Werkzeug k_playbook_gui_status (Hülle über
 │   │                            guiproc.StatusForDir)
-│   └── notify.go                Werkzeug k_playbook_notify (Hülle über notify.Send)
+│   ├── notify.go                Werkzeug k_playbook_notify (Hülle über notify.Send)
+│   └── findings.go              Werkzeug k_playbook_findings_check (Hülle über
+│                                project.CheckFindings, Ergebnis unter check)
 ├── internal/review/
 │   ├── run.go                   Läufe anlegen und auflisten, run.json
 │   ├── scanners.go              scanners.tsv lesen und prüfen: ein Aufruf je Job
@@ -661,6 +669,8 @@ installer/
 │   │                            ReaderPool (bis zu n Sitzungen nebeneinander)
 │   ├── kephtest/                Collection im Speicher und Ersatz-Binary für die Auskunft
 │   │                            (nur Tests)
+│   ├── sync.go                  SyncHub: kephalaion node sync <hub> für eine frische
+│   │                            Replica (Vorprüfung der Befund-Queue, Task 166)
 │   └── check.go                 Prüfung und Zustände, lesbare Collections je Hub (ProbeHubs)
 ├── internal/versionsources/
 │   └── versionsources.go        die Quellenkonfiguration keph:/k-playbook/inventory.md
@@ -4169,6 +4179,47 @@ nicht verrät, welcher Server gerade antwortet. Ein Build ohne
 Alle `POST`-Routen stehen hinter der Herkunftsprüfung, siehe „Lebenszyklus". `POST
 /api/client-gone` gibt es nicht mehr; der Server endet nicht mehr mit dem Fenster.
 
+## Vorprüfung der Befund-Queue: `findings check`
+
+`k-playbook findings check [--json]` und das MCP-Werkzeug `k_playbook_findings_check` sind die
+Vorprüfung vor `/k-befunde-einordnen` (Task 166); beide rufen `project.CheckFindings`
+(`project/findingscheck.go`). Die Prüfung steht im Programm und nicht im Command-Text, weil sie
+mechanisch ist: über 200 Namen prüfen und je Nutzer zählen. Der Command fängt nur an, wenn sie
+`ready` meldet.
+
+Die Reihenfolge, je Stufe gesammelt statt beim ersten Problem abgebrochen, damit der Command
+alles auf einmal samt Zahl je Nutzer meldet:
+
+1. **Abgleich.** `kephalaion.SyncHub` (`internal/kephalaion/sync.go`) startet
+   `kephalaion node sync <hub>` über das Binary aus `FindBinary`, höchstens `SyncTimeout`
+   (eine Minute). Listen lesen die Replica; ohne Abgleich fehlt, was ein anderer Rechner gerade
+   angelegt hat. Bis dahin hatte das Programm keinen solchen Aufruf. Scheitert er oder fehlt
+   das Binary: Problem `sync`, die Prüfung läuft trotzdem weiter.
+2. **Anbindung und Rechte** aus `KephalaionStatus` (dem `whoami` des Nodes): nicht `ok` →
+   Problem `kephalaion`, Ende; fehlt eines der Rechte `read`, `write`, `supersede`
+   (`FindingsRequiredRights`) → je ein Problem `right`. Ohne `supersede` scheitert das Löschen
+   fremder Befunde.
+3. **Einträge.** Ein rekursives `list` von `queue/findings` mit Frontmatter. Jeder Eintrag muss
+   direkt in der Ablage liegen (sonst `subdir`) und dem Namensmuster der Sorte folgen,
+   `^[0-9]{3,}-[a-z0-9]+(-[a-z0-9]+)*\.md$` wie `docFileName` es bildet (sonst `name`). Eine
+   leere Queue ist kein Fehler: Kephalaion speichert keine leeren Verzeichnisse.
+4. **Lesen.** Jeder Befund ein `read`. Fehler oder „none“ → `unreadable`; ein Frontmatter, das
+   der Node nicht lesen konnte → `frontmatter`. Leer oder jünger als `FindingsRecentWindow`
+   (zehn Minuten) → `skipped` mit Grund `leer` bzw. `kürzlich geändert`, kein Problem:
+   `k_playbook_doc_create` legt einen Befund zuerst leer an.
+
+Das Ergebnis `FindingsCheck` trägt `ready` (genau dann, wenn `problems` leer ist), `problems`,
+`sync`, `rights`, `total`, `byUser` (nach den Autor-Metadaten von Kephalaion), `skipped` und
+`findings`; beide Mengen getrennt und nach `created` sortiert, ältester zuerst. Die Zugänge
+stecken in `findingsEnv` (Anbindung, Abgleich, Status, Store, Uhr), damit die Tests ohne Node
+und Binary laufen. Geschrieben wird nichts außer der Replica. Exit-Codes des Subkommandos:
+0 bereit, 1 nicht bereit, 2 Aufruffehler. Vertrag: [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md),
+Abschnitt „Findings Preflight“.
+
+Das Protokoll eines Laufs ist die Sorte `einordnung` (`queue/einordnung/`, projektweit, ohne
+`done/`), ein Eintrag in `project.DocKinds` wie jede andere Sorte; der Command legt es mit
+`k_playbook_doc_create` an und hängt je Befund eine Zeile mit `k_playbook_doc_append` an.
+
 ## Umgebungsprüfung: `health`
 
 `k-playbook health [--json]` nennt Fehler und Warnungen über die Umgebung des Projekts,
@@ -4290,7 +4341,9 @@ gesperrt, sie antworten mit `reviews_paused` (§„Die Review-Wege pausieren") �
 `k-playbook briefing`, `k_playbook_health` (`health.go`) um `health.Check`, wie
 `k-playbook health` (§„Umgebungsprüfung: `health`"), und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
 `k-playbook gui status` (§„Zustand erfragen: `gui status`"), und `k_playbook_notify` (`notify.go`) um
-`notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"). Keine der Hüllen trägt eigene Fachlogik; sie
+`notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"), und `k_playbook_findings_check`
+(`findings.go`) um `project.CheckFindings`, wie `k-playbook findings check` (§„Vorprüfung der
+Befund-Queue: `findings check`“). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
 Antwort in den Umschlag `{ok, tool, projectDir, …}` mit `error: {code, message}` im
 Fehlerfall; den gemeinsamen Fehlerteil trägt `errorEnvelope` (`error_envelope.go`).

@@ -85,11 +85,15 @@ type DocKind struct {
 // (todos.go): doc_create legte ein leeres Dokument an, doc_done verschöbe
 // ohne das Feld done:. docs (Task 124) sind die Doku-Aufträge: projektweit,
 // erledigt nach queue/docs/done/ (k-playbook:/instructions/on-demand/doku-auftraege.md).
+// einordnung (Task 166) sind die Protokolle von /k-befunde-einordnen: ein
+// Dokument je Lauf, <NNN>-<datum>-<sitzung>.md, projektweit unter
+// queue/einordnung/, ohne done/ — gelesen und gelöscht vom Nutzer.
 var DocKinds = []DocKind{
 	{Kind: "tasks", Dir: "user/~/tasks", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
 	{Kind: "workbench", Dir: "user/~/workbench", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
 	{Kind: "findings", Dir: "queue/findings", UserArea: false, Counting: DocCountDir, Done: false, Start: 1},
 	{Kind: "docs", Dir: "queue/docs", UserArea: false, Counting: DocCountDir, Done: true, Start: 1},
+	{Kind: "einordnung", Dir: "queue/einordnung", UserArea: false, Counting: DocCountDir, Done: false, Start: 1},
 	{Kind: TodoKindName, Dir: "todos", UserArea: false, Counting: DocCountDir, Done: true, Start: 1, OwnTools: true},
 }
 

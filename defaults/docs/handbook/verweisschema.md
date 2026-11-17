@@ -43,7 +43,13 @@ More examples:
   wrong version.
 - **A reference k-playbook does not know is an error.** The tool reports it with an error
   code; it does not fall back to reading from disk, and the session reports it instead of
-  searching for the file on its own.
+  searching for the file on its own. **One exception, an optional extension point:** a shipped
+  command may name a local instruction that k-playbook itself does not ship and that a
+  project creates only when it wants to extend the command. The command text says so
+  explicitly, and for that one reference `not_found` means "no project rules", not an error.
+  The only such point is `k-playbook:/instructions/on-demand/befunde-einordnen.md`, read by
+  `/k-befunde-einordnen` (task 166, [commands.md](commands.md)); its `description` says it
+  applies only to that command.
 - **A `keph:` reference names neither hub nor collection.** Both stand in the block
   `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml` and are the same for everyone working on the
   project; the account of this machine is chosen by Kephalaion. k-playbook
@@ -59,7 +65,10 @@ More examples:
   reference to an entry then points nowhere. A text that stays (task, workbench topic, docs,
   code comment, commit or PR text, progress lines of a run) carries what it needs from a
   finding in its own words; it may say that a finding was written or an order queued, without
-  the reference. Naming the directory a new entry is written to is not a reference.
+  the reference. Naming the directory a new entry is written to is not a reference. The
+  protocol of `/k-befunde-einordnen` under `keph:/queue/einordnung/` names each finding by its
+  full name -- a deliberate, temporary exception: it lies in the queue itself and goes with it;
+  only the closing message of the run refers to the protocol.
   `instructions/on-demand/verweise-nachziehen.md` says how existing ones are removed.
 
 ## Bringing References up to Date

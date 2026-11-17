@@ -197,7 +197,7 @@ func TestDocKindsTabelleIstGueltig(t *testing.T) {
 	if err := ValidateDocKinds(DocKinds); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(DocKindNames(DocKinds), ","); got != "tasks,workbench,findings,docs" {
+	if got := strings.Join(DocKindNames(DocKinds), ","); got != "tasks,workbench,findings,docs,einordnung" {
 		t.Fatalf("Sorten: %s", got)
 	}
 }
@@ -266,10 +266,11 @@ func TestDocCreateStartnummer(t *testing.T) {
 	docs := newTestUserDocs(t, store, DocKinds)
 
 	for kind, want := range map[string]string{
-		"tasks":     "keph:/user/kamran/tasks/001-erste.md",
-		"workbench": "keph:/user/kamran/workbench/001-erste.md",
-		"findings":  "keph:/queue/findings/001-erste.md",
-		"docs":      "keph:/queue/docs/001-erste.md",
+		"tasks":      "keph:/user/kamran/tasks/001-erste.md",
+		"workbench":  "keph:/user/kamran/workbench/001-erste.md",
+		"findings":   "keph:/queue/findings/001-erste.md",
+		"docs":       "keph:/queue/docs/001-erste.md",
+		"einordnung": "keph:/queue/einordnung/001-erste.md",
 	} {
 		created, err := docs.Create(context.Background(), kind, "Erste")
 		if err != nil || created.Ref != want {
@@ -767,5 +768,38 @@ func TestDocTitleTruncated(t *testing.T) {
 		if got := docTitleTruncated(title); got != want {
 			t.Errorf("docTitleTruncated(%q) = %v, erwartet %v", title, got, want)
 		}
+	}
+}
+
+// Die Protokolle von /k-befunde-einordnen (Task 166): projektweit unter
+// queue/einordnung/, Name <NNN>-<datum>-<sitzung>.md, gezählt über die
+// Ablage, ohne done/; anhängen kann jeder, die Sorte hat keinen Userbereich.
+func TestEinordnungProtokollCreateListAppend(t *testing.T) {
+	store := newFakeDocStore("kamran", "queue/einordnung/002-2026-11-16-20261116-090000-abc123.md")
+	store.docs["queue/einordnung/002-2026-11-16-20261116-090000-abc123.md"].by = "anna"
+	docs := newTestUserDocs(t, store, DocKinds)
+	ctx := context.Background()
+
+	created, err := docs.Create(ctx, "einordnung", "2026-11-17-20261117-171733-9e99b2")
+	if err != nil || created.Ref != "keph:/queue/einordnung/003-2026-11-17-20261117-171733-9e99b2.md" ||
+		created.User != "" || created.Kind != "einordnung" || created.Number != 3 {
+		t.Fatalf("create: %+v %v", created, err)
+	}
+	list, err := docs.List(ctx, DocListOptions{Kind: "einordnung"})
+	if err != nil || len(list.Items) != 2 || list.User != "" {
+		t.Fatalf("list: %+v %v", list, err)
+	}
+	if list.Items[0].User != "anna" {
+		t.Fatalf("Autor aus den Metadaten: %+v", list.Items[0])
+	}
+	// Ein Protokoll hat kein done/.
+	_, err = docs.Done(ctx, created.Ref)
+	wantCode(t, err, DocCodeDoneUnsupported)
+	// Eine Zeile je Befund wird angehängt; auch an ein fremdes Protokoll.
+	store.docs["queue/einordnung/003-2026-11-17-20261117-171733-9e99b2.md"].content = "---\ntitle: \"Einordnung\"\n---\n"
+	edited, err := docs.Append(ctx, "keph:/queue/einordnung/002-2026-11-16-20261116-090000-abc123.md",
+		"queue/findings/001-a.md | erledigt", DocEditOptions{})
+	if err != nil || !edited.Changed {
+		t.Fatalf("append: %+v %v", edited, err)
 	}
 }

@@ -351,11 +351,11 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_update` | change the text, tick a todo off, reopen it, or set, change or remove its origin (`origin`; `""` removes it) |
 | `k_playbook_todo_delete` | remove a todo permanently |
 | `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/reviews/…`, `/guidelines/…` (shipped only) and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
-| `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`, `docs`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
+| `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`, `docs`, `einordnung`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_doc_list` | list the numbered documents of a kind from the node's replica: by default the own ones, `user: "*"` all, `done` adds the completed ones; an item whose frontmatter the node could not read, or whose title looks cut off at ` #`, carries `problem` (task 136) |
 | `k_playbook_doc_done` | move an own document into `done/` of its location; the answer carries the `revision` after the move |
 | `k_playbook_doc_reopen` | move an own document from `done/` back into its location; the answer carries the `revision` after the move |
-| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings`, `docs`, or of the hand-written documentation under `docs/manual/`, without its content passing through the session; optional precondition `since_revision` |
+| `k_playbook_doc_append` | append `content` to a document of the kinds `tasks`, `workbench`, `findings`, `docs`, `einordnung`, or of the hand-written documentation under `docs/manual/`, without its content passing through the session; optional precondition `since_revision` |
 | `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`, in a document of those kinds or under `docs/manual/`; optional `since_revision` |
 | `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field of a document of those kinds (not `docs/manual/`); other fields and the body stay byte for byte; optional `since_revision` |
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
@@ -367,6 +367,7 @@ then nothing is written and the interface says so.
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing and writes nothing -- a missing access file is no entry and stays missing (`k-playbook github init` creates it); never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
 | `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- without a file `ok: true` with `test.present: false` and a hint to `k-playbook github init`, nothing tested or created; per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`, per service `selected` (the choice of `github run`) and `selectedOk`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
+| `k_playbook_findings_check` | the preflight of the finding queue before `/k-befunde-einordnen`: sync the replica, check the rights `read`, `write`, `supersede`, every entry under `queue/findings/` and every finding; under `check` the result `ready`, `problems`, `sync`, `rights`, `total`, `byUser`, `skipped`, `findings`; like `k-playbook findings check --json` ([below](#findings-preflight)) |
 | `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
@@ -817,6 +818,7 @@ from it.
 | `workbench` | `user/<name>/workbench/` | yes | all `user/*/workbench/` including `done/`, project-wide | yes | 001 |
 | `findings` | `queue/findings/` | no | the directory | no | 001 |
 | `docs` | `queue/docs/` | no | the directory including `done/` | yes | 001 |
+| `einordnung` | `queue/einordnung/` | no | the directory | no | 001 |
 | `todos` | `todos/` | no | the directory including `done/` | yes | 001 |
 
 `todos` has tools of its own (`OwnTools`, task 097) and is not reachable through the `doc`
@@ -827,6 +829,13 @@ tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…`
 code change, closed by `/k-docs-code` or `/k-docs-tools` after a successful `publish` with
 `k_playbook_doc_done` into `queue/docs/done/`. Head and life cycle:
 `k-playbook:/instructions/on-demand/doku-auftraege.md`.
+
+`einordnung` are the protocols of `/k-befunde-einordnen` (task 166): one document per run,
+named `<NNN>-<datum>-<sitzung>.md` (`k_playbook_doc_create` with the name `<datum>-<sitzung>`),
+head `title`, `sitzung`, `stand` (main branch and commit the run checked against), then one
+line `<full name> | <target or reason>` per finding handled or skipped, appended with
+`k_playbook_doc_append`. Project-wide, no `done/`; the user reads and deletes them. The kind
+goes away once the procedure has proven itself.
 
 `<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
 Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
@@ -915,7 +924,7 @@ All three go through one function, `UserDocs.edit` (`project/docedit.go`); grep 
 doc append|replace|set|grep` call the same code. Kephalaion itself is unchanged.
 
 **Scope of the change operations.** A `keph:` reference to one document of a kind without
-tools of its own -- `tasks`, `workbench`, `findings`, `docs` --, open or under `done/`; for kinds with
+tools of its own -- `tasks`, `workbench`, `findings`, `docs`, `einordnung` --, open or under `done/`; for kinds with
 a user area only own documents (`foreign_user`), as for `doc_done`. A segment `~` is replaced by
 `kephalaion.user`. For `append` and `replace` additionally one document of the hand-written
 documentation under `docs/manual/`, at any depth (decision 2026-11-08, prompted by a manual
@@ -1308,6 +1317,55 @@ answer, `available: false` and no report without a project configuration. `GET /
 is **not** this report: it stays the window's heartbeat of the "GUI Status Contract" below and
 must remain cheap, while the environment check asks the Kephalaion node. See the architecture
 document, "Umgebungsprüfung: `health`".
+
+### Findings Preflight
+
+`k_playbook_findings_check` is a thin wrapper over `project.CheckFindings`
+(`project/findingscheck.go`), the same function behind `k-playbook findings check [--json]`
+(task 166). It is the preflight of `/k-befunde-einordnen`: the command starts on the first
+finding only when the answer is `ready`. The check is mechanical -- over 200 names, the count
+per user -- and therefore lives in the program, not in the command text. Its only input is
+`projectDir`.
+
+In this order, collecting instead of stopping at the first problem, so the command reports
+everything at once together with the number per user:
+
+1. **Sync.** `kephalaion node sync <hub>` through the binary (`kephalaion.SyncHub`, at most one
+   minute). Lists read the replica; without a fresh sync, what another machine has just
+   created is missing. A failed sync or a missing binary is a problem of kind `sync`.
+2. **Binding and rights.** The binding must be `ok` (otherwise kind `kephalaion`, and the check
+   ends here); the rights on the collection must include `read`, `write` and `supersede` --
+   without `supersede`, deleting another user's finding fails. Each missing right is a
+   problem of kind `right` with the right as `name`.
+3. **Entries.** Every entry under `queue/findings/` (listed recursively from the replica) is a
+   finding by the name pattern of the kind, `<number>-<short name>.md` directly in the
+   location; otherwise kind `name` or, below a subdirectory, `subdir`. An empty or missing
+   `queue/findings/` is no error -- Kephalaion stores no empty directories.
+4. **Reading.** Every finding is read. A read error, or an entry the list shows but `read`
+   does not, is kind `unreadable`; a frontmatter the node could not read is `frontmatter`. An
+   empty finding, or one changed within the last ten minutes, is **skipped**, not a problem:
+   `k_playbook_doc_create` creates it empty first and the content follows in a second call;
+   it comes up in the next run.
+
+The answer is `{ok: true, tool, projectDir, check: {…}}`, the result nested under `check`
+because its `ready` is a different thing from the envelope's `ok`:
+
+| Field | Meaning |
+|---|---|
+| `ready` | `true` exactly when `problems` is empty |
+| `problems` | each `kind` (`kephalaion`, `sync`, `right`, `name`, `subdir`, `unreadable`, `frontmatter`), `name` (the full name in the collection, for `right` the right) and `message` with the remedy where there is one |
+| `sync` | the state after the sync as the node reports it: `at`, `revision` |
+| `rights` | the rights on the collection |
+| `total`, `byUser` | the readable findings, `findings` and `skipped` together, and their number per user who created them (Kephalaion's author metadata); counted even when not ready |
+| `skipped` | the findings this run skips, each with `reason` `leer` or `kürzlich geändert` -- the text of the protocol line `übersprungen (<reason>)` |
+| `findings` | the findings to work on, each `name` (full name, as `delete` and `rename` need it), `ref`, `revision`, `user`, `created`, `updated`, `ziel` |
+
+`findings` and `skipped` are disjoint and sorted by age, oldest first (`created`, then name).
+An empty queue is `ready` with `total: 0`. Nothing is written except the node's replica, which
+the sync brings up to date. Exit codes of the subcommand: 0 ready, 1 not ready, 2 on a call
+error (unknown option, no project). Error codes of the tool: `invalid_input` for a missing
+`projectDir`, `project_not_found` for one that leads to no project; the check itself never
+fails.
 
 ### GitHub Test Contract
 
