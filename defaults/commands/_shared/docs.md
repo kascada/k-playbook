@@ -140,8 +140,11 @@ sich aus Briefing und Argument, nicht geraten:
   `<context.project.dir>/.k-playbook/` und
   `<context.project.dir>/k-playbook/` — Altbestand: ein liegengebliebener Clone von
   k-playbook aus dem früheren Modell, den `/k-upgrade` löscht; er ist Werkzeug, kein Code
-  des Projekts, und wird nicht dokumentiert. Zeigt `$ARGUMENTS` in einen davon, abbrechen
-  und sagen, dass diese Verzeichnisse nie zum Scan gehören.
+  des Projekts, und wird nicht dokumentiert. Dazu jedes Verzeichnis `keph-backup/` unter
+  `SCAN_ROOT`, auf jeder Ebene — der Spiegel der Collection, den `k-playbook maintain`
+  schreibt; er ist Doku, kein Code, und gilt unabhängig davon, ob `context.docs.exclude` ihn
+  nennt. Zeigt `$ARGUMENTS` in einen davon, abbrechen und sagen, dass diese Verzeichnisse
+  nie zum Scan gehören.
 - **Versteckte Pfade** sind ausgeschlossen, ohne Rückfrage: jede Datei und jedes
   Verzeichnis, dessen Name mit `.` beginnt, auf jeder Ebene — etwa `.git/`, `.github/`,
   `.claude/`, `.opencode/`, `.devcontainer/`, `.venv/`, `.env`. Ein versteckter Pfad kommt
@@ -169,7 +172,7 @@ den Preflight **einmal** bestätigen:
 Scope         <SCAN_ROOT> (project.repoRoot)
 Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
 Zusätzlich    <EXTRA_PATH> | —
-Immer außen   k-playbook/, .k-playbook/, .git/
+Immer außen   k-playbook/, .k-playbook/, keph-backup/, .git/
 Versteckt     ausgeschlossen (.*) | ausgenommen: <aus Argument oder hint>
 Aus K-PLAYBOOK.yaml  <context.docs.exclude, durch Komma getrennt> | —
               verworfen: <pattern> — <reason>   (je Eintrag aus context.docs.problems)

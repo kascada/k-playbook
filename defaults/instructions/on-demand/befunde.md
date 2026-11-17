@@ -116,6 +116,15 @@ und sagt, was stattdessen gilt und woran der Irrtum lag. Die Übernahme sieht be
 - Alles, was der Code selbst schon sagt.
 - Was in der Projektdokumentation bereits richtig steht.
 - Ablaufplauderei, Terminabsprachen, Werkzeugbedienung.
+- **Momentaufnahmen.** Ein Befund muss noch stimmen und nützen, wenn sein Anlass erledigt
+  ist. Prüffrage: Hilft er einer Sitzung, die in einigen Monaten an derselben Stelle
+  arbeitet? Nicht hinein gehören der Zustand eines bestimmten Commits, Testlaufs oder
+  Release („HEAD ist rot“), eine einmalige Störung der Umgebung, ein Übergang zwischen zwei
+  Versionen und ein Fehler, der in derselben Sitzung behoben wurde, als bloße Feststellung.
+- Steckt in der Momentaufnahme ein bleibender Kern, schreib den Kern und nicht den Moment.
+  Ein Kern ist ein Mechanismus, eine Falle, die wiederkommt, ein Grund oder eine Sackgasse.
+  Also nicht „make test ist auf HEAD rot“, sondern „der Schutztest X schlägt auch an, wenn
+  das Handbuch Y nennt“. Wo ein laufendes Vorhaben gerade steht, gehört in die Workbench.
 
 ### Abgeschlossen
 

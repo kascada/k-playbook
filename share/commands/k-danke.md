@@ -85,6 +85,13 @@ Achte besonders auf das, was am leichtesten verlorengeht:
 - Thesen, die sich als **falsch** erwiesen haben.
 - Der Grund, **warum** etwas so gebaut ist, wenn er erkennbar wurde.
 
+Nachgetragen wird nur, was die Prüffrage aus dem Abschnitt „Was nicht festgehalten wird“
+der Befund-Anweisung besteht: Es nützt einer Sitzung, die in einigen Monaten an derselben
+Stelle arbeitet. Was nur den Stand dieser Sitzung beschreibt — ein roter Testlauf, ein
+behobener Fehler als bloße Feststellung, eine einmalige Störung —, kommt nicht in die
+Queue, sondern in die Workbench oder nirgendwohin. Steckt ein bleibender Kern darin,
+schreib den Kern.
+
 Trage Fehlendes als neue Befunde nach, mit `entstanden: k-danke`. Ohne Rückfrage, aber
 melde je Befund eine Zeile. Vorhandene Befunde werden dabei nicht geändert.
 
@@ -111,7 +118,8 @@ Was soll aus diesen Befunden werden?
 
 Schlage je Befund ein Ziel vor. Fallen und Regeln wirken dauerhaft und kosten künftige
 Sitzungen Aufmerksamkeit — schlage sie deshalb nur vor, wenn es klar ist, und im Zweifel
-`wissen`.
+`wissen`. Für einen Befund dieser Sitzung, der nur eine Momentaufnahme ist und keinen
+bleibenden Kern hat, schlage `verwerfen` vor und nenne den Grund in wenigen Worten.
 
 Für jede Antwort außer `offen` setze `ziel` im Kopf des Befunds: lies ihn mit Kephalaion
 `read`, ändere nur diese Zeile und schreibe ihn mit `write` und `base_revision` aus dem
@@ -174,6 +182,8 @@ warten in `keph:/queue/findings/` auf die Übernahme.
   dem Nutzer.
 - **Einen Befund umschreiben.** Außer `ziel` bleibt er, wie er geschrieben wurde; was
   fehlt, ist ein neuer Befund.
+- **Den Stand der Sitzung als Befund festhalten.** Was nach dem Anlass nichts mehr nützt,
+  ist kein Befund, auch wenn es belegt ist.
 - **Die Sitzung zusammenfassen.** Dieser Command sammelt Befunde ein, er schreibt kein
   Protokoll. Was nichts erklärt, gehört nicht hinein.
 - **Bei leerem Ergebnis so tun, als sei alles gut.** Eine Analyse-Sitzung ohne einen

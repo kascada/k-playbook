@@ -18,7 +18,9 @@ Befund, Beleg (`pfad:zeile` oder Testausgabe) und Sicherheit (bestaetigt, unbest
 widerlegt). Ist Kephalaion nicht erreichbar, sag das und gib den Befund vollständig in deiner
 Antwort wieder.
 
-Nicht festgehalten werden Zwischenschritte und alles, was der Code selbst sagt.
+Nicht festgehalten werden Zwischenschritte, alles, was der Code selbst sagt, und
+Momentaufnahmen, die nach ihrem Anlass nichts mehr nützen, etwa der Zustand eines
+bestimmten Commits oder Testlaufs. Steckt darin ein bleibender Kern, schreib den Kern.
 
 Am Ende einer Sitzung schließt **/k-danke** die Arbeit ab. Er legt die Befunde der Sitzung
 vor, trägt Fehlendes nach, fragt, was aus ihnen werden soll, und prüft, ob die Doku
