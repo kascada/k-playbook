@@ -1425,7 +1425,7 @@ The tool tries the known channels in a fixed order and reports honestly when non
 
 | Channel | Condition | How |
 |---|---|---|
-| `windows-toast` | WSL (`WSL_DISTRO_NAME`, `WSL_INTEROP` or a Microsoft kernel in `/proc/version`) and `powershell.exe` on `PATH` | a toast through the WinRT notification classes, sent as `-EncodedCommand`; the toast itself is silent, the sound is `C:\Windows\Media\notify.wav` through `Media.SoundPlayer`, so it does not depend on the Windows notification settings |
+| `windows-toast` | WSL (`WSL_DISTRO_NAME`, `WSL_INTEROP` or a Microsoft kernel in `/proc/version`) and `powershell.exe` on `PATH`, falling back to `/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe` for background services without a Windows `PATH` | a toast through the WinRT notification classes, sent as `-EncodedCommand`; the toast itself is silent, the sound is `C:\Windows\Media\notify.wav` through `Media.SoundPlayer`, so it does not depend on the Windows notification settings |
 | `macos` | `darwin` and `osascript` | `display notification … with title …`, with `sound name "Glass"` on request |
 | `linux-desktop` | `DISPLAY` or `WAYLAND_DISPLAY` set and `notify-send` on `PATH` | `notify-send`; the sound through `paplay` or `canberra-gtk-play` if present, otherwise the notification still goes out and `reason` says why there was no sound |
 

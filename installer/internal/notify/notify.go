@@ -142,7 +142,13 @@ func channels() []channel {
 	return []channel{
 		{
 			name:      ChannelWindowsToast,
-			available: func() bool { return isWSL() && installed("powershell.exe") },
+			available: func() bool {
+				if !isWSL() {
+					return false
+				}
+				_, err := windowsPowerShell()
+				return err == nil
+			},
 			send:      sendWindowsToast,
 		},
 		{
@@ -156,6 +162,17 @@ func channels() []channel {
 			send:      sendLinuxDesktop,
 		},
 	}
+}
+
+const wslPowerShellPath = "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+
+func windowsPowerShell() (string, error) {
+	path, err := lookPath("powershell.exe")
+	if err == nil {
+		return path, nil
+	}
+	// WSL-Hintergrunddienste erben den Windows-PATH nicht immer.
+	return lookPath(wslPowerShellPath)
 }
 
 func installed(name string) bool {
@@ -176,7 +193,7 @@ func noChannelReason() string {
 	}
 	switch {
 	case isWSL():
-		reasons = append(reasons, "WSL ohne powershell.exe im PATH")
+		reasons = append(reasons, "WSL ohne powershell.exe im PATH oder am Windows-Standardpfad")
 	case goos == "darwin":
 		reasons = append(reasons, "osascript nicht gefunden")
 	case !hasDisplay():
@@ -246,8 +263,12 @@ func encodePowerShell(script string) string {
 }
 
 func sendWindowsToast(ctx context.Context, req Request) (Result, error) {
+	powerShell, err := windowsPowerShell()
+	if err != nil {
+		return Result{}, err
+	}
 	args := []string{"-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(windowsScript(req))}
-	if err := runCommand(ctx, "powershell.exe", args...); err != nil {
+	if err := runCommand(ctx, powerShell, args...); err != nil {
 		return Result{}, err
 	}
 	return Result{Channel: ChannelWindowsToast, SoundPlayed: req.Sound}, nil

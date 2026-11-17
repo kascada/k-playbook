@@ -43,4 +43,7 @@ Die Antwort wird nicht ausgewertet und nicht dem Nutzer gezeigt. `ok: false` mit
 `error.code: no_channel` heißt nur, dass dieser Rechner keinen Weg zum Nutzer hat — etwa ein
 Devcontainer; weiter wie geplant, ohne Hinweis und ohne Wiederholung. Dasselbe gilt, wenn
 das Werkzeug fehlt, weil ein älteres Programm läuft. Die Meldung ersetzt keine Ausgabe:
-Frage und Zusammenfassung stehen weiterhin vollständig im Chat.
+Frage und Zusammenfassung stehen weiterhin vollständig im Chat. Die Meldung ist nur ein
+zusätzlicher Hinweis und kann unsichtbar bleiben oder unterdrückt werden. Auch `ok: true`
+bestätigt nicht, dass der Nutzer sie gesehen oder gehört hat; daraus weder Kenntnisnahme
+noch Zustimmung ableiten.

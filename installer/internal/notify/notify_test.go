@@ -47,7 +47,7 @@ func install(t *testing.T, host fakeHost) *[]call {
 
 	lookPath = func(name string) (string, error) {
 		if host.programs[name] {
-			return "/usr/bin/" + name, nil
+			return name, nil
 		}
 		return "", errors.New("nicht installiert")
 	}
@@ -127,6 +127,68 @@ func TestSendWSLToast(t *testing.T) {
 	}
 	if script := decodePowerShell(t, (*calls)[1].args); !strings.Contains(script, "SoundPlayer") {
 		t.Errorf("mit Sound fehlt der SoundPlayer:\n%s", script)
+	}
+}
+
+func TestSendWSLPowerShellResolution(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		programs map[string]bool
+		want     string
+		fail     bool
+	}{
+		{"PATH bevorzugt", map[string]bool{"powershell.exe": true, wslPowerShellPath: true}, "powershell.exe", false},
+		{"Dienst ohne Windows-PATH", map[string]bool{wslPowerShellPath: true, "notify-send": true}, wslPowerShellPath, false},
+		{"Fallback scheitert", map[string]bool{wslPowerShellPath: true, "notify-send": true}, wslPowerShellPath, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			host := fakeHost{programs: tc.programs, wsl: true, env: map[string]string{"DISPLAY": ":0"}}
+			if tc.fail {
+				host.fail = map[string]string{tc.want: "Interop nicht verfügbar"}
+			}
+			calls := install(t, host)
+			result, err := Send(context.Background(), Request{Title: "Fertig", Sound: true})
+			if tc.fail {
+				if err == nil || !strings.Contains(err.Error(), "Interop nicht verfügbar") || errors.Is(err, ErrNoChannel) {
+					t.Fatalf("Fehler = %v", err)
+				}
+			} else if err != nil || result.Channel != ChannelWindowsToast || !result.SoundPlayed {
+				t.Fatalf("Ergebnis = %+v, Fehler = %v", result, err)
+			}
+			if len(*calls) != 1 || (*calls)[0].name != tc.want {
+				t.Fatalf("Aufrufe = %+v, erwartet %s", *calls, tc.want)
+			}
+			decodePowerShell(t, (*calls)[0].args)
+		})
+	}
+}
+
+func TestWindowsPowerShellUsesResolvedPath(t *testing.T) {
+	calls := install(t, fakeHost{wsl: true})
+	lookPath = func(name string) (string, error) { return "/custom/" + name, nil }
+	if _, err := Send(context.Background(), Request{Title: "Fertig"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 || (*calls)[0].name != "/custom/powershell.exe" {
+		t.Fatalf("Aufrufe = %+v", *calls)
+	}
+}
+
+func TestNonWSLDoesNotProbeWindowsPath(t *testing.T) {
+	for _, os := range []string{"linux", "darwin"} {
+		t.Run(os, func(t *testing.T) {
+			install(t, fakeHost{os: os})
+			lookPath = func(name string) (string, error) {
+				if name == "powershell.exe" || name == wslPowerShellPath {
+					t.Fatalf("Windows-Suche außerhalb von WSL: %s", name)
+				}
+				return "", errors.New("nicht installiert")
+			}
+			_, err := Send(context.Background(), Request{Title: "Fertig"})
+			if !errors.Is(err, ErrNoChannel) {
+				t.Fatalf("Fehler = %v", err)
+			}
+		})
 	}
 }
 

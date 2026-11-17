@@ -51,7 +51,10 @@ func addNotifyTool(server *mcp.Server) {
 			"verlangt und ging nicht, steht der Grund in reason. Hat der Rechner keinen Weg zum Nutzer — " +
 			"etwa ein Devcontainer ohne Display und ohne Windows-Seite —, ist die Antwort ok: false mit " +
 			"error.code no_channel und dem Grund in error.message; das ist eine Auskunft, kein Grund zum " +
-			"Wiederholen. Dieselbe Antwort wie das Subkommando `k-playbook notify`.",
+			"Wiederholen. Die Meldung ist nur ein zusätzlicher Hinweis und kann unsichtbar bleiben oder " +
+			"unterdrückt werden. Auch ok: true bestätigt nicht, dass der Nutzer sie gesehen oder gehört hat; " +
+			"daraus weder Kenntnisnahme noch Zustimmung ableiten. Fragen und Ergebnisse weiterhin vollständig " +
+			"im Chat ausgeben. Dieselbe Antwort wie das Subkommando `k-playbook notify`.",
 	}, notifyTool)
 }
 
