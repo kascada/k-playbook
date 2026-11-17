@@ -1,9 +1,9 @@
 # The VS Code extension
 
 k-playbook ships its own VS Code extension, **k-playbook Workspace Tools**
-(`kascada.k-playbook-workspace-tools`). It is a collection of workspace actions: one opens
-OpenCode in a terminal tab inside the editor area, the other binds the project's
-Kephalaion collections into the workspace whenever a window starts.
+(`kascada.k-playbook-workspace-tools`). It is a collection of workspace actions; at the
+moment it holds one, which binds the project's Kephalaion collection into the workspace
+whenever a window starts.
 
 The extension travels inside the program binary. You are not meant to install it
 yourself: starting the interface once installs it and keeps it current.
@@ -12,14 +12,9 @@ yourself: starting the interface once installs it and keeps it current.
 
 | Command | Title | Keybinding |
 |---|---|---|
-| `kPlaybook.openCode` | k-playbook: OpenCode im neuen Tab | `ctrl+alt+shift+o`, mac `cmd+alt+shift+o` |
 | `kPlaybook.initWorkspace` | k-playbook: Kephalaion-Collections einbinden | — (runs on its own at window start) |
 
-The command opens a terminal **in the editor area** — a tab next to your files, not the
-panel at the bottom — and starts the OpenCode attach program in it. The working directory
-is the chosen workspace folder: with one folder it does not ask, with several it offers a
-pick, and cancelling the pick does nothing. The command also sits as a button in the
-editor title bar and appears in the command palette under the category `k-playbook`.
+The command appears in the command palette under the category `k-playbook`.
 Interface texts of the extension are German, like the rest of the interface.
 
 The extension runs in the workspace context (`extensionKind: ["workspace"]`), which is
@@ -78,32 +73,6 @@ Mind `.gitignore`: a newly created `<foldername>.code-workspace` carries the mac
 hub alias and is not ignored by k-playbook. A project that does not want it committed
 ignores `*.code-workspace` itself.
 
-## Settings
-
-Both settings have `scope: "machine"`. No workspace may redirect the executed path — a
-repository you open must not be able to decide what gets run on your machine.
-
-| Setting | Default | Meaning |
-|---|---|---|
-| `kPlaybook.openCode.executable` | `opencode-attach` | The program to start. A value without `/` is looked up in `PATH`, a value with `/` is taken as a path. |
-| `kPlaybook.openCode.args` | `[]` | Extra arguments. The folder is not passed as an argument; it becomes the terminal's working directory. |
-
-The path is resolved in the extension host and handed to the terminal as an absolute
-path. That is deliberate: measured on 2026-10-08, the extension host carries the `PATH`
-of a login shell (under WSL including `~/.local/bin` and `~/.opencode/bin`), while the
-`ptyHost` that starts terminals does not. A bare program name as `shellPath` would depend
-on the environment VS Code hands to the individual terminal; an absolute path does not.
-Resolving there also means a missing program is noticed where a message can be shown.
-
-A missing program, a wrong path or a window without a workspace folder produces an error
-message with an **Einstellung öffnen** button, not just a line in a terminal that may or
-may not stay readable. What the started program writes afterwards stays in its terminal;
-the extension does not read that output and is not meant to.
-
-In a dev container the default only works if the program sits in one of the `PATH`
-directories of the container. `devcontainer.json` decides that through `remoteEnv.PATH`;
-if the program lives elsewhere, set `kPlaybook.openCode.executable` to an absolute path.
-
 ## How it gets installed
 
 **Automatically, when the service starts.** Starting the interface (`k-playbook`, or
@@ -148,8 +117,7 @@ Two consequences worth knowing:
 - **Removing the extension does not stick.** The next start of the service installs it
   again, because the service compares versions and does not record a decision to remove
   it. Respecting a deliberate uninstall is a separate piece of work (todo #23). Until
-  then, set `kPlaybook.openCode.executable` aside and simply ignore the command, or stop
-  using the interface for that project.
+  then, simply leave the extension be, or stop using the interface for that project.
 
 ### The explicit way
 

@@ -9,14 +9,7 @@ const Module = require('node:module');
 
 const state = {
 	workspaceFolders: [],
-	folderPick: undefined,
-	folderPickOptions: null,
-	folderPickCalls: 0,
-	configuration: {},
-	terminals: [],
-	terminalError: null,
 	errorMessages: [],
-	errorAnswer: undefined,
 	registered: [],
 	executedCommands: [],
 	workspaceFile: undefined,
@@ -29,14 +22,7 @@ const state = {
 
 function reset() {
 	state.workspaceFolders = [];
-	state.folderPick = undefined;
-	state.folderPickOptions = null;
-	state.folderPickCalls = 0;
-	state.configuration = {};
-	state.terminals = [];
-	state.terminalError = null;
 	state.errorMessages = [];
-	state.errorAnswer = undefined;
 	state.registered = [];
 	state.executedCommands = [];
 	state.workspaceFile = undefined;
@@ -83,36 +69,15 @@ class Uri {
 
 const vscode = {
 	Uri,
-	TerminalLocation: { Panel: 1, Editor: 2 },
 	window: {
 		async showErrorMessage(message, ...items) {
 			state.errorMessages.push({ message, items });
-			return state.errorAnswer;
 		},
 		async showInformationMessage(message) {
 			state.infoMessages.push(message);
 		},
 		async showWarningMessage(message) {
 			state.warningMessages.push(message);
-		},
-		async showWorkspaceFolderPick(options) {
-			state.folderPickCalls += 1;
-			state.folderPickOptions = options;
-			return state.folderPick;
-		},
-		createTerminal(options) {
-			if (state.terminalError) {
-				throw state.terminalError;
-			}
-			const terminal = {
-				options,
-				shown: 0,
-				show() {
-					this.shown += 1;
-				},
-			};
-			state.terminals.push(terminal);
-			return terminal;
 		},
 	},
 	workspace: {
@@ -125,13 +90,6 @@ const vscode = {
 		updateWorkspaceFolders(start, deleteCount, ...added) {
 			state.updates.push({ start, deleteCount, added });
 			return state.updateResult;
-		},
-		getConfiguration(section) {
-			return {
-				get(key) {
-					return state.configuration[`${section}.${key}`];
-				},
-			};
 		},
 	},
 	extensions: {

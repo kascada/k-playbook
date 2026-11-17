@@ -563,10 +563,8 @@ The target of the user-local path can be relocated through `--prefix` and `--bin
 
 If the environment has VS Code, starting the interface also installs the extension
 **k-playbook Workspace Tools** into the VS Code server of that environment — in the
-background, without holding up the start, and without a window reload. It brings the
-command *k-playbook: OpenCode im neuen Tab*, which opens OpenCode in a terminal tab in
-the editor area. With Kephalaion set up, it also binds the public collection `k-playbook`
-and the project's collection into the workspace on every window start. The extension
+background, without holding up the start, and without a window reload. With Kephalaion
+set up, it binds the project's collection into the workspace on every window start. The extension
 travels inside the program binary, so a program update brings the matching version with
 it.
 

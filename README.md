@@ -87,9 +87,8 @@ project/
 The same interface then registers the MCP server and sets up the linking for the
 assistants. If the environment has VS Code, it
 also installs the extension *k-playbook Workspace Tools* into the VS Code server there, in the background and without
-a window reload; it brings the command *k-playbook: OpenCode im neuen Tab*. With Kephalaion
-set up, the extension also binds the public collection `k-playbook` and the project's own
-collection into the workspace whenever a window starts, opening or creating the project's
+a window reload. With Kephalaion
+set up, the extension binds the project's own collection into the workspace whenever a window starts, opening or creating the project's
 `.code-workspace` file if only the folder is open. Whoever never starts the interface
 installs it with `k-playbook vscode install`. See [`defaults/docs/handbook/vscode.md`](./defaults/docs/handbook/vscode.md).
 

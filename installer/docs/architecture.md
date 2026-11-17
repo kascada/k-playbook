@@ -2203,7 +2203,7 @@ jeden `github`-Eintrag auf zwei Plattformen.
 
 k-playbook bringt eine eigene VS-Code-Erweiterung mit, „k-playbook Workspace Tools"
 (`kascada.k-playbook-workspace-tools`). Sie ist ein Sammelpaket von Workspace-Aktionen;
-die erste öffnet OpenCode in einem Terminal-Tab im Editor-Bereich. Die Quelle liegt in
+derzeit enthält es eine, die die Collection des Projekts in den Arbeitsbereich einbindet. Die Quelle liegt in
 `installer/vscode/` (JavaScript, CommonJS, ohne Abhängigkeiten und ohne Bundler), das Go
 dazu in `internal/vscodeext`.
 
@@ -2346,25 +2346,12 @@ an dem jemand auf eine Rückfrage antworten könnte.
 ### Die Erweiterung selbst
 
 `extension.js` registriert, was in seiner Liste `actions` steht, und sonst nichts; jede
-Aktion exportiert `{ id, run }`. Der Befehl `kPlaybook.openCode` öffnet ein Terminal mit
-`location: TerminalLocation.Editor` und dem gewählten Workspace-Ordner als `cwd`.
+Aktion exportiert `{ id, run }`.
 
-Zwei Entscheidungen darin sind gemessen:
-
-- **`shellPath` bekommt den absoluten Pfad, aufgelöst im Extension-Host.** Der
-  Extension-Host trägt den PATH einer Login-Shell (unter WSL einschließlich
-  `~/.local/bin` und `~/.opencode/bin`), der `ptyHost`, der die Terminals startet, nicht.
-  Ein bloßer Programmname hinge damit an der Umgebung, die VS Code dem einzelnen Terminal
-  mitgibt. Nebeneffekt: ein fehlendes Programm fällt dort auf, wo eine Meldung angezeigt
-  werden kann.
-- **Ein selbst erkennbarer Fehler kommt zusätzlich als `showErrorMessage`.** Ob die
-  Meldung eines mit Exit 1 endenden Programms im Terminal-Tab des Editor-Bereichs lesbar
-  stehen bleibt, ist ungemessen. Die Meldung deckt beide Ausgänge ab und kostet nichts,
-  wenn der Text ohnehin stehen bleibt. Was das gestartete Programm danach selbst schreibt,
-  bleibt in seinem Terminal; die Erweiterung liest die Ausgabe nicht mit.
-
-Beide Einstellungen (`kPlaybook.openCode.executable`, `kPlaybook.openCode.args`) haben
-`scope: "machine"`: kein Arbeitsbereich darf den ausgeführten Pfad umbiegen.
+Programme, die eine Aktion startet, löst `lib/executable.js` im Extension-Host zu einem
+absoluten Pfad auf. Der Extension-Host trägt den PATH einer Login-Shell (unter WSL
+einschließlich `~/.local/bin`); so fällt ein fehlendes Programm auf, bevor es gestartet
+wird.
 
 Der Befehl `kPlaybook.initWorkspace` bindet die Collection des Projekts als
 `keph://`-Ordner ein. Die öffentliche Collection `k-playbook` bindet er nicht ein: ihr

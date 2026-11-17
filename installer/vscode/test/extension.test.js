@@ -50,8 +50,4 @@ test('das Manifest hält die Festlegungen der Auslieferung', () => {
 	assert.deepEqual(manifest.extensionKind, ['workspace']);
 	// Ohne repository bricht vsce 4.0.0 den Bau der VSIX ab.
 	assert.ok(manifest.repository, 'repository fehlt');
-	// scope machine: kein Arbeitsbereich darf den ausgeführten Pfad umbiegen.
-	for (const [key, property] of Object.entries(manifest.contributes.configuration.properties)) {
-		assert.equal(property.scope, 'machine', `${key} hat nicht scope machine`);
-	}
 });

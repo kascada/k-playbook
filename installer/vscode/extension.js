@@ -11,7 +11,7 @@
 
 const vscode = require('vscode');
 
-const actions = [require('./actions/openCode'), require('./actions/initWorkspace')];
+const actions = [require('./actions/initWorkspace')];
 
 function activate(context) {
 	for (const action of actions) {

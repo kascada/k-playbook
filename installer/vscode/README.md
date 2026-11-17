@@ -13,14 +13,7 @@ startet, ruft `k-playbook vscode install`. Einzelheiten in `defaults/docs/handbo
 
 | Befehl | Titel | Tastenkürzel |
 |---|---|---|
-| `kPlaybook.openCode` | k-playbook: OpenCode im neuen Tab | `ctrl+alt+shift+o`, mac `cmd+alt+shift+o` |
 | `kPlaybook.initWorkspace` | k-playbook: Kephalaion-Collections einbinden | — (läuft beim Start von selbst) |
-
-Der Befehl öffnet ein Terminal **im Editor-Bereich** — einen Tab neben den Dateien,
-nicht das Panel unten — und startet darin das Anhäng-Programm von OpenCode. Das
-Arbeitsverzeichnis ist der gewählte Workspace-Ordner; bei mehreren Ordnern fragt eine
-Auswahl, bei einem wird nicht gefragt. Neben der Befehlspalette und dem Tastenkürzel
-liegt der Befehl als Knopf in der Titelzeile des Editors.
 
 ### Kephalaion-Collections im Arbeitsbereich
 
@@ -43,21 +36,6 @@ Beim Start bleibt still, was keine Störung ist: kein Projektordner, keine Anbin
 Kephalaion-Erweiterung, kein `k-playbook` im PATH. Ein Fehlschlag kommt als Warnung. Von Hand
 aufgerufen meldet der Befehl jeden Ausgang. Eine bewusst entfernte Collection kommt beim
 nächsten Start zurück.
-
-## Einstellungen
-
-Beide Einstellungen gehören zu „OpenCode im neuen Tab“ und haben `scope: "machine"`: kein Arbeitsbereich darf den ausgeführten
-Pfad umbiegen.
-
-| Einstellung | Standard | Bedeutung |
-|---|---|---|
-| `kPlaybook.openCode.executable` | `opencode-attach` | Das zu startende Programm. Ein Name ohne `/` wird im PATH gesucht, ein Wert mit `/` als Pfad genommen. |
-| `kPlaybook.openCode.args` | `[]` | Zusätzliche Argumente. Der Ordner wird nicht als Argument übergeben, sondern als Arbeitsverzeichnis. |
-
-Der Programmpfad wird im Extension-Host aufgelöst und dem Terminal absolut übergeben.
-Der Grund steht in `lib/executable.js`: der Extension-Host trägt den PATH der
-Login-Shell, der Prozess, der die Terminals startet, nicht. Fehlt das Programm, sagt
-das eine Meldung mit dem Knopf „Einstellung öffnen“ — nicht nur das Terminal.
 
 ## Eine neue Aktion hinzufügen
 
