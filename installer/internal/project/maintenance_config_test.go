@@ -409,12 +409,12 @@ func TestResolveMaintenanceTargetUnterRepo(t *testing.T) {
 	}
 
 	for target, want := range map[string]string{
-		"omni-gw":          "ist project.repoRoot",
-		"omni-gw/.git":     "ist .git",
-		"omni-gw/.git/x":   "liegt in .git",
-		".git/x":           "liegt in .git",
-		"../x":             "nicht unterhalb des Hauptverzeichnisses",
-		".k-playbook/x":    "liegt in .k-playbook/",
+		"omni-gw":        "ist project.repoRoot",
+		"omni-gw/.git":   "ist .git",
+		"omni-gw/.git/x": "liegt in .git",
+		".git/x":         "liegt in .git",
+		"../x":           "nicht unterhalb des Hauptverzeichnisses",
+		".k-playbook/x":  "liegt in .k-playbook/",
 	} {
 		root := omniProject(t, target)
 		if _, err := resolveTarget(t, root); err == nil || !strings.Contains(err.Error(), want) {
