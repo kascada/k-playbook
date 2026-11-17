@@ -52,7 +52,8 @@ Release, geprüft gegen die `SHA256SUMS` des Tags —; dann `AGENTS.md`, `CLAUDE
 Verlinkung, die fehlenden Felder des Blocks `maintenance:` (Sicherung aus, vorhandene Werte
 bleiben) und MCP-Einträge; `--check` meldet nur, was ein Lauf täte. `maintain` führt die
 Wartungsschritte aus — heute `docs-backup`, die Sicherung von `keph:/docs/` in einen Ordner
-des Repositorys, auf Wunsch mit Commit nur dieses Ordners (Vertrag:
+des Hauptverzeichnisses, auf Wunsch mit Commit nur dieses Ordners in das Git-Repository, in
+dem er liegt; ohne Commit braucht sie kein Git (Vertrag:
 `defaults/docs/handbook/k-playbook-format.md`, Abschnitt `maintenance`).
 
 Es gibt genau zwei Versionsquellen: die eigene Version im Binary und den neuesten

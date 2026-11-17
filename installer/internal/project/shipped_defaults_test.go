@@ -248,9 +248,7 @@ func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
 // das Kontextfeld mit seinem Ort mehr (Task 159), weder unter defaults/ noch unter
 // share/: Jeder Ablageort ist ein keph:-Verweis oder liegt unter .k-playbook/.
 // Der Verzeichnisname ist hier aus Teilen zusammengesetzt, damit die Suche
-// danach im Quell-Repo selbst keinen Treffer hat. Die Liste der Fassungen im
-// Handbuch (mcp.md) nennt context.local noch, als das, was Fassung 7 trug —
-// ohne „.dir“ und ohne das Verzeichnis.
+// danach im Quell-Repo selbst keinen Treffer hat.
 func TestMitgelieferteTexteNennenKeinLokalesVerzeichnis(t *testing.T) {
 	assertShippedTextsLack(t, []string{"k-playbook-" + "local", "local" + ".dir"})
 }

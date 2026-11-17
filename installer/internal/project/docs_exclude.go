@@ -35,9 +35,10 @@ type ContextDocs struct {
 }
 
 // contextDocs baut den Abschnitt aus der gelesenen Konfiguration. Nennt der
-// Block maintenance: ein gültiges Sicherungsziel, kommt es als verankerter
-// Eintrag relativ zu project.repoRoot dazu (maintenanceDocsExclude), gleich ob
-// die Sicherung eingeschaltet ist: Der Export ist kein Quelltext, und eine
+// Block maintenance: ein gültiges Sicherungsziel unterhalb von
+// project.repoRoot, kommt es als verankerter Eintrag relativ zu
+// project.repoRoot dazu (maintenanceDocsExclude), gleich ob die Sicherung
+// eingeschaltet ist: Der Export ist kein Quelltext, und eine
 // Änderung darin löst so auch keinen Doku-Auftrag aus. In docs.exclude der
 // Datei wird er nicht geschrieben.
 func contextDocs(projectDir string, config Config) ContextDocs {

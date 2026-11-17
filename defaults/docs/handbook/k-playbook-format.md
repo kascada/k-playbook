@@ -467,7 +467,7 @@ remediation:
 maintenance:
   # Maintenance run `k-playbook maintain`: daily is the daily programme without --only.
   # backup mirrors keph:/docs/ into target (relative to the project root, a
-  # folder in the repository reserved for it). Applies to all users; with
+  # folder there reserved for the backup). Applies to all users; with
   # several people git.commit stays false, and only the person in charge
   # runs `k-playbook maintain --commit`.
   daily:
@@ -723,13 +723,17 @@ quoted entry.
 `k-playbook context` and the briefing carry the list as `context.docs.exclude` and the
 rejected entries as `context.docs.problems`. Commands read it from there, never from the file.
 `context.docs.exclude` also carries the backup target of the [`maintenance`](#maintenance)
-block whenever that block is present and its target passes the checks, enabled or not: as an
-entry anchored at `project.repo_root` and marked as a directory, for example
-`/keph-backup/docs/` or `/sub/keph-backup/docs/` when the project root lies below the
-repository root. The export is not source code, so it stays out of the code scan, and a
-change inside it queues no documentation job. This entry is computed and never written into
-`docs.exclude` of the file; the leading `/` that the file rejects as absolute is intended
-here.
+block whenever that block is present, its target passes the checks and lies below
+`project.repo_root`, enabled or not: as an entry anchored at `project.repo_root` and marked as
+a directory, for example `/keph-backup/docs/` or `/sub/keph-backup/docs/` when the project
+root lies below the repository root. The export is not source code, so it stays out of the
+code scan, and a change inside it queues no documentation job. This entry is computed and
+never written into `docs.exclude` of the file; the leading `/` that the file rejects as
+absolute is intended here. A target outside `project.repo_root` (in the project root next to
+a repository checked out in a subdirectory) gets no entry, because the form is bound to
+`project.repo_root`; the regular scan does not reach it, but a scan given an additional path
+(the argument of `/k-docs-code` or `/k-docs-tools`) may cover the mirror, and a change in it
+may then queue a documentation job. That gap is accepted.
 `/k-docs-code` applies it to every scan, including additional sources from `hints`; a path
 given explicitly as the argument is scanned anyway. Without the block, `exclude` is empty and
 nothing changes.
@@ -783,7 +787,7 @@ The file is versioned, so the change wants to be committed.
 ### `maintenance`
 
 The maintenance run `k-playbook maintain` (task 161): the daily programme and the backup of
-the project documentation from Kephalaion into a folder of the repository. Optional; a new
+the project documentation from Kephalaion into a folder of the project root. Optional; a new
 file carries it with the backup switched off, and `k-playbook upgrade` adds what is missing.
 
 | Field | Type | Default | Meaning |
@@ -814,12 +818,18 @@ runs `maintain` exports; whoever does not commit then has changed versioned file
 target in their working tree, and a later `git pull` of the backup commit may fail on them.
 
 **The target** is resolved against the project root. After resolving symlinks (for a target
-that does not exist yet, on its nearest existing ancestor) it must lie below
-`project.repo_root`. It must not be `project.repo_root`, the project root, `.git`,
-`.k-playbook/` or `k-playbook-local/`, must not be an ancestor of any of them and must not
-lie inside `.git`, `.k-playbook/` or `k-playbook-local/`; an absolute path or one starting
-with `~` is rejected. The folder is reserved for the export: the first run takes place only
-if the target is missing or empty and then creates the marker file `.k-playbook-backup` in
+that does not exist yet, on its nearest existing ancestor) it must lie strictly below the
+project root (`project.dir`); it may lie inside `project.repo_root` or, when the repository is
+checked out in a subdirectory, next to it. The export needs no Git repository: without a
+requested commit the run calls no Git at all and checks no Git state, so the target may lie
+outside any repository or be ignored by Git. Whether the target is kept out of the code scan
+depends only on its path (section [`docs`](#docs)). The following checks look at paths only. The
+target must not be the project root, `project.repo_root`, `.git` (of the project root or
+of `project.repo_root`) or `.k-playbook/`, must not be an ancestor of any
+of them and must not lie inside `.git` or `.k-playbook/`; an absolute
+path or one starting with `~` is rejected. The rejection mentions symlinks only when
+resolving them actually moved the target. The folder is reserved for the export: the first
+run takes place only if the target is missing or empty and then creates the marker file `.k-playbook-backup` in
 it. Every later run requires the marker, and every export passes
 `--exclude .k-playbook-backup`, so `--delete` never removes it. A non-empty target without
 marker stops the step before the export.
@@ -858,9 +868,16 @@ and an open outcome may leave a partly updated target; the step says so and neve
 After exit 0 it commits only if `--commit` or `git.commit: true` asks for it: `git add -A`
 and `git commit --only`, both limited to the target, so changes and deletions in the target
 are committed while changes already staged elsewhere stay staged and the rest of the working
-tree is untouched. No change means no commit; there is no push, reset or stash. Without Git,
-or when Git ignores the target, a requested commit is a reported error, and the export has
-run anyway. A failing commit (a hook, for instance) leaves the target's changes staged.
+tree is untouched. No change means no commit; there is no push, reset or stash. Git is
+called only here, for a requested commit. The commit goes into the repository the target lies
+in, found with `git rev-parse --show-toplevel` in the target (or its nearest existing
+ancestor), not into `project.repo_root` as such, wherever that repository's root lies: the
+project root, a repository checked out in a subdirectory, one above the project root, or the
+target itself. When the target is not inside a Git repository, or Git ignores it, a requested
+commit is a reported error, and the export has run anyway; the message names the target (or
+its nearest existing ancestor), and for an ignored target the source of the rule as
+`git check-ignore -v` reports it (file and line, such as `.git/info/exclude:4`). A failing
+commit (a hook, for instance) leaves the target's changes staged.
 
 **Upgrade.** `k-playbook upgrade` (and setting up in the interface) adds the block with the
 defaults above when it is missing, and only the missing fields when it is partly there. It

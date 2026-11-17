@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -530,7 +531,7 @@ func TestDocsBackupCommitOhneGitOderIgnoriert(t *testing.T) {
 	pull.install(t)
 	writeFile(t, filepath.Join(root, ".gitignore"), "keph-backup/\n")
 	result, _ := runBackup(t, root, false, true)
-	if result.Status != MaintenanceFailed || !strings.Contains(result.Reason, "Git ignoriert das Ziel keph-backup/docs") {
+	if result.Status != MaintenanceFailed || !strings.Contains(result.Reason, "Git ignoriert das Ziel keph-backup/docs (.gitignore:1)") {
 		t.Errorf("ignoriert: %+v", result)
 	}
 	if _, err := os.Stat(filepath.Join(targetDir(root), "a.md")); err != nil {
@@ -542,7 +543,8 @@ func TestDocsBackupCommitOhneGitOderIgnoriert(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, _ = runBackup(t, root, false, true)
-	if result.Status != MaintenanceFailed || !strings.Contains(result.Reason, "kein Git-Repository") {
+	if result.Status != MaintenanceFailed || !strings.Contains(result.Reason, "Ziel "+targetDir(root)+" liegt in keinem Git-Repository") ||
+		strings.Contains(result.Reason, "repoRoot") {
 		t.Errorf("ohne Git: %+v", result)
 	}
 	if _, err := os.Stat(filepath.Join(targetDir(root), "a.md")); err != nil {
@@ -710,5 +712,277 @@ func TestMaintenanceSchrittnamen(t *testing.T) {
 	}
 	if infos := MaintenanceSteps(); len(infos) != 1 || infos[0].Summary == "" {
 		t.Errorf("Infos: %+v", infos)
+	}
+}
+
+// layoutProject legt ein Projekt für die Sicherung unter einem eigenen
+// Temp-Verzeichnis an, ohne Git: base ist das Temp-Verzeichnis, projectDir
+// das Hauptverzeichnis darin (rel), repoRoot der Wert von project.repo_root.
+// GIT_CEILING_DIRECTORIES hält git davon ab, ein Repo oberhalb von base zu
+// finden.
+func layoutProject(t *testing.T, rel, repoRoot, block string) (string, string) {
+	t.Helper()
+	isolateGit(t)
+	stubMaintenanceKephalaion(t, true)
+	base := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(base); err == nil {
+		base = resolved
+	}
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(base))
+	if block == "" {
+		block = "maintenance:\n  backup:\n    enabled: true\n"
+	}
+	projectDir := filepath.Join(base, rel)
+	writeFile(t, ConfigPath(projectDir), "schema_version: 3\n\nproject:\n  repo_root: "+repoRoot+"\n  vcs: git\n\nkephalaion:\n  hub: vm\n  collection: proj\n\n"+block)
+	return base, projectDir
+}
+
+// omni-Form: Das Hauptverzeichnis ist ein Repo, project.repoRoot ein
+// Unter-Repo darin, das Ziel liegt im Hauptverzeichnis. Der Export läuft, der
+// Commit geht ins Repo des Hauptverzeichnisses, fremde vorgemerkte Änderungen
+// dort bleiben vorgemerkt, das Unter-Repo bleibt unberührt, und
+// context.docs.exclude bekommt keinen Eintrag.
+func TestDocsBackupUnterRepoCommitInsHauptverzeichnis(t *testing.T) {
+	_, root := layoutProject(t, "wrapper", "omni-gw", "maintenance:\n  backup:\n    enabled: true\n    git:\n      commit: true\n")
+	sub := filepath.Join(root, "omni-gw")
+	writeFile(t, filepath.Join(sub, "main.go"), "package main\n")
+	gitIn(t, sub, "init", "-q")
+	gitIn(t, sub, "add", "-A")
+	gitIn(t, sub, "commit", "-q", "-m", "Unter-Repo")
+	writeFile(t, filepath.Join(root, ".gitignore"), "omni-gw/\n")
+	gitIn(t, root, "init", "-q")
+	gitIn(t, root, "add", "-A")
+	gitIn(t, root, "commit", "-q", "-m", "Start")
+	writeFile(t, filepath.Join(root, "fremd.txt"), "vorgemerkt\n")
+	gitIn(t, root, "add", "fremd.txt")
+	subHead := headOf(t, sub)
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+	before := headOf(t, root)
+
+	result, out := runBackup(t, root, false, false)
+	if result.Status != MaintenanceOK || !strings.Contains(result.Reason, "exportiert nach keph-backup/docs und committet") {
+		t.Fatalf("Ergebnis: %+v", result)
+	}
+	if !strings.Contains(out, "→ keph-backup/docs") {
+		t.Errorf("Ausgabe: %s", out)
+	}
+	if headOf(t, root) == before {
+		t.Fatal("kein Commit im Hauptverzeichnis-Repo")
+	}
+	files := strings.Fields(gitIn(t, root, "show", "--name-only", "--format=", "HEAD"))
+	if want := []string{"keph-backup/docs/.k-playbook-backup", "keph-backup/docs/a.md"}; !reflect.DeepEqual(files, want) {
+		t.Errorf("Commit enthält %v, erwartet %v", files, want)
+	}
+	if status := gitIn(t, root, "status", "--porcelain"); !strings.Contains(status, "A  fremd.txt") {
+		t.Errorf("fremde Vormerkung verloren:\n%s", status)
+	}
+	if headOf(t, sub) != subHead || gitIn(t, sub, "status", "--porcelain") != "" {
+		t.Error("Unter-Repo verändert")
+	}
+	config, _ := ReadConfig(root)
+	if docs := contextDocs(root, config); len(docs.Exclude) != 0 {
+		t.Errorf("context.docs.exclude = %v", docs.Exclude)
+	}
+}
+
+// Hauptverzeichnis ohne Git: Der Export läuft, ein verlangter Commit ist ein
+// gemeldeter Fehler, der das Ziel nennt und nicht project.repoRoot.
+func TestDocsBackupHauptverzeichnisOhneGit(t *testing.T) {
+	_, root := layoutProject(t, "wrapper", "omni-gw", "")
+	if err := os.MkdirAll(filepath.Join(root, "omni-gw", ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+
+	result, _ := runBackup(t, root, false, false)
+	if result.Status != MaintenanceOK {
+		t.Fatalf("ohne Commit: %+v", result)
+	}
+	result, _ = runBackup(t, root, false, true)
+	if result.Status != MaintenanceFailed || !strings.Contains(result.Reason, "exportiert nach keph-backup/docs, aber Git: Ziel "+targetDir(root)+" liegt in keinem Git-Repository") ||
+		strings.Contains(result.Reason, "repoRoot") {
+		t.Errorf("Ergebnis: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir(root), "a.md")); err != nil {
+		t.Errorf("Export nicht gelaufen: %v", err)
+	}
+}
+
+// Liegt das Repo oberhalb des Hauptverzeichnisses, das selbst kein Repo ist,
+// geht der Commit in dieses Repo: Es ist das Repo, in dem das Ziel liegt.
+// Fremde vorgemerkte Änderungen dort bleiben vorgemerkt und unberührt.
+func TestDocsBackupRepoOberhalbCommit(t *testing.T) {
+	base, root := layoutProject(t, "projekt", ".", "")
+	gitIn(t, base, "init", "-q")
+	gitIn(t, base, "commit", "-q", "--allow-empty", "-m", "Start")
+	writeFile(t, filepath.Join(base, "fremd.txt"), "vorgemerkt\n")
+	gitIn(t, base, "add", "fremd.txt")
+	before := headOf(t, base)
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+
+	result, _ := runBackup(t, root, false, true)
+	if result.Status != MaintenanceOK || !strings.Contains(result.Reason, "exportiert nach keph-backup/docs und committet") {
+		t.Fatalf("Ergebnis: %+v", result)
+	}
+	if headOf(t, base) == before {
+		t.Fatal("kein Commit im Repo oberhalb des Hauptverzeichnisses")
+	}
+	files := strings.Fields(gitIn(t, base, "show", "--name-only", "--format=", "HEAD"))
+	if want := []string{"projekt/keph-backup/docs/.k-playbook-backup", "projekt/keph-backup/docs/a.md"}; !reflect.DeepEqual(files, want) {
+		t.Errorf("Commit enthält %v, erwartet %v", files, want)
+	}
+	if staged := gitIn(t, base, "diff", "--cached", "--name-only"); strings.TrimSpace(staged) != "fremd.txt" {
+		t.Errorf("Vormerkung danach: %q", staged)
+	}
+}
+
+// Ist das Ziel selbst die Wurzel eines Repos (nach dem ersten Lauf dort
+// angelegt), geht der Commit in dieses Repo und umfasst das Ziel; das Repo
+// des Hauptverzeichnisses bleibt unberührt.
+func TestDocsBackupZielIstRepoWurzel(t *testing.T) {
+	root := backupProject(t, "")
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+	if result, _ := runBackup(t, root, false, false); result.Status != MaintenanceOK {
+		t.Fatalf("erster Lauf: %+v", result)
+	}
+	target := targetDir(root)
+	gitIn(t, target, "init", "-q")
+	gitIn(t, target, "commit", "-q", "--allow-empty", "-m", "Start")
+	before, outer := headOf(t, target), headOf(t, root)
+
+	result, _ := runBackup(t, root, false, true)
+	if result.Status != MaintenanceOK || !strings.Contains(result.Reason, "committet") {
+		t.Fatalf("Ergebnis: %+v", result)
+	}
+	if headOf(t, target) == before {
+		t.Fatal("kein Commit im Repo des Ziels")
+	}
+	files := strings.Fields(gitIn(t, target, "show", "--name-only", "--format=", "HEAD"))
+	if want := []string{".k-playbook-backup", "a.md"}; !reflect.DeepEqual(files, want) {
+		t.Errorf("Commit enthält %v, erwartet %v", files, want)
+	}
+	assertNoCommit(t, root, outer)
+}
+
+// Ohne angeforderten Commit ruft der Wartungslauf kein Git: Das
+// Hauptverzeichnis ist kein Repo, eine .gitignore schließt das Ziel aus, und
+// ein git im PATH, der jeden Aufruf festhält, wird nie gerufen. Auch die
+// Vorschau mit verlangtem Commit ruft kein Git.
+func TestDocsBackupOhneCommitKeinGit(t *testing.T) {
+	_, root := layoutProject(t, "projekt", ".", "")
+	writeFile(t, filepath.Join(root, ".gitignore"), "keph-backup/\n")
+	bin := t.TempDir()
+	called := filepath.Join(bin, "gerufen")
+	writeFile(t, filepath.Join(bin, "git"), "#!/bin/sh\necho \"$@\" >> '"+called+"'\nexit 128\n")
+	if err := os.Chmod(filepath.Join(bin, "git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+
+	result, _ := runBackup(t, root, false, false)
+	if result.Status != MaintenanceOK || !strings.Contains(result.Reason, "exportiert nach keph-backup/docs; kein Commit angefordert") {
+		t.Errorf("ohne Commit: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir(root), "a.md")); err != nil {
+		t.Errorf("Export nicht gelaufen: %v", err)
+	}
+	if result, _ := runBackup(t, root, true, true); result.Status != MaintenanceOK {
+		t.Errorf("Vorschau: %+v", result)
+	}
+	if data, err := os.ReadFile(called); err == nil {
+		t.Errorf("git gerufen: %s", data)
+	}
+}
+
+// Bisherige Form: Das Hauptverzeichnis liegt in project.repoRoot. Der Commit
+// geht wie bisher in dieses Repo, und context.docs.exclude trägt den Eintrag
+// relativ zu project.repoRoot.
+func TestDocsBackupHauptverzeichnisImRepo(t *testing.T) {
+	base, root := layoutProject(t, "sub", "..", "maintenance:\n  backup:\n    enabled: true\n    git:\n      commit: true\n")
+	gitIn(t, base, "init", "-q")
+	gitIn(t, base, "add", "-A")
+	gitIn(t, base, "commit", "-q", "-m", "Start")
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+
+	result, _ := runBackup(t, root, false, false)
+	if result.Status != MaintenanceOK || !strings.Contains(result.Reason, "exportiert nach keph-backup/docs und committet") {
+		t.Fatalf("Ergebnis: %+v", result)
+	}
+	files := strings.Fields(gitIn(t, base, "show", "--name-only", "--format=", "HEAD"))
+	if want := []string{"sub/keph-backup/docs/.k-playbook-backup", "sub/keph-backup/docs/a.md"}; !reflect.DeepEqual(files, want) {
+		t.Errorf("Commit enthält %v, erwartet %v", files, want)
+	}
+	config, _ := ReadConfig(root)
+	if docs := contextDocs(root, config); !reflect.DeepEqual(docs.Exclude, []string{"/sub/keph-backup/docs/"}) {
+		t.Errorf("context.docs.exclude = %v", docs.Exclude)
+	}
+}
+
+// Ignoriert eine Regel aus .git/info/exclude das Ziel, nennt die Meldung
+// diese Datei samt Zeile statt .gitignore.
+func TestDocsBackupIgnoriertNenntQuelle(t *testing.T) {
+	root := backupProject(t, "")
+	pull := &fakePull{store: map[string]string{"a.md": "A\n"}}
+	pull.install(t)
+	exclude := filepath.Join(root, ".git", "info", "exclude")
+	writeFile(t, exclude, "# eins\n# zwei\nkeph-backup/\n")
+	before := headOf(t, root)
+
+	result, _ := runBackup(t, root, false, true)
+	if result.Status != MaintenanceFailed || !strings.Contains(result.Reason, "Git ignoriert das Ziel keph-backup/docs (.git/info/exclude:3)") ||
+		strings.Contains(result.Reason, ".gitignore") {
+		t.Errorf("Ergebnis: %+v", result)
+	}
+	assertNoCommit(t, root, before)
+}
+
+// Ist der Kontext während des Exports abgebrochen, wartet die Schleife nur
+// noch auf Signal und Prozessende, statt mit voller CPU zu drehen: Der
+// Kindprozess braucht nach SIGTERM noch eine Weile, die Schleife läuft dabei
+// nur wenige Male durch.
+func TestRunKephalaionExportAbgebrochenerKontextOhneDauerschleife(t *testing.T) {
+	dir := t.TempDir()
+	started := filepath.Join(dir, "gestartet")
+	script := filepath.Join(dir, "kephalaion")
+	writeFile(t, script, "#!/bin/sh\ntrap 'sleep 0.3; echo abgebrochen >&2; exit 3' TERM\ntouch '"+started+"'\nwhile :; do sleep 0.05; done\n")
+	if err := os.Chmod(script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var loops atomic.Int64
+	exportLoopHook = func() { loops.Add(1) }
+	t.Cleanup(func() { exportLoopHook = nil })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan exportOutcome, 1)
+	go func() { done <- runKephalaionExport(ctx, script, nil, io.Discard, io.Discard) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Export nicht gestartet")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case outcome := <-done:
+		if !outcome.interrupted || outcome.code != 3 {
+			t.Errorf("Ausgang: %+v", outcome)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Export endete nicht")
+	}
+	if n := loops.Load(); n > 10 {
+		t.Errorf("Warteschleife lief %d-mal durch", n)
 	}
 }

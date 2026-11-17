@@ -2699,8 +2699,8 @@ Schritte ohne KI und ohne Rückfrage, damit ihn später ein Cron-Job aufrufen ka
   `k-playbook upgrade` und Einrichten/Aktualisieren in der Oberfläche den Schritt;
   `upgrade --check` fragt `PlanMaintenanceBlock`. `CreateConfig` schreibt den Block mit.
 - **Ziel.** `ResolveMaintenanceTarget` wertet Symlinks aus (für ein fehlendes Ziel auf dem
-  nächsten vorhandenen Vorfahren) und prüft gegen `project.repoRoot`, Hauptverzeichnis, `.git`,
-  `.k-playbook/` und `k-playbook-local/`. Dasselbe geprüfte Ziel landet über `contextDocs` als
+  nächsten vorhandenen Vorfahren) und prüft gegen `project.repoRoot`, Hauptverzeichnis, `.git` und
+  `.k-playbook/`. Dasselbe geprüfte Ziel landet über `contextDocs` als
   verankerter Eintrag in `context.docs.exclude`, nie in der Datei.
 - **Export.** `runDocsBackup` (`project/maintenance_backup.go`) ruft
   `kephalaion node dir pull` als Prozess mit Argumentliste, ohne Shell und ohne Eingabe, in

@@ -239,9 +239,10 @@ asking, so a cron job can call it later. Without `--only` it runs the daily prog
 shows what would happen without writing, `--commit` asks for a Git commit after a complete
 export. Today there is one step, `docs-backup`: when `maintenance.backup.enabled` is `true` it
 mirrors `keph:/docs/` through `kephalaion node dir pull … --delete` into a folder of the
-repository reserved for it (`keph-backup/docs` by default, marked with `.k-playbook-backup`)
-and, when asked, commits only that folder — never a push. The backup is off until switched
-on; in a project with several people `git.commit` stays `false` and only the person in charge
+project root reserved for it (`keph-backup/docs` by default, marked with `.k-playbook-backup`)
+and, when asked, commits only that folder into the Git repository it lies in — never a push;
+without a requested commit it needs no Git at all. The backup is off until switched on; in a
+project with several people `git.commit` stays `false` and only the person in charge
 runs `--commit`. Fields, target checks, exit codes and the upgrade behaviour:
 [`k-playbook-format.md`](./defaults/docs/handbook/k-playbook-format.md#maintenance).
 

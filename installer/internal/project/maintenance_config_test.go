@@ -283,7 +283,7 @@ func resolveTarget(t *testing.T, root string) (MaintenanceTarget, error) {
 
 func TestResolveMaintenanceTargetGefaehrlicheZiele(t *testing.T) {
 	for _, target := range []string{
-		".", "./", ".git", ".git/x", ".k-playbook", ".k-playbook/work/b", "k-playbook-local", "k-playbook-local/docs",
+		".", "./", ".git", ".git/x", ".k-playbook", ".k-playbook/work/b",
 		"..", "../anderswo", "/tmp/x", "~/x", "a/../..", "C:\\x",
 	} {
 		root := maintenanceProject(t, ".", target)
@@ -314,7 +314,7 @@ func TestResolveMaintenanceTargetSymlinks(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(root, "verweis")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := resolveTarget(t, root); err == nil || !strings.Contains(err.Error(), "nicht unterhalb") {
+	if _, err := resolveTarget(t, root); err == nil || !strings.Contains(err.Error(), "nach dem Auswerten der Symlinks nicht unterhalb des Hauptverzeichnisses") {
 		t.Errorf("Symlink nach außen: %v", err)
 	}
 
@@ -352,6 +352,78 @@ func TestResolveMaintenanceTargetGueltig(t *testing.T) {
 	target, err := resolveTarget(t, root)
 	if err != nil || target.Rel != "keph-backup/docs" || target.Path != filepath.Join(root, "keph-backup", "docs") {
 		t.Errorf("Vorgabe: %+v %v", target, err)
+	}
+}
+
+// Ohne Symlink nennt die Ablehnung keine Symlinks; ein Ziel außerhalb des
+// Hauptverzeichnisses bleibt abgelehnt.
+func TestResolveMaintenanceTargetMeldungOhneSymlinks(t *testing.T) {
+	for _, target := range []string{"../x", "../anderswo/docs"} {
+		root := maintenanceProject(t, ".", target)
+		_, err := resolveTarget(t, root)
+		if err == nil || !strings.Contains(err.Error(), "liegt nicht unterhalb des Hauptverzeichnisses") || strings.Contains(err.Error(), "Auswerten der Symlinks") {
+			t.Errorf("Ziel %q: %v", target, err)
+		}
+	}
+}
+
+// omniProject legt die Form an, in der project.repoRoot ein Unter-Repo des
+// Hauptverzeichnisses ist: Hauptverzeichnis mit .git, repo_root omni-gw mit
+// eigenem .git.
+func omniProject(t *testing.T, target string) string {
+	t.Helper()
+	root := maintenanceProject(t, "omni-gw", target)
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+// Liegt project.repoRoot als Unter-Repo im Hauptverzeichnis, ist ein Ziel im
+// Hauptverzeichnis neben dem Unter-Repo zulässig; context.docs.exclude bekommt
+// dann keinen Eintrag. Liegt das Ziel im Unter-Repo, gibt es ihn relativ zu
+// project.repoRoot. project.repoRoot, ihm Übergeordnetes und die .git beider
+// Repos bleiben abgelehnt.
+func TestResolveMaintenanceTargetUnterRepo(t *testing.T) {
+	root := omniProject(t, "")
+	target, err := resolveTarget(t, root)
+	if err != nil || target.Rel != "keph-backup/docs" || target.Path != filepath.Join(root, "keph-backup", "docs") || target.ProjectDir != root {
+		t.Fatalf("Ziel im Hauptverzeichnis: %+v %v", target, err)
+	}
+	config, _ := ReadConfig(root)
+	if entry, ok := maintenanceDocsExclude(root, config); ok {
+		t.Errorf("Eintrag außerhalb von project.repoRoot: %q", entry)
+	}
+	if docs := contextDocs(root, config); len(docs.Exclude) != 0 {
+		t.Errorf("context.docs.exclude = %v", docs.Exclude)
+	}
+
+	root = omniProject(t, "omni-gw/keph-backup/docs")
+	target, err = resolveTarget(t, root)
+	if err != nil || target.Rel != "omni-gw/keph-backup/docs" {
+		t.Fatalf("Ziel im Unter-Repo: %+v %v", target, err)
+	}
+	config, _ = ReadConfig(root)
+	if entry, ok := maintenanceDocsExclude(root, config); !ok || entry != "/keph-backup/docs/" {
+		t.Errorf("Eintrag im Unter-Repo: %q %v", entry, ok)
+	}
+
+	for target, want := range map[string]string{
+		"omni-gw":          "ist project.repoRoot",
+		"omni-gw/.git":     "ist .git",
+		"omni-gw/.git/x":   "liegt in .git",
+		".git/x":           "liegt in .git",
+		"../x":             "nicht unterhalb des Hauptverzeichnisses",
+		".k-playbook/x":    "liegt in .k-playbook/",
+	} {
+		root := omniProject(t, target)
+		if _, err := resolveTarget(t, root); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Ziel %q: %v, erwartet %q", target, err, want)
+		}
+	}
+	root = maintenanceProject(t, "sub/app", "sub")
+	if _, err := resolveTarget(t, root); err == nil || !strings.Contains(err.Error(), "ist project.repoRoot übergeordnet") {
+		t.Errorf("Vorfahre von project.repoRoot: %v", err)
 	}
 }
 

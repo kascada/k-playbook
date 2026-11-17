@@ -44,11 +44,6 @@ const (
 	DefaultMaintenanceBackupTarget = "keph-backup/docs"
 )
 
-// localLayerDirName ist das Verzeichnis für Projekteigenes neben
-// .k-playbook/. Das Programm liest es nicht mehr selbst; als Sicherungsziel ist
-// es trotzdem tabu, weil dort Dateien von Hand liegen können.
-const localLayerDirName = "k-playbook-local"
-
 // ConfigMaintenance ist der gelesene Block maintenance:. Fehlende Felder tragen
 // ihre Vorgabe; Problems nennt, was nicht gelesen werden konnte.
 type ConfigMaintenance struct {
@@ -415,7 +410,7 @@ func (d maintDefault) render(indent int, eol string) []string {
 // eingerückt, damit er zum Block gehört.
 const maintenanceBlockComment = `  # Wartungslauf ` + "`k-playbook maintain`" + `: daily ist das Tagesprogramm ohne --only.
   # backup sichert keph:/docs/ nach target (relativ zum Hauptverzeichnis, ein
-  # nur dafür reservierter Ordner im Repository). Gilt für alle Nutzer; bei
+  # nur dafür reservierter Ordner darin). Gilt für alle Nutzer; bei
   # mehreren Personen bleibt git.commit auf false, und nur die zuständige
   # Person ruft ` + "`k-playbook maintain --commit`" + ` auf.
 `
@@ -619,19 +614,25 @@ type MaintenanceTarget struct {
 	Configured string `json:"configured"`
 	// Path ist der aufgelöste absolute Pfad, Symlinks ausgewertet.
 	Path string `json:"path"`
+	// ProjectDir ist das Hauptverzeichnis (project.dir), Symlinks
+	// ausgewertet. Das Ziel liegt echt darunter.
+	ProjectDir string `json:"projectDir"`
 	// RepoRoot ist project.repoRoot, Symlinks ausgewertet.
 	RepoRoot string `json:"repoRoot"`
-	// Rel ist der Pfad relativ zu RepoRoot, mit /.
+	// Rel ist der Pfad relativ zum Hauptverzeichnis, mit /: die Anzeige des
+	// Ziels in den Meldungen.
 	Rel string `json:"rel"`
 }
 
 // ResolveMaintenanceTarget löst maintenance.backup.target gegen das
 // Hauptverzeichnis auf und lehnt gefährliche Ziele ab: Nach dem Auswerten der
 // Symlinks (fehlt das Ziel noch, auf seinem nächsten vorhandenen Vorfahren)
-// muss es unterhalb von project.repoRoot liegen. Es darf weder
-// project.repoRoot, das Hauptverzeichnis, .git, .k-playbook/ noch
-// k-playbook-local/ sein, keinem davon übergeordnet sein und nicht in .git,
-// .k-playbook/ oder k-playbook-local/ liegen.
+// muss es echt unterhalb des Hauptverzeichnisses liegen. Ein Git-Repository
+// braucht der Export nicht; es zählt erst beim Commit (commitBackupTarget).
+// Das Ziel darf weder das Hauptverzeichnis, project.repoRoot, .git (des
+// Hauptverzeichnisses und von project.repoRoot) noch .k-playbook/ sein,
+// keinem davon übergeordnet sein und nicht in .git oder .k-playbook/ liegen. Vor --delete schützen
+// außerdem die Markierung, die Leere beim ersten Lauf und die Sperre.
 func ResolveMaintenanceTarget(projectDir string, config Config) (MaintenanceTarget, error) {
 	configured := config.Maintenance.BackupTarget
 	if configured == "" {
@@ -653,7 +654,8 @@ func ResolveMaintenanceTarget(projectDir string, config Config) (MaintenanceTarg
 		return reject("enthält ein Steuerzeichen")
 	}
 
-	target, err := evalPathFromAncestor(filepath.Join(projectDir, configured))
+	literal := filepath.Join(projectDir, configured)
+	target, err := evalPathFromAncestor(literal)
 	if err != nil {
 		return reject(err.Error())
 	}
@@ -665,22 +667,27 @@ func ResolveMaintenanceTarget(projectDir string, config Config) (MaintenanceTarg
 	if err != nil {
 		return reject("Hauptverzeichnis nicht auflösbar: " + err.Error())
 	}
-	result.Path, result.RepoRoot = target, repoRoot
+	result.Path, result.ProjectDir, result.RepoRoot = target, main, repoRoot
 
+	if target == main || pathStrictlyBelow(target, main) {
+		return reject("ist das Hauptverzeichnis oder ihm übergeordnet")
+	}
+	if !pathStrictlyBelow(main, target) {
+		if symlinksMoved(projectDir, literal, main, target) {
+			return reject("liegt nach dem Auswerten der Symlinks nicht unterhalb des Hauptverzeichnisses (" + target + ")")
+		}
+		return reject("liegt nicht unterhalb des Hauptverzeichnisses (" + target + ")")
+	}
 	if target == repoRoot {
 		return reject("ist project.repoRoot")
 	}
-	if !pathStrictlyBelow(repoRoot, target) {
-		return reject("liegt nach dem Auswerten der Symlinks nicht unterhalb von project.repoRoot (" + target + ")")
-	}
-	if target == main || pathStrictlyBelow(target, main) {
-		return reject("ist das Hauptverzeichnis oder ihm übergeordnet")
+	if pathStrictlyBelow(target, repoRoot) {
+		return reject("ist project.repoRoot übergeordnet")
 	}
 	protected := []struct{ path, name string }{
 		{filepath.Join(repoRoot, ".git"), ".git"},
 		{filepath.Join(main, ".git"), ".git"},
 		{filepath.Join(main, ProjectDirName), ProjectDirName + "/"},
-		{filepath.Join(main, localLayerDirName), localLayerDirName + "/"},
 	}
 	for _, entry := range protected {
 		resolved, err := evalPathFromAncestor(entry.path)
@@ -699,12 +706,30 @@ func ResolveMaintenanceTarget(projectDir string, config Config) (MaintenanceTarg
 		}
 	}
 
-	rel, err := filepath.Rel(repoRoot, target)
+	rel, err := filepath.Rel(main, target)
 	if err != nil {
 		return reject(err.Error())
 	}
 	result.Rel = filepath.ToSlash(rel)
 	return result, nil
+}
+
+// symlinksMoved sagt, ob das Auswerten der Symlinks die Lage des Ziels zum
+// Hauptverzeichnis verändert hat: Ziel und Hauptverzeichnis werden vor und
+// nach dem Auswerten verglichen. Ein Symlink im Pfad des Hauptverzeichnisses
+// selbst, der beide gleich verschiebt, zählt nicht.
+func symlinksMoved(projectDir, literal, main, target string) bool {
+	literalMain, err := filepath.Abs(projectDir)
+	if err != nil {
+		return main != filepath.Clean(projectDir)
+	}
+	literalTarget, err := filepath.Abs(literal)
+	if err != nil {
+		return true
+	}
+	before, errBefore := filepath.Rel(literalMain, literalTarget)
+	after, errAfter := filepath.Rel(main, target)
+	return errBefore != nil || errAfter != nil || before != after
 }
 
 // evalPathFromAncestor wertet die Symlinks eines Pfads aus. Fehlt er noch, auf
@@ -751,15 +776,23 @@ func pathStrictlyBelow(parent, child string) bool {
 
 // maintenanceDocsExclude ist der Eintrag für context.docs.exclude: das
 // geprüfte Ziel relativ zu project.repoRoot, verankert und als Verzeichnis,
-// etwa /sub/keph-backup/docs/. Ohne Block, mit unlesbarem oder abgelehntem
-// Ziel gibt es keinen.
+// etwa /sub/keph-backup/docs/. Den Eintrag gibt es nur, wenn das Ziel unterhalb
+// von project.repoRoot liegt, denn die Form ist an project.repoRoot gebunden.
+// Liegt das Ziel außerhalb (im Hauptverzeichnis neben einem Unter-Repo), gibt
+// es keinen: Ein Scan mit zusätzlichem Pfad kann den Spiegel dann erfassen,
+// das ist hingenommen (Task 162). Ohne Block, mit unlesbarem oder abgelehntem
+// Ziel gibt es ebenfalls keinen.
 func maintenanceDocsExclude(projectDir string, config Config) (string, bool) {
 	if !config.Maintenance.Present || projectDir == "" {
 		return "", false
 	}
 	target, err := ResolveMaintenanceTarget(projectDir, config)
-	if err != nil || target.Rel == "" {
+	if err != nil || !pathStrictlyBelow(target.RepoRoot, target.Path) {
 		return "", false
 	}
-	return "/" + strings.TrimSuffix(target.Rel, "/") + "/", true
+	rel, err := filepath.Rel(target.RepoRoot, target.Path)
+	if err != nil {
+		return "", false
+	}
+	return "/" + strings.TrimSuffix(filepath.ToSlash(rel), "/") + "/", true
 }

@@ -12,7 +12,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -58,6 +60,10 @@ var maintenanceExport = runKephalaionExport
 // über kephalaion.LookupBinary.
 var maintenanceKephalaionBinary = kephalaion.FindBinary
 
+// exportLoopHook wird bei jedem Durchlauf der Warteschleife des Exports
+// gerufen; nur Tests setzen ihn, um die Durchläufe zu zählen.
+var exportLoopHook func()
+
 // runKephalaionExport startet den Export in einer eigenen Prozessgruppe, ohne
 // Eingabe. Ein SIGINT oder SIGTERM an den Wartungslauf geht genau einmal an
 // Kephalaion weiter: Es beendet den laufenden Einzelvorgang, meldet, wie weit
@@ -81,15 +87,23 @@ func runKephalaionExport(ctx context.Context, binary string, args []string, stdo
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 
+	// cancelled ist nach dem ersten Treffer nil: Ein geschlossener
+	// ctx.Done() bliebe sonst dauerhaft bereit, und die Schleife drehte mit
+	// voller CPU, bis der Kindprozess endet.
+	cancelled := ctx.Done()
 	outcome := exportOutcome{}
 	for {
+		if exportLoopHook != nil {
+			exportLoopHook()
+		}
 		select {
 		case sig := <-signals:
 			if !outcome.interrupted {
 				outcome.interrupted = true
 				_ = cmd.Process.Signal(sig)
 			}
-		case <-ctx.Done():
+		case <-cancelled:
+			cancelled = nil
 			if !outcome.interrupted {
 				outcome.interrupted = true
 				_ = cmd.Process.Signal(syscall.SIGTERM)
@@ -349,29 +363,39 @@ func maintenanceGit(dir string, args ...string) (string, int, string) {
 // beschränkt (wörtlich, ohne Pfadmuster; check-ignore nimmt ohnehin Pfade). Vorgemerkte fremde Änderungen
 // bleiben vorgemerkt und gelangen nicht in den Commit, der übrige Arbeitsbaum
 // bleibt unberührt. Ohne Änderung kein Commit. Kein Reset, kein Stash, kein
-// Push. Ohne Git oder wenn Git das Ziel ignoriert, ist das ein Fehler.
+// Push. Das Repository ist das, in dem das Ziel liegt (git rev-parse im Ziel
+// bzw. seinem nächsten vorhandenen Vorfahren), nicht pauschal
+// project.repoRoot, gleich wo seine Wurzel liegt; ist das Ziel selbst die
+// Wurzel, umfasst der Commit das ganze Repository. Nur hier ruft der
+// Wartungslauf Git, und nur bei angefordertem Commit. Ohne Git oder wenn Git
+// das Ziel ignoriert, ist das ein Fehler.
 func commitBackupTarget(target MaintenanceTarget, message string) (string, bool, error) {
-	top, code, reason := maintenanceGit(target.RepoRoot, "rev-parse", "--show-toplevel")
+	dir, label := nearestExistingDir(target.Path), "Ziel"
+	if dir != target.Path {
+		label = "nächster vorhandener Vorfahre des Ziels"
+	}
+	top, code, reason := maintenanceGit(dir, "rev-parse", "--show-toplevel")
 	switch {
 	case code == -1:
 		return "", false, fmt.Errorf("git nicht ausführbar (%s) — kein Commit", reason)
 	case code != 0:
-		return "", false, fmt.Errorf("project.repoRoot ist kein Git-Repository (%s) — kein Commit", reason)
+		return "", false, fmt.Errorf("%s %s liegt in keinem Git-Repository (%s) — kein Commit", label, dir, reason)
 	}
 	root := strings.TrimSpace(top)
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
 		root = resolved
 	}
 	rel, err := filepath.Rel(root, target.Path)
-	if err != nil || !pathStrictlyBelow(root, target.Path) {
+	if err != nil || (root != target.Path && !pathStrictlyBelow(root, target.Path)) {
 		return "", false, fmt.Errorf("Ziel %s liegt nicht im Git-Repository %s — kein Commit", target.Path, root)
 	}
 	rel = filepath.ToSlash(rel)
+	marker := path.Join(rel, MaintenanceBackupMarker)
 
-	_, code, reason = maintenanceGit(root, "check-ignore", "-q", "--", rel+"/"+MaintenanceBackupMarker)
+	_, code, reason = maintenanceGit(root, "check-ignore", "-q", "--", marker)
 	switch code {
 	case 0:
-		return "", false, fmt.Errorf("Git ignoriert das Ziel %s (.gitignore) — kein Commit", rel)
+		return "", false, fmt.Errorf("Git ignoriert das Ziel %s (%s) — kein Commit", rel, ignoreSource(root, marker))
 	case 1:
 	default:
 		return "", false, fmt.Errorf("git check-ignore: %s — kein Commit", reason)
@@ -393,4 +417,37 @@ func commitBackupTarget(target MaintenanceTarget, message string) (string, bool,
 	}
 	hash, _, _ := maintenanceGit(root, "rev-parse", "--short", "HEAD")
 	return strings.TrimSpace(hash), true, nil
+}
+
+// ignoreSource nennt, woher Git die Regel nimmt, die path ignoriert: Datei und
+// Zeile aus git check-ignore -v, etwa .gitignore:3 oder .git/info/exclude:4.
+// Lässt sie sich nicht ermitteln, steht dort ein allgemeiner Hinweis.
+func ignoreSource(root, path string) string {
+	out, code, _ := maintenanceGit(root, "check-ignore", "-v", "--", path)
+	if code == 0 {
+		if match := checkIgnoreSource.FindStringSubmatch(firstLine(out)); match != nil {
+			return match[1] + ":" + match[2]
+		}
+	}
+	return "Quelle der Regel nicht ermittelt; git check-ignore -v nennt sie"
+}
+
+// checkIgnoreSource liest Quelle und Zeile aus einer Zeile von
+// git check-ignore -v: <quelle>:<zeile>:<muster>\t<pfad>.
+var checkIgnoreSource = regexp.MustCompile(`^(.+?):([0-9]+):`)
+
+// nearestExistingDir ist path selbst, wenn es existiert, sonst sein nächster
+// vorhandener Vorfahre.
+func nearestExistingDir(path string) string {
+	current := filepath.Clean(path)
+	for {
+		if _, err := os.Stat(current); err == nil {
+			return current
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return current
+		}
+		current = parent
+	}
 }
