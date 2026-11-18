@@ -1,6 +1,6 @@
 ---
 description: Listet, ergänzt, ändert, hakt ab und löscht die Todos des Projekts. Ohne Argument listen; done/delete/edit/reopen steuern einen Eintrag, alles andere ist ein neuer Eintrag.
-argument-hint: [text | done <id|stichwort> | delete <id|stichwort> | edit <id> <text> | reopen <id>]
+argument-hint: "[text | done <id|stichwort> | delete <id|stichwort> | edit <id> <text> | reopen <id>]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Bash, mcp__k-playbook__k_playbook_todo_list, mcp__k-playbook__k_playbook_todo_add, mcp__k-playbook__k_playbook_todo_update, mcp__k-playbook__k_playbook_todo_delete, mcp__k-playbook__k_playbook_briefing]
 ---

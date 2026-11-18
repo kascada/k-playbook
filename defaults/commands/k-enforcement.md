@@ -89,8 +89,14 @@ Immer, wenn der Prüfumfang Code enthält. Maßstab ist der Absatz zum Doku-Nach
      `context.kephalaion.address`, `path` = `docs/generated/code` bzw. `docs/generated/libs`),
      ist nichts nachzuziehen: „noch keine erzeugte Doku“.
   2. Sonst suchst du mit `k_playbook_doc_grep`, `kind: docs`, Muster
-     `^sitzung: <session>$`, einen offenen Auftrag dieser Sitzung, und prüfst für die Treffer
-     `^erzeuger: code$` bzw. `^erzeuger: tools$`. Gibt es ihn: „eingereiht“, mit Verweis.
+     `^sitzung: <session>$`, einen offenen rohen Auftrag dieser Sitzung, und prüfst für die
+     Treffer `^erzeuger: code$` bzw. `^erzeuger: tools$`; ein Treffer mit einer Zeile
+     `^dokument: ` ist zerlegt und zählt nicht („Kein Doppel“ in
+     `k-playbook:/instructions/on-demand/doku-auftraege.md`). Gibt es ihn für `tools`:
+     „eingereiht“, mit Verweis. Gibt es ihn für `code`, liest du ihn mit
+     `k_playbook_doc_read`: „eingereiht“, mit Verweis, wenn jeder geänderte Pfad gleich einem
+     seiner `pfade` ist oder darin liegt; sonst „nachzuziehen“ — Schritt 3 ergänzt dann diesen
+     Auftrag, statt einen zweiten anzulegen.
   3. Sonst: „nachzuziehen“. Das Einreihen bietet Schritt 3 an.
 
 Ein veraltetes Dokument unter `libs/`, `versions/` oder `manual/` meldest du nicht als Folge
@@ -99,8 +105,10 @@ einer Codeänderung; die `README.md` eines Erzeuger-Verzeichnisses schreibt `pub
 Ausgang je Teil, einer davon:
 
 - **angepasst** — die Handdoku wurde mit dem Code geändert.
-- **eingereiht** — für die erzeugte Doku liegt ein offener Auftrag dieser Sitzung vor.
-- **nachzuziehen** — die erzeugte Doku veraltet, es gibt noch keinen Auftrag.
+- **eingereiht** — für die erzeugte Doku liegt ein offener roher Auftrag dieser Sitzung vor;
+  bei `code` decken seine `pfade` die Änderung.
+- **nachzuziehen** — die erzeugte Doku veraltet, es gibt noch keinen Auftrag, oder dem
+  Auftrag für `code` fehlen Pfade der Änderung.
 - **nicht nötig** — mit Begründung in einem Satz. Reine Formatierung, Tests für bestehendes
   Verhalten und interne Umbauten ohne geänderte Semantik, die keine Doku beschreibt, brauchen
   in der Regel keine Doku-Änderung.
@@ -136,6 +144,13 @@ Nachzug eingereiht werden soll. Nach Ja, je Erzeuger:
    Prüfumfang, `anlass`, `sitzung` = `session`, `entstanden` = `context.now.date`.
 3. Nenne den Verweis; im Bericht steht dann „eingereiht“.
 
+Hat die Sitzung für `code` schon einen offenen rohen Auftrag, dem Pfade fehlen, legst du
+keinen zweiten an, sondern ergänzt ihn nach „Kein Doppel“ in `doku-auftraege.md`: seine
+`pfade` mit denen aus dem Prüfumfang vereinigen, den weiteren Anlass als Zeile in den Rumpf,
+Kephalaion `write` mit `base_revision` gleich der Revision aus `k_playbook_doc_read`. Bei
+`stale_revision` neu lesen und auf dem neuen Stand ergänzen; liegt der Auftrag nicht mehr
+offen, einen neuen anlegen wie oben.
+
 Bei Nein bleibt es bei „nachzuziehen“; der Abschluss nennt es als offen. `/k-docs-code` bzw.
 `/k-docs-tools` sofort laufen zu lassen bleibt erlaubt.
 
@@ -155,5 +170,5 @@ korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge ar
 
 - **Erzeugte Doku von Hand nachziehen** oder den Erzeuger ungefragt starten. Der Normalfall
   ist der Auftrag, und der kommt nur nach Freigabe.
-- **Einen zweiten Auftrag anlegen**, wenn diese Sitzung schon einen für denselben Erzeuger
-  hat.
+- **Einen zweiten Auftrag anlegen**, wenn diese Sitzung schon einen offenen rohen für
+  denselben Erzeuger hat. Für `code` wird der vorhandene ergänzt.

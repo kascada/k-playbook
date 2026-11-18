@@ -21,7 +21,8 @@ Produces:
   nach `done/` wandert.
 - Bei `PR required: true` einen Pull Request über `gh`, mit Dienst über `k-playbook github run`
   (5f.1).
-- Hat der Lauf Code geändert, je Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`
+- Hat der Lauf Code geändert, je Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`,
+  neu angelegt oder — für `code`, wenn die Sitzung schon einen hat — ergänzt
   (Schritt 7, `k-playbook:/instructions/on-demand/doku-auftraege.md`).
 
 ## Schritt 1 — Briefing und Form
@@ -840,12 +841,17 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
   Lockfile betrifft `tools`.
 - Je betroffenem Erzeuger gilt der Ablauf aus `doku-auftraege.md`: keine erzeugte Doku unter
   `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/` (Kephalaion `list`) → nichts
-  einreihen; sonst mit `k_playbook_doc_grep` (`kind: docs`) nach einem offenen Auftrag mit
-  `sitzung` = `session` aus dem Briefing und demselben `erzeuger` suchen; fehlt er,
+  einreihen; sonst mit `k_playbook_doc_grep` (`kind: docs`) nach einem offenen rohen Auftrag
+  mit `sitzung` = `session` aus dem Briefing und demselben `erzeuger` suchen — ein Treffer
+  mit einer Zeile `^dokument: ` ist zerlegt und zählt nicht; fehlt er,
   `k_playbook_doc_create` mit `kind: docs` und gleich danach Kephalaion `write` mit dem Kopf
-  aus `doku-auftraege.md` — `pfade` aus `CHANGED_PATHS`, `anlass` ein Satz mit den
-  Tasknummern. Das geschieht ohne Rückfrage: Ein Auftrag ändert keine Doku, er merkt den
-  Nachzug vor.
+  aus `doku-auftraege.md` — `pfade` aus `CHANGED_PATHS`, so fein wie möglich, `anlass` ein
+  Satz mit den Tasknummern. Gibt es ihn, bleibt es für `tools` dabei; für `code` wird er nach
+  „Kein Doppel“ in `doku-auftraege.md` ergänzt, statt einen zweiten anzulegen: mit
+  `k_playbook_doc_read` lesen, seine `pfade` mit `CHANGED_PATHS` vereinigen, den weiteren
+  Anlass als Zeile in den Rumpf, Kephalaion `write` mit `base_revision` gleich der gelesenen
+  Revision — nichts schreiben, wenn jeder Pfad schon gedeckt ist. Das geschieht ohne
+  Rückfrage: Ein Auftrag ändert keine Doku, er merkt den Nachzug vor.
 - Ändert der Lauf ein Manifest, ist das Inventar sofort nachzuziehen; das tut dieser Command
   nicht, die Zeile „Doku“ nennt `/k-doc-inventory`.
 - Ohne Kephalaion oder bei einem Task mit „Pfade unbekannt“ wird für ihn nichts eingereiht;

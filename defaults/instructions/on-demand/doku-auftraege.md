@@ -1,16 +1,27 @@
 ---
 title: Doku-Aufträge
-description: Wie nach einer Codeänderung der Nachzug der erzeugten Doku eingereiht wird — ein Dokument je Sitzung und Erzeuger in queue/docs/, Kopf mit erzeuger, pfade, anlass, sitzung und entstanden, wer schreibt und wer abschließt, die Prüfung auf einen vorhandenen Auftrag, wann nichts eingereiht wird und was nicht hineingehört.
+description: Wie der Nachzug der erzeugten Doku eingereiht und abgearbeitet wird — Dokumente in queue/docs/, für code in zwei Reifegraden (roh von einer Sitzung oder von /k-docs, zerlegt je Dokument vom Verarbeiter /k-docs-code), Kopf mit erzeuger, pfade, anlass, sitzung und entstanden, zerlegt dazu dokument und aktion, die Feldregeln, wer schreibt, die Prüfung auf einen vorhandenen Auftrag samt dem Ergänzen seiner Pfade, die Wartezeit für rohe Aufträge, wann nichts eingereiht wird, wer abschließt und was nicht hineingehört; für tools bleibt es bei einem Auftrag je Sitzung, der den ganzen Lauf begründet.
 ---
 
 ## Doku-Aufträge
 
 Ändert eine Sitzung Code, veraltet die erzeugte Doku unter `keph:/docs/generated/code/` und
-`keph:/docs/generated/libs/`. Sie neu zu erzeugen ist ein ganzer Lauf von `/k-docs-code` bzw.
-`/k-docs-tools` über das ganze Projekt. Statt diesen Lauf nach jeder Änderung zu starten, reiht
-die Sitzung einen **Doku-Auftrag** ein; der Erzeuger arbeitet die Aufträge gebündelt ab. Das ist
-der Normalfall nach einer Codeänderung. Den Erzeuger sofort laufen zu lassen bleibt erlaubt;
-dann schließt er den Auftrag gleich mit ab.
+`keph:/docs/generated/libs/`. Statt den Erzeuger nach jeder Änderung zu starten, reiht die
+Sitzung einen **Doku-Auftrag** ein; der Erzeuger arbeitet die Aufträge gebündelt ab. Das ist
+der Normalfall nach einer Codeänderung.
+
+Die beiden Erzeuger gehen mit ihren Aufträgen verschieden um:
+
+- **`code` — die Aufträge steuern den Lauf.** `/k-docs-code` ist ihr **Verarbeiter**: Er liest
+  die offenen Aufträge, legt abhängige zusammen, zerlegt sie in Aufträge je Dokument, schreibt
+  diese in die Queue zurück und arbeitet sie der Reihe nach ab. Die `pfade` bestimmen, welche
+  Dokumente drankommen. Der volle Lauf ist ein Auftrag über das ganze Projekt (`pfade: .`), den
+  `/k-docs code` einreiht; ein Teil-Lauf ist ein Auftrag über einzelne Pfade. Ohne offene
+  Aufträge läuft `/k-docs-code` nicht.
+- **`tools` — die Aufträge begründen den Lauf.** `/k-docs-tools` läuft immer über das ganze
+  Projekt, listet die Aufträge in seinem Preflight und schließt sie nach einem erfolgreichen
+  `publish` ab. `/k-docs-tools` sofort laufen zu lassen bleibt erlaubt; dann schließt er den
+  Auftrag gleich mit ab.
 
 Ein Auftrag ist ein Merkzettel, kein Rohmaterial: Er sagt, dass und warum nachzuziehen ist,
 nicht was in der Doku stehen soll.
@@ -22,14 +33,22 @@ nicht was in der Doku stehen soll.
   Die Antwort nennt den Verweis. Den Inhalt schreibst du gleich danach mit Kephalaion `write`,
   `collection` gleich `kephalaion.address`, `name` gleich dem Pfad ohne `keph:/`, Frontmatter
   eingeschlossen.
-- **Ein Auftrag je Sitzung und Erzeuger.** Ändert eine Sitzung mehrmals Code, bleibt es bei
-  einem Auftrag für `code`; berührt sie auch die Abhängigkeiten, kommt höchstens einer für
-  `tools` dazu.
+- **Ein Auftrag je Sitzung und Erzeuger.** Das gilt für den Auftrag nach einer Codeänderung:
+  Ändert eine Sitzung mehrmals Code, bleibt es bei einem Auftrag für `code`, dessen `pfade` sie
+  ergänzt („Kein Doppel“); berührt sie auch die Abhängigkeiten, kommt höchstens einer für
+  `tools` dazu. Der Auftrag von `/k-docs` über das ganze Projekt und die zerlegten Aufträge
+  des Verarbeiters fallen nicht darunter.
 - **Erledigt** liegt ein Auftrag unter `keph:/queue/docs/done/`; dorthin verschiebt ihn
-  `k_playbook_doc_done`. Die Sorte hat keinen Userbereich: Jeder Erzeuger-Lauf schließt jeden
+  `k_playbook_doc_done`. Die Sorte hat keinen Userbereich: Ein Erzeuger-Lauf schließt einen
   Auftrag ab, gleich wer ihn angelegt hat.
 
 ### Kopf
+
+Eine Sorte, zwei Reifegrade. Ein Auftrag ist **zerlegt**, wenn sein Kopf `dokument` trägt,
+sonst **roh**. Zerlegte Aufträge gibt es nur für `code`.
+
+**Roh** — geschrieben von einer Sitzung nach einer Codeänderung, von `/k-enforcement` oder von
+`/k-docs`:
 
 ```markdown
 ---
@@ -43,23 +62,64 @@ entstanden: <context.now.date>
 ---
 ```
 
+**Zerlegt** — geschrieben nur vom Verarbeiter, ein Auftrag je Dokument:
+
+```markdown
+---
+title: "<dokument ohne .md> <aktion>"
+erzeuger: code
+dokument: <NN>-<slug>.md
+aktion: neu | umschreiben | entfaellt
+pfade:
+  - <pfad relativ zu project.repoRoot>
+anlass: "<warum, in einem Satz>"
+sitzung: <session des Verarbeiters>
+entstanden: <ältestes Datum der aufgegangenen Aufträge>
+---
+
+<datum> — <Anlass eines aufgegangenen Auftrags>
+<datum> — <Anlass eines weiteren>
+```
+
 - `title` zeigen `k_playbook_doc_list` und `/k-docs` an; der Wert steht wie jeder Wert in freiem
   Text (auch `anlass`) in doppelten Anführungszeichen, ein `"` im Wert wird `\"`, damit jeder
-  YAML-Leser genau diesen Text liest, auch bei „: “ oder „ #“. `erzeuger`, `pfade`, `sitzung`
-  und `entstanden` bleiben, wie die Vorlage sie zeigt.
+  YAML-Leser genau diesen Text liest, auch bei „: “ oder „ #“. Die übrigen Felder bleiben, wie
+  die Vorlage sie zeigt. Ein zerlegter Auftrag heißt nach Dokument und Aktion, etwa
+  `"11-installation-und-update umschreiben"`.
 - `erzeuger` ist `code` für `keph:/docs/generated/code/` (`/k-docs-code`) und `tools` für
   `keph:/docs/generated/libs/` (`/k-docs-tools`). Ein Wert, kein zweiter: Wer beides braucht,
   legt zwei Aufträge an. Die Zeile steht genau so im Kopf, `erzeuger: code` bzw.
   `erzeuger: tools`, weil der Erzeuger mit `k_playbook_doc_grep` danach sucht.
 - `pfade` sind die geänderten Dateien oder Verzeichnisse, relativ zu `project.repoRoot`, je
-  einer pro Zeile. Sie begründen den Lauf und erscheinen in seinem Preflight; sie engen den
-  Scope nicht ein. Der Erzeuger läuft immer über das ganze Projekt.
-- `anlass` ist ein Satz: was sich geändert hat, nicht was die Doku sagen soll.
+  einer pro Zeile.
+  - Für `code` bestimmen sie, welche Dokumente drankommen; sie begrenzen nicht, was der
+    Verarbeiter dafür liest. Deshalb so fein wie möglich: ein Verzeichnis nur, wenn wirklich
+    alles darin betroffen ist.
+  - `.` heißt ganzes Projekt und steht dann als einzige Zeile, genau als `  - .`. So schreibt
+    `/k-docs` den vollen Lauf; im Text heißt das `pfade: .`.
+  - Die Ausschlüsse aus dem Abschnitt „Scope“ von `k-playbook:/commands/_shared/docs.md`
+    gelten immer, auch für Pfade eines Auftrags.
+  - Ein Pfad darf in mehreren zerlegten Aufträgen stehen, wenn er mehrere Dokumente betrifft.
+    Doppelt ist nur derselbe Pfad für dasselbe Dokument.
+  - Für `tools` begründen die Pfade den Lauf und erscheinen in seinem Preflight; sie engen den
+    Scope nicht ein. `/k-docs-tools` läuft immer über das ganze Projekt.
+- `dokument` trägt nur ein zerlegter Auftrag: der Dateiname seines Dokuments unter
+  `keph:/docs/generated/code/`, ohne Verzeichnis. Die Zeile steht genau so im Kopf, weil Suche
+  und Bericht den zerlegten Auftrag an `^dokument: ` erkennen.
+- `aktion` trägt nur ein zerlegter Auftrag: `neu`, `umschreiben` oder `entfaellt`.
+- `anlass` ist ein Satz: was sich geändert hat, nicht was die Doku sagen soll. Bei einem
+  zerlegten Auftrag fasst er zusammen; die Einzelheiten stehen im Rumpf.
 - `sitzung` ist die Kennung deiner Sitzung, das Feld `session` des Briefings (im Klartext die
-  Zeile `Sitzung:`). Hast du das Briefing neu geladen, nimm die neue Kennung.
-- `entstanden` ist `context.now.date`. `/k-docs` nennt den ältesten offenen Auftrag danach.
+  Zeile `Sitzung:`). Hast du das Briefing neu geladen, nimm die neue Kennung. Ein zerlegter
+  Auftrag trägt die Sitzung des Verarbeiters.
+- `entstanden` ist `context.now.date`. Gehen mehrere Aufträge in einem auf, bleibt das älteste
+  Datum. `/k-docs` nennt den ältesten offenen Auftrag danach.
 
-Der Rumpf darf leer bleiben. Mehr als ein kurzer Absatz gehört nicht hinein.
+**Rumpf.** Der Rumpf eines rohen Auftrags darf leer bleiben; mehr als ein kurzer Absatz gehört
+nicht hinein. Ergänzt eine Sitzung ihren Auftrag („Kein Doppel“), kommt je weiterem Anlass eine
+Zeile dazu: Datum und ein Satz. Der Rumpf eines zerlegten Auftrags nennt je aufgegangenem
+Auftrag eine Zeile mit Datum und Anlass — als Text und ohne Verweis, denn die Einträge der
+Queue wandern nach `done/`.
 
 ### Wer ihn schreibt
 
@@ -69,6 +129,13 @@ Der Rumpf darf leer bleiben. Mehr als ein kurzer Absatz gehört nicht hinein.
   Abschluss, nicht der Ausführungs-Sub-Agent.
 - **`/k-enforcement`** nach Freigabe durch den Nutzer, wenn sein Bericht für die erzeugte Doku
   „nachzuziehen“ ergibt.
+- **`/k-docs`** bei der Wahl `code` oder `alle`: einen rohen Auftrag für `code` mit `pfade: .`,
+  den vollen Lauf. Liegt schon ein offener roher Auftrag mit `pfade: .` vor, legt es keinen
+  zweiten an. Für diesen Auftrag gelten „Ein Auftrag je Sitzung und Erzeuger“, „Kein Doppel“
+  und „Noch keine erzeugte Doku“ nicht: `/k-docs` reiht ihn auch ein, wenn es noch keine
+  erzeugte Doku gibt — so entsteht sie zum ersten Mal.
+- **Der Verarbeiter `/k-docs-code`**: die zerlegten Aufträge, einen je Dokument. Nur er
+  schreibt `dokument` und `aktion`. Den Ablauf trägt `k-playbook:/commands/k-docs-code.md`.
 
 `code` ist einzureihen, wenn sich Code des Projekts geändert hat, den `/k-docs-code` erfasst:
 Quelltext unter `project.repoRoot` außerhalb von `context.docs.exclude`. `tools` ist
@@ -77,19 +144,61 @@ oder entfernte Abhängigkeit, ein Versionssprung, ein anderes Werkzeug im Build.
 
 ### Kein Doppel
 
-Vor dem Anlegen prüft der Schreiber, ob schon ein offener Auftrag derselben Sitzung für
-denselben Erzeuger besteht: `k_playbook_doc_grep` über die Sorte `docs` (ohne `done`) mit dem
-Muster `^sitzung: <session>$`, dann für die Treffer `^erzeuger: code$` bzw.
-`^erzeuger: tools$`. Gibt es ihn, legt er keinen neuen an; der Lauf ist ohnehin ganz, die Pfade
-des vorhandenen Auftrags genügen. `/k-danke` und `/k-enforcement` zählen einen vorhandenen
-Auftrag als „eingereiht“.
+Die Regel gilt für den Auftrag nach einer Codeänderung und zählt nur rohe Aufträge. Vor dem
+Anlegen prüft der Schreiber, ob schon ein offener roher Auftrag derselben Sitzung für denselben
+Erzeuger besteht: `k_playbook_doc_grep` über die Sorte `docs` (ohne `done`) mit dem Muster
+`^sitzung: <session>$`, dann für die Treffer `^erzeuger: code$` bzw. `^erzeuger: tools$`. Ein
+Treffer mit einer Zeile `^dokument: ` ist zerlegt und zählt nicht.
+
+- **`tools`.** Gibt es ihn, legt der Schreiber keinen neuen an; der Lauf ist ohnehin ganz, die
+  Pfade des vorhandenen Auftrags genügen.
+- **`code`.** Gibt es ihn, legt der Schreiber keinen zweiten an, sondern ergänzt ihn. Die
+  Pfade des vorhandenen Auftrags genügen hier nicht: Sie bestimmen, welche Dokumente
+  drankommen, und ein fehlender Pfad wäre ein Dokument, das nicht nachgezogen wird.
+  1. Lies den Auftrag mit `k_playbook_doc_read`; die Antwort nennt `revision`.
+  2. Ist jeder neue Pfad gleich einem vorhandenen oder liegt darin, wird nichts geschrieben;
+     der Auftrag zählt als eingereiht.
+  3. Sonst vereinigst du seine `pfade` mit den neuen und schreibst den Auftrag ganz zurück:
+     Kephalaion `write` mit `base_revision` gleich der gelesenen Revision. `title` und `anlass`
+     im Kopf bleiben; der weitere Anlass wird eine Zeile im Rumpf, `context.now.date` und ein
+     Satz.
+  4. `stale_revision` heißt, der Auftrag wurde inzwischen geändert: neu lesen und auf dem
+     neuen Stand ergänzen. Liegt der Auftrag beim Schreiben nicht mehr offen, weil der
+     Verarbeiter ihn inzwischen zerlegt hat, legst du einen neuen an.
+
+`/k-danke` und `/k-enforcement` zählen einen vorhandenen Auftrag als „eingereiht“ — für `code`
+nur, wenn seine `pfade` die Änderung decken oder er nach dieser Regel ergänzt wurde.
+
+### Wartezeit
+
+Ein Schreiber soll seinen Auftrag weiter ergänzen können, bevor der Verarbeiter ihn liest.
+
+- Der Verarbeiter nimmt einen rohen Auftrag erst, wenn seine letzte Änderung mindestens
+  **2 Stunden** zurückliegt. Bis dahin **wartet** der Auftrag, danach ist er **reif**. Der Wert
+  steht nur hier; die anderen Texte verweisen auf diesen Abschnitt.
+- Maßgeblich ist `updated` des Auftrags aus `k_playbook_doc_list` (Sorte `docs`), nicht
+  `entstanden` im Kopf, das nur das Datum trägt. Ein Ergänzen beginnt die Frist neu. Ein
+  Kopffeld für die Frist gibt es nicht.
+- Zeitbasis ist `context.now.timestamp` aus dem Briefing. `updated` ist UTC, der Zeitstempel
+  des Briefings trägt eine Zeitzone; vor dem Vergleich werden beide auf dieselbe Zone gebracht.
+  Ein altes Briefing lässt den Lauf eher zu lange warten als zu kurz. Das ist hingenommen;
+  das Briefing wird dafür nicht neu geladen.
+- Die Frist gilt nur für rohe Aufträge. Zerlegte haben keine: Ein unterbrochener Lauf setzt
+  sofort wieder an.
+- Wartende Aufträge nehmen am Zusammenlegen und Zerlegen nicht teil und bleiben unverändert
+  offen, auch wenn ein reifer Auftrag einen ihrer Pfade teilt.
+- **Der volle Lauf wartet nicht.** Ein roher Auftrag mit `pfade: .` hat keine Frist und nimmt
+  alle offenen rohen Aufträge auf, auch die wartenden. So geht `/k-docs code` und gleich danach
+  `/k-docs-code` ohne Warten. Ein Argument oder Kopffeld dafür gibt es nicht.
+- Für `tools` gibt es keine Wartezeit.
 
 ### Wann nicht eingereiht wird
 
-- **Noch keine erzeugte Doku.** Liegt unter `keph:/docs/generated/code/` bzw.
-  `keph:/docs/generated/libs/` noch kein Dokument (Kephalaion `list` auf `docs/generated/code`
-  bzw. `docs/generated/libs`), wird für diesen Erzeuger nichts eingereiht: Es gibt nichts
-  nachzuziehen. Der Abschluss erwähnt es in einem Satz.
+- **Noch keine erzeugte Doku.** Das gilt für den Auftrag nach einer Codeänderung: Liegt unter
+  `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/` noch kein Dokument (Kephalaion
+  `list` auf `docs/generated/code` bzw. `docs/generated/libs`), wird für diesen Erzeuger nichts
+  eingereiht: Es gibt nichts nachzuziehen. Der Abschluss erwähnt es in einem Satz. Den Auftrag
+  mit `pfade: .` reiht `/k-docs` trotzdem ein.
 - **Ohne Kephalaion** (`kephalaion.ok` nicht `true`, oder `kephalaion_unavailable`) wird nicht
   eingereiht, auch nicht auf die Platte. Der Abschluss nennt den fehlenden Nachzug als offen.
 - **Keine Codeänderung.** Reine Änderungen an Handdoku, Tasks, Befunden oder der Konfiguration
@@ -97,12 +206,32 @@ Auftrag als „eingereiht“.
 
 ### Wer ihn abschließt
 
-Der Erzeuger, nach einem erfolgreichen `publish`. Sein Preflight listet die offenen Aufträge
-seines `erzeuger` mit Anlass und Pfaden; nach dem `publish` schließt er genau diese mit
-`k_playbook_doc_done` ab. Erfolgreich heißt: Die Antwort von `publish` meldet keine offenen
-Dokumente (`open` leer), und `cleaned` ist wahr. Aufträge, die nach dem Preflight dazugekommen
-sind, bleiben offen. Bricht der Lauf ab oder meldet `publish` einen Konflikt, bleiben alle
-offen. Die Einzelheiten stehen in `k-playbook:/commands/_shared/docs.md`.
+Der Erzeuger, mit `k_playbook_doc_done` — `code` je Auftrag, `tools` alle auf einmal.
+
+**`code`.** Der Verarbeiter schließt Auftrag für Auftrag:
+
+- Ein roher Auftrag wandert beim Zerlegen nach `done/`, sobald die zerlegten Aufträge, in denen
+  er aufgegangen ist, in der Queue stehen. Folgt aus ihm kein Dokument, etwa weil alle seine
+  Pfade ausgenommen sind, wandert er ebenfalls nach `done/`; der Abschluss des Laufs nennt ihn.
+- Ein zerlegter Auftrag wird geschlossen, wenn er in diesem Lauf abgearbeitet ist und `publish`
+  sein Dokument danach mit `created`, `written`, `deleted` oder `unchanged` meldet. `publish`
+  meldet auch unberührte Dokumente als `unchanged`; ein noch nicht abgearbeiteter Auftrag
+  bleibt deshalb offen.
+- Er bleibt offen bei `conflict`, bei `failed` und bei jeder Ablehnung des ganzen Abgleichs
+  (`invalid_input`, `hints_changed`).
+- Lehnt der Nutzer ein `neu` oder `entfaellt` ab, wird der Auftrag ohne `publish` geschlossen;
+  der Abschluss des Laufs nennt ihn.
+- Ein abgebrochener Lauf setzt an den offenen zerlegten Aufträgen wieder an. Rohe Aufträge,
+  die während des Laufs dazukommen, bleiben für den nächsten Lauf offen.
+
+**`tools`.** Der Preflight von `/k-docs-tools` listet die offenen Aufträge mit Anlass und
+Pfaden; nach einem erfolgreichen `publish` schließt er genau diese ab. Erfolgreich heißt: Die
+Antwort von `publish` meldet keine offenen Dokumente (`open` leer), und `cleaned` ist wahr.
+Aufträge, die nach dem Preflight dazugekommen sind, bleiben offen. Bricht der Lauf ab oder
+meldet `publish` einen Konflikt, bleiben alle offen.
+
+Die Einzelheiten stehen in `k-playbook:/commands/_shared/docs.md`, der Ablauf des Verarbeiters
+in `k-playbook:/commands/k-docs-code.md`.
 
 ### Was nicht hineingehört
 
@@ -116,7 +245,9 @@ offen. Die Einzelheiten stehen in `k-playbook:/commands/_shared/docs.md`.
   `k_playbook_doc_read`; `foreign_change` heißt, jemand anderes hat inzwischen geschrieben,
   dann nicht still nachziehen. Nicht als Ganzes mit `write`; in der Shell ersatzweise
   `k-playbook doc replace|append <keph:-verweis> [--since N]`.
-- **Ein Teil-Scope.** Ein Auftrag engt den Lauf nicht auf seine Pfade ein.
+- **Ein Teil-Scope für `tools`.** Ein Auftrag für `tools` engt den Lauf nicht auf seine Pfade
+  ein. Für `code` wählen die Pfade die Dokumente aus, begrenzen aber nicht, was der Verarbeiter
+  für sie liest.
 - **Inhalt für die Doku.** Was ein Erzeuger schreiben soll, findet er im Code. Erkenntnisse
   sind Befunde (`k-playbook:/instructions/on-demand/befunde.md`), Arbeitsstände gehören in die
   Workbench.

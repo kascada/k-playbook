@@ -1,6 +1,6 @@
 ---
 description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage) — Führt einen vollständigen Audit-Sweep über MCP an oder setzt ihn fort; das optionale Argument wählt new, latest oder ein Datum YYYY-MM-DD.
-argument-hint: [YYYY-MM-DD|latest|new]
+argument-hint: "[YYYY-MM-DD|latest|new]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_review_status, mcp__k-playbook__k_playbook_review_create, mcp__k-playbook__k_playbook_review_scan, mcp__k-playbook__k_playbook_review_merge, mcp__k-playbook__k_playbook_review_write_ai_entry, mcp__k-playbook__k_playbook_briefing]
 ---

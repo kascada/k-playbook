@@ -1017,16 +1017,57 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 		"keph:/queue/docs/", "Sorte `docs`", "erzeuger: code | tools", "pfade:", "anlass:", "sitzung:", "entstanden:",
 		"Ein Auftrag je Sitzung und Erzeuger", "Kein Doppel", "`^sitzung: <session>$`", "Wann nicht eingereiht wird",
 		"Wer ihn schreibt", "Wer ihn abschließt", "Was nicht hineingehört", "`/k-enforcement`", "`open` leer", "`cleaned` ist wahr",
+		// Task 167: zwei Reifegrade für code, Ergänzen statt Doppel, Wartezeit.
+		"Ein Auftrag ist **zerlegt**, wenn sein Kopf `dokument` trägt, sonst **roh**",
+		"dokument: <NN>-<slug>.md", "aktion: neu | umschreiben | entfaellt", "`^dokument: `", "`pfade: .`", "genau als `  - .`",
+		"so fein wie möglich", "Die Ausschlüsse aus dem Abschnitt „Scope“",
+		"**`/k-docs`** bei der Wahl `code` oder `alle`", "**Der Verarbeiter `/k-docs-code`**",
+		"zählt nur rohe Aufträge", "Kephalaion `write` mit `base_revision`", "`stale_revision`",
+		"### Wartezeit", "**2 Stunden**", "`updated` des Auftrags aus `k_playbook_doc_list`", "`context.now.timestamp`",
+		"**Der volle Lauf wartet nicht.**", "Für `tools` gibt es keine Wartezeit",
+		"mit `created`, `written`, `deleted` oder `unchanged` meldet", "ein noch nicht abgearbeiteter Auftrag bleibt deshalb offen",
+		"Den Auftrag mit `pfade: .` reiht `/k-docs` trotzdem ein", "**Ein Teil-Scope für `tools`.**",
 	} {
 		if !strings.Contains(squashSpace(instruction), squashSpace(needle)) {
 			t.Errorf("doku-auftraege.md nennt %q nicht", needle)
 		}
 	}
+	// Der alte Lebenslauf für code — Lauf immer ganz, Pfade ohne Wirkung — steht
+	// nicht mehr da; für tools bleibt er benannt.
+	for _, stale := range []string{"Der Erzeuger läuft immer über das ganze Projekt", "Ein Auftrag engt den Lauf nicht auf seine Pfade ein"} {
+		if strings.Contains(squashSpace(instruction), stale) {
+			t.Errorf("doku-auftraege.md trägt noch %q", stale)
+		}
+	}
+	// „Kein Doppel“ zählt nur rohe Aufträge und ergänzt für code den vorhandenen:
+	// dieselbe Regel in /k-enforcement und beim Einreihen von /k-task-run.
+	for rel, needles := range map[string][]string{
+		"commands/k-enforcement.md": {"einen offenen rohen Auftrag dieser Sitzung", "`^dokument: `", "statt einen zweiten anzulegen",
+			"Kephalaion `write` mit `base_revision`"},
+		"commands/k-task-run.md": {"nach einem offenen rohen Auftrag", "`^dokument: `", "statt einen zweiten anzulegen",
+			"Kephalaion `write` mit `base_revision`"},
+	} {
+		text := squashSpace(readRepoDefault(t, rel))
+		for _, needle := range needles {
+			if !strings.Contains(text, needle) {
+				t.Errorf("%s nennt %q nicht", rel, needle)
+			}
+		}
+	}
 
 	shared := readRepoDefault(t, "commands/_shared/docs.md")
 	section := shared[strings.Index(shared, "\n### Doku-Aufträge\n"):]
+	// Der Wert der Wartezeit steht nur in doku-auftraege.md.
+	if strings.Contains(shared, "2 Stunden") {
+		t.Error("_shared/docs.md wiederholt den Wert der Wartezeit")
+	}
 	for _, needle := range []string{"`k_playbook_doc_grep` mit `kind: docs`", "`^erzeuger: code$`", "`^erzeuger: tools$`",
-		"`ORDERS`", "`k_playbook_doc_done`", "`open` leer", "`cleaned` ist wahr", "bleiben offen", "engen den Scope nicht ein"} {
+		"`ORDERS`", "`k_playbook_doc_done`", "`open` leer", "`cleaned` ist wahr", "bleiben offen", "engen den Scope nicht ein",
+		// Task 167: Der Abschnitt trennt code (Aufträge steuern den Lauf, Ablauf
+		// im Text des Commands) von tools (wie bisher).
+		"**Für `code`: Die Aufträge steuern den Lauf.**", "**Für `tools`: Die Aufträge begründen den Lauf.**",
+		"stehen in `k-playbook:/commands/k-docs-code.md` und nur dort", "nach der Wartezeit aus `doku-auftraege.md`",
+		"`pfade: .`", "gilt für `code` nicht", "Eine Wartezeit gibt es hier nicht"} {
 		if !strings.Contains(squashSpace(section), needle) {
 			t.Errorf("_shared/docs.md, Doku-Aufträge, nennt %q nicht", needle)
 		}
@@ -1253,7 +1294,7 @@ func TestDefaultsKBefundeEinordnenIstHuelleUndText(t *testing.T) {
 		t.Fatal(err)
 	}
 	hull := string(hullData)
-	if !strings.Contains(hull, "`"+ref+"`") || !strings.Contains(hull, "argument-hint: [anzahl]") {
+	if !strings.Contains(hull, "`"+ref+"`") || !strings.Contains(hull, "argument-hint: \"[anzahl]\"") {
 		t.Errorf("Hülle ohne Verweis auf den Text oder ohne Argument:\n%s", hull)
 	}
 	for _, tool := range []string{"mcp__k-playbook__k_playbook_findings_check", "mcp__k-playbook__k_playbook_doc_create",

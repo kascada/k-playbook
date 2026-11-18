@@ -1,6 +1,6 @@
 ---
 description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage) — Führt ein einzelnes Review-Rezept aus; ohne Argument Auswahl aus aktivierten Review-Rezepten, mit Handoff im Report-Modus als review-input.json und review-triage.md.
-argument-hint: [review-name]
+argument-hint: "[review-name]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_briefing]
 ---

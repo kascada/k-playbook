@@ -1,6 +1,6 @@
 ---
 description: Run unit tests, diagnose failures, and report the root cause before asking whether to fix them.
-argument-hint: [path-or-command]
+argument-hint: "[path-or-command]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, mcp__k-playbook__k_playbook_briefing]
 ---

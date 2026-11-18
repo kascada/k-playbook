@@ -1,6 +1,6 @@
 ---
 description: Vorübergehend nicht verfügbar (Umzug der Ergebnisablage) — Arbeitet Befunde aus einer Review-Ergebnisdatei strukturiert ab. Plant zuerst sinnvolle Remediation-Bündel nach Risiko, Aufwand und Kopplung, beachtet die projektlokale Remediation-Policy und erzeugt je nach Modus Tasks in der Projekt-Collection statt direkte Fixes. Dünne Hülle über dem Text k-playbook:/commands/k-remediation.md.
-argument-hint: [result-datei.md]
+argument-hint: "[result-datei.md]"
 # model: github-copilot/gpt-5.5
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_create, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__kephalaion__read, mcp__kephalaion__write]
 ---

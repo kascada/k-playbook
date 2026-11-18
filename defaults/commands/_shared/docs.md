@@ -1,6 +1,6 @@
 ---
 title: Die Docs-Ablage in der Projekt-Collection
-description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, der eine Kopf jedes Dokuments (title, description, generated samt stats, hints, questions, sources, verified), Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), der Scope der Erzeuger, die den Code durchsuchen (/k-docs-code und /k-docs-tools), samt dauerhaften Ausschlüssen in docs.exclude, die Doku-Aufträge aus queue/docs/, die diese beiden im Preflight listen und nach einem erfolgreichen publish abschließen, README.md (aus den Vorlagen unter k-playbook:/docs/, geschrieben vom Programm) und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
+description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, der eine Kopf jedes Dokuments (title, description, generated samt stats, hints, questions, sources, verified), Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), der Scope der Erzeuger, die den Code durchsuchen (/k-docs-code und /k-docs-tools), samt dauerhaften Ausschlüssen in docs.exclude, die Doku-Aufträge aus queue/docs/, die bei /k-docs-code den Lauf steuern und die /k-docs-tools im Preflight listet und nach einem erfolgreichen publish abschließt, README.md (aus den Vorlagen unter k-playbook:/docs/, geschrieben vom Programm) und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
 ---
 
 Die Projektdokumentation liegt in der Collection des Projekts unter `keph:/docs/`; das ist
@@ -205,16 +205,40 @@ nichts ergänzt wurde, entfällt dieser Teil. Die Datei liest und bearbeitest du
 
 Dieser Abschnitt gilt wie „Scope“ nur für `/k-docs-code` und `/k-docs-tools`. Nach einer
 Codeänderung reiht eine Sitzung den Nachzug als Auftrag in `keph:/queue/docs/` ein, statt den
-Erzeuger sofort laufen zu lassen; Kopf und Lebenslauf stehen in
+Erzeuger sofort laufen zu lassen; Kopf, Reifegrade und Lebenslauf stehen in
 `k-playbook:/instructions/on-demand/doku-auftraege.md`. Ein Erzeuger arbeitet die Aufträge
 seines `erzeuger` ab: `/k-docs-code` die mit `erzeuger: code`, `/k-docs-tools` die mit
-`erzeuger: tools` — dessen Verzeichnis heißt `libs`, der Auftrag `tools`.
+`erzeuger: tools` — dessen Verzeichnis heißt `libs`, der Auftrag `tools`. Die beiden gehen
+verschieden damit um: Bei `code` steuern die Aufträge den Lauf, bei `tools` begründen sie ihn.
 
-- **Preflight.** Vor dem Preflight suchst du die offenen Aufträge deines Erzeugers:
-  `k_playbook_doc_grep` mit `kind: docs` (ohne `done`) und dem Muster `^erzeuger: code$`
-  bzw. `^erzeuger: tools$` (ersatzweise `k-playbook doc grep --kind docs '<muster>' --json`).
-  Jeder Treffer ist ein Auftrag; lies ihn mit `k_playbook_doc_read` und nimm aus dem Kopf
-  `anlass`, `pfade` und `entstanden`. Der Preflight listet sie:
+Gemeinsam für beide:
+
+- **Suche.** Die offenen Aufträge deines Erzeugers findest du mit `k_playbook_doc_grep` mit
+  `kind: docs` (ohne `done`) und dem Muster `^erzeuger: code$` bzw. `^erzeuger: tools$`
+  (ersatzweise `k-playbook doc grep --kind docs '<muster>' --json`). Jeder Treffer ist ein
+  Auftrag; lies ihn mit `k_playbook_doc_read` und nimm aus dem Kopf `anlass`, `pfade` und
+  `entstanden` — bei `code` dazu `dokument` und `aktion`, wenn der Auftrag sie trägt.
+- **Rückmeldungen.** `wrong_dir` oder `not_found` bei `k_playbook_doc_done` heißt, ein
+  anderer Lauf hat den Auftrag schon abgeschlossen — nennen, nicht wiederholen.
+  `outcome_unknown` heißt, das Verschieben kann angekommen sein: nicht wiederholen, sondern mit
+  `k_playbook_doc_list` (`kind: docs`, `done: true`) nachsehen. Kennt das Werkzeug die Sorte
+  `docs` nicht (`invalid_input`), ist die Installation älter als der Command: melden,
+  `/k-upgrade` nennen; der Lauf selbst bleibt gültig.
+- **Abschluss.** Die Zusammenfassung nennt die abgeschlossenen Aufträge mit Verweis und die,
+  die offen geblieben sind, mit Grund.
+
+**Für `code`: Die Aufträge steuern den Lauf.** Sie bestimmen, welche Dokumente
+`/k-docs-code` schreibt; ohne offene Aufträge läuft es nicht. Ein Auftrag ist roh oder
+zerlegt (`dokument` im Kopf). Einen rohen nimmt der Lauf erst nach der Wartezeit aus
+`doku-auftraege.md`, außer er oder ein anderer offener roher Auftrag trägt `pfade: .`; ein
+zerlegter hat keine Frist. Zusammenlegen, Zerlegen, Abarbeiten und der Abschluss je Auftrag
+stehen in `k-playbook:/commands/k-docs-code.md` und nur dort. Der Rest dieses Abschnitts —
+`ORDERS`, das Abschließen nach einem erfolgreichen `publish` — gilt für `code` nicht.
+
+**Für `tools`: Die Aufträge begründen den Lauf.** Eine Wartezeit gibt es hier nicht.
+
+- **Preflight.** Vor dem Preflight suchst du die offenen Aufträge mit `erzeuger: tools`
+  (Suche oben). Der Preflight listet sie:
 
   ```text
   Aufträge      <N> offen | keine
@@ -233,11 +257,3 @@ seines `erzeuger` ab: `/k-docs-code` die mit `erzeuger: code`, `/k-docs-tools` d
 - **Offen lassen.** Bricht der Lauf ab, meldet `publish` einen Konflikt, eine Ablehnung oder
   `failed`, oder bleibt etwas offen, schließt du keinen Auftrag ab. Ein `publish`, der nach
   einem behobenen Konflikt doch noch erfolgreich durchläuft, schließt `ORDERS` ab.
-- **Rückmeldungen.** `wrong_dir` oder `not_found` bei `k_playbook_doc_done` heißt, ein
-  anderer Lauf hat den Auftrag schon abgeschlossen — nennen, nicht wiederholen.
-  `outcome_unknown` heißt, das Verschieben kann angekommen sein: nicht wiederholen, sondern mit
-  `k_playbook_doc_list` (`kind: docs`, `done: true`) nachsehen. Kennt das Werkzeug die Sorte
-  `docs` nicht (`invalid_input`), ist die Installation älter als der Command: melden,
-  `/k-upgrade` nennen; der Lauf selbst bleibt gültig.
-- **Abschluss.** Die Zusammenfassung nennt die abgeschlossenen Aufträge mit Verweis und die,
-  die offen geblieben sind, mit Grund.
