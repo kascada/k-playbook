@@ -18,6 +18,7 @@ type findingsFakeDoc struct {
 	created          string
 	updated          string
 	ziel             string
+	thema            string
 	frontmatterError string
 	// readErr lässt read scheitern; gone lässt read „none“ melden.
 	readErr error
@@ -47,8 +48,8 @@ func (s *findingsFakeStore) List(_ context.Context, req kephalaion.ListRequest) 
 		entry := kephalaion.Entry{Kind: "document", Name: name, Revision: revision,
 			Created: &kephalaion.Stamp{At: doc.created, By: doc.by}, Updated: &kephalaion.Stamp{At: doc.updated, By: doc.by},
 			FrontmatterError: doc.frontmatterError}
-		if doc.ziel != "" {
-			entry.Frontmatter = map[string]any{"title": "x", "ziel": doc.ziel}
+		if doc.ziel != "" || doc.thema != "" {
+			entry.Frontmatter = map[string]any{"title": "x", "ziel": doc.ziel, "thema": doc.thema}
 		}
 		out = append(out, entry)
 	}
@@ -116,6 +117,7 @@ func TestFindingsCheckBereit(t *testing.T) {
 		"queue/docs/001-auftrag.md": befund("kamran", findingsOld),
 	}}
 	store.docs["queue/findings/003-c.md"].ziel = "wissen"
+	store.docs["queue/findings/003-c.md"].thema = "Briefing"
 	env, synced := findingsTestEnv(store, allFindingsRights...)
 	check := env.check(context.Background())
 
@@ -137,7 +139,7 @@ func TestFindingsCheckBereit(t *testing.T) {
 		t.Fatalf("Reihenfolge: %v", names)
 	}
 	first := check.Findings[0]
-	if first.Ref != "keph:/queue/findings/003-c.md" || first.Revision != 4711 || first.User != "kamran" || first.Ziel != "wissen" ||
+	if first.Ref != "keph:/queue/findings/003-c.md" || first.Revision != 4711 || first.User != "kamran" || first.Ziel != "wissen" || first.Thema != "Briefing" ||
 		first.Created != findingsOld {
 		t.Fatalf("Eintrag: %+v", first)
 	}

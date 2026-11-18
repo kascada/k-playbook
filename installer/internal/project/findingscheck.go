@@ -116,6 +116,9 @@ type FindingItem struct {
 	Updated string `json:"updated"`
 	// Ziel ist das Feld ziel des Frontmatters; leer, wenn es fehlt.
 	Ziel string `json:"ziel"`
+	// Thema ist das Feld thema des Frontmatters; leer, wenn es fehlt. Die
+	// Einordnung nimmt Befunde mit demselben Thema direkt nacheinander.
+	Thema string `json:"thema"`
 }
 
 // FindingsSkipped ist ein Befund, den die Einordnung diesmal überspringt.
@@ -252,6 +255,9 @@ func (env findingsEnv) check(ctx context.Context) (result FindingsCheck) {
 		}
 		if ziel, ok := entry.Frontmatter["ziel"].(string); ok {
 			item.Ziel = strings.TrimSpace(ziel)
+		}
+		if thema, ok := entry.Frontmatter["thema"].(string); ok {
+			item.Thema = strings.TrimSpace(thema)
 		}
 		read, err := store.Read(ctx, entry.Name)
 		switch {

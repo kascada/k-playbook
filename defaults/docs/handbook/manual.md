@@ -266,7 +266,9 @@ document's frontmatter change only after the user confirms. Each writer changes 
 documents (`generated.by`); the directory's `README.md` is written by `publish`.
 
 `/k-docs` is the guided entry point: it checks inventory, consistency, and
-session memory and offers the possible next step. The three producers create
+session memory and offers the possible next step. For the code documentation it does not
+start the producer: `/k-docs code` queues the full run as a documentation order, and
+`/k-docs-code` works the orders off (see *Docs follow-up*). The three producers create
 content: `/k-docs-code` reads code, `/k-docs-tools` reads libraries, and
 `/k-doc-inventory` reads declared versions from manifests, lockfiles, container,
 Helm, and CI files. Skip a stage if it has no input. Raw material has no inbox of its
@@ -286,8 +288,21 @@ changed files of the working tree; it is temporarily unavailable while it is reb
 checks (task 155). After a code
 change the generated documentation is not regenerated on the spot: the session queues a
 documentation order in `keph:/queue/docs/`
-(`k-playbook:/instructions/on-demand/doku-auftraege.md`), which `/k-docs-code` or
-`/k-docs-tools` works off in one run; `/k-docs` shows the open orders.
+(`k-playbook:/instructions/on-demand/doku-auftraege.md`); `/k-docs` shows the open orders.
+
+For `code` the orders drive the run (task 167). The paths of an order decide which documents
+`/k-docs-code` writes, so a session names them as finely as possible and extends its open
+order with further paths instead of writing a second one. `/k-docs-code` takes no argument: it
+reads the open orders, merges dependent ones, splits them into one order per document, writes
+those back to the queue and works them off one by one. An order per document is closed once
+`publish` reports its document; an interrupted run resumes at the orders that are still open.
+A raw order is picked up only after a waiting period, so that its writer can still extend it;
+the value stands in `doku-auftraege.md`. The full run is an order over the whole project
+(`pfade: .`): `/k-docs code` queues it instead of starting the producer, it does not wait and
+absorbs every open raw order. Without open orders `/k-docs-code` does not run.
+
+For `tools` nothing changes: an order justifies the run, `/k-docs-tools` always covers the
+whole project and closes its orders after a successful publish.
 
 ## Operating rules
 

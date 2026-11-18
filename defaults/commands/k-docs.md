@@ -2,15 +2,20 @@
 
 Zeigt den Stand der Projektdoku unter `keph:/docs/` in der Collection des Projekts, meldet
 Lücken und Widersprüche und bietet die Erzeuger an: das Versionsinventar, die Doku aus dem
-Code und die Steckbriefe der Libraries und Tools. Mit `alle` laufen sie in dieser
-Reihenfolge nacheinander, danach schreibt das Programm die `README.md` der Verzeichnisse
+Code und die Steckbriefe der Libraries und Tools. Inventar und Steckbriefe startet er selbst.
+Die Doku aus dem Code startet er nicht: Für `code` reiht er den vollen Lauf als Doku-Auftrag
+ein, den `/k-docs-code` abarbeitet. Mit `alle` laufen Inventar und Steckbriefe nacheinander,
+die Code-Doku wird eingereiht, danach schreibt das Programm die `README.md` der Verzeichnisse
 aus ihren Vorlagen. Der Ablauf eines Erzeugers steht in seinem eigenen Text; dieser
 Command wiederholt ihn nicht.
 
 Produces:
 
 - Im Statuslauf nichts. Ohne Auswahl ist `/k-docs` read-only.
-- Bei Auswahl schreibt nur der gewählte Erzeuger, nach den Regeln seines Textes.
+- Bei `inventory` und `tools` schreibt nur der gewählte Erzeuger, nach den Regeln seines
+  Textes.
+- Bei `code` und `alle` höchstens ein roher Doku-Auftrag für `code` mit `pfade: .` in
+  `keph:/queue/docs/`. Die Code-Doku selbst schreibt erst `/k-docs-code`.
 - Mit `alle` zuletzt die `README.md` unter `keph:/docs/`, die fehlen oder von ihrer Vorlage
   abweichen — geschrieben vom Programm (`k_playbook_docs_readme`), nicht von Hand.
 
@@ -21,7 +26,8 @@ include: _shared/erster-schritt.md
 include: _shared/docs.md
 
 Aus dem Briefing brauchst du `context.kephalaion` (`ok`, `address`, `message`),
-`context.project.dir` und `context.docs` (`exclude`, `problems`). Ohne
+`context.project.dir`, `context.docs` (`exclude`, `problems`), `session` und `context.now`
+(`date`, `timestamp`). Ohne
 `context.kephalaion.ok: true` endet der Command hier, wie die Ablage oben sagt.
 
 Die Erzeuger und ihre Verzeichnisse:
@@ -62,12 +68,24 @@ Command — die Zeile `README` in Schritt 4 nennt dann `/k-upgrade`.
 
 Dazu die offenen Doku-Aufträge in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`): ein `k_playbook_doc_list` mit
-`kind: docs`, ohne `done` — die erledigten unter `done/` zählen nicht. Für die Aufteilung
-nach Erzeuger und den ältesten Auftrag ein `k_playbook_doc_grep` mit `kind: docs` und dem
-Muster `^(erzeuger|entstanden): `; je Auftrag gelten seine Zeilen `erzeuger:` und
-`entstanden:`. Gelesen wird kein Auftrag einzeln. `invalid_input`, weil die Sorte `docs`
-unbekannt ist, heißt: Die Installation ist älter als dieser Command — die Zeile `Aufträge`
-in Schritt 4 nennt dann `/k-upgrade`.
+`kind: docs`, ohne `done` — die erledigten unter `done/` zählen nicht; es nennt je Auftrag
+`updated`, den Zeitpunkt seiner letzten Änderung. Für die Aufteilung ein
+`k_playbook_doc_grep` mit `kind: docs` und dem Muster
+`^(erzeuger|entstanden|dokument): |^\s*- \.$`; je Auftrag gelten seine Zeilen:
+
+- `erzeuger:` teilt nach Erzeuger, `entstanden:` nennt den ältesten Auftrag.
+- Ein Auftrag mit einer Zeile `dokument:` ist **zerlegt**, sonst **roh**. Zerlegte gibt es
+  nur für `code`; liegen welche offen, ist ein Lauf von `/k-docs-code` unterbrochen.
+- Ein roher Auftrag für `code` mit der Zeile `- .` trägt `pfade: .`: Der volle Lauf ist
+  schon eingereiht.
+- Ein roher Auftrag für `code` **wartet**, solange sein `updated` jünger ist als die
+  Wartezeit, gemessen an `context.now.timestamp`; Wert und Rechnung stehen im Abschnitt
+  „Wartezeit“ von `doku-auftraege.md`. Liegt ein roher Auftrag mit `pfade: .` offen, wartet
+  keiner: Er nimmt alle auf.
+
+Gelesen wird kein Auftrag einzeln. `invalid_input`, weil die Sorte `docs` unbekannt ist,
+heißt: Die Installation ist älter als dieser Command — die Zeile `Aufträge` in Schritt 4
+nennt dann `/k-upgrade`.
 
 Dazu auf der Platte, nur nachsehen:
 
@@ -141,25 +159,36 @@ Handdoku    <N> Dokumente | leer
 Quellen     <N> Verweise | leer
 Unsortiert  <N> Dokumente | —
 Aufträge    <N> (<N> code, <N> tools), ältester <entstanden> | keine
+            code: <N> roh (<N> warten noch), <N> zerlegt — ein Lauf ist unterbrochen
 README      <N> Vorlagen, <N> fehlen, <N> weichen ab | alle aktuell | keine Vorlagen
 Befunde     <N> (<Kategorien>) | keine
 Offen       Arbeitsverzeichnis: <erzeuger> seit <alter> | —
 
 Mögliche Aktionen:
   1. inventory  Versionsinventar erheben            → /k-doc-inventory
-  2. code       Doku aus dem Code                   → /k-docs-code    <N> Aufträge offen
+  2. code       Doku aus dem Code: vollen Lauf einreihen
+                <N> Aufträge offen → /k-docs-code
   3. tools      Steckbriefe der Libraries und Tools → /k-docs-tools   <N> Aufträge offen
-  4. alle       1, 2 und 3 nacheinander, danach die README aus den Vorlagen
+  4. alle       1 und 3 nacheinander, 2 einreihen, danach die README aus den Vorlagen
   5. status     nur diesen Bericht
 
 Was soll ich tun?
 ```
 
+Die zweite Zeile zu `Aufträge` steht nur, wenn Aufträge für `code` offen sind: rohe und
+zerlegte getrennt, bei den rohen, wie viele noch warten. Offene zerlegte heißen: Ein Lauf ist
+unterbrochen; `/k-docs-code` setzt ihn fort. Ohne zerlegte entfällt dieser Teil der Zeile.
+
 `tools` setzt das Inventar voraus. Fehlt es, steht bei 3 „braucht das Inventar (1)“; `alle`
 erhebt es zuerst. Bei 2 und 3 steht die Zahl der offenen Aufträge des Erzeugers
-(`erzeuger: code` bzw. `erzeuger: tools`); ohne offene Aufträge entfällt der Zusatz. Der
-gewählte Erzeuger listet sie in seinem Preflight und schließt sie nach einem erfolgreichen
-`publish` ab.
+(`erzeuger: code` bzw. `erzeuger: tools`); ohne offene Aufträge entfällt der Zusatz.
+
+- **`code`** startet keinen Erzeuger, sondern reiht den vollen Lauf über das ganze Projekt
+  ein (Schritt 5). Offene Aufträge für `code` arbeitet `/k-docs-code` ab, ohne dass hier
+  etwas gewählt wird — dann nur ihre Dokumente. Liegt der volle Lauf schon als Auftrag offen,
+  steht bei 2 „voller Lauf eingereiht → /k-docs-code“.
+- **`tools`** listet seine Aufträge im Preflight und schließt sie nach einem erfolgreichen
+  `publish` ab.
 
 ## Schritt 5 — Weitergeben
 
@@ -167,21 +196,29 @@ Ohne `$ARGUMENTS` zeigst du den Bericht und wartest auf die Wahl. Kein Erzeuger 
 selbst.
 
 Mit Argument entfällt die Frage nach dem Bericht, nicht der Bericht: Das erste Wort wählt die
-Aktion, der Rest geht an den Erzeuger.
+Aktion. Einen Rest nimmt nur `tools`, auch innerhalb von `alle`.
 
 - `status` → Bericht, dann Ende.
 - `inventory` → lies `k-playbook:/commands/k-doc-inventory.md` mit `k_playbook_doc_read`
   (ersatzweise `k-playbook read`) und befolge ihn. Er nimmt kein Argument.
-- `code` → lies `k-playbook:/commands/k-docs-code.md` und befolge ihn mit dem Rest der
-  Argumente.
+- `code` → **„Vollen Lauf einreihen“** unten. `/k-docs-code` startest du nicht; seinen Text
+  `k-playbook:/commands/k-docs-code.md` liest und befolgst du hier nicht. Steht nach `code`
+  ein Rest, weist du ihn mit dieser Meldung ab und reihst nichts ein:
+
+  ```text
+  /k-docs code nimmt kein Argument: „<rest>“ wird nicht ausgewertet, nichts ist eingereiht.
+  Der volle Lauf geht über das ganze Projekt; einzelne Pfade kommen über Doku-Aufträge.
+  ```
+
 - `tools` → lies `k-playbook:/commands/k-docs-tools.md` und befolge ihn mit dem Rest der
   Argumente.
-- `alle` → nacheinander `inventory`, `code`, `tools`, in genau dieser Reihenfolge: Die
-  Steckbriefe bauen auf dem Inventar auf. Der Rest der Argumente geht an `code` und
-  `tools`. Jeder Erzeuger läuft mit seinem eigenen Preflight und seinen eigenen
-  Bestätigungen; dieser Command fasst sie nicht zusammen. Endet einer ohne Ergebnis —
-  abgelehnt, abgebrochen, Konflikt offen —, fragst du, ob die übrigen trotzdem laufen
-  sollen. `tools` läuft nicht ohne Inventar. Zuletzt, auch wenn ein Erzeuger übersprungen
+- `alle` → zuerst „Vollen Lauf einreihen“ für `code`, dann
+  nacheinander `inventory` und `tools`, in genau dieser Reihenfolge: Die Steckbriefe bauen
+  auf dem Inventar auf. `code` wird nur eingereiht, die Code-Doku läuft hier nicht. Der Rest
+  der Argumente geht nur an `tools`. Jeder Erzeuger läuft mit seinem eigenen Preflight und
+  seinen eigenen Bestätigungen; dieser Command fasst sie nicht zusammen. Endet einer ohne
+  Ergebnis — abgelehnt, abgebrochen, Konflikt offen —, fragst du, ob die übrigen trotzdem
+  laufen sollen. `tools` läuft nicht ohne Inventar. Zuletzt, auch wenn ein Erzeuger übersprungen
   wurde: `k_playbook_docs_readme` mit `projectDir` = `context.project.dir`, ohne `pfad` und
   ohne `check` (ersatzweise `k-playbook docs readme --json`) — es schreibt jede README, die
   fehlt oder von ihrer Vorlage abweicht. `publish` und das Inventar haben die ihrer
@@ -191,17 +228,55 @@ Aktion, der Rest geht an den Erzeuger.
 Das Briefing aus Schritt 1 gilt für den Erzeuger weiter; er lädt es nicht neu, außer sein
 Text verlangt es.
 
+**Vollen Lauf einreihen.** Für `code` und `alle` reihst du höchstens einen rohen Auftrag für
+`code` mit `pfade: .` ein, nach `k-playbook:/instructions/on-demand/doku-auftraege.md`. Die
+Regeln für den Auftrag einer Sitzung nach einer Codeänderung — einer je Sitzung und Erzeuger,
+„Kein Doppel“, „Noch keine erzeugte Doku“ — gelten für ihn nicht: Du reihst ihn auch ein,
+wenn es unter `keph:/docs/generated/code/` noch kein Dokument gibt.
+
+1. Liegt laut Schritt 2 schon ein offener roher Auftrag für `code` mit `pfade: .` vor, legst
+   du keinen zweiten an, gleich aus welcher Sitzung er stammt. Nenne ihn; weiter bei 4.
+2. Liegen feine rohe Aufträge für `code` offen (ohne `.`), sagst du vor dem Einreihen: Der
+   Auftrag über `.` nimmt sie alle auf, auch die wartenden, und der Lauf geht dann über das
+   ganze Projekt statt nur über ihre Dokumente. Ohne den vollen Lauf arbeitet `/k-docs-code`
+   allein die feinen ab.
+3. `k_playbook_doc_create` mit `kind: docs` und dem Kurznamen `code-voller-lauf`; gleich
+   danach Kephalaion `write` mit `collection` = `context.kephalaion.address`, `name` =
+   Verweis ohne `keph:/` und diesem Inhalt:
+
+   ```markdown
+   ---
+   title: "Code-Doku: voller Lauf über das ganze Projekt"
+   erzeuger: code
+   pfade:
+     - .
+   anlass: "Voller Lauf, eingereiht über /k-docs."
+   sitzung: <session>
+   entstanden: <context.now.date>
+   ---
+   ```
+
+4. Sag ausdrücklich: Die Code-Doku ist noch nicht gelaufen. `/k-docs-code` arbeitet den
+   Auftrag ab — ohne Wartezeit, ein Auftrag mit `pfade: .` hat keine.
+
 ## Schritt 6 — Abschluss
 
 Im Statuslauf:
 
-- Dokumente je Bereich, offene Aufträge und Befunde je Kategorie, gezählt.
+- Dokumente je Bereich, offene Aufträge — für `code` rohe, wartende und zerlegte getrennt —
+  und Befunde je Kategorie, gezählt.
 - Ausdrücklich: Es wurde nichts geschrieben.
 - Folge-Command: einer der Erzeuger aus Schritt 4, sobald der Nutzer ihn wählt; ohne Wahl
   keiner.
 
+Nach `code`: der Auftrag mit Verweis — eingereiht oder schon offen gewesen —, welche feinen
+Aufträge er aufnimmt, und ausdrücklich: Die Code-Doku ist noch nicht gelaufen. Folge-Command:
+`/k-docs-code`.
+
 Nach einer Weitergabe gilt der Abschluss des Erzeugers. Bei `alle` danach eine Zeile je
-Erzeuger: gelaufen, übersprungen oder abgebrochen, mit Grund — und eine Zeile `README` aus
+Erzeuger: `inventory` und `tools` gelaufen, übersprungen oder abgebrochen, mit Grund; `code`
+eingereiht oder schon offen gewesen, mit Verweis und dem ausdrücklichen Satz, dass die
+Code-Doku noch nicht gelaufen ist, Folge-Command `/k-docs-code` — und eine Zeile `README` aus
 der Antwort von `k_playbook_docs_readme`: wie viele angelegt, überschrieben und unverändert,
 und jede README mit `failed`, ihrem Code und ihrer Meldung. `outcome_unknown` heißt, das
 Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
@@ -213,6 +288,11 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
   Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - Unbekanntes Argument → die gültigen nennen: `status`, `inventory`, `code`, `tools`,
   `alle`.
+- Ein Rest nach `code` → die Meldung aus Schritt 5; nichts wird eingereiht.
+- `k_playbook_doc_create` meldet `invalid_input` für die Sorte `docs` → die Installation ist
+  älter als dieser Command: melden, `/k-upgrade` nennen, keinen Auftrag von Hand anlegen.
+- `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Abschluss nennt es.
+  `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`) nachsehen.
 - Der Text eines Erzeugers ist nicht lesbar (`not_found`) → die Installation ist
   unvollständig oder älter als dieser Command: melden, `/k-upgrade` nennen; den Ablauf nicht
   im Gespräch nachbauen.
@@ -221,6 +301,9 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
 
 - **Erzeuger von selbst starten.** Der Bericht ist read-only; geschrieben wird erst nach
   einer Wahl.
+- **`/k-docs-code` starten.** Für `code` wird nur eingereiht; den Lauf startet der Nutzer.
+- **Einen zweiten Auftrag mit `pfade: .` anlegen** oder einen vorhandenen Auftrag ändern.
+  Zusammengelegt und zerlegt wird allein in `/k-docs-code`.
 - **Abläufe nachbauen.** Was ein Erzeuger tut, steht in seinem Text.
 - **Befunde nebenbei beheben.** Kein Dokument wird im Statuslauf geändert, auch kein alter
   Kopf und kein Steckbrief mit abweichender Version.

@@ -732,11 +732,13 @@ never written into `docs.exclude` of the file; the leading `/` that the file rej
 absolute is intended here. A target outside `project.repo_root` (in the project root next to
 a repository checked out in a subdirectory) gets no entry, because the form is bound to
 `project.repo_root`; the regular scan does not reach it, but a scan given an additional path
-(the argument of `/k-docs-code` or `/k-docs-tools`) may cover the mirror, and a change in it
-may then queue a documentation job. That gap is accepted.
-`/k-docs-code` applies it to every scan, including additional sources from `hints`; a path
-given explicitly as the argument is scanned anyway. Without the block, `exclude` is empty and
-nothing changes.
+(the argument of `/k-docs-tools`; `/k-docs-code` takes no argument since task 167) may cover
+the mirror, and a change in it may then queue a documentation job. That gap is accepted.
+`/k-docs-code` applies the list to every scan, including additional sources from `hints` and
+the paths of a documentation order. It takes no argument any more, so a path excluded here
+cannot be reached for `code`; a hidden path still gets in through a `hint`. For
+`/k-docs-tools` a path given explicitly as the argument is scanned anyway. Without the block,
+`exclude` is empty and nothing changes.
 
 The block is written by `k-playbook docs exclude add <pattern>… [--json]` and the MCP tool
 `k_playbook_docs_exclude_add` (`projectDir`, `patterns`), both over the same logic; a docs

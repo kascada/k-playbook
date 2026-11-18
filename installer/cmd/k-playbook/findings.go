@@ -160,7 +160,7 @@ Ohne --json der Klartext: Zustand, Abgleich, Rechte, Zahl je Nutzer,
 byUser, skipped, findings}; problems je mit kind (kephalaion, sync, right,
 name, subdir, unreadable, frontmatter), name und message; findings und skipped
 je mit name (voller Name in der Collection), ref, revision, user, created,
-updated, ziel, skipped dazu reason — beide getrennt und nach Alter sortiert,
+updated, ziel, thema, skipped dazu reason — beide getrennt und nach Alter sortiert,
 ältester zuerst.
 
 Exit-Code 0 bereit, 1 nicht bereit, 2 bei Aufruffehlern. Gesucht wird das

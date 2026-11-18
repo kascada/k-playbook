@@ -142,7 +142,9 @@ eingereiht wurde.
 
 Der Ausgang **„eingereiht“** zählt als erledigt: Liegt für die erzeugte Doku schon ein
 offener Auftrag dieser Sitzung vor, oder reiht `/k-enforcement` ihn nach Freigabe ein, ist
-der Nachzug für diese Sitzung getan; nenne den Verweis im Abschluss.
+der Nachzug für diese Sitzung getan; nenne den Verweis im Abschluss. Für `code` zählt der
+vorhandene Auftrag nur, wenn seine `pfade` die Änderung decken; sonst wird er nach „Kein
+Doppel“ in `doku-auftraege.md` ergänzt.
 
 Bleibt danach etwas offen, nenne es beim Abschluss, statt es still zu lassen.
 

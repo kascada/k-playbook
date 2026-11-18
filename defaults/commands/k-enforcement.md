@@ -151,8 +151,9 @@ Kephalaion `write` mit `base_revision` gleich der Revision aus `k_playbook_doc_r
 `stale_revision` neu lesen und auf dem neuen Stand ergänzen; liegt der Auftrag nicht mehr
 offen, einen neuen anlegen wie oben.
 
-Bei Nein bleibt es bei „nachzuziehen“; der Abschluss nennt es als offen. `/k-docs-code` bzw.
-`/k-docs-tools` sofort laufen zu lassen bleibt erlaubt.
+Bei Nein bleibt es bei „nachzuziehen“; der Abschluss nennt es als offen. `/k-docs-tools`
+sofort laufen zu lassen bleibt erlaubt. Für `code` gibt es den sofortigen Lauf nur als vollen
+Lauf: `/k-docs code` reiht ihn ein, `/k-docs-code` arbeitet ihn ab.
 
 Folge-Command: keiner. Der Bericht und die genannte nächste Aktion sind das Ergebnis;
 korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge arbeitet

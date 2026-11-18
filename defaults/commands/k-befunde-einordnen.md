@@ -72,7 +72,8 @@ Es wird nichts geschrieben, kein Befund angefasst, kein Protokoll angelegt.
 Sonst merkst du dir:
 
 - `check.findings` — die Befunde in der Reihenfolge, in der Schritt 4 sie nimmt (ältester
-  zuerst), je mit `name` (dem vollen Namen in der Collection), `revision`, `user` und `ziel`;
+  zuerst), je mit `name` (dem vollen Namen in der Collection), `revision`, `user`, `ziel` und
+  `thema`;
 - `check.skipped` — die Befunde, die dieser Lauf überspringt, je mit `reason`;
 - `check.total` und `check.byUser`.
 
@@ -102,6 +103,13 @@ Geprüft wird nur gegen `STAND` — `git show <STAND>:<pfad>`, `git grep <muster
 **Bestand melden.** Eine kurze Meldung: Befunde gesamt und je Nutzer, wie viele die
 Vorprüfung übersprungen hat, die Obergrenze `LIMIT` dieses Laufs, Hauptbranch und `STAND`.
 
+**Listen einmal holen.** Die offenen Tasks (`k_playbook_doc_list` mit `kind: tasks`,
+`user: *`), die Todos (`k_playbook_todo_list`) und die Workbench-Themen
+(`k_playbook_doc_list` mit `kind: workbench`, `user: *`) holst du einmal hier, nicht je
+Befund. Was du im Lauf selbst schreibst — ein neues oder ergänztes Todo, ein Nachtrag —,
+trägst du in deine Fassung der Listen nach. Neu geholt wird nur, wenn ein Schreiben
+`foreign_change` meldet: Dann hat jemand anderes daran geschrieben.
+
 **Protokoll anlegen.** `k_playbook_doc_create` mit `kind: einordnung` und `name` =
 `<context.now.date>-<sitzung>`. Den Inhalt schreibst du gleich danach mit Kephalaion `write`
 (`collection` = `context.kephalaion.address`, `name` = der Pfad aus `ref` ohne `keph:/`):
@@ -123,8 +131,12 @@ hängst du danach mit `k_playbook_doc_append` und `since_revision` an, die Revis
 Antwort ist die nächste. `foreign_change` am eigenen Protokoll heißt: Ein zweiter Lauf
 schreibt hinein. Halte an, fasse keinen weiteren Befund an und melde es im Abschluss.
 
+Jede Protokollzeile ist ein Listenpunkt: `- <voller Name> | <Ziel oder Grund>`.
+`k_playbook_doc_append` setzt vor jeden Eintrag eine Leerzeile; als Liste sieht das Protokoll
+gerendert trotzdem gleich aus, ob mehrere Zeilen in einem Anhängen kamen oder einzeln.
+
 Die Befunde aus `check.skipped` bekommen jetzt ihre Zeilen, in einem Anhängen:
-`<voller Name> | übersprungen (<reason>)`.
+`- <voller Name> | übersprungen (<reason>)`, je Befund eine.
 
 **Ausnahme vom Verweisverbot.** Das Protokoll nennt jeden Befund mit vollem Namen. Das ist
 eine bewusste, vorübergehende Ausnahme von der Regel, dass auf nichts unter `keph:/queue/`
@@ -134,8 +146,11 @@ Workbench-Thema, ein Todo oder eine Doku.
 
 ## Schritt 4 — Je Befund
 
-Nimm die Befunde aus `check.findings` in ihrer Reihenfolge, einzeln, bis `LIMIT` erreicht
-ist. Gedacht ist ein Lauf je Projekt zur Zeit.
+Nimm die Befunde aus `check.findings` einzeln, bis `LIMIT` erreicht ist: den ältesten noch
+nicht behandelten, und gleich nach ihm die übrigen mit demselben `thema`, auch wenn ältere
+dazwischen liegen. Sie fragen meist nach denselben Code- und Doku-Stellen, die du dann noch
+vor dir hast. Jeder Befund zählt einzeln gegen `LIMIT`; erreicht sie mitten in einem Thema,
+bleibt der Rest für den nächsten Lauf. Ohne `thema` steht ein Befund für sich. Gedacht ist ein Lauf je Projekt zur Zeit.
 
 ### 4.1 Lesen
 
@@ -144,7 +159,7 @@ Lies den Befund ganz mit Kephalaion `read` (`collection` = `context.kephalaion.a
 `base_revision` für Löschen und Verschieben.
 
 - Leer, oder in den letzten sechs Stunden geändert (`updated` gegen
-  `context.now.timestamp`): Zeile `<voller Name> | übersprungen (leer)` bzw.
+  `context.now.timestamp`): Zeile `- <voller Name> | übersprungen (leer)` bzw.
   `übersprungen (jünger als 6 h)`, weiter mit dem nächsten. `k_playbook_doc_create` legt
   einen Befund zuerst leer an, der Inhalt kommt im zweiten Aufruf, und eine Sitzung kann ihn
   noch nachtragen; die Wartezeit verhindert, dass gelesen wird, woran noch geschrieben wird.
@@ -155,9 +170,7 @@ Lies den Befund ganz mit Kephalaion `read` (`collection` = `context.kephalaion.a
 
 - **Relevant?** Prüfe die Aussage gegen den Code auf `STAND`, gegen die Doku
   (`keph:/docs/`: Kephalaion `search` mit englischen Wörtern, dann `read` des Abschnitts),
-  gegen offene Tasks (`k_playbook_doc_list` mit `kind: tasks`, `user: *`), Todos
-  (`k_playbook_todo_list`) und Workbench-Themen (`k_playbook_doc_list` mit
-  `kind: workbench`, `user: *`), dazu gegen das, was die Projektregeln nennen. Einen Befund
+  gegen die offenen Tasks, Todos und Workbench-Themen aus den Listen von Schritt 3, dazu gegen das, was die Projektregeln nennen. Einen Befund
   mit `sicherheit: unbestaetigt` bestätigst oder widerlegst du, wenn das mit vertretbarem
   Aufwand geht; was dabei herauskommt, geht ins Ziel.
 - **Nachhaltig?** Zwei getrennte Fragen: Ist der Anlass erledigt? Ist das Wissen noch
@@ -190,8 +203,8 @@ Entscheidung. Es gilt die erste passende Zeile:
 | Erzeugte Doku (`docs/generated/`) ist falsch oder unvollständig | nicht von Hand: Doku-Auftrag nach `k-playbook:/instructions/on-demand/doku-auftraege.md` und dazu ein Todo, das den Fehler in eigenen Worten trägt — ein Auftrag ist nur ein Merkzettel und allein kein Löschgrund |
 | Ziel oder Bewertung unklar, oder nur der Verfasser kann es beurteilen | `unclear/` |
 
-- **Vor einem Todo** siehst du die vorhandenen Todos (`k_playbook_todo_list`, Kephalaion
-  `search`), offenen Tasks und Workbench-Themen durch. Gibt es eins zum Thema, ergänzt du
+- **Vor einem Todo** siehst du die Todos, offenen Tasks und Workbench-Themen aus den Listen
+  von Schritt 3 durch, bei Bedarf dazu Kephalaion `search`. Gibt es eins zum Thema, ergänzt du
   dieses (`k_playbook_todo_update`); deckt ein offener Task es ab, entfällt das Todo. Todos
   legst du ohne Rückfrage an.
 - **Nachträge** gehen nur in eigene Tasks und Workbench-Themen (`k_playbook_doc_append`
@@ -220,7 +233,7 @@ Immer in dieser Reihenfolge:
     `"` im Wert wird `\"`); hat der Befund kein Frontmatter, bekommt er eines nur mit
     `frage`. Der Rumpf bleibt Zeichen für Zeichen.
 - **(d) Erst dann die Protokollzeile** mit dem tatsächlichen Ausgang:
-  `<voller Name> | <Ziel oder Löschgrund>`, etwa `| Handdoku keph:/docs/manual/<datei>`,
+  `- <voller Name> | <Ziel oder Löschgrund>`, etwa `| Handdoku keph:/docs/manual/<datei>`,
   `| Todo #<id>`, `| Nachtrag <task>`, `| Doku-Auftrag + Todo #<id>`, `| Datei <pfad> +
   Todo #<id>`, `| unclear`, `| erledigt`, `| abgedeckt (<wo>)`, `| nicht nachhaltig`.
 

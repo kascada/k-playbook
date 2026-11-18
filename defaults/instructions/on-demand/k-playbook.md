@@ -121,7 +121,8 @@ verschwindet aus der `AGENTS.md` erst, wenn er am Ziel geschrieben ist.
 - **Doku-Aufträge** nach `keph:/queue/docs/`: Wer nach einer Codeänderung die erzeugte Doku
   (`keph:/docs/generated/code/`, `keph:/docs/generated/libs/`) nachgezogen haben will, schreibt
   sie nicht selbst, sondern reiht einen Auftrag ein; `/k-docs-code` bzw. `/k-docs-tools`
-  arbeitet die Aufträge gebündelt ab. Die Form steht in
+  arbeitet die Aufträge gebündelt ab. Bei `code` bestimmen die `pfade` der Aufträge, welche
+  Dokumente drankommen; den vollen Lauf reiht `/k-docs code` ein. Die Form steht in
   `k-playbook:/instructions/on-demand/doku-auftraege.md`.
 
 Ein Auftrag ist ein Merkzettel: Er sagt, dass und warum nachzuziehen ist, und enthält keine

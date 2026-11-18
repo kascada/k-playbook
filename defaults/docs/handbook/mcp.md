@@ -825,16 +825,24 @@ from it.
 tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…` reference is
 `invalid_input` there. Contract: "Todo Contract".
 
-`docs` are the documentation orders (task 124): one per session and producer, written after a
-code change, closed by `/k-docs-code` or `/k-docs-tools` after a successful `publish` with
-`k_playbook_doc_done` into `queue/docs/done/`. Head and life cycle:
-`k-playbook:/instructions/on-demand/doku-auftraege.md`.
+`docs` are the documentation orders (task 124). After a code change a session writes one per
+session and producer; for `code` it extends its open order with further paths instead of
+writing a second one. Since task 167 the orders for `code` come in two stages within the same
+kind: raw — from a session, or from `/k-docs` for the full run with `pfade: .` — and split,
+one per document with `dokument` and `aktion`, written only by `/k-docs-code`. `/k-docs-code`
+reads a raw order only after the waiting period, measured by `updated` from
+`k_playbook_doc_list`, moves it to `queue/docs/done/` with `k_playbook_doc_done` once it is
+split, and closes a split order once it was worked off and `publish` reports its document.
+`/k-docs-tools` closes its orders after a successful `publish`, as before. The program does
+not evaluate the head fields of an order; they are defined in the texts only. Head and life
+cycle: `k-playbook:/instructions/on-demand/doku-auftraege.md`.
 
 `einordnung` are the protocols of `/k-befunde-einordnen` (task 166): one document per run,
 named `<NNN>-<datum>-<sitzung>.md` (`k_playbook_doc_create` with the name `<datum>-<sitzung>`),
 head `title`, `sitzung`, `stand` (main branch and commit the run checked against), then one
-line `<full name> | <target or reason>` per finding handled or skipped, appended with
-`k_playbook_doc_append`. Project-wide, no `done/`; the user reads and deletes them. The kind
+list item `- <full name> | <target or reason>` per finding handled or skipped, appended with
+`k_playbook_doc_append` (a list renders the same whether the blank line the append puts before
+each entry is there or not). Project-wide, no `done/`; the user reads and deletes them. The kind
 goes away once the procedure has proven itself.
 
 `<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
@@ -1359,7 +1367,7 @@ because its `ready` is a different thing from the envelope's `ok`:
 | `rights` | the rights on the collection |
 | `total`, `byUser` | the readable findings, `findings` and `skipped` together, and their number per user who created them (Kephalaion's author metadata); counted even when not ready |
 | `skipped` | the findings this run skips, each with `reason` `leer` or `jünger als 6 h` -- the text of the protocol line `übersprungen (<reason>)` |
-| `findings` | the findings to work on, each `name` (full name, as `delete` and `rename` need it), `ref`, `revision`, `user`, `created`, `updated`, `ziel` |
+| `findings` | the findings to work on, each `name` (full name, as `delete` and `rename` need it), `ref`, `revision`, `user`, `created`, `updated`, `ziel`, `thema` (the run takes findings with the same `thema` one after the other) |
 
 `findings` and `skipped` are disjoint and sorted by age, oldest first (`created`, then name).
 An empty queue is `ready` with `total: 0`. Nothing is written except the node's replica, which

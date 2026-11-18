@@ -520,10 +520,30 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 	}
 	for _, tool := range []string{"mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
 		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_exclude_add",
-		"mcp__kephalaion__list", "mcp__kephalaion__read"} {
+		"mcp__kephalaion__list", "mcp__kephalaion__read",
+		// Task 167: Der Verarbeiter legt zerlegte Aufträge an und ergänzt sie.
+		"mcp__k-playbook__k_playbook_doc_create", "mcp__kephalaion__write"} {
 		if !strings.Contains(hull, tool) {
 			t.Errorf("Hülle erlaubt %s nicht", tool)
 		}
+	}
+	// Seit Task 167 nimmt /k-docs-code kein Argument mehr: Die Hülle trägt
+	// keinen argument-hint, und die description nennt die Aufträge statt des
+	// Zusatzpfads.
+	description := ""
+	for _, line := range strings.Split(hull, "\n") {
+		if value, ok := strings.CutPrefix(line, "description: "); ok {
+			description = value
+		}
+	}
+	if strings.Contains(hull, "argument-hint") || strings.Contains(description, "ein Argument ergänzt") ||
+		!strings.Contains(description, "Doku-Aufträge") || !strings.Contains(description, "Nimmt kein Argument") ||
+		!strings.Contains(description, "keph:/docs/generated/code/") || !strings.Contains(description, "/k-docs code") {
+		t.Errorf("Hülle noch mit argument-hint oder description ohne die Aufträge: %q", description)
+	}
+	// Ein „: “ in der unquotierten description machte das Frontmatter unlesbar.
+	if strings.Contains(description, ": ") || strings.Contains(description, " #") {
+		t.Errorf("description mit „: “ oder „ #“: %q", description)
 	}
 	if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", "_docs", "code.md")); !os.IsNotExist(err) {
 		t.Error("share/commands/_docs/code.md ist noch da; der Ablauf steht im Text des Commands")
@@ -563,6 +583,45 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 	} {
 		if strings.Contains(file, repeated) {
 			t.Errorf("k-docs-code.md wiederholt %q aus _shared/docs.md", repeated)
+		}
+	}
+	// Task 167: Die Aufträge steuern den Lauf. Der Text weist ein Argument ab,
+	// liest die Aufträge (roh, zerlegt, wartend), legt zusammen, zerlegt in die
+	// Queue, arbeitet je Auftrag und schließt nach „Abschluss eines Auftrags“.
+	squashed := squashSpace(file)
+	for _, needle := range []string{
+		"**Kein Argument.** `/k-docs-code` nimmt kein Argument", "bevor etwas gesucht, geholt oder geschrieben wird",
+		"/k-docs-code nimmt kein Argument: „<$ARGUMENTS>“", "**Kein `EXTRA_PATH`.**", "**Die Dokumente kommen aus den Aufträgen.**",
+		"**Gelesen wird innerhalb von `SCAN_ROOT`.**", "**Die Ausschlüsse gelten** auch für die Pfade eines Auftrags",
+		"k-playbook:/instructions/on-demand/doku-auftraege.md", "`k_playbook_doc_list` mit `kind: docs`", "`updated`",
+		"`context.now.timestamp`", "Abschnitt „Wartezeit“ von `doku-auftraege.md` und nur dort",
+		"ist das der **volle Lauf**", "auch die wartenden", "ein **Teil-Lauf**", "**Zusammenlegen.**",
+		"wenn ein Pfad des einen gleich einem Pfad des anderen ist oder darin liegt",
+		"`RAW_ORDERS`", "`SPLIT_ORDERS`", "`WAITING`", "`WORK_ORDERS`", "`WORKED`",
+		"**Nichts zu tun.**", "nenne `/k-docs code` als Weg zum vollen Lauf", "`/k-docs code` als Weg, sofort zu laufen",
+		"wartet <datei> — noch <restzeit>", "Lies **alle** Dokumente in `WORK_DIR`, bevor du den Code analysierst — auch im Teil-Lauf",
+		"**Zuordnung Pfad → Dokument.**", "`## Key places in the code`", "Der Auftrag tritt an die Stelle von „im Scope“",
+		"**Zerlegen.**", "**`neu` und `entfällt` bestätigt der Nutzer, `umschreiben` nicht.**",
+		"**In die Queue schreiben.**", "`k_playbook_doc_create` mit `kind: docs`", "`code-<dokument ohne .md>`",
+		"Kephalaion `write` mit `base_revision`", "`stale_revision`", "statt einen zweiten anzulegen",
+		"ohne `publish`", "wandern die rohen Aufträge, die in `RAW_ORDERS` aufgegangen sind, nach `done/`",
+		"## Schritt 5 — Schreiben, je Auftrag", "## Schritt 6 — publish und Aufträge schließen",
+		"**Abschluss eines Auftrags.**", "mit `created`, `written`, `deleted` oder `unchanged` meldet",
+		"Ein Auftrag, der nicht in `WORKED` steht, bleibt deshalb offen", "**Neu auschecken.**",
+		"`$ARGUMENTS` ist nicht leer → kein Lauf", "**Ohne Auftrag laufen.**", "**Einen wartenden Auftrag anfassen.**",
+		"**Einen Auftrag zu früh schließen.**", "keph:/queue/docs/done/", "`erzeuger: code`",
+	} {
+		if !strings.Contains(squashed, needle) {
+			t.Errorf("k-docs-code.md nennt %q nicht", needle)
+		}
+	}
+	// Vom alten Lauf — Argument als Zusatzpfad, ORDERS aus dem Preflight,
+	// Abschluss nach einem aufgeräumten publish — bleibt im Text nichts; der
+	// Wert der Wartezeit steht nur in doku-auftraege.md.
+	for _, stale := range []string{"`EXTRA_PATH` aus `$ARGUMENTS`", "`ORDERS`", "<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>",
+		"`SCAN_ROOT`, `EXTRA_PATH`", "liegt außerhalb von `context.project.dir`", "2 Stunden", "argument-hint"} {
+		if strings.Contains(squashed, stale) {
+			t.Errorf("k-docs-code.md trägt noch %q", stale)
 		}
 	}
 	// Ein Dokument des Overlay-Skills wird nie als „entfällt“ vorgeschlagen.
@@ -751,8 +810,10 @@ func TestDefaultsKDocsToolsIstHuelleUndText(t *testing.T) {
 }
 
 // /k-docs ist Hülle plus Text: Er berichtet über keph:/docs/ und gibt an die
-// drei Erzeuger weiter, in der Reihenfolge Inventar, Code, Tools; vom alten
-// Verteiler über die Platte bleibt nichts.
+// Erzeuger Inventar und Tools weiter, in dieser Reihenfolge; vom alten
+// Verteiler über die Platte bleibt nichts. Seit Task 167 startet er
+// /k-docs-code nicht mehr: Für code und alle reiht er den vollen Lauf als
+// Doku-Auftrag mit pfade: . ein, ein Rest nach code wird abgewiesen.
 func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 	const ref = "k-playbook:/commands/k-docs.md"
@@ -767,13 +828,32 @@ func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
 	}
 	for _, tool := range []string{"WebFetch", "mcp__k-playbook__k_playbook_doc_read", "mcp__k-playbook__k_playbook_docs_checkout",
 		"mcp__k-playbook__k_playbook_docs_publish", "mcp__k-playbook__k_playbook_docs_readme", "mcp__k-playbook__k_playbook_docs_exclude_add",
-		"mcp__kephalaion__list", "mcp__kephalaion__read"} {
+		"mcp__kephalaion__list", "mcp__kephalaion__read",
+		// Task 167: /k-docs legt den Auftrag für den vollen Lauf an und schreibt ihn.
+		"mcp__k-playbook__k_playbook_doc_create", "mcp__kephalaion__write"} {
 		if !strings.Contains(hull, tool) {
 			t.Errorf("Hülle erlaubt %s nicht", tool)
 		}
 	}
 	if strings.Contains(hull, "knowledge") {
 		t.Error("Hülle erlaubt noch Werkzeuge der Wissensablage")
+	}
+	// Der Zusatzpfad gilt nur noch für tools und alle; die description nennt
+	// das Einreihen statt des Laufs über Inventar, Code und Tools.
+	description := ""
+	for _, line := range strings.Split(hull, "\n") {
+		if value, ok := strings.CutPrefix(line, "description: "); ok {
+			description = value
+		}
+	}
+	if !strings.Contains(hull, "\nargument-hint: \"[status|inventory|code|tools|alle] [zusatz-pfad nur bei tools und alle]\"\n") {
+		t.Errorf("argument-hint nennt den Zusatzpfad nicht nur für tools und alle:\n%s", hull)
+	}
+	if strings.Contains(description, "Inventar, Code und Tools nacheinander") ||
+		!strings.Contains(description, "reiht den vollen Lauf der Code-Doku als Doku-Auftrag ein") ||
+		!strings.Contains(description, "mit alle laufen Inventar und Tools nacheinander, die Code-Doku wird eingereiht") ||
+		strings.Contains(description, ": ") || strings.Contains(description, " #") {
+		t.Errorf("description nennt das Einreihen nicht oder ist nicht als YAML-Wert lesbar: %q", description)
 	}
 
 	file := readRepoDefault(t, "commands/k-docs.md")
@@ -792,7 +872,7 @@ func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
 	for _, needle := range []string{
 		"k-playbook:/commands/k-doc-inventory.md", "k-playbook:/commands/k-docs-code.md", "k-playbook:/commands/k-docs-tools.md",
 		"`recursive: true`, `frontmatter: true`", "`generated.stats`", "alter Kopf", "`alle`",
-		"nacheinander `inventory`, `code`, `tools`, in genau dieser Reihenfolge", "Es wurde nichts geschrieben",
+		"nacheinander `inventory` und `tools`, in genau dieser Reihenfolge", "Es wurde nichts geschrieben",
 		"kephalaion_unavailable", "/k-upgrade",
 		// Task 137: README gegen die Vorlagen — read-only im Statuslauf, geschrieben mit alle.
 		"`k_playbook_docs_readme`", "`check: true`", "`k-playbook docs readme --check --json`", "`missing`", "`differs`",
@@ -807,6 +887,33 @@ func TestDefaultsKDocsIstHuelleUndText(t *testing.T) {
 		"RESOLVED_DOCS_DIR", "knowledge", "opencode.json", "inbox/", "material/",
 	} {
 		if strings.Contains(file, stale) {
+			t.Errorf("k-docs.md trägt noch %q", stale)
+		}
+	}
+	// Task 167: code und alle reihen ein, statt /k-docs-code zu starten; der
+	// Bericht trennt rohe, wartende und zerlegte Aufträge.
+	squashed := squashSpace(file)
+	for _, needle := range []string{
+		"Doku aus dem Code: vollen Lauf einreihen", "<N> Aufträge offen → /k-docs-code",
+		"code: <N> roh (<N> warten noch), <N> zerlegt — ein Lauf ist unterbrochen",
+		"`^(erzeuger|entstanden|dokument): |^\\s*- \\.$`", "`updated`", "`context.now.timestamp`",
+		"Abschnitt „Wartezeit“ von `doku-auftraege.md`", "**Vollen Lauf einreihen.**",
+		"höchstens einen rohen Auftrag für `code` mit `pfade: .`", "legst du keinen zweiten an",
+		"nimmt sie alle auf, auch die wartenden", "wenn es unter `keph:/docs/generated/code/` noch kein Dokument gibt",
+		"`k_playbook_doc_create` mit `kind: docs`", "`code-voller-lauf`", "Kephalaion `write`",
+		"`/k-docs-code` startest du nicht", "/k-docs code nimmt kein Argument: „<rest>“", "reihst nichts ein",
+		"`code` wird nur eingereiht, die Code-Doku läuft hier nicht", "Der Rest der Argumente geht nur an `tools`",
+		"Die Code-Doku ist noch nicht gelaufen", "Folge-Command: `/k-docs-code`", "**`/k-docs-code` starten.**",
+	} {
+		if !strings.Contains(squashed, needle) {
+			t.Errorf("k-docs.md nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{
+		"befolge ihn mit dem Rest der Argumente. - `tools`", "Der Rest der Argumente geht an `code`",
+		"1, 2 und 3 nacheinander", "→ /k-docs-code <N> Aufträge offen", "2 Stunden",
+	} {
+		if strings.Contains(squashed, stale) {
 			t.Errorf("k-docs.md trägt noch %q", stale)
 		}
 	}
@@ -1002,10 +1109,12 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 }
 
 // Die Doku-Aufträge (Task 124): Die Anweisung doku-auftraege.md beschreibt
-// Kopf und Lebenslauf, /k-docs
-// zählt die offenen Aufträge, und die beiden Erzeuger listen sie im Preflight
-// und schließen sie nach einem erfolgreichen publish ab — alles über die
-// doc-Werkzeuge, die ihre Hüllen erlauben.
+// Kopf und Lebenslauf, /k-docs zählt die offenen Aufträge, und /k-docs-tools
+// listet sie im Preflight und schließt sie nach einem erfolgreichen publish
+// ab — alles über die doc-Werkzeuge, die ihre Hüllen erlauben. Seit Task 167
+// steuern die Aufträge für code den Lauf von /k-docs-code: zwei Reifegrade
+// (roh, zerlegt), Ergänzen statt Doppel, Wartezeit für rohe Aufträge, deren
+// Wert nur in doku-auftraege.md steht.
 func TestDefaultsDocsAuftraege(t *testing.T) {
 	layers := repoDefaultsLayers(t)
 
@@ -1072,13 +1181,40 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 			t.Errorf("_shared/docs.md, Doku-Aufträge, nennt %q nicht", needle)
 		}
 	}
-	for name, erzeuger := range map[string]string{"k-docs-code": "code", "k-docs-tools": "tools"} {
-		file := readRepoDefault(t, "commands/"+name+".md")
-		for _, needle := range []string{"`erzeuger: " + erzeuger + "`", "`ORDERS`", "<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>",
-			"keph:/queue/docs/done/"} {
-			if !strings.Contains(file, needle) {
-				t.Errorf("%s.md nennt %q nicht", name, needle)
+	// Das Handbuch beschreibt den neuen Lebenslauf: kein Argument für
+	// /k-docs-code, /k-docs code reiht ein, die Sorte docs in zwei Reifegraden.
+	for rel, stales := range map[string][]string{
+		"docs/handbook/commands.md": {"an argument adds one path inside the project", "`alle` runs them in that order",
+			"Dispatches `inventory`, `code` and `tools`"},
+		"docs/handbook/mcp.md":               {"one per session and producer, written after a code change, closed by"},
+		"docs/handbook/k-playbook-format.md": {"the argument of `/k-docs-code` or `/k-docs-tools`"},
+	} {
+		page := squashSpace(readRepoDefault(t, rel))
+		for _, stale := range stales {
+			if strings.Contains(page, stale) {
+				t.Errorf("%s trägt noch %q", rel, stale)
 			}
+		}
+	}
+	for rel, needles := range map[string][]string{
+		"docs/handbook/commands.md": {"The command takes no argument (task 167)", "it queues the full run as one raw documentation order for `code` with `pfade: .`"},
+		"docs/handbook/manual.md":   {"For `code` the orders drive the run (task 167)", "`/k-docs code` queues it instead of starting the producer"},
+		"docs/handbook/mcp.md":      {"raw — from a session, or from `/k-docs` for the full run with `pfade: .` — and split"},
+	} {
+		page := squashSpace(readRepoDefault(t, rel))
+		for _, needle := range needles {
+			if !strings.Contains(page, needle) {
+				t.Errorf("%s nennt %q nicht", rel, needle)
+			}
+		}
+	}
+	// /k-docs-tools listet und schließt wie bisher über ORDERS; /k-docs-code
+	// nimmt den Umfang aus den Aufträgen (TestDefaultsKDocsCodeIstHuelleUndText).
+	tools := readRepoDefault(t, "commands/k-docs-tools.md")
+	for _, needle := range []string{"`erzeuger: tools`", "`ORDERS`", "<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>",
+		"keph:/queue/docs/done/"} {
+		if !strings.Contains(tools, needle) {
+			t.Errorf("k-docs-tools.md nennt %q nicht", needle)
 		}
 	}
 	docs := readRepoDefault(t, "commands/k-docs.md")
@@ -1317,7 +1453,7 @@ func TestDefaultsKBefundeEinordnenIstHuelleUndText(t *testing.T) {
 		"`k-playbook:/instructions/on-demand/befunde-einordnen.md`", "**Das ist kein Fehler.**",
 		"`k-playbook:/instructions/always/010-verweise.md`", "`k_playbook_findings_check`",
 		"`k-playbook findings check --json`", "`check.byUser`", "Standard 25", "`kind: einordnung`",
-		"`<voller Name> | übersprungen (<reason>)`", "`base_revision`", "`request_id`", "`replayed`",
+		"`- <voller Name> | übersprungen (<reason>)`", "`base_revision`", "`request_id`", "`replayed`",
 		"**(a) Ziel schreiben.**", "**(b) Gegenlesen:**", "**(c) Löschen bzw. verschieben,**",
 		"**(d) Erst dann die Protokollzeile**", "`stale_revision`", "`übersprungen (anderer Lauf)`",
 		"`übersprungen (Ausgang unklar)`", "`übersprungen (Rückfrage)`", "`queue/unclear/<dateiname>`", "`frage`",
