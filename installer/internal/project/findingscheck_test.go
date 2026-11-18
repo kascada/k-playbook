@@ -275,10 +275,10 @@ func TestFindingsCheckFalscheEintraege(t *testing.T) {
 	}
 }
 
-// Leere und kürzlich geänderte Befunde werden übersprungen, nicht als
+// Leere und in den letzten sechs Stunden geänderte Befunde werden übersprungen, nicht als
 // Problem gezählt; sie stehen in skipped, nicht in findings.
 func TestFindingsCheckUebersprungen(t *testing.T) {
-	recent := findingsNow.Add(-2 * time.Minute).Format("2006-01-02T15:04:05.000Z")
+	recent := findingsNow.Add(-5*time.Hour - 59*time.Minute).Format("2006-01-02T15:04:05.000Z")
 	store := &findingsFakeStore{docs: map[string]*findingsFakeDoc{
 		"queue/findings/001-a.md":    befund("kamran", findingsOld),
 		"queue/findings/002-leer.md": {content: "", by: "anna", created: findingsOld, updated: findingsOld},
@@ -297,7 +297,7 @@ func TestFindingsCheckUebersprungen(t *testing.T) {
 	for _, s := range check.Skipped {
 		got = append(got, s.Name+"="+s.Reason)
 	}
-	want := "queue/findings/004-raum.md=leer queue/findings/002-leer.md=leer queue/findings/003-jung.md=kürzlich geändert"
+	want := "queue/findings/004-raum.md=leer queue/findings/002-leer.md=leer queue/findings/003-jung.md=jünger als 6 h"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("skipped: %v", got)
 	}

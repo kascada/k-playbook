@@ -4204,9 +4204,10 @@ alles auf einmal samt Zahl je Nutzer meldet:
    `^[0-9]{3,}-[a-z0-9]+(-[a-z0-9]+)*\.md$` wie `docFileName` es bildet (sonst `name`). Eine
    leere Queue ist kein Fehler: Kephalaion speichert keine leeren Verzeichnisse.
 4. **Lesen.** Jeder Befund ein `read`. Fehler oder „none“ → `unreadable`; ein Frontmatter, das
-   der Node nicht lesen konnte → `frontmatter`. Leer oder jünger als `FindingsRecentWindow`
-   (zehn Minuten) → `skipped` mit Grund `leer` bzw. `kürzlich geändert`, kein Problem:
-   `k_playbook_doc_create` legt einen Befund zuerst leer an.
+   der Node nicht lesen konnte → `frontmatter`. Leer oder letzte Änderung (`updated`) jünger als
+   `FindingsRecentWindow` (sechs Stunden) → `skipped` mit Grund `leer` bzw. `jünger als 6 h`, kein
+   Problem: `k_playbook_doc_create` legt einen Befund zuerst leer an, und eine Sitzung kann ihn noch
+   nachtragen; so wird nie gelesen, woran noch geschrieben wird.
 
 Das Ergebnis `FindingsCheck` trägt `ready` (genau dann, wenn `problems` leer ist), `problems`,
 `sync`, `rights`, `total`, `byUser` (nach den Autor-Metadaten von Kephalaion), `skipped` und

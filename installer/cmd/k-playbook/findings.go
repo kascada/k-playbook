@@ -148,9 +148,9 @@ Befund nach dem Namensmuster <nummer>-<kurzname>.md sein, direkt in der
 Ablage — und liest zuletzt jeden Befund. Sie meldet alles auf einmal, nicht
 nur das erste Problem, und zählt den Bestand auch, wenn sie nicht bereit ist.
 
-Ein leerer oder in den letzten zehn Minuten geänderter Befund wird
-übersprungen (skipped, mit Grund „leer“ bzw. „kürzlich geändert“), nicht als
-Problem gezählt; er kommt im nächsten Lauf dran. Eine leere Queue ist bereit.
+Ein leerer oder in den letzten sechs Stunden geänderter Befund wird
+übersprungen (skipped, mit Grund „leer“ bzw. „jünger als 6 h“), nicht als
+Problem gezählt; er kommt in einem späteren Lauf dran. Eine leere Queue ist bereit.
 
 Geschrieben wird nichts, außer der Replica des Nodes, die der Abgleich
 nachzieht.

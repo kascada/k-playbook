@@ -40,8 +40,8 @@ func addFindingsTool(server *mcp.Server) {
 			"Meldet alles auf einmal und zählt den Bestand auch, wenn sie nicht bereit ist. Antwort unter check: ready " +
 			"(true genau dann, wenn problems leer ist), problems (je kind — kephalaion, sync, right, name, subdir, " +
 			"unreadable, frontmatter —, name, message), sync (at, revision), rights, total, byUser (Zahl je User, der " +
-			"den Befund angelegt hat), skipped (leere oder in den letzten zehn Minuten geänderte Befunde mit reason " +
-			"„leer“ bzw. „kürzlich geändert“; sie machen nicht „nicht bereit“) und findings (name — der volle Name in " +
+			"den Befund angelegt hat), skipped (leere oder in den letzten sechs Stunden geänderte Befunde mit reason " +
+			"„leer“ bzw. „jünger als 6 h“; sie machen nicht „nicht bereit“) und findings (name — der volle Name in " +
 			"der Collection —, ref, revision, user, created, updated, ziel). findings und skipped sind getrennte Mengen, " +
 			"nach Alter sortiert, ältester zuerst. Eine leere Queue ist bereit mit total 0. Schreibt nichts außer der " +
 			"Replica des Nodes. Dieselbe Antwort wie `k-playbook findings check --json`.",

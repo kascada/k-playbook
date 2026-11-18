@@ -143,10 +143,11 @@ Lies den Befund ganz mit Kephalaion `read` (`collection` = `context.kephalaion.a
 `name` = sein voller Name) und merke dir die Revision aus dieser Antwort — sie ist die
 `base_revision` für Löschen und Verschieben.
 
-- Leer, oder in den letzten zehn Minuten geändert (`updated` gegen
+- Leer, oder in den letzten sechs Stunden geändert (`updated` gegen
   `context.now.timestamp`): Zeile `<voller Name> | übersprungen (leer)` bzw.
-  `übersprungen (kürzlich geändert)`, weiter mit dem nächsten. `k_playbook_doc_create` legt
-  einen Befund zuerst leer an; der Inhalt kommt im zweiten Aufruf.
+  `übersprungen (jünger als 6 h)`, weiter mit dem nächsten. `k_playbook_doc_create` legt
+  einen Befund zuerst leer an, der Inhalt kommt im zweiten Aufruf, und eine Sitzung kann ihn
+  noch nachtragen; die Wartezeit verhindert, dass gelesen wird, woran noch geschrieben wird.
 - `kind: none`: Ein anderer Lauf hat ihn schon behandelt — `übersprungen (anderer Lauf)`.
 - Ein Fehler: `übersprungen (Fehler: <code>)`.
 

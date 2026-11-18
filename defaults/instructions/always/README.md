@@ -74,6 +74,9 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
   was festgehalten wird; die Form eines Tasks liegt in `on-demand/tasks.md`.
 - `400-github-ueber-run.md`: Netzbefehle von git und `gh` gegen das Repo eines Dienstes
   laufen über `k-playbook github run <dienst>`; ohne Dienst gilt das Bisherige. Steht als
-  Letztes, weil es nicht sagt, wie Arbeit festgehalten oder geführt wird, sondern einen
+  hinter den Arbeitsabläufen, weil es nicht sagt, wie Arbeit festgehalten oder geführt wird, sondern einen
   einzelnen Zugriffsweg regelt, den die Sitzung erst beim Ausführen braucht; Ausnahmen,
   Fehlerbild und Verbote liegen in `on-demand/github.md`.
+- `410-session-kommunikation.md`: Macht die vorhandene Kommunikation unabhängiger
+  OpenCode-Sessions bekannt und verweist auf den On-demand-Ablauf und `/k-session-contact`.
+  Steht nach dem GitHub-Zugriffsweg als weiterer gezielter Zugriff; Claude bleibt getrennt.

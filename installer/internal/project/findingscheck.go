@@ -30,9 +30,10 @@ import (
 //     das Löschen der Befunde anderer Nutzer.
 //  3. Die Liste unter queue/findings/: Jeder Eintrag folgt dem Namensmuster
 //     der Sorte findings und liegt direkt in der Ablage.
-//  4. Jeden Befund lesen. Ein leerer oder kürzlich geänderter Befund wird
-//     übersprungen (skipped), nicht als Problem gezählt: k_playbook_doc_create
-//     legt ihn zuerst leer an, der Inhalt folgt im zweiten Aufruf.
+//  4. Jeden Befund lesen. Ein leerer oder in den letzten sechs Stunden
+//     geänderter Befund wird übersprungen (skipped), nicht als Problem gezählt:
+//     k_playbook_doc_create legt ihn zuerst leer an, der Inhalt folgt im zweiten
+//     Aufruf, und eine Sitzung kann ihn noch nachtragen.
 
 // FindingsKind ist der Name der Sorte, deren Ablage die Vorprüfung liest.
 const FindingsKind = "findings"
@@ -41,10 +42,12 @@ const FindingsKind = "findings"
 // Einordnung nicht anfängt.
 var FindingsRequiredRights = []string{"read", "write", "supersede"}
 
-// FindingsRecentWindow ist das Zeitfenster für „kürzlich geändert“: Ein
-// Befund, der jünger ist, kann noch geschrieben werden und kommt im nächsten
-// Lauf dran.
-const FindingsRecentWindow = 10 * time.Minute
+// FindingsRecentWindow ist das Zeitfenster für „jünger als 6 h“: Ein Befund,
+// dessen letzte Änderung (updated) jünger ist, kann noch geschrieben werden und
+// kommt in einem späteren Lauf dran. Maßstab ist die letzte Änderung, nicht das
+// Anlegen: Sie liegt nie davor, und ein Nachtrag setzt die Wartezeit neu, damit
+// nie gelesen wird, woran noch jemand schreibt.
+const FindingsRecentWindow = 6 * time.Hour
 
 // Die Arten eines Problems der Vorprüfung (FindingsProblem.Kind).
 const (
@@ -74,7 +77,7 @@ const (
 // Sie sind zugleich der Text der Protokollzeile „übersprungen (<grund>)“.
 const (
 	FindingsSkipEmpty  = "leer"
-	FindingsSkipRecent = "kürzlich geändert"
+	FindingsSkipRecent = "jünger als 6 h"
 )
 
 // findingNamePattern ist das Namensmuster der Sorte findings: dreistellige

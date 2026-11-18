@@ -354,7 +354,7 @@ Unterkommandos:
             (kephalaion node sync), prüft die Rechte read, write und
             supersede, jeden Eintrag unter keph:/queue/findings/ auf das
             Namensmuster eines Befunds und liest jeden Befund; leere und
-            kürzlich geänderte werden übersprungen. Ergebnis: bereit oder
+            in den letzten sechs Stunden geänderte werden übersprungen. Ergebnis: bereit oder
             nicht, mit allen Gründen, dazu der Bestand je Nutzer. Schreibt
             nichts. Exit-Code 0 bereit, 1 nicht bereit, 2 bei
             Aufruffehlern. Dasselbe wie das MCP-Werkzeug

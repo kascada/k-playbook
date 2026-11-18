@@ -1343,9 +1343,10 @@ everything at once together with the number per user:
    `queue/findings/` is no error -- Kephalaion stores no empty directories.
 4. **Reading.** Every finding is read. A read error, or an entry the list shows but `read`
    does not, is kind `unreadable`; a frontmatter the node could not read is `frontmatter`. An
-   empty finding, or one changed within the last ten minutes, is **skipped**, not a problem:
-   `k_playbook_doc_create` creates it empty first and the content follows in a second call;
-   it comes up in the next run.
+   empty finding, or one whose last change (`updated`) lies less than six hours back, is
+   **skipped**, not a problem: `k_playbook_doc_create` creates it empty first and the content
+   follows in a second call, and a session may still add to it; the wait keeps a run from reading
+   what is still being written. It comes up in a later run.
 
 The answer is `{ok: true, tool, projectDir, check: {…}}`, the result nested under `check`
 because its `ready` is a different thing from the envelope's `ok`:
@@ -1357,7 +1358,7 @@ because its `ready` is a different thing from the envelope's `ok`:
 | `sync` | the state after the sync as the node reports it: `at`, `revision` |
 | `rights` | the rights on the collection |
 | `total`, `byUser` | the readable findings, `findings` and `skipped` together, and their number per user who created them (Kephalaion's author metadata); counted even when not ready |
-| `skipped` | the findings this run skips, each with `reason` `leer` or `kürzlich geändert` -- the text of the protocol line `übersprungen (<reason>)` |
+| `skipped` | the findings this run skips, each with `reason` `leer` or `jünger als 6 h` -- the text of the protocol line `übersprungen (<reason>)` |
 | `findings` | the findings to work on, each `name` (full name, as `delete` and `rename` need it), `ref`, `revision`, `user`, `created`, `updated`, `ziel` |
 
 `findings` and `skipped` are disjoint and sorted by age, oldest first (`created`, then name).
