@@ -21,9 +21,9 @@ func TestDefaultsKSessionContactIstHuelleUndText(t *testing.T) {
 		t.Error("API-Ablauf gehört in den Hub-Text, nicht in die Hülle")
 	}
 	for file, needles := range map[string][]string{
-		"commands/k-session-contact.md": {"Session: <bestätigte eigene ses_… oder unbekannt>", "keine** OpenCode-Session-ID", "session-kommunikation.md", "Playwright", "keine Nachricht", "Claude"},
+		"commands/k-session-contact.md":                    {"Session: <bestätigte eigene ses_… oder unbekannt>", "keine** OpenCode-Session-ID", "session-kommunikation.md", "Playwright", "keine Nachricht", "Claude"},
 		"instructions/always/410-session-kommunikation.md": {"### OpenCode", "### Claude", "opencode api", "session-kommunikation.md", "/k-session-contact"},
-		"instructions/on-demand/session-kommunikation.md": {"\"resume\":true", "/api/experimental/session/SESSION_ID/wait", "Auftrag-ID", "Berechtigungen", "experimentell", "keinen zweiten Auftrag blind senden"},
+		"instructions/on-demand/session-kommunikation.md":  {"\"resume\":true", "/api/experimental/session/SESSION_ID/wait", "Auftrag-ID", "Berechtigungen", "experimentell", "keinen zweiten Auftrag blind senden"},
 	} {
 		text := readRepoDefault(t, file)
 		for _, needle := range needles {
