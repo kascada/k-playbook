@@ -60,6 +60,16 @@ Füge hinzu, dass die Umstellungen aus Schritt 3 danach mit einem zweiten Lauf v
 folgen; 3.8 setzt voraus, dass Schritt 2 das laufende Programm als neuestes Release meldet,
 und das tut nach einem Programmwechsel erst der zweite Lauf.
 
+Läufst du in OpenCode und meldet die Ausgabe „OpenCode: alle MCP-Server des Dienstes neu
+geladen“ und außer dem Programmwechsel keinen anderen Grund für einen Neustart, insbesondere
+keinen von Kephalaion, ist kein Neustart der Sitzung nötig: Der Reload hat den MCP-Server
+dieser Sitzung schon aus dem neuen Programm gestartet. Der Command endet trotzdem hier; statt
+des Neustart-Hinweises sagst du, dass der zweite Lauf von `/k-upgrade` in derselben Sitzung
+folgen kann. Meldet der Lauf noch einen anderen Neustart-Grund, bleibt es beim Neustart der
+Sitzung. Ohne diese Bedingung gilt der Absatz davor, in Claude Code also weiter der Hinweis auf
+den Neustart, auch wenn die Zeile „neu geladen“ dasteht: Sie betrifft nur den OpenCode-Dienst
+desselben Benutzers.
+
 ## Schritt 3 — Umstellungen
 
 Jede Umstellung prüft zuerst ihren Anlass. Liegt er nicht vor, gehst du ohne Meldung zur

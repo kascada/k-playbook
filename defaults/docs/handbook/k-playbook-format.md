@@ -419,8 +419,11 @@ hint. This runs at setup, at the start of the interface and with
 newest release, only when the running program is older than it; a clone
 `k-playbook/` is neither pulled nor read (task 156) —, then the project: `AGENTS.md`, `CLAUDE.md` as the
 include file, the linking of commands and skills, the MCP entries. After a
-binary change the newly installed program performs the project step, and the
-message ends with the hint to restart the session; `--check` writes nothing
+binary change the newly installed program performs the project step; after
+that the calling program, when `opencode service status` reports a running
+OpenCode service, reloads the service's MCP servers with `opencode reload`; the message ends with the hint to restart the
+session, which `/k-upgrade` drops in OpenCode after such a reload unless another
+reason for a restart is reported, in particular one from Kephalaion; `--check` writes nothing
 and reports what a run would do. It never touches project prose in `AGENTS.md`.
 
 Claude Code does not read `AGENTS.md` automatically. Setup therefore creates a
