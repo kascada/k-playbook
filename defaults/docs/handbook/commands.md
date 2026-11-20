@@ -39,8 +39,8 @@ New commands become visible only after linking is in place and the assistant has
 | `/k-remediation` | Bundle findings and turn them into tasks or fixes — **temporarily unavailable** while the results storage moves; the command only says so | [`code-review.md`](./code-review.md) |
 | **Task flow** | | |
 | `/k-task-create` | Create a task file from the conversation context | [`task-flow.md`](./task-flow.md) |
-| `/k-task-refine` | Harden task files before execution through a Critic/Editor dialogue | [`task-flow.md`](./task-flow.md) |
-| `/k-task-run` | Execute task files sequentially; execution and code review run in subagents, a critical finding stops the run | [`task-flow.md`](./task-flow.md) |
+| `/k-task-refine` | Harden task files before execution through a Critic/Editor dialogue; without an argument only unreviewed tasks, in groups of related tasks reviewed in parallel subagents, followed by an overlap check; asks before reviewing an already reviewed target unless `nochmal` follows | [`task-flow.md`](./task-flow.md) |
+| `/k-task-run` | Execute task files sequentially; execution and code review run in subagents, a critical finding stops the run, unfixed findings are offered as todos at the end | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | List, add, edit, complete, and delete the project todos through `k-playbook todo` | |
 | **Helpers** | | |
 | `/k-enforcement` | Explicit report on the docs follow-up — **temporarily unavailable** while it is rebuilt without checks (task 155); the command only says so | determines the changed files of the working tree against `HEAD` including untracked ones and checks the docs follow-up for them per the always-instruction `k-playbook:/instructions/always/220-regeln-anwenden.md`: hand-written docs adjusted, and for generated docs whether a raw order of this session lies in `keph:/queue/docs/` — for `code` one whose `pfade` cover the change; after approval it queues one (`k_playbook_doc_create`, kind `docs`, then Kephalaion `write`) or, for `code`, extends the session's open order with the missing paths instead of writing a second one (task 167). Fixes only after approval. The former check against a rule set is gone with the rule kind (task 135), the run of checks with the checks (task 155). Hull in `share/commands/`, text read as `k-playbook:/commands/k-enforcement.md` (task 124) |
@@ -59,7 +59,7 @@ There is no `/k-install-security-tools` command anymore. The interface provides 
 |---|---|---|
 | complete security sweep across suitable tools and audit recipes | `/k-audit` | `<ergebnisort>/YYYY-MM-DD/review-input.json`, `review-input.md`, `review-triage.md` |
 | focused individual review recipe, interactive or as a report | `/k-review <name>` | interactive change proposals or `<ergebnisort>/<family>/YYYY-MM-DD/review-input.json` and `review-triage.md` |
-| harden a task/instruction file before execution | `/k-task-refine [path]` | review log directly in the reviewed task/instruction file |
+| harden a task/instruction file before execution | `/k-task-refine [ref-or-path] [nochmal]` | review log directly in the reviewed task/instruction file |
 
 1. `/k-review <name>` runs a recipe and, depending on the recipe, produces interactive change proposals or `review-triage.md` as a report handoff.
 2. `/k-audit` orchestrates the run model: creates or continues a run, starts scanners, runs evidence recipes before the merge, starts the merge, leads perspectives afterward, and writes `review-triage.md`.

@@ -231,11 +231,18 @@ Review: <n> kritisch, <n> wichtig, <n> Hinweis
 Umfang: ab Task-Beginn | nur seit Fortsetzung
 Kritisch:
   - <datei:zeile oder Prüfbefehl> — <ein Satz>
+Wichtig:
+  - <datei:zeile oder Prüfbefehl> — <ein Satz>
 Revision: <n>
 ```
 
-Ohne kritischen Befund lautet die dritte Zeile `Kritisch: keine`. „Umfang“ wiederholt den
-übergebenen Umfang.
+Je Befund der Einstufung kritisch bzw. wichtig steht eine Zeile im Block `Kritisch:` bzw.
+`Wichtig:`, in derselben Form und mit demselben Ort wie in der Tabelle. Ohne kritischen
+Befund lautet die Zeile `Kritisch: keine`, ohne Befund „wichtig“ `Wichtig: keine`; beide
+Blöcke stehen in jeder Rückgabe nach Teil 2. Hinweise bleiben allein eine Zahl in der ersten
+Zeile. „Umfang“ wiederholt den übergebenen Umfang. Der Hauptkontext zeigt die Zeilen unter
+`Wichtig:` in seiner Zusammenfassung und bietet sie als Todo an; er liest den Abschnitt
+`### Review: Befunde` nicht.
 
 **`Revision: <n>`** steht in jeder Rückgabe dieses Moduls — nach Teil 1 allein, nach Teil 2
 und beim Abbruch — und nennt die Revision des letzten eigenen Anhängens; wurde nichts

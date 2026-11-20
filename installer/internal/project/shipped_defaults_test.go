@@ -1480,3 +1480,123 @@ func TestDefaultsKBefundeEinordnenIstHuelleUndText(t *testing.T) {
 		t.Error("defaults/instructions/on-demand/befunde-einordnen.md liegt im Lieferumfang")
 	}
 }
+
+// Task 169: /k-task-refine nimmt ohne Argument nur Ungeprüfte, prüft sie in
+// Gruppen je in einem Sub-Agenten und fragt bei schon Geprüftem nach, außer
+// nochmal steht hinter dem Ziel. Die Hülle sagt das in description und
+// argument-hint; der Text trägt die Verträge mit dem Sub-Agenten einer Gruppe
+// und mit dem Critic der Überschneidungen.
+func TestShareKTaskRefineHuelleNurUngepruefte(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-task-refine.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hull := string(data)
+	if !strings.Contains(hull, "\nargument-hint: \"[ref-or-path] [nochmal]\"\n") {
+		t.Errorf("argument-hint nennt nochmal nicht:\n%s", hull)
+	}
+	description := ""
+	for _, line := range strings.Split(hull, "\n") {
+		if value, ok := strings.CutPrefix(line, "description: "); ok {
+			description = value
+		}
+	}
+	for _, want := range []string{"nur die eigenen offenen Tasks ohne Review-Log", "in Gruppen zusammenhängender Tasks",
+		"Sub-Agenten parallel", "Überschneidungen", "erst nach Rückfrage, außer nochmal", "k-playbook:/commands/k-task-refine.md"} {
+		if !strings.Contains(description, want) {
+			t.Errorf("description ohne %q: %q", want, description)
+		}
+	}
+	// Ein „: “ in der unquotierten description machte das Frontmatter unlesbar.
+	if strings.Contains(description, ": ") || strings.Contains(description, " #") {
+		t.Errorf("description mit „: “ oder „ #“: %q", description)
+	}
+
+	text := readRepoDefault(t, "commands/k-task-refine.md")
+	for _, want := range []string{
+		"Muster `^## Review-Log`",
+		"`nochmal`, `erneut` oder\n`again`",
+		"Alle <n> offenen Tasks sind schon geprüft.",
+		"`Rückfrage: schon geprüft`",
+		"Ergebnis: geprüft | rückfrage | abgebrochen | keine-subagenten",
+		"`Foreign-Change: <revision> <updatedBy> <updatedAt>`",
+		"`Zwischenstand:`",
+		"Werkzeug `subagent`",
+		"Überschneidung: <nr> + <nr> — <was> — Empfehlung:",
+		"Überschneidungen: keine",
+		"Folge-Command: **`/k-task-run`**",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("k-task-refine.md ohne %q", want)
+		}
+	}
+}
+
+// Task 170: Die Rückgabe des Review-Moduls nennt die Befunde „wichtig“ in einem
+// eigenen Block, die Hülle von /k-task-run darf daraus Todos anlegen, und 5a,
+// Option (a), holt die Befunde eines schon ausgeführten Tasks über den
+// Befund-Leser, dessen Rückgabe ebenfalls `Wichtig:` trägt.
+func TestKTaskRunReviewBefundeWichtigAlsTodo(t *testing.T) {
+	module := readRepoDefault(t, "commands/_task-run/diff-review.md")
+	at := strings.Index(module, "### Rückgabe")
+	if at < 0 {
+		t.Fatal("diff-review.md ohne Abschnitt „Rückgabe“")
+	}
+	rueckgabe, _, ok := strings.Cut(module[at:], "## Abbruch")
+	if !ok {
+		t.Fatal("diff-review.md ohne Abschnitte „Rückgabe“ und „Abbruch“")
+	}
+	for _, want := range []string{"\nKritisch:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nWichtig:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nRevision: <n>\n",
+		"`Wichtig: keine`"} {
+		if !strings.Contains(rueckgabe, want) {
+			t.Errorf("Rückgabe in diff-review.md ohne %q", want)
+		}
+	}
+
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-task-run.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowed := ""
+	for _, line := range strings.Split(string(data), "\n") {
+		if value, ok := strings.CutPrefix(line, "allowed-tools: "); ok {
+			allowed = value
+		}
+	}
+	for _, want := range []string{"mcp__k-playbook__k_playbook_todo_add", "mcp__k-playbook__k_playbook_todo_list"} {
+		if !strings.Contains(allowed, want) {
+			t.Errorf("Hülle k-task-run.md erlaubt %s nicht: %q", want, allowed)
+		}
+	}
+
+	text := readRepoDefault(t, "commands/k-task-run.md")
+	start := strings.Index(text, "### 5a — Lesen und verstehen")
+	end := strings.Index(text, "### 5a.1 — ")
+	if start < 0 || end < start {
+		t.Fatal("k-task-run.md ohne Abschnitt 5a")
+	}
+	fuenfA := text[start:end]
+	for _, want := range []string{"- (a): Zuerst die Befunde des letzten Laufs holen", "**Befund-Leser.**",
+		"Kritisch:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>\nWichtig:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>",
+		"`Review: kein Abschnitt`"} {
+		if !strings.Contains(fuenfA, want) {
+			t.Errorf("5a in k-task-run.md ohne %q", want)
+		}
+	}
+	for _, want := range []string{"Eine Rückgabe ohne `Wichtig:`-Block ist wie jede\n  formwidrige kein gültiges Review.",
+		"**Befunde sammeln**", "`Rückfrage: Befunde als Todo`",
+		"Als Todo übernehmen? (alle / keine / alle außer <nummern> / nur <nummern>)",
+		"`origin` ist `Task <NNN> — <TASK_REF_DONE>`", "Todos:         angelegt <kennung>",
+		"`Review: kein Abschnitt im letzten Lauf`"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("k-task-run.md ohne %q", want)
+		}
+	}
+	// Die Abfrage steht in Schritt 7 nach dem Doku-Nachzug und vor der Fertig-Meldung.
+	nachzug := strings.Index(text, "**Doku-Nachzug.**")
+	abfrage := strings.Index(text, "**Befunde als Todo.**")
+	fertig := strings.Index(text, "Nach allen Tasks zuerst die Fertig-Meldung")
+	if nachzug < 0 || abfrage < nachzug || fertig < abfrage {
+		t.Errorf("Abfrage nicht zwischen Doku-Nachzug (%d) und Fertig-Meldung (%d): %d", nachzug, fertig, abfrage)
+	}
+}

@@ -24,6 +24,9 @@ Produces:
 - Hat der Lauf Code geändert, je Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`,
   neu angelegt oder — für `code`, wenn die Sitzung schon einen hat — ergänzt
   (Schritt 7, `k-playbook:/instructions/on-demand/doku-auftraege.md`).
+- Je Review-Befund „wichtig“ oder übergangenem kritischen Befund eines Tasks unter `done/`,
+  den der Nutzer in der Abfrage am Ende übernimmt, ein Todo über `k_playbook_todo_add`
+  (Schritt 7).
 
 ## Schritt 1 — Briefing und Form
 
@@ -50,6 +53,9 @@ ganzen Command:
   er zählt nur noch mit `k_playbook_doc_grep` und hängt an. Die eine Ausnahme ist 5a,
   Option (a): Dort liest er `## Ausführungskontext` (`section`, erster Treffer) eines schon
   ausgeführten Tasks, um die Ausführungswurzel für den Abschluss zu bestimmen.
+- **Den Abschnitt `### Review: Befunde` liest er nie.** Die Befunde daraus kennt er nur aus
+  Rückgaben: der des Review-Sub-Agenten (5f, Schritt 4) und der des Befund-Lesers (5a,
+  Option (a)).
 
 Der Grund: Diff und Review stehen im Task-Dokument, und der Hauptkontext darf sie nicht
 sehen — sonst wäre jede Rückfrage an den Nutzer von Dateiinhalten und Befunden überlagert,
@@ -71,7 +77,7 @@ Abschnitt „Lesen und schreiben“; dieser Command wiederholt es nicht. Command
   `REVISION` sein, sonst gilt der Replica-Nachlauf aus
   `k-playbook:/instructions/on-demand/tasks.md`.
 - Jeder Sub-Agent bekommt `TASK_REF` und `REVISION`; mit seiner Rückgabe setzt der
-  Hauptkontext `REVISION` neu.
+  Hauptkontext `REVISION` neu. Ausgenommen ist der Befund-Leser (5a), der nur liest.
 - `foreign_change` — selbst bekommen oder so gemeldet — führt immer zu demselben Schritt:
   Fertig-Meldung (`Rückfrage: fremder Schreiber`), dann die Rückfrage mit `revision`,
   `updatedBy` und `updatedAt`, wer weitermacht. Sagt der Nutzer „weiter“, gilt die Revision
@@ -83,8 +89,9 @@ Abschnitt „Lesen und schreiben“; dieser Command wiederholt es nicht. Command
 Vor jeder Rückfrage an den Nutzer und am Ende des Commands meldet sich der Hauptkontext auf
 dem Rechner des Nutzers. Die Stellen in diesem Command: die Rückfragen in Schritt 2 (mehrere
 Treffer, erledigter Task), die Rückfrage in Schritt 3, die Optionen in 5a und 5a.2, der
-Blocker in 5d, jede Rückfrage nach `foreign_change`, die Stopp-Abfrage in 5f und die
-Zusammenfassung in Schritt 7.
+Blocker in 5d, jede Rückfrage nach `foreign_change`, die Stopp-Abfrage in 5f, die Abfrage
+der Befunde als Todo in Schritt 7 (`Rückfrage: Befunde als Todo`) und die Zusammenfassung in
+Schritt 7.
 
 include: _task/fertig-meldung.md
 
@@ -232,7 +239,13 @@ Wie weiter?
   (b) anhalten     - der Lauf endet hier, keine weiteren Tasks
 ```
 
-- (a): Mit `k_playbook_doc_append` und `since_revision: REVISION` anhängen:
+- (a): Zuerst die Befunde des letzten Laufs holen, ohne sie selbst zu lesen: Der
+  Hauptkontext startet den **Befund-Leser** (unten) mit der Zeilennummer der letzten
+  Kennzeile „ausgeführt“, die oben trifft. Aus seiner Rückgabe sammelt er die Zeilen unter
+  `Kritisch:` und `Wichtig:` für diesen Task, wie nach „(b) trotzdem weiter“ (5f, Schritt 5,
+  „Befunde sammeln“); bei `Review: kein Abschnitt` oder einer Rückgabe in anderer Form
+  sammelt er nichts. Der Leser schreibt nichts, `REVISION` bleibt. Dann mit
+  `k_playbook_doc_append` und `since_revision: REVISION` anhängen:
 
   ```text
   **Status nach Review:** abgeschlossen vom Nutzer (<context.now.date>)
@@ -245,6 +258,36 @@ Wie weiter?
 - (b): Der Lauf endet, keine weiteren Tasks.
 
 Kein automatisches Beheben, kein erneutes Review, keine erneute Ausführung.
+
+**Befund-Leser.** Ein General-Purpose-Sub-Agent (OpenCode: `general`, Claude Code:
+`general-purpose`), reines Nachschlagen ohne Briefing. Er läuft hier und in 5f, Schritt 5,
+„Befunde sammeln“, wenn ein Task ohne gültige Review-Rückgabe nach `done/` geht. Sein Auftrag,
+mit eingesetzten Werten:
+
+````text
+Lies im Task <TASK_REF> (projectDir <context.project.dir>) den letzten Review-Abschnitt nach
+Zeile <ZEILE> und gib seine Befunde zurück. Du schreibst nichts und fragst niemanden.
+
+1. k_playbook_doc_grep (MCP; in der Shell `k-playbook doc grep`) mit ref <TASK_REF> und
+   pattern `^### Review: Befunde$`, mit Zeilennummern. Maßgeblich ist der letzte Treffer
+   nach Zeile <ZEILE>. Gibt es keinen, ist die Rückgabe allein `Review: kein Abschnitt`.
+2. Lies ab diesem Treffer mit k_playbook_doc_read und `lines` bis vor die nächste Zeile, die
+   mit `#`, `<!-- k-task-run:` oder `**Status nach Review:**` beginnt, sonst bis zum Ende.
+3. Gib aus der Zeile `**Ergebnis:**` und der Tabelle genau das zurück, ohne weiteren Text:
+
+Review: <n> kritisch, <n> wichtig, <n> Hinweis
+Kritisch:
+  - <Ort aus der Tabelle> — <Befund in einem Satz>
+Wichtig:
+  - <Ort aus der Tabelle> — <Befund in einem Satz>
+
+Je Tabellenzeile mit der Einstufung kritisch bzw. wichtig eine Zeile; Hinweise nur als Zahl.
+Ein leerer Block lautet `Kritisch: keine` bzw. `Wichtig: keine`.
+````
+
+Eine Rückgabe ist gültig, wenn sie genau `Review: kein Abschnitt` lautet oder der Form oben
+folgt, mit beiden Blöcken. Der Leser bekommt keine Revision und gibt keine zurück; er hängt
+nichts an.
 
 **Trifft sie nicht**, lies den Task bis vor seine ersten Lauf-Abschnitte, geschnitten nach
 `k-playbook:/instructions/on-demand/tasks.md`, „Rumpf und Lauf-Abschnitte“: mit
@@ -587,9 +630,10 @@ Er fragt den Nutzer nicht und hängt seine Abschnitte selbst an den Task an. Sei
 beschreibt das Modul; sie endet mit `Revision: <n>` oder `Foreign-Change: …`. Danach
 dieselben Zeilen erneut zählen:
 
-- Das Review ist **gültig**, wenn die Rückgabe dem Format des Moduls folgt und
-  `### Review: Befunde` genau einmal mehr dasteht als vorher — nie gilt ein Lauf ohne das als
-  „0 kritisch“.
+- Das Review ist **gültig**, wenn die Rückgabe dem Format des Moduls folgt — mit den Blöcken
+  `Kritisch:` und `Wichtig:`, jeder mit Befundzeilen oder `keine` — und `### Review: Befunde`
+  genau einmal mehr dasteht als vorher. Eine Rückgabe ohne `Wichtig:`-Block ist wie jede
+  formwidrige kein gültiges Review. Nie gilt ein Lauf ohne das als „0 kritisch“.
 - Die Diff-Abschnitte hat der Lauf geschrieben, wenn `### Diff: Geänderte Dateien` genau
   einmal mehr dasteht.
 - `REVISION` wird nach der Revisionskette gesetzt; `Foreign-Change:` führt zur Rückfrage aus
@@ -657,6 +701,32 @@ Versuch bleibt ungeprüft`.
   Fortsetzung“ oder der Grund aus (a). Der Task bleibt liegen, die Fortschrittszeilen
   unverändert; kein PR, keine weiteren Tasks. Die Kennzeile aus 5f, Schritt 2 steht schon im
   Dokument; den nächsten Lauf regelt 5a.
+
+Ein Befund „wichtig“ ist kein Grund für die Stopp-Abfrage; er hält den Lauf nicht an.
+
+**Befunde sammeln** — für jeden Task, der nach `done/` geht, vor 5f, Schritt 6. Der
+Hauptkontext merkt sich je Task die Befundzeilen für die Zusammenfassung und die Abfrage in
+Schritt 7, unverändert in der Form `<datei:zeile oder Prüfbefehl> — <ein Satz>`, jede
+kritische mit dem Merkmal „kritisch“:
+
+- Maßgeblich ist die Rückgabe des **letzten** Reviews dieses Laufs für diesen Task; nach
+  „(a) beheben lassen“ ist das das erneute.
+- Ist sie gültig: die Zeilen unter `Wichtig:`; nach „(b) trotzdem weiter“ dazu die unter
+  `Kritisch:`.
+- Ist sie nicht gültig und geht der Task trotzdem nach `done/` (nach „(b) trotzdem
+  weiter“): Der Hauptkontext sucht mit `k_playbook_doc_grep` (mit Zeilennummern) die
+  Kennzeile `^<!-- k-task-run: ausgeführt <TASK_FILE> -->$` — der letzte Treffer ist die
+  dieses Laufs — und startet mit ihrer Zeilennummer den Befund-Leser aus 5a. Gesammelt
+  werden die Zeilen unter `Kritisch:` und `Wichtig:` aus dessen Rückgabe. Bei
+  `Review: kein Abschnitt` wird nichts gesammelt; bei einer Rückgabe in anderer Form auch
+  nicht, und die Zeile „Review“ in Schritt 7 bekommt den Zusatz „— Befunde nicht gelesen“.
+  Lief kein Review mit Teil 2 (Rezept fehlt), entfällt der Leser.
+- Ohne Review — `DIFF_ENABLED=false`, ohne Snapshot oder bei abgeschaltetem Rezept — gibt es
+  nichts zu sammeln.
+
+Ein angehaltener Task (c) behält seine Befunde im Dokument; sie werden nicht gesammelt.
+Schließt ein späterer Lauf ihn in 5a mit „(a) abschließen“ ab, sammelt der Befund-Leser sie
+dort.
 
 **6. Abschluss.**
 
@@ -766,7 +836,8 @@ beim Einrichten zu helfen („Die Zugangsdatei als Abhilfe“ im Block oben).
 
 Weiter mit dem nächsten Task der Liste. Ist ein Task fehlgeschlagen (5e), angehalten (5f,
 Schritt 5, oder 5a, Option (b)) oder nach `foreign_change` liegen geblieben: anhalten — keine
-weiteren Tasks.
+weiteren Tasks. Auch dann folgen Schritt 6, soweit er greift, und Schritt 7 mit der Abfrage
+der Befunde aus den bis dahin abgeschlossenen Tasks.
 
 ## Schritt 6 — Intent-Alignment-Check
 
@@ -857,6 +928,44 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
 - Ohne Kephalaion oder bei einem Task mit „Pfade unbekannt“ wird für ihn nichts eingereiht;
   die Zeile „Doku“ nennt den Nachzug als offen und `/k-enforcement`.
 
+**Befunde als Todo.** Nach dem Doku-Nachzug und vor der Fertig-Meldung `fertig` oder
+`abgebrochen`. Gibt es keine gesammelten Befunde (5f, Schritt 5, „Befunde sammeln“, und 5a,
+Option (a)), entfällt die Abfrage. Sonst kommt sie genau einmal je Lauf, auch wenn der Lauf
+vorher anhielt oder abbrach (5e, 5g, Stopp-Abfrage (c), `foreign_change`); sie gilt den
+Befunden der bis dahin abgeschlossenen Tasks. Erst die Fertig-Meldung
+(`Rückfrage: Befunde als Todo`, der Body nennt die Zahl der Befunde), dann in **einer**
+Nachricht alle Befunde, nummeriert über den ganzen Lauf, nach Tasks gegliedert:
+
+```
+Review-Befunde aus diesem Lauf:
+  <TASK_FILE>
+    1. kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
+    2. <datei:zeile oder Prüfbefehl> — <ein Satz>
+  <TASK_FILE>
+    3. <datei:zeile oder Prüfbefehl> — <ein Satz>
+
+Als Todo übernehmen? (alle / keine / alle außer <nummern> / nur <nummern>)
+```
+
+Voreingestellt ist `alle`: Eine Antwort wie „ja“ oder „ok“ gilt als `alle`. `<nummern>` sind
+Nummern aus der Liste, getrennt durch Komma oder Leerzeichen, auch Bereiche wie `2-4`. Passt
+eine Antwort auf keine der vier Formen oder nennt sie eine Nummer, die nicht in der Liste
+steht, wird nichts angelegt und einmal nachgefragt, wie sie gemeint ist.
+
+Je übernommenem Befund ein `k_playbook_todo_add` (`projectDir` = `context.project.dir`):
+
+- `text` ist der Befund in einem Satz samt Ort (`datei:zeile` oder Prüfbefehl), so
+  formuliert, dass er ohne Task und Lauf verständlich ist; einen kritischen kennzeichnet der
+  Satz als „Review-Befund kritisch“.
+- `origin` ist `Task <NNN> — <TASK_REF_DONE>`, mit der Nummer des Tasks und seinem Verweis
+  unter `done/`.
+- Kein Verweis auf `keph:/queue/`.
+- `outcome_unknown`: nicht wiederholen, sondern mit `k_playbook_todo_list` und `search` (ein
+  markantes Stück aus `text`) nachsehen; steht das Todo da, gilt seine Kennung, sonst wird es
+  einmal neu angelegt.
+
+Die angelegten Kennungen nennt die Zusammenfassung in der Zeile „Todos“.
+
 Nach allen Tasks zuerst die Fertig-Meldung (`fertig` oder `abgebrochen`; der Body trägt die
 Zeilen „Erfolgreich“, „Angehalten“ und „Abgebrochen“ in Kurzform), dann eine knappe
 Zusammenfassung:
@@ -865,11 +974,16 @@ Zusammenfassung:
 Ausgeführt:    <n> Tasks
 Erfolgreich:   <Verweise unter done/>
   <TASK_FILE>  Review: <n> kritisch, <n> wichtig, <n> Hinweis
+    - kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
+    - <datei:zeile oder Prüfbefehl> — <ein Satz>
 Abgeschlossen: <Tasks, die der Nutzer in 5a, Option (a), abgeschlossen hat>
+  <TASK_FILE>  Review: <n> kritisch, <n> wichtig, <n> Hinweis — letzter Lauf
+    - kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
 Angehalten:    <TASK_FILE> - <Grund>
 Abgebrochen:   <TASK_FILE, falls vorhanden> - <Grund>
 Übersprungen:  <TASK_FILEs, falls vorhanden>
 Intent:        Ja / Teilweise / Nein / - (kein Intent)
+Todos:         angelegt <kennung> [, <kennung>] | keine übernommen | – (keine Befunde)
 Doku:          eingereiht <verweis> [, <verweis>] | schon eingereiht <verweis> | kein Code geändert
                | keine erzeugte Doku | offen — <Grund>, /k-enforcement  [; Inventar: /k-doc-inventory]
 ```
@@ -878,8 +992,17 @@ Die Zeile „Review“ steht je erfolgreichem Task und gibt das letzte gültige 
 
 - bei `REVIEW_SCOPE` `nur seit Fortsetzung` mit dem Zusatz „— nur seit Fortsetzung“,
 - `Review: abgeschaltet` bei abgeschaltetem Rezept,
-- `Review: kein gültiges Review` nach (b) ohne gültiges Review,
+- `Review: kein gültiges Review` nach (b) ohne gültiges Review, mit dem Zusatz „— Befunde
+  nicht gelesen“, wenn der Befund-Leser nicht in seiner Form antwortete,
 - `Review: – (ohne Diff)` ohne `DIFF_ENABLED` oder ohne Snapshot.
+
+Unter der Zeile „Review“ stehen die für diesen Task gesammelten Befundzeilen, kritische mit
+dem Vorsatz `kritisch:`; ohne gesammelte Befunde keine.
+
+Je Task unter „Abgeschlossen“ steht die Zeile `Review:` aus der Rückgabe des Befund-Lesers mit
+dem Zusatz „— letzter Lauf“, darunter die gesammelten Zeilen wie oben. Bei
+`Review: kein Abschnitt` lautet sie `Review: kein Abschnitt im letzten Lauf`, bei einer
+Rückgabe in anderer Form `Review: Befunde nicht gelesen`.
 
 Bei „Abgeschlossen“ steht ein offener PR-Schritt dabei, wenn der Task `PR required: true`
 trägt. Ein nach `foreign_change` liegen gebliebener Task steht unter „Angehalten“ mit dem

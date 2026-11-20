@@ -677,6 +677,18 @@ Rules:
   catches a repository whose name only starts with the same text (`acme/web` and
   `acme/website`). That is accepted: a command run under one service rarely touches such a
   neighbour, and the form with `.git` is exact.
+- **The helper is set per URL, without `useHttpPath`.** Clearing and the own helper are
+  entries `credential.<url>.helper` (an empty value first, then the helper) for the https form
+  with and without `.git`. git applies them to exactly that repository although
+  `credential.useHttpPath` is not set: it matches the configuration against the URL including
+  its path and strips the path only afterwards (`credential_apply_config` in git's
+  `credential.c`), so `useHttpPath` changes what a helper is told, not which configuration
+  applies. Setting it for `github.com` is therefore not needed, and would change every other
+  repository on the machine. The path match works on whole segments: `…/o/r` matches `…/o/r`
+  and `…/o/r/…`, but not `…/o/r.git` or `…/o/rx.git`, which is why both forms get their own
+  entries. Measured with git 2.53.0 (2026-11-02); `TestChildEnvCredentialHelperGegenStore` in
+  `installer/internal/githubaccess/runenv_test.go` fails if a helper of the machine gets the
+  token. It no longer holds if git starts to need `useHttpPath` for URL-specific helpers.
 - **Every form goes to the target form.** For every access, each form listed under *Only this
   repository* is rewritten to the target form of the chosen access. Which forms are rewritten
   does not depend on the type; only the target form does. A script or a clone that writes the

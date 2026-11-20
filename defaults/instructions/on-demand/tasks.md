@@ -42,6 +42,10 @@ gestützt Code ändert, prüft den Verweis, bevor er etwas schreibt oder Code ä
   unter den eigenen erledigten Tasks trifft. Welche Rückfrage das ist, sagt der Command:
   `/k-task-run` bietet an, den Task wieder zu öffnen; `/k-task-refine` fragt, ob er trotzdem
   geprüft oder abgebrochen wird.
+- **Schon geprüft.** `/k-task-refine` fragt vor der Prüfung eines ausdrücklich genannten
+  Ziels, das schon ein `## Review-Log` trägt, ob es erneut geprüft oder abgebrochen wird —
+  außer der Aufruf verlangt die erneute Prüfung (`nochmal`, `erneut` oder `again` nach dem
+  Ziel). Ist das Ziel zugleich erledigt, bleibt es bei einer Rückfrage.
 
 ### Kopf
 
@@ -150,8 +154,10 @@ ohne Fortschrittsverfolgung.
 ### Lebenslauf
 
 1. **Offen** — angelegt in `keph:/user/~/tasks/`. Das Briefing nennt ihn unter `work.tasks`.
-2. **Geprüft** — `/k-task-refine` hat ein `## Review-Log (<datum>)` angehängt. Ein Task ohne
-   diesen Block wurde nie gegengelesen; `/k-task-run` fragt dann nach.
+2. **Geprüft** — `/k-task-refine` hat ein `## Review-Log (<datum>)` angehängt. Geprüft heißt
+   allein, dass eine Zeile mit `## Review-Log` am Anfang im Dokument steht; ob der Task danach
+   geändert wurde, spielt keine Rolle. Ein Task ohne diesen Block wurde nie gegengelesen;
+   `/k-task-run` fragt dann nach, und `/k-task-refine` ohne Argument nimmt nur solche Tasks.
 3. **Ausgeführt** — `/k-task-run` hat `## Ausführung` mit der Kennzeile „ausgeführt“, Diff
    und Review angehängt. Solange das Dokument nicht in `done/` liegt, ist der Task nicht
    abgeschlossen (Review, Befunde oder eine Stopp-Abfrage offen).

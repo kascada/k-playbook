@@ -84,5 +84,5 @@ Fehlerfälle:
   einen zweiten Task an.
 
 Folge-Command: **`/k-task-refine`** — härtet den angelegten Task vor der Ausführung im
-Critic/Editor-Dialog; ohne Argument nimmt er die eigenen offenen Tasks, mit dem Verweis
-genau diesen.
+Critic/Editor-Dialog; ohne Argument nimmt er die eigenen offenen Tasks, die noch kein
+Review-Log tragen — also auch diesen —, mit dem Verweis genau diesen.

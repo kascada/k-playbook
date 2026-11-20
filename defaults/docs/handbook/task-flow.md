@@ -45,7 +45,9 @@ Substantial work is not split into many small tasks, but structured in one docum
 
 ## /k-task-refine
 
-`/k-task-refine [ref-or-path]` hardens tasks or instruction files before execution. Without an argument it takes the own open tasks from the collection (`k_playbook_doc_list`); with an argument a `keph:` reference, a task number or -- as before -- an instruction file or directory on disk.
+`/k-task-refine [ref-or-path] [nochmal]` hardens tasks or instruction files before execution. Without an argument it takes only the own open tasks from the collection (`k_playbook_doc_list`) that carry no review log yet -- a line starting with `## Review-Log`, the same check `/k-task-run` uses. If there are open tasks but none unreviewed, it says so and ends without writing anything. With an argument it takes a `keph:` reference, a task number or -- as before -- an instruction file or directory on disk; if that target already carries a review log, it asks first whether to review it again, unless the call ends in `nochmal`, `erneut` or `again`. The word alone, without a target, takes all own open tasks, reviewed ones included.
+
+Without a target the main context splits the tasks into groups on every run. Two tasks belong together when one names the other as prerequisite, dependency or shared goal, or when both change the same file; a file a task only reads or names as a model does not count, and in doubt tasks count as related. The relation is transitive. The start overview shows the groups with the reason for each group of more than one task. Each group is reviewed by its own subagent, all in parallel; the subagent is the moderator for its tasks, starts Critic and Editor itself and appends the review logs. It never asks the user: it stops and returns the question with its intermediate state, and the main context asks and starts a new subagent that continues from there. Where a subagent cannot start subagents -- OpenCode v2.3.0 with its default settings, measured -- the main context forms the same groups and reviews them itself one after another. When all groups are done, a lean Critic checks once for overlaps between groups and with the already reviewed open tasks (same file, same contract, a required order); its hits appear in the final summary with a one-line recommendation each, without a further review log and without a question.
 
 The command uses a structured Critic/Editor dialogue:
 
@@ -122,6 +124,10 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
   ([`defaults/commands/_task-run/diff-review.md`](../../../defaults/commands/_task-run/diff-review.md)),
   which it reads itself, and appends `### Diff: Geänderte Dateien`, `### Diff: Code-Änderungen`,
   and `### Review: Befunde` to the task with `k_playbook_doc_append` and `since_revision`.
+  Its return to the main context carries the counts, one line per critical finding under
+  `Kritisch:` and one line per important finding under `Wichtig:` (`Kritisch: keine` and
+  `Wichtig: keine` when empty); notes stay a number. A return without the `Wichtig:` block
+  counts as malformed, like any other.
   Criteria and the classification into critical, important, and note are defined only in the
   recipe [`reviews/review-code.md`](../../../defaults/reviews/review-code.md), section
   `## Ergebnisform für den Diff eines Tasks`; this page does not repeat them. The recipe is
@@ -161,6 +167,39 @@ A review that aborted, returned no valid result, or wrote no new section counts 
 never as "0 critical"; (a) then means running the review again. A review that covers only the
 changes since the resumption is asked about the same way, with (b) and (c). With (c) the
 task gets the line `**Status nach Review:** angehalten — <reason>` and stays where it is.
+An important finding never stops the run (task 170): `/k-task-run` often runs unattended over
+several tasks, and every stop holds up the whole run.
+
+### Findings as todos
+
+Review findings that a run does not fix do not stay hidden in a task under `done/` (task
+170). For every task that moves to `done/`, the main context collects finding lines from the
+return of the **last** review of this run -- after "(a) fix" that is the new review:
+
+- the lines under `Wichtig:`; after "(b) continue" also those under `Kritisch:`;
+- when that return is not valid and the task still moves to `done/` (after "(b) continue"),
+  a lookup subagent, the *finding reader*, reads the last `### Review: Befunde` of this run
+  -- the one after the marker "ausgeführt" of this run -- and returns the same two blocks;
+  the main context collects from that return and still never reads the section itself;
+- a task stopped with (c) keeps its findings in the document; nothing is collected.
+
+The final summary shows the collected lines below each task's `Review:` line, critical ones
+prefixed with `kritisch:`. After the documentation follow-up and before the final
+notification, the run asks once -- with its own notification `Rückfrage: Befunde als Todo`
+-- listing all collected findings numbered across the whole run:
+
+```text
+Als Todo übernehmen? (alle / keine / alle außer <nummern> / nur <nummern>)
+```
+
+`alle` is the default. Each accepted finding becomes one `k_playbook_todo_add`: the text is
+the finding in one self-contained sentence with its location, the origin is
+`Task <NNN> — <reference under done/>`; the summary names the created IDs in the line
+`Todos`. On `outcome_unknown` the run looks the todo up with `k_playbook_todo_list`
+(`search`) instead of adding it again. The question also comes when the run stopped or
+aborted earlier (5e, a stop, `foreign_change`), for the tasks completed until then; without
+collected findings there is no question. An automatic todo per finding was rejected: review
+findings are not always right, and unchecked todos fill the briefing with noise.
 
 ### Executed but not completed
 
@@ -171,11 +210,19 @@ session ended between the note and the move to `done/`. A later `/k-task-run` re
 marker before reading the task, neither reads nor executes it again, and asks:
 
 - **(a) complete** -- open points are done or accepted; the task gets
-  `**Status nach Review:** abgeschlossen vom Nutzer (<date>)` and moves to `done/`. The PR
-  handoff does not run; if the task requires a PR, the run names it as an open step.
+  `**Status nach Review:** abgeschlossen vom Nutzer (<date>)` and moves to `done/`. Before
+  that line is appended, the finding reader (see "Findings as todos") reads the last
+  `### Review: Befunde` after the matching marker "ausgeführt" and returns its `Kritisch:` and
+  `Wichtig:` lines. They are collected like after "(b) continue", appear under "Abgeschlossen"
+  in the summary below the line `Review: … — letzter Lauf` and go into the todo question.
+  Without such a section the line reads `Review: kein Abschnitt im letzten Lauf`; a malformed
+  return gives `Review: Befunde nicht gelesen`. The section may predate a fix and name
+  something already fixed; the question lets the user deselect it. The PR handoff does not
+  run; if the task requires a PR, the run names it as an open step.
 - **(b) stop** -- the run ends here, no further tasks.
 
-There is no automatic fix, no new review, and no re-execution. A task that merely quotes
+There is no automatic fix, no new review, and no re-execution; the finding reader only
+reads. A task that merely quotes
 the marker template carries a placeholder or another file name there and does not count as
 executed. All marker lines are listed in `on-demand/tasks.md`, section "Kennzeilen".
 
