@@ -201,6 +201,14 @@ Wiederaufnahme ohne rohe Aufträge entfällt die Analyse hier; Schritt 5 liest j
   gehört zu einem bestehenden Thema, das dann `umschreiben` bekommt. Ein Dokument, dessen
   Thema mit der Änderung weggefallen ist, bekommt `entfällt`.
 - Ist die Zuordnung eines Pfads unklar, fragst du den Nutzer, statt zu raten.
+- Betrifft ein Teil-Lauf jedes Dokument, für das er zuständig ist, nennt die Liste unter
+  „Aus dem Scan“, dass Code, den kein Dokument und kein Auftrag abdeckt, nur ein voller Lauf
+  (`/k-docs code`) erfasst. Ein Dokument, dessen Thema einen ganzen Bereich umfasst (etwa
+  alle Pakete), liest dafür seinen ganzen Bereich, nicht nur die Pfade der Aufträge.
+- Zugeordnet wird nach dem heutigen Stand der Pfade, nicht nach dem `anlass`: Hat eine
+  spätere Änderung die eines Auftrags überholt, zählt, was die Pfade jetzt enthalten. Ein
+  gelöschter Pfad führt zu `umschreiben` des Dokuments, das ihn beschreibt (seine Stellen
+  fallen weg), oder zu `entfällt`, wenn vom Thema nichts bleibt.
 - Ein Pfad, den die Ausschlüsse ausnehmen, führt zu keinem Dokument. Folgt aus einem Auftrag
   deshalb kein Dokument, steht er unter „Ohne Dokument“, und Schritt 7 nennt den Nachzug als
   offen.
@@ -211,8 +219,8 @@ Wiederaufnahme ohne rohe Aufträge entfällt die Analyse hier; Schritt 5 liest j
 Sub-Agenten je Thema, nach den Regeln der Ablage oben. Jeder bekommt zusätzlich
 `SCAN_ROOT`, die Ausschlüsse, den Stand aus Schritt 1, sein Thema, die Pfade und Anlässe
 seines Auftrags, `WORK_DIR`, die bisherige Fassung seines Dokuments samt `hints`, die Vorlage
-aus Schritt 5 und die Regel „nur Bedeutung, keine Zeilenlisten“; er meldet außerdem Dateiname
-und Zeilenzahl. Ein Sub-Agent schreibt keine Aufträge und schließt keine ab.
+aus Schritt 5, die Regel „nur Bedeutung, keine Zeilenlisten“ und den Abschnitt „Nur was der
+Code jetzt zeigt“ aus Schritt 5; er meldet außerdem Dateiname und Zeilenzahl. Ein Sub-Agent schreibt keine Aufträge und schließt keine ab.
 
 Zeige dann eine **kompakte** Liste, nicht die Doku selbst:
 
@@ -296,6 +304,24 @@ nach `dokument`. Je Auftrag:
 - Danach ist der Auftrag **abgearbeitet**; du merkst ihn dir in `WORKED`. Ein Dokument ohne
   Auftrag fasst du nicht an.
 
+**Nur was der Code jetzt zeigt.** Aufträge sammeln sich über Tage. Was ihr `anlass` oder ihr
+Rumpf beschreibt, kann eine spätere Änderung überholt haben: Eingeführtes wurde wieder
+entfernt, ein Name hat sich geändert, ein Pfad ist gelöscht. Dasselbe gilt für die bisherige
+Fassung des Dokuments. Beide sagen nur, wo du hinschaust, nie, was in der Doku steht.
+
+- Quelle jeder Aussage ist der Stand aus Schritt 1. Was dort nicht mehr vorkommt, kommt nicht
+  in die Doku, auch wenn ein Auftrag oder die bisherige Fassung es nennt.
+- Entferntes wird aus dem Dokument gestrichen, nicht als Geschichte beschrieben („wurde mit
+  Task … entfernt“, „früher …“). Die Doku beschreibt den Stand, nicht den Weg dorthin.
+- **Vor dem Einfügen prüfen.** Bevor eine Aussage ins Dokument kommt, prüfst du sie erneut
+  am Code: Jede Stelle `pfad:zeile` existiert und zeigt auf das Beschriebene; jeder
+  genannte Bezeichner, jedes Feld, jeder Befehl, jede Option und jede Meldung kommt im Code
+  so vor; kein Satz stützt sich allein auf einen Auftrag oder die bisherige Fassung. Was sich
+  nicht bestätigen lässt, kommt nicht hinein; ist es wichtig, wird es eine Unklarheit.
+- Das gilt auch für Sub-Agenten. Was sie schreiben, prüft der Lauf vor `publish` noch einmal
+  nach denselben Punkten — mindestens alle Stellen `pfad:zeile` und alle Bezeichner — und
+  berichtigt, was nicht stimmt.
+
 Dateinamen `<NN>-<slug>.md`, klein, nur `a–z`, `0–9`, `.`, `_`, `-`. Keine `README.md`,
 keine anderen Dateien als `.md`. Der Kopf ist der aus dem Abschnitt „Der Kopf“ der Ablage
 oben; die Vorlage zeigt, wie dieser Command ihn belegt — `sources` nur, wenn Quellen außer
@@ -339,7 +365,10 @@ Regeln:
 
 - Neue `hints` schlägt Schritt 4 vor; eingetragen werden sie erst nach Bestätigung, wie im
   Kopf beschrieben.
-- Stellen im Code immer als `pfad:zeile`. Verwandte Themen im selben Verzeichnis mit ihrem
+- Stellen im Code immer als `pfad:zeile`, mit dem Pfad ab `SCAN_ROOT` und an jeder Stelle
+  ganz — nie nur der Dateiname, auch nicht, wenn der volle Pfad im selben Abschnitt schon
+  stand: Namen wie `server.go` gibt es in mehreren Paketen, und ein Leser springt über die
+  Suche mitten in einen Abschnitt. Verwandte Themen im selben Verzeichnis mit ihrem
   Dateinamen, andere Teile der Projektdoku als `keph:`-Verweis — ein isoliertes Dokument ist
   ein Fehler. Auf einen Auftrag verweist kein Dokument.
 - Keine erfundenen Erklärungen: Unklarheiten — auch die der Sub-Agenten — legst du wie in
@@ -464,6 +493,9 @@ Kompakte Zusammenfassung:
 
 - **Datei-für-Datei-Beschreibung.** „modul_x enthält Klasse Y“ steht schon im Code; die
   Doku beschreibt Bedeutung.
+- **Aus dem Auftrag oder der alten Fassung schreiben.** `anlass`, Rumpf und bisheriger Text
+  zeigen, wo nachzusehen ist; ungeprüft übernommen machen sie die Doku falsch, sobald eine
+  spätere Änderung sie überholt hat.
 - **Themen zersplittern.** Dreißig winzige Dokumente statt zehn sinnvoller; eine Frage
   gehört in genau eine Datei.
 - **Ohne Auftrag laufen.** Kein Dokument wird geschrieben oder gelöscht, für das kein

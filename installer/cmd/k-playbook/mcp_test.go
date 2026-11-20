@@ -316,8 +316,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 29 {
-		t.Fatalf("tools/list meldet nicht genau neunundzwanzig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 30 {
+		t.Fatalf("tools/list meldet nicht genau dreißig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -355,6 +355,7 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_gui_status",
 		"k_playbook_notify",
 		"k_playbook_findings_check",
+		"k_playbook_lock",
 	} {
 		if !found[name] {
 			t.Errorf("tools/list meldet %s nicht: %v", name, found)
@@ -390,7 +391,7 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 29 {
+	if !ok || len(tools) != 30 {
 		t.Fatalf("tools/list meldet nicht neunundzwanzig Werkzeuge: %v", responses[1])
 	}
 
@@ -549,8 +550,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 28 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 28", withProjectDir)
+	if withProjectDir != 29 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 29", withProjectDir)
 	}
 }
 
@@ -595,6 +596,7 @@ var projectDirCalls = []struct {
 	{name: "k_playbook_doc_read", args: map[string]any{"ref": "k-playbook:/instructions/always/"}},
 	{name: "k_playbook_doc_create", args: map[string]any{"kind": "tasks", "name": "ohne-projectdir"}},
 	{name: "k_playbook_findings_check", args: map[string]any{}},
+	{name: "k_playbook_lock", args: map[string]any{"action": "status"}},
 }
 
 // TestFehlendesProjectDirIstEingabefehler prüft über das Protokoll, dass ein

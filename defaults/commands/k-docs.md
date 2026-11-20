@@ -108,6 +108,11 @@ gelesen, wo eine Prüfung unten es verlangt.
   `severity`, `last-reviewed`, ein eigener Block wie `inventory:` oder ein anderes Feld),
   ist das ein **alter Kopf**: je Dokument eine Zeile mit den Feldern. Der nächste Lauf
   seines Erzeugers schreibt ihn neu; ein Handdokument zieht der Nutzer nach.
+- **Sprache.** Die Doku unter `keph:/docs/` ist englisch. Sind `title` oder `description`
+  eines Dokuments erkennbar nicht englisch, etwa deutsch, ist das eine Lücke: je Dokument
+  eine Zeile. Ein erzeugtes Dokument wird erst englisch, wenn ein Lauf seines Erzeugers es
+  umschreibt — bei `code` braucht das einen Auftrag (`code` einreihen); ein Handdokument
+  übersetzt der Nutzer.
 - **Schreiber.** `generated.by` passt nicht zum Verzeichnis laut Tabelle in Schritt 1; ein
   Dokument unter `manual/` oder `sources/` trägt `generated`; ein Dokument in einem
   Erzeuger-Verzeichnis trägt keins.

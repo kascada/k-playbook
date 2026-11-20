@@ -14,8 +14,8 @@
 // `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
 // `version` nennt die Version des Programms, `gui status` nennt Zustand und
 // Adresse der Oberfläche, ohne sie anzufassen, `stop` beendet den
-// Hintergrunddienst der Oberfläche, und `notify` zeigt dem Nutzer eine
-// Meldung auf diesem Rechner.
+// Hintergrunddienst der Oberfläche, `notify` zeigt dem Nutzer eine
+// Meldung auf diesem Rechner, und `lock` ist die Sperre des Arbeitsbaums.
 package main
 
 import (
@@ -177,6 +177,10 @@ func run(args []string) error {
 		// gefragt wurde, und nichts daneben — und sie läuft später aus
 		// Hooks, deren Ausgabe niemand liest.
 		return runNotify(os.Stdout, args[1:])
+	case "lock":
+		// Ohne Wirt-Pflege wie health: die Ausgabe ist der Stand der Sperre,
+		// als Klartext oder JSON, und ein Skript liest den Exit-Code.
+		return runLock(os.Stdout, args[1:])
 	case "troubleshooting":
 		// Ohne Wirt-Pflege wie health: der Befehl soll gerade bei einer
 		// kaputten Umgebung laufen und nichts daneben anfassen.
@@ -466,6 +470,12 @@ Unterkommandos:
             notify-send. Ohne Weg zum Nutzer — etwa im Devcontainer — endet
             es mit Fehler und nennt den Grund. Dasselbe wie das MCP-Werkzeug
             k_playbook_notify.
+  lock      Die Sperre des Arbeitsbaums, die /k-task-run nimmt: k-playbook
+            lock status|release|acquire|wait|check [--token <marke>]
+            [--force] [--json]. status nennt den Halter oder frei; release
+            --force gibt eine Sperre frei, deren Sitzung ohne Freigabe
+            endete. Exit-Code 3 bei belegt oder verloren. Dasselbe wie das
+            MCP-Werkzeug k_playbook_lock.
   help      Diese Übersicht.
 `)
 }

@@ -311,6 +311,8 @@ installer/
 │   ├── stop.go                  Subkommando stop
 │   ├── notify.go                Subkommando notify: Meldung auf diesem Rechner über
 │   │                            notify.Send, --title, --body, --sound, --json
+│   ├── lock.go                  Subkommando lock: Sperre des Arbeitsbaums über worklock,
+│   │                            status, release, acquire, wait, check (Task 171)
 │   ├── version.go               Subkommando version: die gestempelte Version, eine Zeile
 │   ├── scan.go                  Subkommando scan: Lauf lesen, Auswahl, Ausführung anstoßen
 │   │                            (zurzeit gesperrt, review.Paused)
@@ -394,6 +396,11 @@ installer/
 ├── internal/notify/
 │   └── notify.go                Meldung an den Nutzer: Kanäle windows-toast (WSL),
 │                                macos, linux-desktop; ehrlich ohne Kanal
+├── internal/worklock/
+│   ├── worklock.go              Sperre des Arbeitsbaums je Projekt: Marke, flock,
+│   │                            Sperrdatei unter .k-playbook/work/lock/ (Task 171)
+│   └── holder.go                Halter-Prozess (Client über dem MCP-Server) und
+│                                die Prüfung „verwaist“
 ├── internal/guiproc/
 │   ├── guiproc.go               Schlüssel, Laufzeitverzeichnis, Laufzeitdatei (O_EXCL)
 │   ├── classify.go              Einordnung in fünf Ergebnisse, Antwort von /api/health
@@ -616,6 +623,8 @@ installer/
 │   ├── gui.go                   Werkzeug k_playbook_gui_status (Hülle über
 │   │                            guiproc.StatusForDir)
 │   ├── notify.go                Werkzeug k_playbook_notify (Hülle über notify.Send)
+│   ├── lock.go                  Werkzeug k_playbook_lock (Hülle über worklock, Halter
+│   │                            ist der Client-Prozess)
 │   └── findings.go              Werkzeug k_playbook_findings_check (Hülle über
 │                                project.CheckFindings, Ergebnis unter check)
 ├── internal/review/
@@ -4342,7 +4351,8 @@ gesperrt, sie antworten mit `reviews_paused` (§„Die Review-Wege pausieren") �
 `k-playbook briefing`, `k_playbook_health` (`health.go`) um `health.Check`, wie
 `k-playbook health` (§„Umgebungsprüfung: `health`"), und `k_playbook_gui_status` (`gui.go`) um `guiproc.StatusForDir`, wie
 `k-playbook gui status` (§„Zustand erfragen: `gui status`"), und `k_playbook_notify` (`notify.go`) um
-`notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"), und `k_playbook_findings_check`
+`notify.Send`, wie `k-playbook notify` (§„Fertig-Meldung: `notify`"), `k_playbook_lock` (`lock.go`) um
+`worklock`, wie `k-playbook lock` (§„Sperre des Arbeitsbaums: `lock`“), und `k_playbook_findings_check`
 (`findings.go`) um `project.CheckFindings`, wie `k-playbook findings check` (§„Vorprüfung der
 Befund-Queue: `findings check`“). Keine der Hüllen trägt eigene Fachlogik; sie
 lösen das Projekt über `projectDir` auf, rufen die Funktion in `project/` und packen die
@@ -5329,6 +5339,35 @@ Die Container-Erkennung lag vorher in `webui/browser.go`; sie liegt jetzt in
 brauchen. Was bewusst noch fehlt: ein rechnerlokaler Schalter gegen den Ton (einen Platz
 dafür gibt es noch nicht), Hooks in den Assistenten, die am Ende
 eines Turns `k-playbook notify` rufen, und ein Weg vom Devcontainer zum Desktop davor.
+
+### Sperre des Arbeitsbaums: `lock`
+
+`k-playbook lock` und `k_playbook_lock` rufen dieselben Funktionen in `internal/worklock/`:
+die Sperre, mit der `/k-task-run` dafür sorgt, dass zu einer Zeit höchstens ein Lauf den
+Arbeitsbaum eines Projekts ändert (Task 171). Vertrag und Antworten stehen im Handbuch
+(`k-playbook:/docs/handbook/mcp.md`, „Working-Tree Lock“); hier das, was der Code entscheidet.
+
+- **Ort.** `<projekt>/.k-playbook/work/lock/arbeitsbaum.json`, daneben `arbeitsbaum.mutex`
+  für `flock` und eine `.gitignore` mit `*`, die das Verzeichnis selbst aus Git nimmt — die
+  Zeile `/work` in `.k-playbook/.gitignore` setzt nur `docs checkout`, nicht jedes Projekt
+  hat sie. Im Arbeitsbaum sehen Host und Devcontainer dieselbe Sperre; ein Verzeichnis unter
+  dem Home sähe nur derselbe Benutzer, das Git-Verzeichnis gäbe es ohne Git nicht.
+- **Atomar** über `flock` auf die Mutex-Datei, nicht auf die Sperrdatei: die wird über eine
+  temporäre Datei und `rename` ersetzt. `flock` gilt je geöffneter Datei, also auch zwischen
+  zwei Aufrufen im selben Prozess. `status` und `check` legen nichts an.
+- **Marke** `<zähler>-<zufall>`; die Datei bleibt nach dem Freigeben stehen und trägt den
+  Zähler und die letzten 20 Enden von Marken mit Grund, damit `check` einen Verlust erklären
+  kann.
+- **Halter** ist der Vorfahr des MCP-Servers namens `claude` (Rolle Sitzung) oder `opencode`
+  (Rolle geteilt), gesucht über `/proc/<pid>/stat` und `/proc/<pid>/exe`; die CLI hat keinen.
+  Sicher verwaist nur ein Sitzungsprozess auf demselben Rechner (`hostname`, `boot_id`) im
+  selben PID-Namensraum, dessen PID samt Startzeit nicht mehr passt. Grund: Claude Code
+  startet einen gestorbenen MCP-Server in der lebenden Sitzung neu, unter demselben `claude`;
+  OpenCode 2 teilt Dienst und Server zwischen allen Sitzungen.
+- **`wait`** fragt einmal je Sekunde und hält dazwischen nichts fest; das SDK bearbeitet
+  `tools/call` nebenläufig, also kommen `check` und `release` über denselben Server durch
+  (`TestLockWaitUndReleaseUeberDenselbenServer` gegen den echten Prozess). Frist höchstens
+  100 Sekunden, unter den 120 Sekunden, nach denen ein Bash-Aufruf in beiden Clients endet.
 
 ### Browser öffnen
 

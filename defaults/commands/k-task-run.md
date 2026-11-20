@@ -1,7 +1,13 @@
 # k-task-run
 
 Führt Tasks aus der Projekt-Collection aus. Ohne Argument die eigenen offenen Tasks in
-Nummernreihenfolge; mit Argument einen `keph:`-Verweis oder eine Tasknummer.
+Nummernreihenfolge; mit Argument einen `keph:`-Verweis oder eine Tasknummer. Steht dahinter
+— oder allein — das Wort `refine`, gehen ungeprüfte Tasks vorher ungefragt durch
+`/k-task-refine` (Schritt 3).
+
+In einem Projekt ändert zu einer Zeit höchstens ein `/k-task-run` den Arbeitsbaum: Vor der
+ersten Änderung nimmt der Lauf die Sperre bei k-playbook, wartet, solange ein anderer Run sie
+hält, und prüft an festen Stellen nach, ob er sie noch hält („Sperre des Arbeitsbaums“).
 
 Der Hauptkontext steuert und fragt, Sub-Agenten arbeiten und schreiben. Ausführung, Diff
 und Code-Review laufen je Task in Sub-Agenten, die ihre Ergebnisse selbst an das
@@ -27,6 +33,9 @@ Produces:
 - Je Review-Befund „wichtig“ oder übergangenem kritischen Befund eines Tasks unter `done/`,
   den der Nutzer in der Abfrage am Ende übernimmt, ein Todo über `k_playbook_todo_add`
   (Schritt 7).
+- Für die Dauer von Schritt 5 die Sperre des Arbeitsbaums in
+  `.k-playbook/work/lock/` des Projekts, genommen und freigegeben über `k_playbook_lock`.
+- Mit `refine` an jedem ungeprüften Task das `## Review-Log` von `/k-task-refine` (Schritt 3).
 
 ## Schritt 1 — Briefing und Form
 
@@ -88,14 +97,85 @@ Abschnitt „Lesen und schreiben“; dieser Command wiederholt es nicht. Command
 
 Vor jeder Rückfrage an den Nutzer und am Ende des Commands meldet sich der Hauptkontext auf
 dem Rechner des Nutzers. Die Stellen in diesem Command: die Rückfragen in Schritt 2 (mehrere
-Treffer, erledigter Task), die Rückfrage in Schritt 3, die Optionen in 5a und 5a.2, der
-Blocker in 5d, jede Rückfrage nach `foreign_change`, die Stopp-Abfrage in 5f, die Abfrage
-der Befunde als Todo in Schritt 7 (`Rückfrage: Befunde als Todo`) und die Zusammenfassung in
-Schritt 7.
+Treffer, erledigter Task), die Rückfrage in Schritt 3, im Modus `refine` jede Rückfrage und
+jedes `Foreign-Change:` eines Refine-Sub-Agenten und ein Hinweis zur Reihenfolge, der der
+Nummernfolge widerspricht (Schritt 3), die Rückfragen der Sperre (`Rückfrage: Sperre
+unsicher`, `Rückfrage: Sperre verloren`, `Rückfrage: Marke unbekannt`, „Sperre des
+Arbeitsbaums“), die Optionen in 5a und 5a.2, der Blocker in 5d, jede Rückfrage nach
+`foreign_change`, die Stopp-Abfrage in 5f, die Abfrage der Befunde als Todo in Schritt 7
+(`Rückfrage: Befunde als Todo`), das Ende nach einer leeren Liste („Liste neu prüfen“) und
+die Zusammenfassung in Schritt 7.
 
 include: _task/fertig-meldung.md
 
+## Sperre des Arbeitsbaums
+
+Die Sperre hält und vergibt k-playbook, nicht der Hauptkontext: Was das Werkzeug
+`k_playbook_lock` (MCP-Server `k-playbook`, `projectDir` = `context.project.dir`) sagt, gilt
+— auch gegen das, was die Sitzung von sich glaubt. Gesperrt wird je Projekt. Die Sperre nimmt
+und prüft allein der Hauptkontext, nie ein Sub-Agent; Commits eines Sub-Agenten deckt die
+Prüfung vor seiner Delegation ab. Ein Task mit `Target repo` außerhalb des Projekts ist durch
+sie nicht geschützt.
+
+- **Marke.** `acquire` und `wait` geben bei `state: acquired` eine Marke `token` zurück. Der
+  Hauptkontext merkt sie sich als `LOCK_TOKEN` und gibt sie bei `check` und `release` mit;
+  sie ist für die Sperre, was `REVISION` für den Task ist. Er nimmt nie neu, solange er eine
+  Marke hält, und nie still nach einem Verlust.
+- **Halter.** `state: busy` nennt unter `holder` den Halter: `client`, `session`, `purpose`,
+  `since`, `number` (die Nummer seiner Marke) und `orphaned` — `no`, `yes` oder `uncertain`,
+  mit dem Grund in `orphanedWhy`. Einen sicher verwaisten Halter (`yes`) übernimmt `acquire`
+  selbst und nennt ihn unter `takenOver`.
+- **Ohne MCP-Werkzeug** gilt dasselbe über die Shell: `k-playbook lock <aktion> --json`
+  mit `--token`, `--purpose`, `--session`, `--force`, `--expect` (Exit-Code 3 bei `busy`
+  oder `lost`). So genommen kennt die Sperre keinen langlebigen Halter und gilt nie als
+  sicher verwaist; endet die Sitzung ohne Freigabe, gibt der Nutzer mit
+  `k-playbook lock release --force` frei.
+
+**Prüfen.** `check` mit `LOCK_TOKEN` vor dem Branch-Wechsel in 5a.1, vor jedem Snapshot
+(5b.1), vor jeder Delegation an den Ausführungs- oder Behebungs-Sub-Agenten (5c, 5f
+Stopp-Abfrage (a)), vor dem Push in 5f.1 und nach jeder Antwort des Nutzers während
+Schritt 5 — auch nach einer Antwort, mit der eine unterbrochene Sitzung fortgesetzt wird.
+`state: held` heißt weiter.
+
+**Verloren.** `state: lost` heißt: anhalten, nichts mehr am Arbeitsbaum ändern.
+Fertig-Meldung (`Rückfrage: Sperre verloren`), dann:
+
+```
+Sperre verloren — <reason: freigegeben (released) | vom Nutzer freigegeben (forced) |
+als verwaist übernommen (taken_over) | Sperrdatei fehlte (file_missing) | unbekannt>
+Halter jetzt: <holder in einer Zeile | frei>
+Seit dem letzten check kann noch geschrieben worden sein; ein laufender Sub-Agent wurde nicht
+unterbrochen.
+
+Wie weiter?
+  (a) warten und neu nehmen
+  (b) abbrechen
+```
+
+(a) nimmt neu wie unter „Sperre nehmen“ (Schritt 5), prüft danach die Liste neu und setzt am
+Prüfpunkt fort; (b) verlässt Schritt 5 (Freigeben entfällt, die Sperre gehört dem Lauf nicht
+mehr).
+
+**Marke unbekannt.** Kennt der Hauptkontext `LOCK_TOKEN` nicht mehr — etwa nach einer
+Zusammenfassung des Kontexts —, ruft er `status` und fragt dann immer den Nutzer, gleich, wer
+der Halter ist: Fertig-Meldung (`Rückfrage: Marke unbekannt`), die Frage nennt den Halter aus
+`status` oder „frei“ und bietet (a) neu nehmen (warten, bis frei), (b) freigeben und neu
+nehmen (`release` mit `force` und `expect` = `holder.number`) oder (c) abbrechen. Nie still
+übernehmen oder neu nehmen.
+
+**Freigeben** mit `release` und `LOCK_TOKEN` an genau einer Stelle: wenn der Lauf Schritt 5
+verlässt (5g), also nach 5f.1 des letzten Tasks und vor Schritt 6 — auch nach einem Anhalten,
+Abbruch oder `foreign_change` — und auf jedem Abbruchweg davor, sobald die Sperre genommen
+ist. Bis dahin trägt jeder Task, den dieser Lauf ausgeführt hat, seine Kennzeile „ausgeführt“
+oder „abgebrochen“ oder liegt unter `done/`. Während einer Rückfrage in Schritt 5 bleibt die
+Sperre gehalten. Schritt 6 und 7 schreiben nur in die Collection und laufen ohne Sperre und
+ohne `check`. Meldet `release` `lost`, wird das in Schritt 7 genannt, nicht gefragt.
+
 ## Schritt 2 — Tasks sammeln
+
+**Wort `refine`.** Ist das letzte Wort des Arguments `refine` (Groß- und Kleinschreibung
+gleich), nimm es ab und merke `REFINE = ja`; der Rest ist das Argument. Sonst
+`REFINE = nein`.
 
 Das Argument entscheidet:
 
@@ -128,7 +208,10 @@ Das Argument entscheidet:
   Fehler.
 
 Je Task merkst du dir `TASK_REF` (der Verweis), `TASK_FILE` (der letzte Pfadteil, etwa
-`014-setup-tts.md`) und `TASK_STEM` (ohne `.md`).
+`014-setup-tts.md`) und `TASK_STEM` (ohne `.md`). Dazu merkst du dir je Task `SCHON_AUSGEFUEHRT`:
+ob die Kennzeile „ausgeführt“ jetzt schon trifft — Suche und Regel aus 5a, ohne etwas zu
+lesen. Daran erkennt die Prüfung nach dem Nehmen der Sperre, was ein anderer Run inzwischen
+ausgeführt hat (5, „Liste neu prüfen“).
 
 Kündige die Liste an, bevor etwas beginnt. Prüfe den **letzten** Task auf einen Abschnitt
 `## Intent` (`k_playbook_doc_read` mit `section: "## Intent"`; `section_not_found` heißt:
@@ -158,7 +241,9 @@ Ein Task, der nie durch `/k-task-refine` gegangen ist, wurde nie gegengelesen. P
 jeden gesammelten Task mit `k_playbook_doc_grep` (`^## Review-Log`, `count_only`), ob er ein
 `## Review-Log` trägt; gelesen wird dafür nichts.
 
-Tragen **alle** Tasks ein Review-Log: weiter, ohne Rückfrage.
+Tragen **alle** Tasks ein Review-Log: weiter, ohne Rückfrage. Mit `REFINE = ja` gehen die
+ungeprüften zuerst durch den Modus `refine` (unten); die Rückfrage gilt dann nur den Tasks,
+die dort auf sie zurückfallen, und nennt je Task den Grund.
 
 Fehlt es mindestens einem: erst die Fertig-Meldung (`Rückfrage: ohne Task-Refine`), dann die
 betroffenen Tasks in **einer** Nachricht nennen und fragen:
@@ -182,6 +267,49 @@ zu ändern war (dort mit dem Vermerk „keine Änderungen“). Ein fehlender Blo
 dieser Task ist nie durch Task-Refine gegangen. Trotzdem bleibt es eine Rückfrage und kein
 Abbruch: Ein von Hand geschriebener oder aus einem anderen Projekt übernommener Task kann
 sachlich in Ordnung sein — das zu entscheiden ist Sache des Nutzers, nicht des Commands.
+
+**Modus `refine`.** Mit `REFINE = ja` fragt Schritt 3 nicht, sondern lässt genau die
+ungeprüften Tasks nach `k-playbook:/commands/k-task-refine.md` prüfen — vor dem Nehmen der
+Sperre, damit sie während des Prüfens nicht gehalten wird. Der Hauptkontext moderiert nicht
+selbst und sieht keine Ausgabe von Critic und Editor; er liest aus dem Refine-Text nur die
+Abschnitte, die er braucht (`k_playbook_doc_read` mit `section`).
+
+- **Ohne zweite Ebene kein Refine.** Jeder Refine läuft in einem Sub-Agenten, der selbst
+  Critic und Editor startet. Kann der Client das nicht — in OpenCode kann ein Sub-Agent in der
+  Grundeinstellung keine Sub-Agenten starten (Rückfall in Schritt 5 des Refine-Texts) —,
+  prüft der Hauptkontext nicht selbst: Alle ungeprüften Tasks fallen auf die Rückfrage oben
+  zurück, mit dem Grund „refine: dieser Client kann keine Sub-Agenten in Sub-Agenten
+  starten“.
+- **Ohne Argument** (`/k-task-run refine`): wie `/k-task-refine` ohne Argument — die
+  ungeprüften Tasks der Liste sind `REVIEW_TARGETS`, die geprüften `UEBRIGE_TASKS`. Der
+  Hauptkontext bildet die Gruppen nach Schritt 3, prüft sie nach Schritt 5 (Übergabe, Regeln,
+  Rückgabe, Auswerten) und lässt danach den Überschneidungs-Critic nach Schritt 15 laufen,
+  jeweils des Refine-Texts. Dessen Schritte 4 und 16 entfallen: keine Startübersicht, keine
+  Schluss-Fertig-Meldung, kein Folge-Command.
+- **Mit Argument** (`/k-task-run <ref-or-number> refine`): Ist das Ziel ungeprüft, prüft es
+  ein Sub-Agent als Gruppe mit einem Task, mit demselben Auftrag, derselben Rückgabe und
+  derselben Fortsetzung wie nach Schritt 5 des Refine-Texts; ohne Überschneidungs-Critic und
+  ohne Hinweise zur Reihenfolge. Ein schon geprüftes Ziel geht nicht in den Refine; die
+  Rückfrage „schon geprüft“ kommt nicht vor.
+- **Rückgaben.** Ausgewertet wie in Schritt 5 des Refine-Texts, „Auswerten“, mit diesen
+  Abweichungen: Ohne Rückfrage weiter geht nur ein Task, für den `Ergebnis: geprüft`
+  zurückkommt, auch nach einer Fortsetzung. Bei `rückfrage` oder `Foreign-Change:`
+  Fertig-Meldung (`Rückfrage: <worum es geht>` bzw. `Rückfrage: fremder Schreiber`), dann die
+  Frage an den Nutzer und je nach Antwort die Fortsetzung dort (neuer Sub-Agent mit
+  `Zwischenstand:`, Revision und Antwort). `keine-subagenten`, `abgebrochen` ohne
+  `Foreign-Change:` und eine fehlende oder formwidrige Rückgabe: Dieser Task fällt auf die
+  Rückfrage oben zurück, die den Grund nennt; der Hauptkontext prüft nie selbst. Lehnt der
+  Nutzer eine Fortsetzung ab, fällt der Task ebenso zurück.
+- **Danach** in der Ausgabe kurz je Ziel `Refine: <TASK_FILE> — <Ergebnis>, Runden <n>,
+  gefixt <n>, offen <n>`, dieselben Zeilen später in Schritt 7. Hinweise zur Reihenfolge aus
+  dem Überschneidungs-Critic werden angezeigt; die Reihenfolge bleibt die nach Nummer.
+  Empfiehlt ein Hinweis eine andere Reihenfolge, ist das eine Rückfrage an den Nutzer
+  (Fertig-Meldung vorher, `Rückfrage: Reihenfolge`): nach Nummer weiter oder abbrechen.
+- Dann liest der Hauptkontext `## Intent` des letzten Tasks und `## Tools` jedes Tasks neu, wie
+  in Schritt 2; hat sich die Werkzeugliste geändert, nennt er sie erneut. Weiter mit der
+  Rückfrage oben für zurückgefallene Tasks, sonst mit Schritt 4, ohne erneute Rückfrage.
+
+Ohne `refine` bleibt Schritt 3, wie oben beschrieben.
 
 ## Schritt 4 — Diff und Review vorbereiten
 
@@ -211,6 +339,54 @@ Mit `DIFF_ENABLED=true`:
   Task-Dokument liegt in der Collection und ist nie Teil des Diffs.
 
 ## Schritt 5 — Tasks nacheinander ausführen
+
+### Sperre nehmen
+
+Vor dem ersten Task, vor der ersten Änderung am Arbeitsbaum — nach Schritt 3, im Modus
+`refine` also nach dem Refine —, nimmt der Hauptkontext die Sperre („Sperre des
+Arbeitsbaums“): `k_playbook_lock` mit `action: acquire`, `purpose` =
+`/k-task-run <TASK_FILE> [, <TASK_FILE> …]` und `session` = die Kennung aus der Zeile
+`Sitzung:` des Briefings.
+
+- `acquired`: `LOCK_TOKEN` merken. Nennt die Antwort `takenOver`, sagt der Hauptkontext in
+  einer Zeile, wessen verwaiste Sperre übernommen wurde.
+- `busy`: melden, ohne Rückfrage, und warten:
+
+  ```
+  Arbeitsbaum gesperrt von <client>, Sitzung <session>, wozu: <purpose>, seit <since>.
+  Warte, bis die Sperre frei ist. Abbrechen jederzeit; freigeben nur, wenn der andere Lauf
+  sicher nicht mehr arbeitet: k-playbook lock release --force
+  ```
+
+  Dann `wait` in Schleife (je Aufruf die Frist des Werkzeugs, ohne `seconds`), ohne
+  Zeitgrenze, bis `acquired`. Ist `holder.orphaned` `uncertain`, kommt vorher eine
+  Rückfrage, höchstens einmal je Halter, erkannt an `holder.number`: Fertig-Meldung
+  (`Rückfrage: Sperre unsicher`), dann die Meldung oben mit `orphanedWhy` und der Frage
+  „(a) warten / (b) freigeben und übernehmen / (c) abbrechen“. (a) wartet ohne weitere
+  Rückfrage, bis frei; (b) ruft `release` mit `force` und `expect` = `holder.number`, dann
+  wieder `acquire`; (c) beendet den Lauf ohne Sperre und mit der Fertig-Meldung
+  `abgebrochen`. Die Wartezeit merkt sich der Hauptkontext für Schritt 7.
+
+**Liste neu prüfen.** Nach dem Nehmen, auch nach dem Warten, prüft der Hauptkontext die
+Liste aus Schritt 2 neu. Heraus fällt nur, was sich seit Schritt 2 geändert hat:
+
+- ein Task, der inzwischen unter `done/` liegt oder nicht mehr gefunden wird — ein
+  `not_found` direkt nach dem Wieder-Öffnen in Schritt 2 ist Replica-Nachlauf, kein Grund;
+- ein Task mit `SCHON_AUSGEFUEHRT = nein`, an dem die Kennzeile „ausgeführt“ jetzt trifft
+  (Suche und Regel aus 5a, nur nach der letzten Zeile „wieder geöffnet“).
+
+Ein solcher Task fällt ohne Rückfrage heraus und wird in der Ausgabe genannt. Alles andere
+bleibt und läuft durch 5a wie bisher, auch ein Task, der schon vor Schritt 2 ausgeführt, aber
+nicht abgeschlossen war. Hält der Hauptkontext für einen Task schon eine eigene `REVISION`
+(nach dem Wieder-Öffnen in Schritt 2), vergleicht er sie mit der Revision dieser Prüfung;
+weicht sie nach dem Replica-Nachlauf ab, gilt `foreign_change` (Schritt 1), kein stilles
+Neuholen. Für die übrigen Tasks setzt 5a `REVISION` wie bisher.
+
+Hat sich die Liste geändert, liest der Hauptkontext `## Intent` (letzter Task) und
+`## Tools` neu, wie nach dem Refine. Ist sie leer, gibt er die Sperre frei, meldet das und
+endet mit der Fertig-Meldung `fertig` — Schritt 6 und 7 entfallen.
+
+### Die Tasks
 
 Für jeden Task, **streng nacheinander** (nie parallel — zwei Agenten dürfen nicht zugleich
 Code ändern):
@@ -324,7 +500,7 @@ Vor der Delegation der Branch-Preflight in der Ausführungswurzel:
 2. Prüfe den Dirty-State mit `git status --short`.
 3. Ist er nicht leer: anhalten und die Dateien zeigen. Weiter nur, wenn der Nutzer ausdrücklich
    bestätigt, dass diese Dateien für den Task erwartet sind; sonst nicht delegieren.
-4. Ist `Work branch` gesetzt:
+4. Ist `Work branch` gesetzt (vor einem Wechsel `check` der Sperre):
    - schon darauf: weiter;
    - existiert er lokal: `git switch <Work branch>`;
    - sonst, wenn `Base branch` gesetzt und nicht `<manual>` ist: auf `Base branch` wechseln und
@@ -394,7 +570,7 @@ Task fest, samt nicht committeter und ungetrackter Änderungen. Das Review vergl
 den Stand nach dem Task damit, einschließlich neu angelegter Dateien. In den Hauptkontext
 gelangt nur seine Kennung.
 
-Der Snapshot gehört zum Task, nicht zu einer Delegation. Er entsteht beim ersten Start des
+Vor dem Anlegen `check` der Sperre. Der Snapshot gehört zum Task, nicht zu einer Delegation. Er entsteht beim ersten Start des
 Tasks — unmittelbar vor seiner ersten Delegation, nach dem Branch-Preflight, in der
 Ausführungswurzel — und gilt für jeden weiteren Start: nach 5d und in jedem späteren Lauf,
 ob der offene Etappen fortsetzt oder von vorn beginnt. Ein neuer Snapshot enthielte schon
@@ -458,7 +634,7 @@ Schlägt ein Aufruf fehl, hält der Command vor der Delegation an und fragt den 
 
 ### 5c — An den Sub-Agenten delegieren
 
-Vorher die Fortschrittszeilen zählen (`k_playbook_doc_grep`,
+Vorher `check` der Sperre, dann die Fortschrittszeilen zählen (`k_playbook_doc_grep`,
 `^<!-- k-task-run: etappe [0-9]+ erledigt `, `count_only`) und Anzahl und Revision merken;
 die Revision muss `REVISION` sein (Revisionskette, Schritt 1, samt Replica-Nachlauf nach
 `k-playbook:/instructions/on-demand/tasks.md`).
@@ -669,7 +845,7 @@ Bei den anderen Gründen steht statt der Befundzeilen `<TASK_FILE>: kein gültig
 <Grund>` bzw. `<TASK_FILE>: Review nur seit Fortsetzung — ein Fehler aus dem früheren
 Versuch bleibt ungeprüft`.
 
-- **(a) beheben lassen.** Ein General-Purpose-Sub-Agent bekommt `TASK_REF`, `REVISION`, den
+- **(a) beheben lassen.** Nach `check` der Sperre bekommt ein General-Purpose-Sub-Agent `TASK_REF`, `REVISION`, den
   Rahmen aus 5c (Ausführungswurzel, `projectDir`, Branch, Preflight) und die kritischen
   Befunde. Er behebt nur diese, schreibt nichts in den Task, fragt den Nutzer nicht, meldet
   eine offene Entscheidung unter „Blocker“ und gibt das Format aus 5c zurück (`Revision:` ist
@@ -793,7 +969,7 @@ Preflight:
    dass vor dem PR ein Commit nötig ist.
 4. Prüfen, dass der Branch einen Upstream hat. Ohne Upstream vor dem Push fragen; nie still
    pushen.
-5. Pushen. Mit Dienst:
+5. `check` der Sperre, dann pushen. Mit Dienst:
 
    ```bash
    k-playbook github run <GH_SERVICE> --write -- git -C "<EXEC_ROOT>" push -u origin <Work branch>
@@ -838,6 +1014,9 @@ Weiter mit dem nächsten Task der Liste. Ist ein Task fehlgeschlagen (5e), angeh
 Schritt 5, oder 5a, Option (b)) oder nach `foreign_change` liegen geblieben: anhalten — keine
 weiteren Tasks. Auch dann folgen Schritt 6, soweit er greift, und Schritt 7 mit der Abfrage
 der Befunde aus den bis dahin abgeschlossenen Tasks.
+
+Kein weiterer Task — nach dem letzten oder nach einem Anhalten —: Sperre freigeben
+(`release` mit `LOCK_TOKEN`, „Sperre des Arbeitsbaums“), erst dann Schritt 6.
 
 ## Schritt 6 — Intent-Alignment-Check
 
@@ -982,6 +1161,9 @@ Abgeschlossen: <Tasks, die der Nutzer in 5a, Option (a), abgeschlossen hat>
 Angehalten:    <TASK_FILE> - <Grund>
 Abgebrochen:   <TASK_FILE, falls vorhanden> - <Grund>
 Übersprungen:  <TASK_FILEs, falls vorhanden>
+Refine:        <je Ziel: TASK_FILE — Ergebnis, Runden, gefixt, offen> | – (ohne refine)
+Sperre:        sofort genommen | nach <dauer> Warten auf <holder> | übernommen von <holder>
+               [; verloren — <reason>] [; Freigabe meldete lost]
 Intent:        Ja / Teilweise / Nein / - (kein Intent)
 Todos:         angelegt <kennung> [, <kennung>] | keine übernommen | – (keine Befunde)
 Doku:          eingereiht <verweis> [, <verweis>] | schon eingereiht <verweis> | kein Code geändert
@@ -1003,6 +1185,10 @@ Je Task unter „Abgeschlossen“ steht die Zeile `Review:` aus der Rückgabe de
 dem Zusatz „— letzter Lauf“, darunter die gesammelten Zeilen wie oben. Bei
 `Review: kein Abschnitt` lautet sie `Review: kein Abschnitt im letzten Lauf`, bei einer
 Rückgabe in anderer Form `Review: Befunde nicht gelesen`.
+
+Die Zeile „Sperre“ nennt die Wartezeit aus „Sperre nehmen“, einen übernommenen Halter und
+einen Verlust samt Grund; „Refine“ die Zeilen aus dem Modus `refine` (Schritt 3), auch für
+Tasks, die auf die Rückfrage zurückfielen.
 
 Bei „Abgeschlossen“ steht ein offener PR-Schritt dabei, wenn der Task `PR required: true`
 trägt. Ein nach `foreign_change` liegen gebliebener Task steht unter „Angehalten“ mit dem

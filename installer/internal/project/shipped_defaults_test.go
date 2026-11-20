@@ -610,6 +610,11 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 		"Ein Auftrag, der nicht in `WORKED` steht, bleibt deshalb offen", "**Neu auschecken.**",
 		"`$ARGUMENTS` ist nicht leer → kein Lauf", "**Ohne Auftrag laufen.**", "**Einen wartenden Auftrag anfassen.**",
 		"**Einen Auftrag zu früh schließen.**", "keph:/queue/docs/done/", "`erzeuger: code`",
+		// Aufträge und alte Fassung sind Hinweise, keine Quelle: geschrieben wird
+		// nur, was der Stand aus Schritt 1 bestätigt, auch beim Text der Sub-Agenten.
+		"**Nur was der Code jetzt zeigt.**", "**Vor dem Einfügen prüfen.**",
+		"Zugeordnet wird nach dem heutigen Stand der Pfade, nicht nach dem `anlass`",
+		"**Aus dem Auftrag oder der alten Fassung schreiben.**",
 	} {
 		if !strings.Contains(squashed, needle) {
 			t.Errorf("k-docs-code.md nennt %q nicht", needle)
@@ -1598,5 +1603,62 @@ func TestKTaskRunReviewBefundeWichtigAlsTodo(t *testing.T) {
 	fertig := strings.Index(text, "Nach allen Tasks zuerst die Fertig-Meldung")
 	if nachzug < 0 || abfrage < nachzug || fertig < abfrage {
 		t.Errorf("Abfrage nicht zwischen Doku-Nachzug (%d) und Fertig-Meldung (%d): %d", nachzug, fertig, abfrage)
+	}
+}
+
+// Task 171: Die Hülle von /k-task-run nennt das Wort refine im argument-hint und
+// erlaubt das Sperr-Werkzeug; der Text nimmt die Sperre nach Schritt 3, prüft sie
+// an den festen Stellen und gibt sie beim Verlassen von Schritt 5 frei.
+func TestKTaskRunSperreUndRefine(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-task-run.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hint, allowed := "", ""
+	for _, line := range strings.Split(string(data), "\n") {
+		if value, ok := strings.CutPrefix(line, "argument-hint: "); ok {
+			hint = value
+		}
+		if value, ok := strings.CutPrefix(line, "allowed-tools: "); ok {
+			allowed = value
+		}
+	}
+	if hint != `"[ref-or-number] [refine]"` {
+		t.Errorf("argument-hint der Hülle: %q", hint)
+	}
+	for _, want := range []string{"mcp__k-playbook__k_playbook_lock", "mcp__k-playbook__k_playbook_notify",
+		"mcp__k-playbook__k_playbook_doc_append", "Agent"} {
+		if !strings.Contains(allowed, want) {
+			t.Errorf("Hülle k-task-run.md erlaubt %s nicht: %q", want, allowed)
+		}
+	}
+
+	text := readRepoDefault(t, "commands/k-task-run.md")
+	for _, want := range []string{"## Sperre des Arbeitsbaums", "`LOCK_TOKEN`", "**Wort `refine`.**",
+		"`SCHON_AUSGEFUEHRT`", "**Modus `refine`.**", "### Sperre nehmen", "**Liste neu prüfen.**",
+		"`Rückfrage: Sperre unsicher`", "`Rückfrage: Sperre verloren`", "`Rückfrage: Marke unbekannt`",
+		"k-playbook lock release --force", "Ohne `refine` bleibt Schritt 3", "Sperre:        sofort genommen",
+		"Refine:        <je Ziel"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("k-task-run.md ohne %q", want)
+		}
+	}
+	// Die Sperre wird nach Schritt 3 genommen und vor Schritt 6 freigegeben.
+	schritt3 := strings.Index(text, "## Schritt 3 — ")
+	nehmen := strings.Index(text, "### Sperre nehmen")
+	fuenfA := strings.Index(text, "### 5a — Lesen und verstehen")
+	freigeben := strings.Index(text, "Kein weiterer Task — nach dem letzten oder nach einem Anhalten —: Sperre freigeben")
+	schritt6 := strings.Index(text, "## Schritt 6 — ")
+	if schritt3 < 0 || nehmen < schritt3 || fuenfA < nehmen || freigeben < fuenfA || schritt6 < freigeben {
+		t.Errorf("Reihenfolge Schritt 3 (%d) < Sperre nehmen (%d) < 5a (%d) < Freigabe (%d) < Schritt 6 (%d) verletzt",
+			schritt3, nehmen, fuenfA, freigeben, schritt6)
+	}
+	// check vor jeder Stelle, die den Arbeitsbaum ändert.
+	for _, want := range []string{"(vor einem Wechsel `check` der Sperre)", "Vor dem Anlegen `check` der Sperre.",
+		"Vorher `check` der Sperre, dann die Fortschrittszeilen zählen", "Nach `check` der Sperre bekommt",
+		"`check` der Sperre, dann pushen."} {
+		if !strings.Contains(text, want) {
+			t.Errorf("k-task-run.md ohne Prüfstelle %q", want)
+		}
 	}
 }

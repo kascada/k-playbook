@@ -22,8 +22,8 @@ the start of a session,
 `k_playbook_health` for the errors and warnings about the project's environment,
 `k_playbook_github_test` for the test of the personal GitHub accesses against GitHub,
 `k_playbook_gui_status` for the state and the address
-of the project's interface, and `k_playbook_notify` for a desktop notification on the
-machine the server runs on.
+of the project's interface, `k_playbook_notify` for a desktop notification on the
+machine the server runs on, and `k_playbook_lock` for the working-tree lock of `/k-task-run`.
 `k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
 because a stdio server must not assume that its process working directory is the target
 project. There is no fallback to that directory.
@@ -369,6 +369,7 @@ then nothing is written and the interface says so.
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
 | `k_playbook_findings_check` | the preflight of the finding queue before `/k-befunde-einordnen`: sync the replica, check the rights `read`, `write`, `supersede`, every entry under `queue/findings/` and every finding; under `check` the result `ready`, `problems`, `sync`, `rights`, `total`, `byUser`, `skipped`, `findings`; like `k-playbook findings check --json` ([below](#findings-preflight)) |
 | `k_playbook_notify` | show the user a desktop notification (`title`, `body`, optional `sound`) on the machine the server runs on; `no_channel` when that machine has no way to the user, like `k-playbook notify` |
+| `k_playbook_lock` | the lock of the project's working tree held by `/k-task-run`: `action` `acquire`, `wait`, `check`, `release` or `status`; a token on taking, the holder when busy, `held` or `lost` with a reason on `check`; like `k-playbook lock` ([below](#working-tree-lock)) (task 171) |
 
 There is deliberately no `k_playbook_review_next_steps` tool yet. The orchestrating command
 reads the status and makes its own decision from it.
@@ -1521,6 +1522,71 @@ Questions and results must still appear in full in the chat.
 What is deliberately not there yet: a per-machine switch to turn the sound off, hooks in
 the assistants that call `k-playbook notify` when a turn ends, and a way from a devcontainer
 to the desktop in front of it.
+
+### Working-Tree Lock
+
+At any time at most one `/k-task-run` changes the working tree of a project. The lock is
+held and granted by k-playbook, not by the assistant: what `k_playbook_lock` says is what
+holds. It lives in `<project>/.k-playbook/work/lock/arbeitsbaum.json`; the directory carries
+its own `.gitignore` with `*`, so no `git add -A` (snapshot, auto-commit) ever picks it up
+and the project's `.k-playbook/.gitignore` stays untouched. Taking is atomic through `flock`
+on a neighbouring `arbeitsbaum.mutex`. One lock per project directory; a run in another
+project does not wait. The file format already carries subject (`arbeitsbaum`), kind
+(`k-task-run`), purpose, holder and token, so later kinds of occupation can build on it.
+
+Input: `projectDir`, `action`, and depending on the action `token`, `seconds` (only `wait`,
+1 to 100, default 90), `force` and `expect` (only `release`), `purpose` and `session` (only
+for display, on `acquire` and `wait`).
+
+| Action | Answer (`state`) |
+|---|---|
+| `acquire` | `acquired` with `token` and `number`; with the own still valid token as `token` the same token again (`reentrant`). Otherwise `busy` with `holder`. A holder that is certainly orphaned is taken over; the answer names it under `takenOver` |
+| `wait` | like `acquire`, but while busy it polls once a second until `seconds` are over, then `busy` with the holder. A running `wait` holds nothing: other calls of the same server -- `check` or `release` of another session sharing the server (OpenCode), the calls of the own subagents -- go through |
+| `check` | `held`, or `lost` with `reason` (`released`, `forced`, `taken_over`, `file_missing`, `unknown`) and the current `holder` (none: the lock is free). A `held` check from a new client process moves the holder to it |
+| `release` | `released`; a stale token releases nothing and answers `lost`. Without a token only with `force` -- only on the user's explicit wish --, with `expect` only while the holder still has the token with that `number` |
+| `status` | `busy` with `holder`, or `free` -- for any session, also one that no longer knows its token |
+
+`holder` carries `session`, `client`, `clientSession` (the session OpenCode passes with every
+call), `purpose`, `since`, `number` (the number of its token, never the token itself),
+`process` and `orphaned` -- `no`, `yes` or `uncertain` -- with the reason in `orphanedWhy`.
+
+**The token** is `<counter>-<random>`. The counter rises with every taking, also when the
+same session takes again after a loss; the random part keeps an old token from matching even
+when the file was deleted and the counter started anew. Taking again, checking and releasing
+depend on the token alone, never on a session id or a process.
+
+**The holder** is the client process above the server, found by walking up from the server's
+parent to a process named `claude` or `opencode`, with PID, start time (field 22 of
+`/proc/<pid>/stat`), host name, `boot_id` and PID namespace. Measured with Claude Code 2.1.328
+and OpenCode 2.3.0: Claude Code runs one `claude` process per session, which starts the
+stdio server as a child and restarts it within the living session when it dies; subagents
+run in the same process. OpenCode 2 runs every session, also `opencode run`, inside the
+service `opencode serve --service`, which starts one server per project directory, shares it
+between sessions and outlives all of them. Hence:
+
+- `orphaned: yes` only when the holder is a session process (`claude`), ran on the same host
+  since the same boot in the same PID namespace, and PID plus start time no longer match. With
+  it ends everything the session was doing; a later `claude --resume` is a new process that
+  checks its token before it goes on.
+- `uncertain` for the shared OpenCode service, alive or dead, for a holder without a process
+  (taken through the CLI), another host or namespace, and a system without `/proc` (macOS).
+  Such a lock is never taken over automatically.
+- No heartbeat: a session that waits for its user does nothing and is still alive.
+
+**Limits.** A tool call of 540 seconds ran to its end in both clients; a Bash call without an
+explicit timeout ends after 120 seconds (OpenCode kills it, Claude Code moves it to the
+background). The default and maximum of `wait` lie below that, so the same wait works through
+`k-playbook lock wait` in Bash.
+
+Error codes: `invalid_input` (missing `projectDir`, unknown `action`, `check` without
+`token`, `release` without `token` and without `force`, `seconds` out of range),
+`project_not_found`, `cancelled` (the client cancelled a running `wait`) and `failed`.
+
+The subcommand `k-playbook lock <action> [--token …] [--seconds …] [--force] [--expect …]
+[--purpose …] [--session …] [--dir …] [--json]` calls the same functions. It has no
+long-lived holder process; a lock it takes is always `uncertain`. Exit code 3 for `busy` and
+`lost`. When a session ended without releasing, the user frees the lock with
+`k-playbook lock release --force`.
 
 ## Inspecting What the Server Offers
 

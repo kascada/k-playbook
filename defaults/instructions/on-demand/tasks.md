@@ -160,7 +160,12 @@ ohne Fortschrittsverfolgung.
    `/k-task-run` fragt dann nach, und `/k-task-refine` ohne Argument nimmt nur solche Tasks.
 3. **Ausgeführt** — `/k-task-run` hat `## Ausführung` mit der Kennzeile „ausgeführt“, Diff
    und Review angehängt. Solange das Dokument nicht in `done/` liegt, ist der Task nicht
-   abgeschlossen (Review, Befunde oder eine Stopp-Abfrage offen).
+   abgeschlossen (Review, Befunde oder eine Stopp-Abfrage offen). Bevor `/k-task-run` den
+   Arbeitsbaum ändert, nimmt es bei k-playbook die Sperre des Arbeitsbaums
+   (`k_playbook_lock`, `k-playbook lock`); hält sie ein anderer Lauf im Projekt, wartet es.
+   Freigegeben wird, wenn der Lauf keinen weiteren Task mehr ausführt; bis dahin trägt jeder
+   Task, den er ausgeführt hat, seine Kennzeile oder liegt unter `done/`. Ein wartender Lauf
+   prüft nach dem Nehmen seine Liste neu und lässt aus, was inzwischen ausgeführt wurde.
 4. **Erledigt** — `k_playbook_doc_done` verschiebt das Dokument nach `done/`; der Verweis
    ändert sich auf `keph:/user/<user>/tasks/done/<datei>`. Zurück nach offen geht es mit
    `k_playbook_doc_reopen`.

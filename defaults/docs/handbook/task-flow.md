@@ -61,12 +61,12 @@ Every reviewed task receives a `## Review-Log (<date>)`, including one that need
 
 ## /k-task-run
 
-`/k-task-run [ref-or-number]` executes tasks sequentially. Without an argument it takes the own open tasks from the collection, sorted by number; with an argument a `keph:` reference or a task number. Directories are no longer an argument.
+`/k-task-run [ref-or-number] [refine]` executes tasks sequentially. Without an argument it takes the own open tasks from the collection, sorted by number; with an argument a `keph:` reference or a task number. Directories are no longer an argument. With the word `refine` -- alone or after the reference or number -- unreviewed tasks first go through `/k-task-refine` without a question (see [Mode refine](#mode-refine)).
 
 The command:
 
-- never executes tasks in parallel.
-- asks when a task has no review log and therefore has never gone through `/k-task-refine`.
+- never executes tasks in parallel, and never two runs in one project at the same time: before the first change to the working tree it takes the working-tree lock (see [The working-tree lock](#the-working-tree-lock)).
+- asks when a task has no review log and therefore has never gone through `/k-task-refine` -- unless `refine` was given and the review succeeded.
 - clarifies open questions before delegating to subagents, from the task alone.
 - has each task executed and then reviewed by subagents that append their results to the task themselves.
 - stops before a task moves to `done/` when its review reports a critical finding.
@@ -77,6 +77,68 @@ The command:
 If a task contains `### Etappe` headings, the execution subagent appends a progress line immediately after every completed stage, not only at the end, so progress survives a hard interruption. A later `/k-task-run` reads the lines and offers to resume at the first open stage. The lines are the only source of progress; nothing is inferred from the code or `git log`.
 
 If a task contains `## Ausführungskontext`, `/k-task-run` evaluates `Target repo`, `Base branch`, `Work branch`, and `PR required`, among other values. The branch/dirty-worktree preflight and, where applicable, PR handoff are then part of the flow.
+
+### The working-tree lock
+
+At any time at most one `/k-task-run` changes the working tree of a project; a second one
+waits instead of writing in between (task 171). The lock is held and granted by k-playbook
+(`k_playbook_lock`, `k-playbook lock`, see [mcp.md](./mcp.md#working-tree-lock)), not by the
+assistant: what the tool says holds, even against what a session believes about itself.
+
+- **Taking.** After step 3 -- with `refine` after the review --, before the first change to
+  the working tree, the main context calls `acquire` and keeps the token as `LOCK_TOKEN`.
+  When the lock is busy it reports the holder and the user's ways out (abort, or free it with
+  `k-playbook lock release --force`) and then calls `wait` in a loop without a time limit; a
+  waiting run continues by itself once the lock is free. A holder that is certainly orphaned
+  is taken over by `acquire` itself. For an uncertain one (the shared OpenCode service, a lock
+  taken through the CLI) the user is asked once per holder: wait, free and take over, or abort.
+- **Checking the list again.** After taking, also after waiting, the run drops only what
+  changed since it collected its list: a task that moved to `done/` or disappeared, or one
+  whose marker "ausgeführt" appeared since then. A task it reopened itself and that another
+  writer changed meanwhile is a `foreign_change`. An empty list releases the lock and ends.
+- **Checking.** `check` with the token before a branch switch, before every snapshot, before
+  every delegation to the execution or fix subagent, before the push and after every answer
+  of the user. Subagents never take or check the lock; the check before their delegation
+  covers their commits. A lost lock (`lost` with the reason: released by the user, taken over
+  as orphaned, file missing) stops the run before the next change and asks the user -- wait
+  and take again, or abort --, saying that writes may have happened since the last check; a
+  running subagent is not interrupted. A session that no longer knows its token (after a
+  context summary) asks `status` and then always the user; nothing is taken over or taken
+  again silently.
+- **Releasing** happens at one fixed point: when the run leaves step 5 (no further task, also
+  after a stop or abort), before the intent check and the summary, which only write to the
+  collection. By then every task the run executed carries its marker or lies under `done/`,
+  so a waiting run that checks its list finds that state.
+- **Without the MCP tool** the run takes the lock through `k-playbook lock` in the shell. Such
+  a lock knows no long-lived holder and is never treated as orphaned; if the session ends
+  without releasing it, the user frees it with `k-playbook lock release --force`.
+
+The lock protects only the project's own working tree: a task whose `Target repo` lies
+outside the project is not covered. `/k-task-refine`, the release, `/k-docs-code` and a
+briefing line are not part of it yet.
+
+### Mode refine
+
+`/k-task-run refine` and `/k-task-run <ref-or-number> refine` replace the question of step 3:
+the unreviewed tasks are reviewed by `/k-task-refine` first, before the lock is taken.
+
+- `/k-task-run refine` works like `/k-task-refine` without an argument: the main context forms
+  the groups, one subagent reviews each group, and the overlap Critic runs at the end. Its hints
+  on order are shown; the order stays by number, and a hint that contradicts it becomes a
+  question.
+- `/k-task-run <ref-or-number> refine` reviews the one target like `/k-task-refine <target>`,
+  but in a subagent as a group of one, without the overlap Critic. An already reviewed target
+  is not reviewed again.
+- The main context never moderates itself and sees nothing from Critic or Editor. Only a task
+  that comes back `geprüft` goes on without a question. A question of the review or a
+  `foreign_change` is asked and continued as in `/k-task-refine`. `keine-subagenten`,
+  `abgebrochen`, or a missing or malformed return lets that task fall back to the question of
+  step 3, with the reason.
+- In OpenCode a subagent cannot start subagents with the default settings, so `refine` there
+  always falls back to the question of step 3 and says why. A way of its own for OpenCode is
+  follow-up work.
+- Afterwards the main context reads the intent and the tools again and names a changed tool
+  list; the final summary carries one line per reviewed task and a line on the lock.
 
 ### A lean main context
 
