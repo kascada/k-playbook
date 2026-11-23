@@ -141,7 +141,12 @@ type docListInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 	Kind       string `json:"kind" jsonschema:"Pflicht. Die Sorte."`
 	User       string `json:"user,omitempty" jsonschema:"Wessen Dokumente: leer der eigene User, * alle, sonst ein Username. Greift nur bei Sorten mit Userbereich."`
-	Done       bool   `json:"done,omitempty" jsonschema:"Auch die Erledigten unter done/ zeigen."`
+	Done       bool   `json:"done,omitempty" jsonschema:"Auch die Erledigten unter done/ zeigen. Ohne weitere Angabe kommt eine Seite (Standard-limit), nicht alle."`
+	Number     int    `json:"number,omitempty" jsonschema:"Nur Dokumente mit dieser Nummer (führende Ziffernfolge des Dateinamens, als Zahl verglichen: 7 und 007 sind gleich); trifft mehr als eines, kommen alle. Bei einer Sorte ohne Nummern invalid_input."`
+	Name       string `json:"name,omitempty" jsonschema:"Nur Dokumente, deren Dateiname diesen Teilstring enthält, ohne Beachtung der Groß- und Kleinschreibung."`
+	Limit      int    `json:"limit,omitempty" jsonschema:"Höchstens so viele Einträge; Standard 50, Obergrenze 200 mit compact, 50 ohne. Zusätzlich bricht die Seite bei etwa 15000 Zeichen ab (mindestens ein Eintrag); dann sind truncated und next gesetzt."`
+	After      string `json:"after,omitempty" jsonschema:"Der ref des letzten Eintrags der vorigen Seite (next.after); geliefert werden Einträge mit größerem ref. Die Liste ist nach ref sortiert."`
+	Compact    bool   `json:"compact,omitempty" jsonschema:"Nur ref, title und done je Eintrag (problem nur, wenn es eines gibt), ohne user, created und updated."`
 }
 
 type docMoveInput struct {
@@ -220,10 +225,14 @@ func addUserDocTools(server *mcp.Server) {
 		Description: "Listet die nummerierten Dokumente einer Sorte (" + kinds + ") aus der Replica: standardmäßig " +
 			"nur die eigenen, mit user * alle, mit done auch die Erledigten. Bei Sorten ohne Userbereich greift user " +
 			"nicht; der User kommt dann aus den Autor-Metadaten. Jeder Eintrag trägt ref, title (Frontmatter title, " +
-			"sonst Dateiname), user, created, updated, done — und problem, wenn Kephalaion das Frontmatter nicht lesen " +
+			"sonst Dateiname), user, created, updated, done (mit compact nur ref, title, done) — und problem, wenn Kephalaion das Frontmatter nicht lesen " +
 			"konnte (title ist dann der Dateiname) oder der Titel vermutlich an ‚ #‘ abgeschnitten ist; gemeldet, nicht " +
 			"repariert, Abhilfe: Titel in doppelte Anführungszeichen setzen. Was ein anderer Rechner gerade angelegt hat, kann fehlen, " +
-			"bis die Replica abgeglichen ist; Eigenes steht sofort da. Hülle über " +
+			"bis die Replica abgeglichen ist; Eigenes steht sofort da. Gefiltert wird mit number (Nummer, auch mehrere " +
+			"Treffer) und name (Teilstring im Dateinamen). Die Antwort ist eine Seite: limit hat den Standard 50 " +
+			"(höchstens 200 mit compact, 50 ohne) und eine Zeichenobergrenze von etwa 15000; auch done: true ohne " +
+			"weitere Angabe liefert nur eine Seite. total nennt alle Treffer; ist die Antwort abgeschnitten, sind " +
+			"truncated und next gesetzt, und next.after geht als after in den nächsten Aufruf. Hülle über " +
 			"`k-playbook doc list`.",
 	}, docListTool)
 	mcp.AddTool(server, &mcp.Tool{
@@ -268,6 +277,15 @@ func docCreateTool(ctx context.Context, _ *mcp.CallToolRequest, input docCreateI
 	return jsonToolResult(docCreateEnvelope{OK: true, Tool: docToolCreate, ProjectDir: projectDir, DocCreated: &created}, false), nil, nil
 }
 
+// docListLimit setzt den Standard-limit an der Außenkante: List selbst hat
+// keinen, damit interne Aufrufer nicht still abgeschnitten werden.
+func docListLimit(limit int) int {
+	if limit == 0 {
+		return project.DocListDefaultLimit
+	}
+	return limit
+}
+
 func docListTool(ctx context.Context, _ *mcp.CallToolRequest, input docListInput) (*mcp.CallToolResult, any, error) {
 	fail := func(dir string, code string, err error) *mcp.CallToolResult {
 		return jsonToolResult(docListEnvelope{OK: false, Tool: docToolList, ProjectDir: dir,
@@ -281,7 +299,8 @@ func docListTool(ctx context.Context, _ *mcp.CallToolRequest, input docListInput
 	if err != nil {
 		return fail(projectDir, docErrorCode(err), err), nil, nil
 	}
-	list, err := docs.List(ctx, project.DocListOptions{Kind: input.Kind, User: input.User, Done: input.Done})
+	list, err := docs.List(ctx, project.DocListOptions{Kind: input.Kind, User: input.User, Done: input.Done,
+		Number: input.Number, Name: input.Name, Limit: docListLimit(input.Limit), After: input.After, Compact: input.Compact})
 	if err != nil {
 		return fail(projectDir, docErrorCode(err), err), nil, nil
 	}

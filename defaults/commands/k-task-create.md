@@ -82,7 +82,7 @@ Fehlerfälle:
 - `kephalaion_unavailable`: wie Schritt 1 — nichts auf die Platte, Meldung mit
   `context.kephalaion.message`.
 - `outcome_unknown`: nicht noch einmal anlegen, sondern mit `k_playbook_doc_list` (Sorte
-  `tasks`) nachsehen, ob der Task da ist; sonst den Nutzer fragen.
+  `tasks`, `name` = der Kurzname) nachsehen, ob der Task da ist; sonst den Nutzer fragen.
 
 Folge-Command: **`/k-task-refine`** — härtet den angelegten Task vor der Ausführung im
 Critic/Editor-Dialog; ohne Argument nimmt er die eigenen offenen Tasks, die noch kein

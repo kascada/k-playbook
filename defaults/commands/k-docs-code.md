@@ -303,7 +303,7 @@ ergänzt hat. Kompakte Zusammenfassung:
   schreiben.
 - Das Schreiben eines zerlegten Auftrags scheitert → die rohen Aufträge bleiben offen; der
   Lauf endet vor Schritt 5 und nennt, was schon in der Queue steht. `outcome_unknown` →
-  nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`) nachsehen.
+  nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`, `number` oder `name` des geschriebenen Auftrags) nachsehen.
 - `publish` meldet `conflict`, `hints_changed` oder `failed` → wie im Modul zu `publish`; die
   betroffenen Aufträge bleiben offen.
 - Der Scan findet keine Kernlogik, nur Framework-Standard → das sagen und keine Doku

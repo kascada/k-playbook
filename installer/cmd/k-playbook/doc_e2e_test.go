@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -452,5 +453,42 @@ func TestDocSubkommandoListMeldetFrontmatterProblem(t *testing.T) {
 	if list.Items[0].Problem != "" || list.Items[1].Problem != "Frontmatter nicht lesbar: YAML ungültig: mapping values are not allowed in this context" ||
 		!strings.HasPrefix(list.Items[2].Problem, "Titel vermutlich an ‚ #‘ abgeschnitten") || strings.Count(stdout, `"problem"`) != 2 {
 		t.Errorf("problem im JSON: %+v\n%s", list.Items, stdout)
+	}
+}
+
+// TestDocListSeiteFilterCompactCLI prüft Standard-limit, --number, --name,
+// --after und --compact von `doc list` (Task 181).
+func TestDocListSeiteFilterCompactCLI(t *testing.T) {
+	todoProject(t)
+	var names []string
+	for i := 1; i <= 55; i++ {
+		names = append(names, fmt.Sprintf("queue/findings/%03d-befund.md", i))
+	}
+	useCLIDocs(t, names...)
+
+	stdout, stderr, err := runDocCaptured(t, "list", "findings", "--json")
+	var list project.DocList
+	if err != nil || json.Unmarshal([]byte(stdout), &list) != nil || len(list.Items) != 50 || list.Total != 55 ||
+		!list.Truncated || list.Next == nil || !strings.Contains(stderr, "after=") {
+		t.Fatalf("Standard-limit: %v %q", err, stderr)
+	}
+	stdout, _, err = runDocCaptured(t, "list", "findings", "--after", list.Next.After, "--compact")
+	if err != nil || strings.Count(stdout, "\n") != 5 || strings.Count(strings.SplitN(stdout, "\n", 2)[0], "\t") != 1 {
+		t.Fatalf("zweite Seite compact: %q %v", stdout, err)
+	}
+	stdout, _, err = runDocCaptured(t, "list", "findings", "--number", "7", "--json")
+	list = project.DocList{}
+	if err != nil || json.Unmarshal([]byte(stdout), &list) != nil || len(list.Items) != 1 || list.Total != 1 {
+		t.Fatalf("--number: %q %v", stdout, err)
+	}
+	stdout, _, err = runDocCaptured(t, "list", "findings", "--name", "BEFUND", "--limit", "3")
+	if err != nil || strings.Count(stdout, "\n") != 3 {
+		t.Fatalf("--name --limit: %q %v", stdout, err)
+	}
+	if _, _, err = runDocCaptured(t, "list", "findings", "--limit", "100"); err == nil {
+		t.Fatal("--limit 100 ohne --compact müsste abgewiesen werden")
+	}
+	if _, _, err = runDocCaptured(t, "list", "findings", "--number", "x"); err == nil {
+		t.Fatal("--number x müsste abgewiesen werden")
 	}
 }

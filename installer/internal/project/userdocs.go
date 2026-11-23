@@ -687,7 +687,7 @@ const (
 	// Eintrag hat etwa 300 Zeichen, 200 davon wären wieder etwa 60 000.
 	DocListMaxLimitFull = 50
 	// DocListMaxChars ist die Zeichenobergrenze der Einträge einer Seite, wenn
-	// limit gesetzt ist. Wird sie vor limit erreicht, bricht die Seite dort
+	// limit gesetzt ist, gemessen an der eingerückten JSON-Antwort. Wird sie vor limit erreicht, bricht die Seite dort
 	// ab; mindestens ein Eintrag kommt immer.
 	DocListMaxChars = 15000
 )
@@ -902,7 +902,8 @@ func (u *UserDocs) expandUserRef(ref string) string {
 func (l *DocList) page(limit int) {
 	keep, chars := 0, 0
 	for keep < len(l.Items) && keep < limit {
-		encoded, err := json.Marshal(l.Items[keep])
+		// Gemessen wird, wie der Eintrag in der eingerückten Antwort steht.
+		encoded, err := json.MarshalIndent(l.Items[keep], "    ", "  ")
 		if err != nil {
 			break
 		}

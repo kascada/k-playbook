@@ -40,7 +40,8 @@ Zeilennummer, nach der er sucht. Seine Rückgabe ist gültig, wenn sie genau
    ab jetzt `REVISION` für alles, was noch an diesen Task angehängt wird (Schritt 6).
    `foreign_change` gibt es hier nicht. `outcome_unknown` heißt nach
    `k-playbook:/instructions/on-demand/tasks.md`, „`outcome_unknown` je Operation“: mit
-   `k_playbook_doc_list` (Sorte `tasks`, `done: true`) nachsehen, ob das Dokument unter
+   `k_playbook_doc_list` (Sorte `tasks`, `done: true`, `number` = die Nummer aus dem
+   Dateinamen von `TASK_REF`) nachsehen, ob das Dokument unter
    `done/` liegt, dann die Revision mit `k_playbook_doc_grep` und `count_only` unter
    `TASK_REF_DONE` holen; nicht noch einmal verschieben, solange es dort liegt. Ein
    `not_found` unter `TASK_REF_DONE` direkt nach dem Verschieben ist der Replica-Nachlauf.

@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -597,4 +598,55 @@ func docReadSchemaText(t *testing.T) string {
 		t.Error("Schema ohne includes")
 	}
 	return text.String()
+}
+
+// TestDocListSeitenFilterUeberHuelle prüft den Standard-limit an der
+// Außenkante, number, name, after und compact (Task 181).
+func TestDocListSeitenFilterUeberHuelle(t *testing.T) {
+	root := newDocProject(t)
+	var names []string
+	for i := 1; i <= 60; i++ {
+		names = append(names, fmt.Sprintf("queue/findings/%03d-befund.md", i))
+	}
+	useMemDocs(t, names...)
+	ctx := context.Background()
+
+	var list struct {
+		OK        bool                  `json:"ok"`
+		Total     int                   `json:"total"`
+		Truncated bool                  `json:"truncated"`
+		Next      *project.DocListNext  `json:"next"`
+		Items     []project.DocListItem `json:"items"`
+		Error     struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	result, _, _ := docListTool(ctx, nil, docListInput{ProjectDir: root, Kind: "findings"})
+	decodeEnvelope(t, result, &list)
+	if !list.OK || len(list.Items) != 50 || list.Total != 60 || !list.Truncated || list.Next == nil {
+		t.Fatalf("Standard-limit: %d Einträge, total %d, next %+v", len(list.Items), list.Total, list.Next)
+	}
+	after := list.Next.After
+	list.Items, list.Truncated, list.Next = nil, false, nil
+	result, _, _ = docListTool(ctx, nil, docListInput{ProjectDir: root, Kind: "findings", After: after})
+	decodeEnvelope(t, result, &list)
+	if len(list.Items) != 10 || list.Truncated || list.Next != nil {
+		t.Fatalf("zweite Seite: %d Einträge", len(list.Items))
+	}
+	list.Items = nil
+	result, _, _ = docListTool(ctx, nil, docListInput{ProjectDir: root, Kind: "findings", Number: 7})
+	decodeEnvelope(t, result, &list)
+	if len(list.Items) != 1 || list.Total != 1 {
+		t.Fatalf("number: %+v", list)
+	}
+	result, _, _ = docListTool(ctx, nil, docListInput{ProjectDir: root, Kind: "findings", Limit: 100})
+	decodeEnvelope(t, result, &list)
+	if !result.IsError || list.Error.Code != "invalid_input" {
+		t.Fatalf("limit 100 ohne compact: %+v", list)
+	}
+	result, _, _ = docListTool(ctx, nil, docListInput{ProjectDir: root, Kind: "findings", Limit: 100, Compact: true})
+	text := result.Content[0].(*mcp.TextContent).Text
+	if result.IsError || strings.Contains(text, `"updated"`) || strings.Contains(text, `"created"`) {
+		t.Fatalf("compact: %s", text)
+	}
 }

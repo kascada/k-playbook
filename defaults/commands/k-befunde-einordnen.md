@@ -104,9 +104,10 @@ Geprüft wird nur gegen `STAND` — `git show <STAND>:<pfad>`, `git grep <muster
 Vorprüfung übersprungen hat, die Obergrenze `LIMIT` dieses Laufs, Hauptbranch und `STAND`.
 
 **Listen einmal holen.** Die offenen Tasks (`k_playbook_doc_list` mit `kind: tasks`,
-`user: *`), die Todos (`k_playbook_todo_list`) und die Workbench-Themen
-(`k_playbook_doc_list` mit `kind: workbench`, `user: *`) holst du einmal hier, nicht je
-Befund. Was du im Lauf selbst schreibst — ein neues oder ergänztes Todo, ein Nachtrag —,
+`user: *`, `compact: true`), die Todos (`k_playbook_todo_list`) und die Workbench-Themen
+(`k_playbook_doc_list` mit `kind: workbench`, `user: *`, `compact: true`) holst du einmal
+hier, nicht je Befund; ist eine Antwort `truncated`, holst du mit `next.after` als `after`
+die nächste Seite, bis alle da sind. Was du im Lauf selbst schreibst — ein neues oder ergänztes Todo, ein Nachtrag —,
 trägst du in deine Fassung der Listen nach. Neu geholt wird nur, wenn ein Schreiben
 `foreign_change` meldet: Dann hat jemand anderes daran geschrieben.
 
@@ -284,8 +285,8 @@ Melde dem Nutzer:
 - die Zahlen je Ziel (gelöscht je Grund, Handdoku, Todo, Nachtrag, Doku-Auftrag, Datei,
   `unclear/`) und je Grund für `übersprungen`;
 - **immer** — auch wenn die Obergrenze nicht erreicht wurde —, wie viele Befunde noch in
-  `keph:/queue/findings/` offen sind, neu gezählt mit `k_playbook_doc_list` und
-  `kind: findings`. Ein eben gelöschter Befund kann in der Replica noch kurz stehen; dann
+  `keph:/queue/findings/` offen sind, neu gezählt mit `k_playbook_doc_list`, `kind: findings` und `limit: 1`
+  (gezählt wird `total`, die Liste selbst wird nicht gebraucht). Ein eben gelöschter Befund kann in der Replica noch kurz stehen; dann
   gilt der Replica-Nachlauf aus `k-playbook:/instructions/on-demand/tasks.md`;
 - den Verweis auf das Protokoll — nur hier, in dieser Antwort;
 - die geänderten Dateien im Projekt (nicht committet) und die eingereihten Doku-Aufträge;

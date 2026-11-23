@@ -39,7 +39,7 @@ Bei `tools` ist jeder offene Auftrag Teil von `orders`; eine Wartezeit gibt es n
 - `wrong_dir` oder `not_found` heißt, ein anderer Lauf hat den Auftrag schon abgeschlossen —
   nennen, nicht wiederholen.
 - `outcome_unknown` heißt, das Verschieben kann angekommen sein: nicht wiederholen, sondern
-  mit `k_playbook_doc_list` (`kind: docs`, `done: true`) nachsehen.
+  mit `k_playbook_doc_list` (`kind: docs`, `done: true`, `number` oder `name` des Auftrags) nachsehen.
 - Kennt ein Werkzeug die Sorte `docs` nicht (`invalid_input`), ist die Installation älter
   als der Command: melden, `/k-upgrade` nennen; der Lauf selbst bleibt gültig.
 

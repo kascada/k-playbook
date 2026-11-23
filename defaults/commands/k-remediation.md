@@ -9,6 +9,10 @@ umzieht und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
+Hinweis für den Umbau (Task 181): Beim Wiedereinschalten sind die Aufrufe von
+`k_playbook_doc_list` in diesem Text (Sorte `tasks`, nach `outcome_unknown`) auf `number` und
+`name` umzustellen; `done: true` allein liefert nur eine Seite.
+
 Hinweis für den Umbau (Task 178): Beim Wiedereinschalten legt der Command Tasks über
 `k_playbook_task_create` an, nicht mehr über `k_playbook_doc_create` und Kephalaion `write`
 (Schritt „Task anlegen“ unten, mit `k_playbook_doc_create`). Die Hinweise dort zu Nummer,

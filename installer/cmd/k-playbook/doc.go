@@ -129,16 +129,27 @@ func runDoc(args []string) error {
 		}
 		result, line = created, func() { fmt.Println(created.Ref) }
 	case "list":
-		list, err := docs.List(ctx, project.DocListOptions{Kind: positional[0], User: opts.user, Done: opts.done})
+		limit := opts.limit
+		if limit == 0 {
+			limit = project.DocListDefaultLimit
+		}
+		list, err := docs.List(ctx, project.DocListOptions{Kind: positional[0], User: opts.user, Done: opts.done,
+			Number: opts.number, Name: opts.name, Limit: limit, After: opts.after, Compact: opts.compact})
 		if err != nil {
 			return docError(err)
 		}
 		if list.Hint != "" {
 			fmt.Fprintf(os.Stderr, "Hinweis: %s\n", list.Hint)
 		}
+		if list.Next != nil {
+			fmt.Fprintf(os.Stderr, "Hinweis: %s\n", list.Next.Hint)
+		}
 		result, line = list, func() {
 			for _, item := range list.Items {
 				fields := []string{item.Ref, item.Title, item.User, item.Updated}
+				if opts.compact {
+					fields = []string{item.Ref, item.Title}
+				}
 				if item.Done {
 					fields = append(fields, "done")
 				}
@@ -179,6 +190,12 @@ type docOptions struct {
 	kind  string
 	unset string
 	since int64
+
+	number  int
+	name    string
+	limit   int
+	after   string
+	compact bool
 }
 
 // parseDocArgs liest Schalter und Positionsargumente eines Unterbefehls.
@@ -186,7 +203,7 @@ func parseDocArgs(sub string, args []string) (docOptions, []string, error) {
 	kinds := strings.Join(project.DocKindNames(project.DocKinds), "|")
 	usage := map[string]string{
 		"create":  "doc create <" + kinds + "> <kurzname> [--json]",
-		"list":    "doc list <" + kinds + "> [--user <name>|*] [--done] [--json]",
+		"list":    "doc list <" + kinds + "> [--user <name>|*] [--done] [--number <n>] [--name <teil>] [--limit <n>] [--after <verweis>] [--compact] [--json]",
 		"done":    "doc done <keph:-verweis> [--json]",
 		"reopen":  "doc reopen <keph:-verweis> [--json]",
 		"append":  "doc append <keph:-verweis> [--since <revision>] [--json] (Text von stdin)",
@@ -220,6 +237,40 @@ func parseDocArgs(sub string, args []string) (docOptions, []string, error) {
 			opts.help = true
 		case arg == "--done" && (sub == "list" || sub == "grep"):
 			opts.done = true
+		case arg == "--compact" && sub == "list":
+			opts.compact = true
+		case is(arg, "--number") && sub == "list":
+			v, err := value(&i, "--number")
+			if err != nil {
+				return opts, nil, err
+			}
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 {
+				return opts, nil, fmt.Errorf("--number erwartet eine Nummer (ganze Zahl ab 1), nicht %q — erwartet wird %s", v, usage)
+			}
+			opts.number = n
+		case is(arg, "--limit") && sub == "list":
+			v, err := value(&i, "--limit")
+			if err != nil {
+				return opts, nil, err
+			}
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 {
+				return opts, nil, fmt.Errorf("--limit erwartet eine ganze Zahl ab 1, nicht %q — erwartet wird %s", v, usage)
+			}
+			opts.limit = n
+		case is(arg, "--name") && sub == "list":
+			v, err := value(&i, "--name")
+			if err != nil {
+				return opts, nil, err
+			}
+			opts.name = v
+		case is(arg, "--after") && sub == "list":
+			v, err := value(&i, "--after")
+			if err != nil {
+				return opts, nil, err
+			}
+			opts.after = v
 		case arg == "--count" && sub == "grep":
 			opts.count = true
 		case is(arg, "--user") && (sub == "list" || sub == "grep"):
@@ -382,7 +433,7 @@ func printDocUsage(out io.Writer) {
 
 Aufruf:
   k-playbook doc create <sorte> <kurzname> [--json]
-  k-playbook doc list <sorte> [--user <name>|*] [--done] [--json]
+  k-playbook doc list <sorte> [--user <name>|*] [--done] [--number <n>] [--name <teil>] [--limit <n>] [--after <verweis>] [--compact] [--json]
   k-playbook doc done <keph:-verweis> [--json]
   k-playbook doc reopen <keph:-verweis> [--json]
   k-playbook doc append <keph:-verweis> [--since <revision>] [--json]   (Text von stdin)
@@ -402,6 +453,15 @@ Sorten: %s.
           eigenen, mit --user '*' alle. --done nimmt die Erledigten mit auf.
           Je Zeile Verweis, Titel, User und Änderungszeit, getrennt durch
           Tabulatoren. Bei Sorten ohne Userbereich greift --user nicht.
+          --number <n> liefert die Dokumente mit dieser Nummer (7 und 007
+          sind gleich), --name <teil> die, deren Dateiname den Teilstring
+          enthält (ohne Groß-/Kleinschreibung). Die Ausgabe ist eine Seite:
+          --limit hat den Standard 50 (höchstens 200 mit --compact, 50
+          ohne) und eine Zeichenobergrenze von etwa 15000; auch --done ohne
+          weitere Angabe liefert nur eine Seite. Bei einer abgeschnittenen
+          Seite nennt der Hinweis auf stderr den Wert für --after (mit
+          --json: total, truncated und next). --compact gibt nur Verweis und
+          Titel aus (mit --json ref, title, done).
   done    Verschiebt ein eigenes Dokument nach done/; ~ im Verweis steht für
           den eigenen User. Ausgabe: der neue Verweis; mit --json dazu
           revision, die Revision nach dem Verschieben.

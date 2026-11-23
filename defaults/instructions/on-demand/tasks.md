@@ -26,9 +26,11 @@ Kephalaion-Revisionen seines Dokuments, nicht in Git.
   nur hier. Niemand zählt selbst, und niemand gibt eine Nummer vor.
 - **Eindeutig ist nur der Dateiname** `<NNN>-<kurzname>.md`, nicht die Nummer. Zwei Tasks mit
   derselben Nummer und verschiedenen Namen sind zulässig.
-  Eine Nummer als Argument eines Commands wird deshalb so aufgelöst: zuerst unter den eigenen
-  offenen Tasks (`k_playbook_doc_list`, Sorte `tasks`), dann unter den eigenen erledigten
-  (`done: true`). Passt mehr als ein Dokument, zeige alle Treffer und lass den Nutzer wählen.
+  Eine Nummer als Argument eines Commands wird deshalb so aufgelöst: ein Aufruf von
+  `k_playbook_doc_list` (Sorte `tasks`) mit `number` und `done: true` liefert die eigenen
+  offenen und die eigenen erledigten Tasks mit dieser Nummer, ohne die Liste aller zu holen;
+  offene und erledigte unterscheidet das Feld `done` des Eintrags. Passt mehr als ein Dokument,
+  zeige alle Treffer und lass den Nutzer wählen.
   Ein `keph:`-Verweis als Argument wird unverändert genommen, nach den beiden Prüfungen unter
   „Fremde und erledigte Verweise“.
 
@@ -325,7 +327,7 @@ Antwort muss die eigene letzte sein (Replica-Nachlauf oben).
 | `append` | `k_playbook_doc_grep` mit `count_only` auf die gezählte Zeile (oben) | die Zahl gestiegen ist |
 | `replace` | `k_playbook_doc_grep` mit `count_only` auf eine Zeile aus `new`, die in `old` nicht vorkommt | sie jetzt dasteht |
 | `set_field` | `k_playbook_doc_read` mit `lines` über das Frontmatter | das Feld den neuen Wert trägt bzw. fehlt |
-| `done`, `reopen` | `k_playbook_doc_list` (Sorte `tasks`, `done: true`), dann `k_playbook_doc_grep` mit `count_only` unter dem neuen Verweis für die Revision | das Dokument am neuen Ort liegt |
+| `done`, `reopen` | `k_playbook_doc_list` (Sorte `tasks`, `done: true`, `number` aus dem Dateinamen), dann `k_playbook_doc_grep` mit `count_only` unter dem neuen Verweis für die Revision | das Dokument am neuen Ort liegt |
 
 Ist es angekommen, gilt die Revision aus dem Nachlesen als die eigene letzte. Ist es nicht
 angekommen und stimmt die Revision mit der eigenen letzten überein (nach dem

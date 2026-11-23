@@ -69,7 +69,9 @@ Command — die Zeile `README` in Schritt 4 nennt dann `/k-upgrade`.
 Dazu die offenen Doku-Aufträge in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`): ein `k_playbook_doc_list` mit
 `kind: docs`, ohne `done` — die erledigten unter `done/` zählen nicht; es nennt je Auftrag
-`updated`, den Zeitpunkt seiner letzten Änderung. Für die Aufteilung ein
+`updated`, den Zeitpunkt seiner letzten Änderung. Die Antwort ist eine Seite (Standard
+50 Einträge): Ist sie `truncated`, holst du mit `next.after` als `after` die nächste, bis
+alle da sind; `total` ist die Zahl aller offenen Aufträge. Für die Aufteilung ein
 `k_playbook_doc_grep` mit `kind: docs` und dem Muster
 `^(erzeuger|entstanden|dokument): |^\s*- \.$`; je Auftrag gelten seine Zeilen:
 
@@ -288,8 +290,8 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
   meldet `invalid_input` für die Sorte `docs` → die Installation ist älter als dieser Command:
   melden, `/k-upgrade` nennen, keinen Auftrag von Hand anlegen.
 - `skipped` mit `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Abschluss
-  nennt es. `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`)
-  nachsehen.
+  nennt es. `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`,
+  `name` oder `number` des Auftrags) nachsehen.
 - Der Text eines Erzeugers ist nicht lesbar (`not_found`) → die Installation ist
   unvollständig oder älter als dieser Command: melden, `/k-upgrade` nennen; den Ablauf nicht
   im Gespräch nachbauen.

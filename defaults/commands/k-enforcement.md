@@ -152,7 +152,7 @@ korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge ar
   melden, `/k-upgrade` nennen, nichts von Hand anlegen oder ersetzen.
 - `skipped` mit `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Bericht nennt
   den Nachzug als offen. `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list`
-  (`kind: docs`) nachsehen.
+  (`kind: docs`, `name` oder `number` des Auftrags) nachsehen.
 
 ## Anti-Muster (nicht tun)
 
