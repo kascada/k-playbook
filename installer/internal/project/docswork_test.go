@@ -559,7 +559,7 @@ func TestDocsPublishAbgleich(t *testing.T) {
 	}
 }
 
-// Fehlt die Vorlage auf dem Hub (Versatz Binary/Hub, Task 133), scheitert nur
+// Fehlt die Vorlage auf dem Hub (Versatz Binary/Hub), scheitert nur
 // der README-Schritt: Die Dokumente sind veröffentlicht, die README ist
 // failed mit template_missing, keine leere README entsteht, und aufgeräumt
 // wird trotzdem.

@@ -224,6 +224,30 @@ func (o *DocsOrders) Split(ctx context.Context, in DocsSplitInput) (DocsSplitRes
 		}
 	}
 
+	// Ein wartender roher Auftrag nimmt an nichts teil; nur ein voller Lauf
+	// (Auftrag über .) unter den rohen der Eingabe nimmt ihn auf.
+	var waiting []string
+	full := false
+	at := now()
+	for _, ref := range raws {
+		for _, order := range open {
+			if order.Ref != ref {
+				continue
+			}
+			if len(order.Pfade) == 1 && order.Pfade[0] == "." {
+				full = true
+			}
+			if age, ok := docsOrderAge(order.Updated, at); ok && age < DocsOrderWait {
+				waiting = append(waiting, ref)
+			}
+		}
+	}
+	if len(waiting) > 0 && !full {
+		return DocsSplitResult{}, docRefErrorf(DocCodeInvalidInput,
+			"%s wartet noch (letzte Änderung jünger als %d Minuten) und geht in keinem vollen Lauf auf — nichts geschrieben",
+			strings.Join(waiting, ", "), int(DocsOrderWait/time.Minute))
+	}
+
 	result := DocsSplitResult{Documents: []DocsSplitDocResult{}, Raw: []DocsSplitRawResult{}, ClosedRaw: []string{}}
 	failed := false
 	for _, item := range prepared {

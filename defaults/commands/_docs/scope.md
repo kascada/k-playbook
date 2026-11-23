@@ -27,7 +27,11 @@ Programm; dieser Text wiederholt sie nicht, und du rechnest sie nicht nach.
 - Ein versteckter Pfad kommt nur in den Scan, wenn `$ARGUMENTS` oder ein `hint` ihn
   ausdrücklich nennt; eine Zusatzquelle aus einem `hint` gehört für dieses Dokument zum Scan,
   mit denselben Ausschlüssen — auch denen aus `NEW_EXCLUDES`, nie den immer ausgeschlossenen
-  Verzeichnissen.
+  Verzeichnissen. Immer ausgeschlossen sind `.k-playbook/` und `k-playbook/` unter
+  `context.project.dir` und unter `context.project.repoRoot` sowie `keph-backup/` und `.git/`
+  auf jeder Ebene.
+- Ist `gitignoreTruncated` gesetzt, hat die Grenze von 200 gelesenen `.gitignore` gegriffen: so
+  viele Dateien blieben ungelesen; der Scope bleibt gültig, nenne den Hinweis im Preflight.
 
 **Stand.** Beschrieben wird der Arbeitsbaum von `SCAN_ROOT`, wie er ausgecheckt ist. Ist
 `stand.git` wahr und der Branch nicht der Standard-Branch, oder ist `clean` falsch, fragst du

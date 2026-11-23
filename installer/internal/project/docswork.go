@@ -786,7 +786,7 @@ func (w *DocsWork) Publish(ctx context.Context, name string, opts DocsPublishOpt
 	result.Readme = w.publishReadme(ctx, producer)
 
 	// Fehlt nur die Vorlage der README (template_missing — der Lieferumfang
-	// auf dem Hub ist älter als das Programm, Task 133), scheitert allein der
+	// auf dem Hub ist älter als das Programm), scheitert allein der
 	// README-Schritt: Die Dokumente sind veröffentlicht, aufgeräumt wird
 	// trotzdem; ein zweites publish hülfe nicht, erst ein neuer Lieferumfang
 	// und docs readme. Jeder andere Fehler der README hält das

@@ -11,7 +11,7 @@ import (
 
 // Der Scope der Docs-Erzeuger, die den Code durchsuchen (/k-docs-code und
 // /k-docs-tools), als Rechnung im Programm (Task 179): k-playbook docs scope.
-// Die Regeln sind die des Abschnitts „Scope“ in k-playbook:/commands/_shared/docs.md;
+// Die Regeln stehen in k-playbook:/commands/_docs/scope.md;
 // das Programm entscheidet nur, was sich rechnen lässt. Ob ein anderer Stand
 // beschrieben wird und was der Nutzer im Preflight ergänzt, bleibt bei der
 // Sitzung. Der Scope liest nur lokal (K-PLAYBOOK.yaml, git, Dateisystem) und
@@ -93,6 +93,10 @@ type DocsScopeResult struct {
 	Extra      *DocsScopeExtra  `json:"extra,omitempty"`
 	Exclude    DocsScopeExclude `json:"exclude"`
 	Checks     []DocsScopeCheck `json:"checks,omitempty"`
+	// GitignoreTruncated ist die Zahl der .gitignore-Dateien, die nicht
+	// gelesen wurden, weil docsScopeMaxGitignores gegriffen hat; 0 und dann
+	// nicht gesetzt, wenn alle gelesen sind.
+	GitignoreTruncated int `json:"gitignoreTruncated,omitempty"`
 }
 
 // DocsScopeOptions sind die Eingaben: ExtraPath ergänzt den Scope um genau
@@ -153,7 +157,8 @@ func DocsScope(ctx context.Context, projectDir string, opts DocsScopeOptions) (D
 	if scope.extraRel != "" && docsHiddenPath(scope.extraRel) {
 		result.Exclude.Hidden.Excepted = []string{scope.extraRel}
 	}
-	files := scope.collectGitignores()
+	files, truncated := scope.collectGitignores()
+	result.GitignoreTruncated = truncated
 	result.Exclude.Gitignore = make([]DocsScopeIgnoreFile, 0, len(files))
 	for _, file := range files {
 		result.Exclude.Gitignore = append(result.Exclude.Gitignore, file)
@@ -266,8 +271,9 @@ func docsHiddenPath(rel string) bool {
 // collectGitignores sammelt die .gitignore unter SCAN_ROOT, die Wurzel
 // zuerst. Verzeichnisse, die ohnehin ausgeschlossen sind, werden nicht
 // betreten.
-func (s *docsScope) collectGitignores() []DocsScopeIgnoreFile {
+func (s *docsScope) collectGitignores() ([]DocsScopeIgnoreFile, int) {
 	files := []DocsScopeIgnoreFile{}
+	truncated := 0
 	filepath.WalkDir(s.scanRoot, func(full string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			if entry != nil && entry.IsDir() {
@@ -295,7 +301,11 @@ func (s *docsScope) collectGitignores() []DocsScopeIgnoreFile {
 			}
 			return nil
 		}
-		if entry.Name() != ".gitignore" || len(files) >= docsScopeMaxGitignores {
+		if entry.Name() != ".gitignore" {
+			return nil
+		}
+		if len(files) >= docsScopeMaxGitignores {
+			truncated++
 			return nil
 		}
 		data, readErr := os.ReadFile(full)
@@ -326,7 +336,7 @@ func (s *docsScope) collectGitignores() []DocsScopeIgnoreFile {
 	sort.SliceStable(s.ignores, func(i, j int) bool {
 		return depth(gitignoreFileName(s.ignores[i].dir)) < depth(gitignoreFileName(s.ignores[j].dir))
 	})
-	return files
+	return files, truncated
 }
 
 // check meldet, ob ein Pfad ausgeschlossen ist und warum. Relativ gilt der

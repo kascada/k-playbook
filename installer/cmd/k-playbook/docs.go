@@ -434,13 +434,15 @@ der Projekt-Collection.
             (pattern, reason) und changed. Nach -- zählt alles als Muster.
 
   scope     Rechnet den Scope der Erzeuger, die den Code durchsuchen (/k-docs-code,
-            /k-docs-tools), nach dem Abschnitt „Scope“ in
-            k-playbook:/commands/_shared/docs.md — ohne Kephalaion, nur lokal:
+            /k-docs-tools), nach den Regeln in
+            k-playbook:/commands/_docs/scope.md — ohne Kephalaion, nur lokal:
             SCAN_ROOT (project.repoRoot), den Stand (Branch, Commit, ob
             git status --porcelain leer ist), die wirksamen Ausschlüsse nach
             Herkunft (immer: k-playbook/, .k-playbook/, keph-backup/ auf jeder
             Ebene, .git/; versteckt; weitere feste; jede .gitignore unter
-            SCAN_ROOT; docs.exclude samt verworfenen Einträgen). Ein <pfad> vor
+            SCAN_ROOT, höchstens 200 — greift die Grenze, nennt die Ausgabe sie und
+            --json trägt gitignoreTruncated mit der Zahl der nicht gelesenen;
+            docs.exclude samt verworfenen Einträgen). Ein <pfad> vor
             --check ergänzt den Scope um genau einen Pfad (EXTRA_PATH, relativ zu
             project.dir): Er muss existieren und in project.dir liegen, nicht in
             einem immer ausgeschlossenen Verzeichnis; ein versteckter Pfad oder
@@ -482,7 +484,10 @@ der Projekt-Collection.
             (created, extended, skipped, failed), schließt danach die rohen
             Aufträge nach done/ — nur wenn jeder zerlegte steht, sonst bleiben sie
             offen (kept) — und schließt ein abgelehntes neu oder entfaellt gleich.
-            Alles wird vorher geprüft (invalid_input). Ein failed endet nach der
+            Alles wird vorher geprüft (invalid_input); ein roher Auftrag, der noch
+            wartet (letzte Änderung jünger als die Wartezeit), wird abgelehnt und
+            nichts geschrieben, außer unter den rohen der Eingabe steht ein voller
+            Lauf (pfade .), der alle aufnimmt. Ein failed endet nach der
             Ausgabe mit Exit 1. Ausgabe immer JSON: documents, raw, closedRaw.
 
 Ausgabe von publish: je Dokument Zustand (created, written, deleted,

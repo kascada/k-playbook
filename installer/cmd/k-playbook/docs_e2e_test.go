@@ -398,7 +398,7 @@ func TestDocsReadmeSubkommando(t *testing.T) {
 	}
 }
 
-// Fehlt die README-Vorlage (Versatz Binary/Hub, Task 133), veröffentlicht
+// Fehlt die README-Vorlage (Versatz Binary/Hub), veröffentlicht
 // publish über die CLI die Dokumente und räumt auf, endet aber mit Exit 1 und
 // nennt die README mit template_missing; eine README entsteht nicht.
 func TestDocsSubkommandoPublishOhneVorlage(t *testing.T) {

@@ -101,11 +101,11 @@ func addDocsOrderTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: docsToolScope,
 		Description: "Rechnet den Scope der Docs-Erzeuger, die den Code durchsuchen (/k-docs-code, /k-docs-tools), nach den Regeln " +
-			"des Abschnitts „Scope“ in k-playbook:/commands/_shared/docs.md — nur lokal, ohne Kephalaion. Antwort: scanRoot " +
+			"in k-playbook:/commands/_docs/scope.md — nur lokal, ohne Kephalaion. Antwort: scanRoot " +
 			"(project.repoRoot), stand (git, branch, commit, clean: `git status --porcelain` leer), bei pfad extra (path, abs, " +
 			"exists, inProject, alwaysExcluded) und exclude: always (nie im Scan: k-playbook/, .k-playbook/, keph-backup/ auf jeder " +
 			"Ebene, .git/), hidden (excluded, excepted), further (die weiteren festen Ausschlüsse), gitignore (je .gitignore unter " +
-			"project.repoRoot file und patterns), config (docs.exclude) und rejected (verworfene Einträge mit reason). pfad ergänzt " +
+			"project.repoRoot file und patterns), config (docs.exclude) und rejected (verworfene Einträge mit reason); gitignoreTruncated (nur gesetzt, wenn die Grenze von 200 .gitignore gegriffen hat: die Zahl der nicht gelesenen). pfad ergänzt " +
 			"den Scope um genau einen Pfad; fehlt er, liegt er außerhalb von project.dir oder in einem immer ausgeschlossenen " +
 			"Verzeichnis, ist das invalid_input. check meldet je Pfad checks (path, excluded, reason: always, hidden, further, gitignore, " +
 			"config oder outside, by). Ob ein anderer Stand beschrieben wird und was der Nutzer im Preflight ergänzt, bleibt bei der " +
@@ -153,7 +153,7 @@ func addDocsOrderTools(server *mcp.Server) {
 			"dokument, aktion, pfade, anlass, sitzung, entstanden, im Rumpf je Anlass eine Zeile Datum — Anlass) oder der offene " +
 			"für dasselbe Dokument ergänzt (pfade vereinigt, aktion neu gesetzt, nur neue Anlass-Zeilen, entstanden bleibt das " +
 			"älteste Datum; Neulesen bei stale_revision). Danach wandern die rohen Aufträge nach done/ — nur wenn jeder zerlegte " +
-			"Auftrag steht, sonst bleiben sie offen (kept). Ein abgelehntes neu oder entfaellt (abgelehnt) wird geschrieben und " +
+			"Auftrag steht, sonst bleiben sie offen (kept). Ein roher Auftrag, der noch wartet (letzte Änderung jünger als die Wartezeit), wird mit invalid_input abgelehnt und nichts geschrieben, außer unter den rohen der Eingabe steht ein voller Lauf (pfade .). Ein abgelehntes neu oder entfaellt (abgelehnt) wird geschrieben und " +
 			"gleich geschlossen, ohne publish. Antwort: documents je Dokument mit status (created, extended, skipped mit reason " +
 			"nothing_to_add, failed mit code und message), ref, revision, closed und doneRef; raw je roher Auftrag mit status " +
 			"(closed mit doneRef, gone: ein anderer Lauf hat ihn schon abgeschlossen, kept, failed); closedRaw, die geschlossenen " +

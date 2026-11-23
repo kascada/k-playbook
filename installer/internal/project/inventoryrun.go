@@ -29,7 +29,7 @@ var InventoryReadmeDir = strings.TrimPrefix(path.Dir(inventory.DocName), docDocs
 // die README seines Verzeichnisses aus ihrer Vorlage, wenn sie fehlt oder
 // abweicht. Scheitert der Lauf des Inventars, ist das der Fehler, und die
 // README wird nicht versucht (readme nil). Scheitert nur die README — etwa
-// weil die Vorlage auf dem Hub fehlt (template_missing, Task 133) —, steht
+// weil die Vorlage auf dem Hub fehlt (template_missing) —, steht
 // das in readme, das Inventar ist trotzdem geschrieben.
 func RunInventory(ctx context.Context, projectDir string, store inventory.Store, options inventory.Options) (inventory.Result, inventory.Outcome, *DocsReadmeItem, error) {
 	result, outcome, err := inventory.Run(ctx, store, options)

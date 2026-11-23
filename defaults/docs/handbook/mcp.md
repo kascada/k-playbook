@@ -1096,7 +1096,7 @@ differs (through the README writer below). The working directory and the record 
 only when no document is `conflict` or `failed` and the README went through; otherwise the
 record is updated with what was published, and a second publish after clearing up writes only
 the rest. One exception: if only the template is missing on the hub (`readme` `failed` with
-`template_missing` -- the hub's delivery is older than the program, task 133), the documents
+`template_missing` -- the hub's delivery is older than the program), the documents
 are published and the working directory is cleaned up anyway; nothing is written for the
 README, not even an empty one, and the CLI ends with exit 1 after the output. Without a
 checkout the answer is `not_checked_out`.
@@ -1189,6 +1189,8 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   `build/`, `tests/fixtures/`, `**/*.min.js`, ...), `gitignore` (per `.gitignore` under
   `project.repoRoot` its `file` and `patterns`; nested files best effort), `config`
   (`docs.exclude`) and `rejected` (entries dropped when reading, each `pattern` and `reason`).
+  At most 200 `.gitignore` files are read; when that limit applies, `gitignoreTruncated` (set
+  only then) holds the number of files not read and the CLI text names it. The scope stays valid.
   An extra path that does not exist, lies outside `project.dir` or inside an always-excluded
   directory is `invalid_input`. A hidden extra path and one that `docs.exclude` excludes enter
   the scan through the argument; `.git/` and `.k-playbook/` never do. `checks` has per path
@@ -1233,7 +1235,10 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   default: the distinct `anlaesse` joined), `entstanden` (default: the oldest `datum`) and
   `abgelehnt` (the user declined a `neu` or `entfaellt`); `raw` are the absorbed raw orders as
   `keph:/queue/docs/<file>` references. Everything is validated before anything is written
-  (`invalid_input`). Per document one split order named `code-<document without .md>` is
+  (`invalid_input`). A raw order that is still waiting (last change younger than the waiting
+  time) is rejected with `invalid_input` and nothing is written, unless the raw orders of the
+  input include one with `pfade: .` (the full run takes all of them in); a waiting order not in
+  `raw` is left untouched. Per document one split order named `code-<document without .md>` is
   created or, when one is open for that document, extended (united `pfade`, `aktion` set anew,
   only new body lines, `entstanden` stays the oldest date): `created`, `extended`, `skipped`
   with `nothing_to_add`, or `failed` with `code` and `message`. A declined order is written like

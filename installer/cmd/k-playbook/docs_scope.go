@@ -94,6 +94,9 @@ func printDocsScope(out io.Writer, result project.DocsScopeResult) {
 		rest = append(rest, fmt.Sprintf("%s (%d)", file.File, len(file.Patterns)))
 	}
 	fmt.Fprintf(out, "Ausschlüsse   %s\n", strings.Join(rest, ", "))
+	if result.GitignoreTruncated > 0 {
+		fmt.Fprintf(out, "              Grenze: nur die ersten %d .gitignore gelesen, %d weitere nicht\n", len(result.Exclude.Gitignore), result.GitignoreTruncated)
+	}
 	for _, item := range result.Checks {
 		if item.Excluded {
 			fmt.Fprintf(out, "ausgeschlossen\t%s\t%s\t%s\n", item.Path, item.Reason, item.By)

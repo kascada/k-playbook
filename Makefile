@@ -45,12 +45,6 @@ VSCE_VERSION := 4.0.0
 K_PLAYBOOK ?= k-playbook
 GITHUB_SERVICE ?= k-playbook
 
-# Altbestand: Bis Task 156 war die Installation eines Projekts ein Clone dieses
-# Repos unter k-playbook/, auch im Entwicklungsrepo selbst, das zugleich sein
-# eigenes Zielprojekt ist. Das Programm liest einen solchen Clone nicht mehr;
-# der Name dient nur noch dazu, ihn zu erkennen, wenn `make` versehentlich
-# darin läuft (in_dev_installation).
-PLAYBOOK_DIR := k-playbook
 # Für Fehlermeldungen: das Ziel, das der Aufrufer genannt hat. Ohne Angabe
 # greift das Standardziel, damit die Meldung nie einen leeren Namen zeigt.
 GOAL = $(or $(firstword $(MAKECMDGOALS)),$(.DEFAULT_GOAL))
@@ -80,7 +74,6 @@ help: ## Zeigt diese Hilfe an
 # `git add -A` mitnimmt — auch wenn sich am Code nichts geändert hat. Gelesen
 # wird die Revision von niemandem.
 define build_binaries
-	$(require_writable)
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
 	for target in $(1); do \
@@ -107,36 +100,6 @@ build: dist ## Alias für dist
 # holt es nach <hub>:k-playbook/defaults/. Lokal zum Prüfen vor einem Release.
 defaults-archive: ## Packt defaults/ wie das Release nach ./dist/k-playbook-defaults.tar.gz
 	@.github/scripts/pack-defaults.sh "$(INSTALLER_DIST_DIR)/$(DEFAULTS_ASSET)"
-
-# Altbestand. Die Verwechslung, gegen die das hier absichert: `make` läuft in
-# einem liegengebliebenen Clone k-playbook/ unter dem Arbeitsstand statt im
-# Arbeitsstand selbst. Frühere Versionen haben einem solchen Clone den
-# Schreibzugriff entzogen; der Build scheitert dann daran — mit einer Meldung,
-# die den richtigen Ort nennt statt eines "permission denied".
-define in_dev_installation
-test -d "../installer" -a -d "../$(PLAYBOOK_DIR)/.git"
-endef
-
-define hint_use_workspace
-	    printf 'Hier läuft die Makefile-Kopie in der Installation. Gebaut und\n' >&2; \
-	    printf 'eingespielt wird aus dem Arbeitsstand eine Ebene höher:\n\n' >&2; \
-	    printf '  make -C %s %s\n\n' "$(abspath ..)" "$(GOAL)" >&2
-endef
-
-# Vor dem Build, nicht mittendrin: sonst bricht `go build` erst beim Schreiben
-# des Binaries ab, und zwar mit "permission denied" auf einen Pfad in /tmp.
-define require_writable
-	@test -w . || { \
-	  if $(in_dev_installation); then \
-	    $(hint_use_workspace); \
-	  else \
-	    printf 'Schreibgeschützt: %s\n' "$(CURDIR)" >&2; \
-	    printf 'Eine Installation wird nicht überschrieben. Zum Bauen freigeben:\n' >&2; \
-	    printf '  chmod -R u+w .\n' >&2; \
-	  fi; \
-	  exit 1; \
-	}
-endef
 
 install: ## Installiert das passende Release-Binary ohne Go
 	"./bin/install"

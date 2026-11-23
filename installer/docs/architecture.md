@@ -2666,7 +2666,7 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
 - **Aufräumen.** Arbeitsverzeichnis und Merkdatei verschwinden nur, wenn nichts in Konflikt
   oder fehlgeschlagen ist; sonst trägt die Merkdatei danach den Stand des Veröffentlichten,
   und ein zweites `publish` schreibt nur den Rest. Fehlt allein die Vorlage der README
-  (`template_missing`, Versatz Binary/Hub, Task 133), wird trotzdem aufgeräumt: Die
+  (`template_missing`, Versatz Binary/Hub, hingenommen), wird trotzdem aufgeräumt: Die
   Dokumente sind veröffentlicht, ein zweites `publish` hülfe nicht; die CLI endet nach der
   Ausgabe mit Exit 1. Ist aufgeräumt (`cleaned`), entfernt
   `publish` auch `.k-playbook/work/docs/` und `.k-playbook/work/`, wenn sie danach leer sind

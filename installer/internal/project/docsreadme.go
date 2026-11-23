@@ -47,7 +47,7 @@ func docsReadmeDocName(dir string) string {
 // README.md sind keine Vorlagen und werden übergangen — so die Seiten des
 // Handbuchs unter docs/handbook/, das deshalb keine README.md trägt. Fehlt docs/ in der
 // mitgelieferten Ebene, ist die Liste leer, kein Fehler — der Hub trägt dann
-// einen Lieferumfang ohne Vorlagen (Versatz Binary/Hub, Task 133). Ein Fehler
+// einen Lieferumfang ohne Vorlagen (Versatz Binary/Hub, hingenommen). Ein Fehler
 // der Ebene selbst, etwa kephalaion_unavailable, kommt zurück.
 func ListDocsTemplates(dist DocSource) ([]string, error) {
 	if dist == nil {
@@ -124,7 +124,7 @@ func CleanDocsDir(arg string) (string, error) {
 
 // DocCodeTemplateMissing: die Vorlage k-playbook:/docs/<pfad>/README.md gibt
 // es in der mitgelieferten Ebene nicht — etwa weil das Binary neuer ist als
-// der Lieferumfang auf dem Hub (Task 133). Nichts wurde geschrieben, auch
+// der Lieferumfang auf dem Hub. Nichts wurde geschrieben, auch
 // keine leere README.
 const DocCodeTemplateMissing = "template_missing"
 
