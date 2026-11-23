@@ -28,11 +28,12 @@ nicht was in der Doku stehen soll.
 
 ### Wohin
 
-- **Ein Dokument je Auftrag** in `keph:/queue/docs/`. Anlegen mit `k_playbook_doc_create`,
-  Sorte `docs`, Kurzname: Erzeuger und Anlass in wenigen Worten, etwa `code-doc-operationen`.
-  Die Antwort nennt den Verweis. Den Inhalt schreibst du gleich danach mit Kephalaion `write`,
-  `collection` gleich `kephalaion.address`, `name` gleich dem Pfad ohne `keph:/`, Frontmatter
-  eingeschlossen.
+- **Ein Dokument je Auftrag** in `keph:/queue/docs/`. Eingereiht wird ein roher Auftrag mit
+  `k_playbook_docs_order_add` (`k-playbook docs order add <code|tools> --pfad <pfad>…
+  --anlass <satz> --sitzung <kennung>`): Das Programm legt das Dokument an, baut Kopf und
+  Rumpf nach dieser Anweisung und ergänzt den offenen Auftrag der Sitzung, statt einen zweiten
+  anzulegen. Die zerlegten Aufträge schreibt `k_playbook_docs_orders_split` für
+  `/k-docs-code`. Von Hand legt keiner einen Auftrag an.
 - **Ein Auftrag je Sitzung und Erzeuger.** Das gilt für den Auftrag nach einer Codeänderung:
   Ändert eine Sitzung mehrmals Code, bleibt es bei einem Auftrag für `code`, dessen `pfade` sie
   ergänzt („Kein Doppel“); berührt sie auch die Abhängigkeiten, kommt höchstens einer für
@@ -97,8 +98,7 @@ entstanden: <ältestes Datum der aufgegangenen Aufträge>
     alles darin betroffen ist.
   - `.` heißt ganzes Projekt und steht dann als einzige Zeile, genau als `  - .`. So schreibt
     `/k-docs` den vollen Lauf; im Text heißt das `pfade: .`.
-  - Die Ausschlüsse aus dem Abschnitt „Scope“ von `k-playbook:/commands/_shared/docs.md`
-    gelten immer, auch für Pfade eines Auftrags.
+  - Die Ausschlüsse von `k-playbook docs scope` gelten immer, auch für Pfade eines Auftrags.
   - Ein Pfad darf in mehreren zerlegten Aufträgen stehen, wenn er mehrere Dokumente betrifft.
     Doppelt ist nur derselbe Pfad für dasselbe Dokument.
   - Für `tools` begründen die Pfade den Lauf und erscheinen in seinem Preflight; sie engen den
@@ -144,27 +144,19 @@ oder entfernte Abhängigkeit, ein Versionssprung, ein anderes Werkzeug im Build.
 
 ### Kein Doppel
 
-Die Regel gilt für den Auftrag nach einer Codeänderung und zählt nur rohe Aufträge. Vor dem
-Anlegen prüft der Schreiber, ob schon ein offener roher Auftrag derselben Sitzung für denselben
-Erzeuger besteht: `k_playbook_doc_grep` über die Sorte `docs` (ohne `done`) mit dem Muster
-`^sitzung: <session>$`, dann für die Treffer `^erzeuger: code$` bzw. `^erzeuger: tools$`. Ein
-Treffer mit einer Zeile `^dokument: ` ist zerlegt und zählt nicht.
+Die Regel gilt für den Auftrag nach einer Codeänderung und zählt nur rohe Aufträge; ein
+zerlegter Auftrag (Zeile `dokument:`) zählt nicht. Das Programm rechnet sie, wenn die Sitzung
+`k_playbook_docs_order_add` aufruft: Es sucht den offenen rohen Auftrag derselben Sitzung für
+denselben Erzeuger.
 
-- **`tools`.** Gibt es ihn, legt der Schreiber keinen neuen an; der Lauf ist ohnehin ganz, die
-  Pfade des vorhandenen Auftrags genügen.
-- **`code`.** Gibt es ihn, legt der Schreiber keinen zweiten an, sondern ergänzt ihn. Die
-  Pfade des vorhandenen Auftrags genügen hier nicht: Sie bestimmen, welche Dokumente
-  drankommen, und ein fehlender Pfad wäre ein Dokument, das nicht nachgezogen wird.
-  1. Lies den Auftrag mit `k_playbook_doc_read`; die Antwort nennt `revision`.
-  2. Ist jeder neue Pfad gleich einem vorhandenen oder liegt darin, wird nichts geschrieben;
-     der Auftrag zählt als eingereiht.
-  3. Sonst vereinigst du seine `pfade` mit den neuen und schreibst den Auftrag ganz zurück:
-     Kephalaion `write` mit `base_revision` gleich der gelesenen Revision. `title` und `anlass`
-     im Kopf bleiben; der weitere Anlass wird eine Zeile im Rumpf, `context.now.date` und ein
-     Satz.
-  4. `stale_revision` heißt, der Auftrag wurde inzwischen geändert: neu lesen und auf dem
-     neuen Stand ergänzen. Liegt der Auftrag beim Schreiben nicht mehr offen, weil der
-     Verarbeiter ihn inzwischen zerlegt hat, legst du einen neuen an.
+- **`tools`.** Gibt es ihn, kommt kein neuer dazu; der Lauf ist ohnehin ganz, die Pfade des
+  vorhandenen Auftrags genügen (`covered`).
+- **`code`.** Gibt es ihn, kommt kein zweiter dazu, sondern der vorhandene wird ergänzt. Die
+  Pfade des vorhandenen Auftrags genügen nur, wenn jeder neue Pfad gleich einem vorhandenen
+  ist oder darin liegt (`covered`): Sie bestimmen, welche Dokumente drankommen, und ein
+  fehlender Pfad wäre ein Dokument, das nicht nachgezogen wird. Sonst vereinigt das Programm
+  die `pfade` und hängt den weiteren Anlass als Zeile an den Rumpf (`extended`). Hat der
+  Verarbeiter den Auftrag inzwischen zerlegt, entsteht ein neuer.
 
 `/k-danke` und `/k-enforcement` zählen einen vorhandenen Auftrag als „eingereiht“ — für `code`
 nur, wenn seine `pfade` die Änderung decken oder er nach dieser Regel ergänzt wurde.
@@ -173,16 +165,12 @@ nur, wenn seine `pfade` die Änderung decken oder er nach dieser Regel ergänzt 
 
 Ein Schreiber soll seinen Auftrag weiter ergänzen können, bevor der Verarbeiter ihn liest.
 
-- Der Verarbeiter nimmt einen rohen Auftrag erst, wenn seine letzte Änderung mindestens
-  **2 Stunden** zurückliegt. Bis dahin **wartet** der Auftrag, danach ist er **reif**. Der Wert
-  steht nur hier; die anderen Texte verweisen auf diesen Abschnitt.
-- Maßgeblich ist `updated` des Auftrags aus `k_playbook_doc_list` (Sorte `docs`), nicht
-  `entstanden` im Kopf, das nur das Datum trägt. Ein Ergänzen beginnt die Frist neu. Ein
-  Kopffeld für die Frist gibt es nicht.
-- Zeitbasis ist `context.now.timestamp` aus dem Briefing. `updated` ist UTC, der Zeitstempel
-  des Briefings trägt eine Zeitzone; vor dem Vergleich werden beide auf dieselbe Zone gebracht.
-  Ein altes Briefing lässt den Lauf eher zu lange warten als zu kurz. Das ist hingenommen;
-  das Briefing wird dafür nicht neu geladen.
+- Der Verarbeiter nimmt einen rohen Auftrag erst, wenn seine letzte Änderung eine Weile
+  zurückliegt. Bis dahin **wartet** der Auftrag, danach ist er **reif**. Den Wert und die
+  Rechnung trägt allein das Programm: `k-playbook docs orders code` nennt ihn als
+  `waitMinutes` und je wartendem Auftrag die Restzeit; diese Anweisung nennt ihn nicht.
+- Maßgeblich ist die letzte Änderung des Auftrags, nicht `entstanden` im Kopf, das nur das
+  Datum trägt. Ein Ergänzen beginnt die Frist neu. Ein Kopffeld für die Frist gibt es nicht.
 - Die Frist gilt nur für rohe Aufträge. Zerlegte haben keine: Ein unterbrochener Lauf setzt
   sofort wieder an.
 - Wartende Aufträge nehmen am Zusammenlegen und Zerlegen nicht teil und bleiben unverändert
@@ -194,15 +182,17 @@ Ein Schreiber soll seinen Auftrag weiter ergänzen können, bevor der Verarbeite
 
 ### Wann nicht eingereiht wird
 
-- **Noch keine erzeugte Doku.** Das gilt für den Auftrag nach einer Codeänderung: Liegt unter
-  `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/` noch kein Dokument (Kephalaion
-  `list` auf `docs/generated/code` bzw. `docs/generated/libs`), wird für diesen Erzeuger nichts
-  eingereiht: Es gibt nichts nachzuziehen. Der Abschluss erwähnt es in einem Satz. Den Auftrag
-  mit `pfade: .` reiht `/k-docs` trotzdem ein.
-- **Ohne Kephalaion** (`kephalaion.ok` nicht `true`, oder `kephalaion_unavailable`) wird nicht
-  eingereiht, auch nicht auf die Platte. Der Abschluss nennt den fehlenden Nachzug als offen.
-- **Keine Codeänderung.** Reine Änderungen an Handdoku, Tasks, Befunden oder der Konfiguration
-  von k-playbook reihen nichts ein.
+`k_playbook_docs_order_add` meldet es als `skipped` mit Grund; nichts wird geschrieben.
+
+- **Noch keine erzeugte Doku** (`no_generated_docs`). Das gilt für den Auftrag nach einer
+  Codeänderung: Liegt unter `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/`
+  noch kein Dokument, wird für diesen Erzeuger nichts eingereiht: Es gibt nichts nachzuziehen.
+  Der Abschluss erwähnt es in einem Satz. Den Auftrag mit `pfade: .` reiht `/k-docs` trotzdem
+  ein.
+- **Ohne Kephalaion** (`kephalaion_unavailable`) wird nicht eingereiht, auch nicht auf die
+  Platte. Der Abschluss nennt den fehlenden Nachzug als offen.
+- **Keine Codeänderung.** Das entscheidet die Sitzung, nicht das Programm: Reine Änderungen
+  an Handdoku, Tasks, Befunden oder der Konfiguration von k-playbook reihen nichts ein.
 
 ### Wer ihn abschließt
 
@@ -230,8 +220,8 @@ Antwort von `publish` meldet keine offenen Dokumente (`open` leer), und `cleaned
 Aufträge, die nach dem Preflight dazugekommen sind, bleiben offen. Bricht der Lauf ab oder
 meldet `publish` einen Konflikt, bleiben alle offen.
 
-Die Einzelheiten stehen in `k-playbook:/commands/_shared/docs.md`, der Ablauf des Verarbeiters
-in `k-playbook:/commands/k-docs-code.md`.
+Die Einzelheiten stehen in `k-playbook:/commands/_docs/auftraege.md`, der Ablauf des
+Verarbeiters in `k-playbook:/commands/k-docs-code.md`.
 
 ### Was nicht hineingehört
 

@@ -19,10 +19,18 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
   einem liegengebliebenen Clone `k-playbook/` (Altbestand), versteckten Pfaden und
   `context.docs.exclude`; ein geändertes Manifest oder
   Lockfile betrifft `tools`.
-- Je betroffenem Erzeuger gilt der Ablauf aus `doku-auftraege.md`, einschließlich „Kein
-  Doppel“ und „Wann nicht eingereiht wird“: `pfade` aus `CHANGED_PATHS`, so fein wie möglich,
-  `anlass` ein Satz mit den Tasknummern. Das geschieht ohne Rückfrage: Ein Auftrag ändert keine
-  Doku, er merkt den Nachzug vor.
+- Je betroffenem Erzeuger ruft er `k_playbook_docs_order_add` auf (ersatzweise `k-playbook
+  docs order add <code|tools> --pfad <pfad>… --anlass "<satz>" --sitzung <session> --json`):
+  `projectDir` = `context.project.dir`, `erzeuger` `code` bzw. `tools`, `pfade` aus
+  `CHANGED_PATHS`, so fein wie möglich, `anlass` ein Satz mit den Tasknummern, `sitzung` = die
+  `session` seines Briefings. „Kein Doppel“ und „Wann nicht eingereiht wird“ rechnet das
+  Programm nach `doku-auftraege.md`; die Antwort sagt `status`: `created` oder `extended`
+  (eingereiht), `covered` (ein Auftrag deckt schon, mit `ref`), `skipped` (`no_generated_docs`:
+  nichts nachzuziehen; `kephalaion_unavailable`: nichts eingereiht, der Nachzug bleibt offen).
+  Das geschieht ohne Rückfrage: Ein Auftrag ändert keine Doku, er merkt den Nachzug vor. Ist
+  das Werkzeug unbekannt (`invalid_input`) oder meldet `k-playbook docs` `unbekannter
+  Unterbefehl`, ist die Installation älter: melden, `/k-upgrade` nennen, nichts von Hand
+  anlegen.
 - Ändert der Lauf ein Manifest, ist das Inventar sofort nachzuziehen; das tut dieser Command
   nicht, die Zeile „Doku“ nennt `/k-doc-inventory`.
 - Ohne Kephalaion oder bei einem Task mit „Pfade unbekannt“ wird für ihn nichts eingereiht;

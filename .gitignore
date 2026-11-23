@@ -63,6 +63,8 @@ venv/
 
 # Go build artifacts
 /installer/k-playbook-installer
+# Ergebnis von `go build ./cmd/...` im Ordner installer/
+/installer/k-playbook
 
 # Die Plattform-Binaries sind Release-Assets und werden nicht mehr versioniert:
 # 57 MB je Build-Satz, und jedes Update zog alle vier. Gebaut wird lokal mit

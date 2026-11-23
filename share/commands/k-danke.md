@@ -1,7 +1,7 @@
 ---
 description: Schließt eine Arbeitssitzung ab - legt die Befunde der Sitzung vor, trägt Fehlendes nach, lässt den Nutzer entscheiden, was aus ihnen werden soll, und prüft, ob die Doku nachzuziehen ist. Nimmt kein Argument.
 # model: github-copilot/gpt-5.5
-allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_create, mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write, mcp__k-playbook__k_playbook_briefing]
+allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mcp__k-playbook__k_playbook_doc_list, mcp__k-playbook__k_playbook_doc_grep, mcp__k-playbook__k_playbook_doc_create, mcp__k-playbook__k_playbook_docs_order_add, mcp__kephalaion__list, mcp__kephalaion__read, mcp__kephalaion__write, mcp__k-playbook__k_playbook_briefing]
 ---
 
 # k-danke
@@ -140,11 +140,12 @@ Solange `/k-enforcement` vorübergehend nicht verfügbar ist, nennst du im Absch
 Anweisung „Doku nachziehen“ ohnehin verlangt: den Verweis auf den Auftrag, oder warum nichts
 eingereiht wurde.
 
-Der Ausgang **„eingereiht“** zählt als erledigt: Liegt für die erzeugte Doku schon ein
-offener Auftrag dieser Sitzung vor, oder reiht `/k-enforcement` ihn nach Freigabe ein, ist
-der Nachzug für diese Sitzung getan; nenne den Verweis im Abschluss. Für `code` zählt der
-vorhandene Auftrag nur, wenn seine `pfade` die Änderung decken; sonst wird er nach „Kein
-Doppel“ in `doku-auftraege.md` ergänzt.
+Der Ausgang **„eingereiht“** zählt als erledigt: Liegt für die erzeugte Doku schon ein offener Auftrag dieser Sitzung vor, ist der Nachzug getan. Reiht `/k-enforcement` den Auftrag nach
+Freigabe ein, ruft es `k_playbook_docs_order_add` auf; `created`, `extended` und `covered`
+(ein offener Auftrag dieser Sitzung deckt die Änderung schon) zählen als eingereiht, nenne den
+Verweis `ref` im Abschluss. „Kein Doppel“ und die Pfadprüfung rechnet das Programm nach
+`doku-auftraege.md`, dieser Schritt wiederholt sie nicht. Fehlt das Kommando
+(`unbekannter Unterbefehl`), ist die Installation älter: melden, `/k-upgrade` nennen.
 
 Bleibt danach etwas offen, nenne es beim Abschluss, statt es still zu lassen.
 

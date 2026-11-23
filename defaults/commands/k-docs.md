@@ -79,8 +79,7 @@ Dazu die offenen Doku-Aufträge in `keph:/queue/docs/`
 - Ein roher Auftrag für `code` mit der Zeile `- .` trägt `pfade: .`: Der volle Lauf ist
   schon eingereiht.
 - Ein roher Auftrag für `code` **wartet**, solange sein `updated` jünger ist als die
-  Wartezeit, gemessen an `context.now.timestamp`; Wert und Rechnung stehen im Abschnitt
-  „Wartezeit“ von `doku-auftraege.md`. Liegt ein roher Auftrag mit `pfade: .` offen, wartet
+  Wartezeit; ob er wartet, sagt `k_playbook_docs_orders` mit `erzeuger: code` (read-only, `waiting`, `remainingMinutes`), nicht eine eigene Rechnung. Liegt ein roher Auftrag mit `pfade: .` offen, wartet
   keiner: Er nimmt alle auf.
 
 Gelesen wird kein Auftrag einzeln. `invalid_input`, weil die Sorte `docs` unbekannt ist,
@@ -234,34 +233,24 @@ Das Briefing aus Schritt 1 gilt für den Erzeuger weiter; er lädt es nicht neu,
 Text verlangt es.
 
 **Vollen Lauf einreihen.** Für `code` und `alle` reihst du höchstens einen rohen Auftrag für
-`code` mit `pfade: .` ein, nach `k-playbook:/instructions/on-demand/doku-auftraege.md`. Die
-Regeln für den Auftrag einer Sitzung nach einer Codeänderung — einer je Sitzung und Erzeuger,
-„Kein Doppel“, „Noch keine erzeugte Doku“ — gelten für ihn nicht: Du reihst ihn auch ein,
-wenn es unter `keph:/docs/generated/code/` noch kein Dokument gibt.
+`code` mit `pfade: .` ein, nach `k-playbook:/instructions/on-demand/doku-auftraege.md`. Das
+Programm trägt die Regeln dazu: Für diesen Auftrag gelten „Ein Auftrag je Sitzung und
+Erzeuger“, „Kein Doppel“ und „Noch keine erzeugte Doku“ nicht — er wird auch eingereiht,
+wenn es unter `keph:/docs/generated/code/` noch kein Dokument gibt, und ein schon offener
+roher Auftrag mit `pfade: .` wird nicht verdoppelt, gleich aus welcher Sitzung er stammt.
 
-1. Liegt laut Schritt 2 schon ein offener roher Auftrag für `code` mit `pfade: .` vor, legst
-   du keinen zweiten an, gleich aus welcher Sitzung er stammt. Nenne ihn; weiter bei 4.
-2. Liegen feine rohe Aufträge für `code` offen (ohne `.`), sagst du vor dem Einreihen: Der
-   Auftrag über `.` nimmt sie alle auf, auch die wartenden, und der Lauf geht dann über das
-   ganze Projekt statt nur über ihre Dokumente. Ohne den vollen Lauf arbeitet `/k-docs-code`
-   allein die feinen ab.
-3. `k_playbook_doc_create` mit `kind: docs` und dem Kurznamen `code-voller-lauf`; gleich
-   danach Kephalaion `write` mit `collection` = `context.kephalaion.address`, `name` =
-   Verweis ohne `keph:/` und diesem Inhalt:
-
-   ```markdown
-   ---
-   title: "Code-Doku: voller Lauf über das ganze Projekt"
-   erzeuger: code
-   pfade:
-     - .
-   anlass: "Voller Lauf, eingereiht über /k-docs."
-   sitzung: <session>
-   entstanden: <context.now.date>
-   ---
-   ```
-
-4. Sag ausdrücklich: Die Code-Doku ist noch nicht gelaufen. `/k-docs-code` arbeitet den
+1. Liegen laut Schritt 2 feine rohe Aufträge für `code` offen (ohne `.`), sagst du vor dem
+   Einreihen: Der Auftrag über `.` nimmt sie alle auf, auch die wartenden, und der Lauf geht
+   dann über das ganze Projekt statt nur über ihre Dokumente. Ohne den vollen Lauf arbeitet
+   `/k-docs-code` allein die feinen ab.
+2. Rufe `k_playbook_docs_order_add` mit `projectDir` = `context.project.dir`, `erzeuger:
+   code`, `pfade: ["."]`, `anlass: "Voller Lauf, eingereiht über /k-docs."`, `sitzung` =
+   `session` und `title: "Code-Doku: voller Lauf über das ganze Projekt"` auf (ersatzweise
+   `k-playbook docs order add code --pfad . --anlass "…" --sitzung <session> --title "…"
+   --json`). `status` ist `created` (eingereiht), `covered` (ein offener Auftrag mit `.`
+   liegt schon vor: nenne ihn, `ref`) oder `skipped` mit `reason` (`kephalaion_unavailable`:
+   nicht eingereiht).
+3. Sag ausdrücklich: Die Code-Doku ist noch nicht gelaufen. `/k-docs-code` arbeitet den
    Auftrag ab — ohne Wartezeit, ein Auftrag mit `pfade: .` hat keine.
 
 ## Schritt 6 — Abschluss
@@ -294,10 +283,13 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
 - Unbekanntes Argument → die gültigen nennen: `status`, `inventory`, `code`, `tools`,
   `alle`.
 - Ein Rest nach `code` → die Meldung aus Schritt 5; nichts wird eingereiht.
-- `k_playbook_doc_create` meldet `invalid_input` für die Sorte `docs` → die Installation ist
-  älter als dieser Command: melden, `/k-upgrade` nennen, keinen Auftrag von Hand anlegen.
-- `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Abschluss nennt es.
-  `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`) nachsehen.
+- `k_playbook_docs_order_add` ist unbekannt (`invalid_input` für das Werkzeug), `k-playbook
+  docs` meldet `unbekanntes Kommando` oder `unbekannter Unterbefehl`, oder `k_playbook_doc_list`
+  meldet `invalid_input` für die Sorte `docs` → die Installation ist älter als dieser Command:
+  melden, `/k-upgrade` nennen, keinen Auftrag von Hand anlegen.
+- `skipped` mit `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Abschluss
+  nennt es. `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`)
+  nachsehen.
 - Der Text eines Erzeugers ist nicht lesbar (`not_found`) → die Installation ist
   unvollständig oder älter als dieser Command: melden, `/k-upgrade` nennen; den Ablauf nicht
   im Gespräch nachbauen.

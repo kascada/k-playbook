@@ -14,7 +14,7 @@ Produces:
   Inventars, geschrieben von `k_playbook_docs_publish`.
 
 Dazu verschiebt der Lauf nach einem erfolgreichen `publish` die Doku-Aufträge aus dem
-Preflight nach `keph:/queue/docs/done/` (Abschnitt „Doku-Aufträge“ der Docs-Ablage).
+Preflight nach `keph:/queue/docs/done/`.
 
 Nichts sonst. Die `README.md` des Verzeichnisses schreibt `publish` aus ihrer Vorlage; das
 Arbeitsverzeichnis unter `.k-playbook/work/docs/libs/` entfernt `publish` nach einem
@@ -42,8 +42,8 @@ include: _shared/docs.md
 Dieser Command ist der Schreiber des Erzeugers `libs`: sein Verzeichnis ist
 `keph:/docs/generated/libs/`, seine Dokumente tragen `generated.by: k-docs-tools`.
 
-Aus dem Briefing brauchst du `context.kephalaion` — `ok`, `address`, `message`. Ohne
-`ok: true` endet der Command hier (siehe die Ablage oben).
+Aus dem Briefing brauchst du `context.kephalaion` — `ok`, `address`, `message` — und
+`context.project.dir`. Ohne `ok: true` endet der Command hier (siehe die Ablage oben).
 
 **Das Inventar.** Lies `keph:/docs/generated/versions/inventory.md` mit `k_playbook_doc_read`
 (ersatzweise `k-playbook read`). Aus dem Kopf nimmst du `generated.at` und die Zahl der
@@ -59,15 +59,18 @@ Einträge, `generated.stats.entries` — ein Inventar im alten Kopf trägt sie n
 - Der Kopf ist unvollständig oder nicht lesbar → das als Hinweis im Preflight nennen und
   anbieten, `k-playbook inventory` neu laufen zu lassen; der Rumpf bleibt lesbar.
 
-**Der Scope** ist der aus dem Abschnitt „Scope“ der Docs-Ablage oben: `SCAN_ROOT`, Stand,
-`EXTRA_PATH` aus `$ARGUMENTS`, die Ausschlüsse und `NEW_EXCLUDES`. Er begrenzt hier nur das
-Zählen der Nutzung im Code (Schritt 4), nicht die Liste der Kandidaten.
+**Der Scope.** Lies `k-playbook:/commands/_docs/scope.md` und rufe `k_playbook_docs_scope`
+auf, mit `pfad` = `EXTRA_PATH`, dem einen Pfad aus `$ARGUMENTS` (leer, wenn keiner da ist).
+Der Scope begrenzt hier nur das Zählen der Nutzung im Code (Schritt 4), nicht die Liste der
+Kandidaten.
 
-Die offenen Doku-Aufträge mit `erzeuger: tools` suchst du wie im Abschnitt
-„Doku-Aufträge“ der Ablage oben und merkst sie dir als `ORDERS`.
+**Aufträge.** Lies `k-playbook:/commands/_docs/auftraege.md` und rufe `k_playbook_docs_orders`
+mit `erzeuger: tools` auf. Die offenen Aufträge in `orders` merkst du dir als `ORDERS`; `problems` nennst du im Preflight. Sie
+begründen den Lauf; sie engen den Scope nicht ein, der Lauf bleibt ganz. Eine Wartezeit gibt
+es hier nicht.
 
 Zeige den Preflight und lass ihn **einmal** bestätigen; der Nutzer darf dabei Ausschlüsse
-ergänzen (`NEW_EXCLUDES`, wie im Abschnitt „Scope“).
+ergänzen (`NEW_EXCLUDES`, wie im Modul zum Scope).
 
 ```text
 /k-docs-tools — Preflight
@@ -75,8 +78,10 @@ ergänzen (`NEW_EXCLUDES`, wie im Abschnitt „Scope“).
 Collection    <context.kephalaion.address>
 Ziel          keph:/docs/generated/libs/
 Inventar      erhoben <generated.at>, <N> Einträge | Hinweis: <Problem im Kopf>
-<die Scope-Zeilen aus dem Abschnitt „Scope“>
-<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>
+<die Scope-Zeilen aus dem Modul zum Scope>
+Aufträge      <N> offen | keine
+              <datei> (<entstanden>) — <anlass>
+                <pfad>, <pfad>, …
 ```
 
 Bei „nein“ abbrechen; nichts wurde geholt oder geschrieben.
@@ -106,297 +111,53 @@ du dir Dateiname, `generated.by`, `generated.at`, `hints`, `questions` und die E
 `sources`, deren `resource` das Inventar ist (`item`, `version`).
 
 - `hints` befolgst du (Kopf in der Ablage oben) — etwa Schwerpunkte oder eine Zusatzquelle.
-  Eine Zusatzquelle aus einem `hint` gehört zum Zählen wie im Abschnitt „Scope“.
+  Eine Zusatzquelle aus einem `hint` gehört zum Zählen wie im Modul zum Scope.
 - **Zuständig** ist dieser Lauf nur für Dokumente mit `generated.by: k-docs-tools` oder dem
   Altwert `k-tools-scan`. Alle anderen — ohne `generated.by` oder mit einem anderen Wert —
   bleiben im Arbeitsverzeichnis **unverändert liegen**, samt `hints` und `questions`.
 - Ein Dokument gehört zu dem Gegenstand, den sein Inventar-Eintrag in `sources` als `item`
-  nennt, sonst zu dem Gegenstand, aus dem sein Dateiname nach der Regel in Schritt 6
-  entsteht. Den bisherigen Text nimmst du als Anregung, nicht als Vorlage zum Abschreiben.
+  nennt, sonst zu dem Gegenstand, aus dem sein Dateiname nach der Regel im Modul zu Schritt 5
+  (`_docs-tools/schreiben.md`) entsteht. Den bisherigen Text nimmst du als Anregung, nicht als Vorlage zum Abschreiben.
 
 ## Schritt 4 — Kandidaten und Auswahl
 
-**Kandidaten sind alle Gegenstände des Inventars.** Lies dazu den Rumpf des Inventars, die
-Abschnitte je Umgebung (`## lokal`, `## dev`, `## devcontainer`, `## ci`, `## deployment`,
-ohne Einträge `## Einträge`) mit den Spalten `Gegenstand`, `Art`, `Version`, `Pin`, `Scope`
-und `Herkunft`. Ein Gegenstand (`<ökosystem>/<name>`, etwa `python/celery` oder
-`go/github.com/yuin/goldmark`) steht dort je Quelle und Umgebung in einer eigenen Zeile, auch
-mit verschiedenen Versionen. Als Kandidat fasst du ihn über seine Zeilen zusammen:
+Lies `k-playbook:/commands/_docs-tools/kandidaten.md` und befolge es: Kandidaten sind alle
+Gegenstände des Inventars; du zählst ihre Nutzung im Code im Scope aus Schritt 1, vergibst
+Score und Klasse (A empfohlen, B optional, C übersprungen) und zeigst die kompakte Liste, aus
+der der Nutzer in **einer** Nachricht wählt. **Nichts schreiben, bevor die Auswahl
+bestätigt ist.** Fällt alles in C und wählt der Nutzer nichts, sag das und ende mit dem
+Abschluss.
 
-- **Art** — die Werte aus `Art` (`package`, `tool`, `runtime`, `image`, `chart`,
-  `chart-dependency`, `action`).
-- **Versionen** — die verschiedenen Werte aus `Version`, leere ausgelassen.
-- **Pin** — die verschiedenen Werte aus `Pin`, nach der Taxonomie des Vertrags.
-- **Scope** — die verschiedenen Werte aus `Scope` (`main`, `dev`, `optional`, `test`,
-  `build`), dazu die Umgebungen, in denen er vorkommt.
+## Schritt 5 — Recherche und Schreiben
 
-Das Inventar führt die Angaben der Manifeste; aus Lockfiles kommen nur die direkten
-Abhängigkeiten, transitive Pakete werden nicht ergänzt. Indirekte Angaben bringt nur
-`go.mod` mit: Es nennt auch indirekte Go-Module (`// indirect`), und das Inventar führt sie
-als gekennzeichnete Zeilen. Erkennungsmerkmal ist die Spalte `Herkunft`: Sie enthält
-`indirekt (// indirect in go.mod)`. Abweichungen zwischen den Zeilen sind kein Fehler
-dieses Commands; das Inventar weist sie selbst aus.
+Setze `GENERATED_AT` einmal je Lauf (`date -Iseconds`). Lies
+`k-playbook:/commands/_docs-tools/schreiben.md`: Recherche je ausgewähltem Kandidaten (Basis,
+bei Klasse A gezielt im Web, höchstens drei Abrufe), Dateiname, Kopf und Vorlage des
+Steckbriefs. Recherchiere in Gruppen von etwa drei Kandidaten je Zwischenmeldung, damit der Nutzer den Fortschritt sieht. Bei vielen Kandidaten darfst du Recherche und Schreiben auf Sub-Agenten
+verteilen. Ihr Auftrag beginnt mit: Führe zuerst `k-playbook briefing` aus und lies die
+Ausgabe; er liest `k-playbook:/commands/_docs-tools/schreiben.md` mit `k_playbook_doc_read`
+(`projectDir` = `context.project.dir`; in Claude Code lädt er die Werkzeuge
+`mcp__k-playbook__*` vorher mit der Werkzeugsuche) und bekommt von dir seinen Kandidaten mit
+den Zeilen aus Schritt 4, den Scope, `WORK_DIR`, `GENERATED_AT` und die bisherige Fassung
+seines Dokuments samt `hints`.
 
-**Nutzung im Code** zählst du je Kandidat mit Grep, innerhalb des Scope aus Schritt 1 —
-der Scope begrenzt nur dieses Zählen, nicht die Liste. Gesucht wird nach dem Import, passend
-zur Sprache (Python `import <name>|from <name>`, JavaScript `require\(['"]<name>|from
-['"]<name>`, Go nach der Regel unten, …):
+Was sich nicht klären lässt, ist eine Unklarheit; sie wird vor `publish` vorgelegt. Nach
+jeder geschriebenen Datei kurz melden: Dateiname und Zeilenzahl, nicht der Inhalt.
 
-- `file_count` — wie viele Dateien importieren,
-- `import_count` — Vorkommen insgesamt.
+## Schritt 6 — publish
 
-**Go** zählst du importgenau, ohne `go` vorauszusetzen:
+Lies `k-playbook:/commands/_docs/publish.md` und rufe `publish` mit `erzeuger: libs` auf.
+Ist `open` leer und `cleaned` wahr, schließt du genau die Aufträge aus `ORDERS` ab, je einen
+mit `k_playbook_doc_done`; Aufträge, die nach dem Preflight angelegt wurden, stehen nicht in
+`ORDERS` und bleiben offen. Bricht der Lauf ab, meldet `publish` einen Konflikt, eine
+Ablehnung oder `failed`, oder bleibt etwas offen, schließt du keinen Auftrag ab; ein
+`publish`, das nach einem behobenen Konflikt doch noch erfolgreich durchläuft, schließt
+`ORDERS` ab. Die Rückmeldungen von `k_playbook_doc_done` stehen im Modul zu den Aufträgen.
 
-- **Importzeile.** Gezählt werden nur Zeilen, die aus nichts bestehen als einem optionalen
-  `import`, einem optionalen Alias (`_`, `.` oder Bezeichner), dem Pfad in Anführungszeichen
-  und einem optionalen Kommentar — die Einzelform `import "<p>"` und die Zeilen eines Blocks
-  `import ( … )`. Eine Zeichenkette sonst im Code zählt nicht. Grenze: Ob die Zeile in einem
-  Importblock steht, prüft Grep nicht; eine Zeile dieser Form außerhalb, etwa eine einzelne
-  Zeichenkette in einem mehrzeiligen Literal, zählt mit. Das ist hingenommen.
-- **Zugehörigkeit.** Ein Importpfad gehört zu einem Modul, wenn er gleich dem Modulpfad ist
-  oder mit `<modulpfad>/` beginnt. So zählen Unterpakete mit (`…/go-sdk/mcp` für
-  `github.com/modelcontextprotocol/go-sdk`), und ein Modul zählt nicht für ein anderes, das
-  nur mit denselben Zeichen beginnt (`github.com/yuin/goldmark` nicht für
-  `github.com/yuin/goldmark-emoji`).
-- **Muster.** `<modulpfad>` ist der Gegenstand ohne `go/`, Punkte als `\.` maskiert:
+## Schritt 7 — Abschluss
 
-  ```text
-  ^[[:space:]]*(import[[:space:]]+)?([A-Za-z_.][A-Za-z0-9_]*[[:space:]]+)?"<modulpfad>(/[^"]*)?"[[:space:]]*(//.*)?$
-  ```
-
-  `grep -rHE --include='*.go' '<muster>' <scope>` liefert die Treffer als `datei:zeile`;
-  `import_count` ist die Zahl der Treffer, `file_count` die Zahl der verschiedenen Dateien
-  davor.
-- **Verschachtelte Module.** Beginnt der Pfad eines anderen Go-Kandidaten mit
-  `<modulpfad>/` (`cloud.google.com/go/storage` unter `cloud.google.com/go`), zählt eine
-  Importzeile nur für das längste passende Modul. Für das kürzere ziehst du deshalb vor dem
-  Zählen die Treffer ab, die auch das Muster des längeren trifft — je längerem Modul ein
-  `grep -vE '"<längerer modulpfad>(/[^"]*)?"'` hinter dem Grep oben. Eine Datei, von der danach
-  kein Treffer bleibt, zählt nicht für das kürzere.
-
-Bei Gegenständen ohne Import — `image`, `chart`, `chart-dependency`, `action`, `runtime` —
-entfällt die Zählung; die Liste zeigt dort `—`.
-
-**Score und Klasse.** Je Kandidat ein Score, transparent gehalten:
-
-| Signal | Score |
-|---|---|
-| Framework oder Fundament, formt die Architektur (etwa FastAPI, Django, React, Celery, SQLAlchemy, NestJS, Rails) | +3 |
-| Externe Kopplung mit Auth, Netz oder Zustand (Cloud-SDKs, DB-Treiber, Message-Broker, Auth-Anbieter, ML-Runtimes) | +3 |
-| Steht auf der Known-Pitfall-Liste (unten) | +2 |
-| Breit im Code (`file_count` ≥ 20 % aller Quelldateien im Scope) | +2 |
-| Pin in allen Zeilen `exact` oder `digest` | +1 |
-| Test, Lint oder Format ohne aufwendige Konfiguration (pytest, mypy, ruff, black, prettier, eslint) | −2 |
-| Triviales Hilfsmittel (requests ohne Auth-Sonderfall, click, python-dotenv, chalk, colorama) | −2 |
-
-- **A — empfohlen:** Score ≥ 3 oder auf der Known-Pitfall-Liste.
-- **B — optional:** Score 1–2.
-- **C — übersprungen:** Score ≤ 0.
-- **Rein indirekt:** Ein Kandidat, dessen Zeilen alle das Merkmal
-  `indirekt (// indirect in go.mod)` in der Spalte `Herkunft` tragen, kommt nach C — ohne
-  Ausnahme, unabhängig vom Score und ohne Hinweis. Wer ihn will, holt ihn mit
-  `add <gegenstand>` aus C.
-
-**Known-Pitfall-Liste:** JWT, cryptography, aiohttp, pytz und Zeitzonen-Handling, Kafka,
-LangChain, boto3, azure-sdk-*, pandas mit großen Frames, nebenläufige asyncio-Libraries, ORMs,
-WebSocket-Libraries, gRPC. Sie ist eine Konstante dieses Commands: hier ergänzbar, nicht
-projektweise abschaltbar.
-
-**Vorhanden.** Hat ein Kandidat schon ein Dokument, für das dieser Lauf zuständig ist
-(Schritt 3), steht er mit „vorhanden“ und dem bisherigen `generated.at` in der Liste.
-Umschreiben ist eine Auswahl wie jede andere; vorhandene Kandidaten sind deshalb **nicht
-vorausgewählt**, auch nicht in A.
-
-Zeige die Liste **kompakt**: A und B einzeln, C als eine zusammengefasste Zeile.
-
-```text
-Kandidaten aus dem Inventar (<N> Gegenstände, erhoben <generated.at>):
-
-Empfohlen (A):
-  [x] python/fastapi            0.115.0          exact   in 47 Dateien
-      → Framework, Reihenfolge der Middleware, Async-Fallen
-  [ ] python/sqlalchemy         2.0.35           exact   in 28 Dateien   vorhanden (2026-10-02)
-      → Session-Semantik 1.x → 2.0, Async-Unterschiede
-  [x] container/postgres        16.4, 15         exact   —
-      → Major-Upgrade braucht Dump/Restore, verschiedene Versionen je Umgebung
-
-Optional (B):
-  [ ] python/pydantic           2.9.2            exact   in 34 Dateien
-  [ ] python/httpx              0.27.0           range   in 8 Dateien, mit Auth
-
-Übersprungen (C): python/pytest, python/ruff, python/black, … (18 Gegenstände) — auf Wunsch
-  ausklappen.
-
-Ohne Gegenstand im Inventar: python-requests.md — bleibt liegen | drop
-
-Kommandos:
-  all             alle A und B aufnehmen
-  A-only          nur A ohne „vorhanden“ (Standard)
-  add <gegenstand>     aufnehmen, auch „vorhanden“ (umschreiben) oder aus C
-  remove <gegenstand>  aus der Auswahl streichen
-  show C          C vollständig zeigen
-  drop <datei>    ein eigenes Dokument ohne Gegenstand im Inventar entfernen
-  proceed         mit der aktuellen Auswahl weiter
-```
-
-- Ein eigenes Dokument, dessen Gegenstand nicht mehr im Inventar steht, zeigt die Liste
-  unter „Ohne Gegenstand im Inventar“. Es bleibt liegen, außer der Nutzer wählt `drop`; hat
-  es `hints`, braucht die Löschung die Bestätigung, dass sie mit ihm gehen (Kopf in der
-  Ablage oben). `publish` deutet eine fehlende Datei als Löschung.
-- Kein Hin und Her je Tool: Der Nutzer wählt in **einer** Nachricht, dann geht es weiter.
-- Fällt alles in C und wählt der Nutzer nichts aus, sag das und ende mit dem Abschluss.
-- **Nichts schreiben, bevor die Auswahl bestätigt ist.**
-
-## Schritt 5 — Recherche
-
-Setze zuerst `GENERATED_AT` wie in der Ablage oben (`date -Iseconds`). Recherchiere je
-ausgewähltem Kandidaten, in Gruppen von etwa drei je Zwischenmeldung, damit der Nutzer den
-Fortschritt sieht:
-
-**Basis (immer):**
-
-- Die Rolle im Projekt aus der Nutzung im Code und eigenem Wissen ableiten.
-- Zwei bis drei Kernstellen im Code nennen, als `pfad:zeile`, innerhalb des Scope.
-- Versionen und Pin aus Schritt 4 übernehmen.
-
-**Klasse A — zusätzlich gezielt im Web:**
-
-- `WebFetch` auf die Startseite der offiziellen Doku zur genutzten Version.
-- `WebFetch` auf Changelog oder Release-Notes rund um die genutzte Version (major.minor).
-- Höchstens ein gezielter Abruf nach bekannten Pitfalls an der offiziellen Quelle (etwa die
-  Issues des Repos). Keine breite Suche: insgesamt **höchstens drei** Abrufe je Gegenstand.
-
-**Klasse B — nur die Basis.** Ins Web nur, wenn beim Schreiben eine konkrete Frage aufkommt,
-die nicht sicher zu beantworten ist.
-
-Was sich aus Repo und Quellen nicht klären lässt, ist eine Unklarheit nach der Ablage oben:
-sammeln und vor `publish` vorlegen, nicht raten. Bei vielen Kandidaten darfst du Recherche
-und Schreiben auf Sub-Agenten verteilen, nach den Regeln der Ablage oben; jeder bekommt
-zusätzlich seinen Kandidaten mit den Zeilen aus Schritt 4, den Scope, `WORK_DIR`, die
-bisherige Fassung seines Dokuments samt `hints` und die Vorlage aus Schritt 6.
-
-## Schritt 6 — Schreiben
-
-Je ausgewähltem Kandidaten eine Datei `<WORK_DIR>/<name>.md`, mit den Datei-Werkzeugen.
-`<name>` ist der Gegenstand, klein geschrieben; jedes Zeichen außer `a–z`, `0–9`, `.`, `_`,
-`-` wird `-`. Aus `go/github.com/yuin/goldmark` wird `go-github.com-yuin-goldmark`, aus
-`python/celery` wird `python-celery`. Ein vorhandenes Dokument, das umgeschrieben wird, behält
-seinen Dateinamen. Keine `README.md`, keine anderen Dateien als `.md`.
-
-Der Kopf ist der aus dem Abschnitt „Der Kopf“ der Ablage oben; die Vorlage zeigt, wie dieser
-Command ihn belegt:
-
-```markdown
----
-title: "<Name, wie das Projekt ihn nennt>"
-description: "Projektrelevante Pitfalls und Idiome für <Name>."
-generated: { by: k-docs-tools, at: <GENERATED_AT> }
-hints: [ <unverändert übernommen; das Feld fehlt, wenn das Dokument keine hatte> ]
-questions: [ "<Frage, die genau dieser Steckbrief beantwortet>", … ]
-sources:
-  - resource: keph:/docs/generated/versions/inventory.md
-    item: <gegenstand>
-    version: <version>
-  - resource: <URL der offiziellen Doku, wenn gelesen>
-  - resource: <URL von Changelog oder Release-Notes, wenn gelesen>
----
-
-# <Name>
-
-## Rolle im Projekt
-
-<1–2 Absätze: wofür es genutzt wird und wie zentral es für dieses Projekt ist. Zwei bis
-drei Kernstellen als `pfad:zeile`.>
-
-## Version und Migration
-
-- Deklariert: `<version>` (`<pin>`) in <Umgebungen>; weitere Versionen je Umgebung, wenn
-  das Inventar sie nennt.
-- Bekannte Breaking Changes seit …: <knapp, mit Version>
-- Upgrade-Pfad, nur wenn er für dieses Projekt zählt: …
-
-## Pitfalls (projektrelevant)
-
-- **<Kurztitel>** — <1–3 Sätze mit Ursache und Symptom>. Ref: `<pfad:zeile>` oder URL.
-
-## Empfohlene Idiome
-
-- <kurz>
-
-## Anti-Patterns
-
-- <kurz>
-
-## Verwandte Themen
-
-- `keph:/docs/generated/code/<NN>-<slug>.md` — <in welchem Zusammenhang>
-- `<anderer-steckbrief>.md` — <in welchem Zusammenhang>
-```
-
-Regeln:
-
-- **`sources` beginnt mit dem Inventar:** je Version, die das Inventar für den Gegenstand
-  nennt, ein Eintrag mit `resource: keph:/docs/generated/versions/inventory.md`,
-  `item: <gegenstand>` und `version: <version>`; `item` ist in allen diesen Einträgen
-  gleich. Zeilen ohne Version geben keinen eigenen Eintrag. Nennt das Inventar für den
-  Gegenstand gar keine Version, steht ein Eintrag ohne `version`. Danach folgen die
-  Herstellerquellen, die du tatsächlich gelesen hast, mit ihrer URL — eine nicht gelesene
-  URL steht nicht in `sources`.
-- **Wie kritisch** ein Gegenstand für das Projekt ist, zeigen die Reihenfolge der Pitfalls
-  (das Wichtigste zuerst) und ein Satz unter „Rolle im Projekt“ — kein Feld im Kopf.
-- Pitfalls sind **konkret**, mit Ursache und Symptom, nicht allgemein („kann Fehler
-  werfen“). Ist keiner bekannt, steht dort ehrlich: „Kein projektrelevanter Pitfall bekannt
-  in dieser Version.“
-- Keine Tutorials, keine „Getting Started“-Schnipsel, keine abgeschriebene Doku.
-- Keinen Abschnitt „Offene Fragen“: Unklarheiten legst du wie in der Ablage oben vor
-  `publish` vor; was offen bleibt, nennt der Abschluss.
-- Verwandte Themen im selben Verzeichnis mit ihrem Dateinamen, die Code-Doku und andere
-  Teile der Projektdoku als `keph:`-Verweis.
-- Neue `hints` schlägst du nur vor; eingetragen werden sie erst nach Bestätigung, wie im
-  Kopf beschrieben.
-
-Nach jeder geschriebenen Datei kurz melden: Dateiname und Zeilenzahl, nicht der Inhalt.
-
-## Schritt 7 — publish
-
-Rufe `k_playbook_docs_publish` mit `projectDir` = `context.project.dir` und
-`erzeuger: libs` (ersatzweise `k-playbook docs publish libs --json`). `allow_hints: true`
-nur, wenn der Nutzer geänderte, neue oder mit einem Dokument entfallende `hints` bestätigt
-hat.
-
-Melde die Antwort je Dokument: `created`, `written`, `deleted`, `unchanged`, `conflict`
-oder `failed`, mit Revision; dazu `hintsChanged`, `readme` und ob aufgeräumt wurde
-(`cleaned`).
-
-- `invalid_input` — eine Ablehnung im Arbeitsverzeichnis (fehlendes Frontmatter, falscher
-  Name, `README.md`, andere Datei als `.md`). Nichts wurde geschrieben. Die Stellen
-  beheben und `publish` erneut aufrufen.
-- `hints_changed` — `hints` weichen vom checkout ab, oder ein Dokument mit `hints` wird
-  gelöscht oder neu angelegt. Nichts wurde geschrieben. Dem Nutzer die genannten Dokumente
-  vorlegen; erst nach Bestätigung mit `allow_hints: true` erneut aufrufen, sonst die
-  `hints` zurücksetzen.
-- `conflict` — das Dokument wurde seit dem checkout in Kephalaion geändert, angelegt oder
-  gelöscht; die eigene Fassung wurde nicht geschrieben. **Vorlegen, nicht still
-  nachziehen.** Der Nutzer entscheidet: eigene Änderung verwerfen, oder die eigene Fassung
-  sichern, mit `k_playbook_docs_checkout` und `discard: true` neu holen — was schon
-  veröffentlicht ist, kommt dabei mit —, die Änderung auf den neuen Stand übertragen und
-  erneut veröffentlichen.
-- `failed` mit `kephalaion_unavailable` — beim Hub ist nichts angekommen. Später erneut
-  `publish`; es schreibt dann nur noch den Rest.
-- `failed` mit `outcome_unknown` — der Vorgang kann angekommen sein. **Nicht** noch einmal
-  veröffentlichen, sondern mit Kephalaion `read` nachsehen und dem Nutzer berichten.
-
-Arbeitsverzeichnis und Merkdatei bleiben liegen, solange etwas offen ist (`open`).
-
-Ist `open` leer und `cleaned` wahr, schließt du die Aufträge aus `ORDERS` ab, wie im
-Abschnitt „Doku-Aufträge“ der Ablage oben; sonst bleiben alle offen.
-
-## Schritt 8 — Abschluss
-
-**Ausschlüsse speichern** wie im Abschnitt „Scope“ der Ablage, wenn der Nutzer im
-Preflight `NEW_EXCLUDES` ergänzt hat.
-
-Kompakte Zusammenfassung:
+**Ausschlüsse speichern** wie im Modul zum Scope, wenn der Nutzer im Preflight `NEW_EXCLUDES`
+ergänzt hat. Kompakte Zusammenfassung:
 
 - Kandidaten aus dem Inventar: N Gegenstände, davon A = x, B = y, C = z; ausgewählt: k.
 - Je Dokument der Zustand aus `publish`, gezählt nach neu, umgeschrieben, entfallen,
@@ -425,37 +186,31 @@ Kompakte Zusammenfassung:
   scheitert → kein Lauf; die Meldung nennen und `/k-doc-inventory` als nächsten Schritt.
   Keine Manifeste selbst lesen.
 - `$ARGUMENTS` fehlt auf der Platte, liegt außerhalb von `context.project.dir` oder in
-  einem der immer ausgeschlossenen Verzeichnisse → abbrechen, den Pfad nennen (Abschnitt
-  „Scope“ der Ablage).
+  einem der immer ausgeschlossenen Verzeichnisse (`invalid_input` von `k_playbook_docs_scope`)
+  → abbrechen, den Pfad nennen.
 - `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen.
-- `k_playbook_docs_checkout` ist unbekannt, `k-playbook docs` meldet `unbekanntes Kommando`
-  oder `unbekannter Erzeuger "libs"` → die Installation ist älter als dieser Command:
-  melden, `/k-upgrade` nennen, nichts von Hand nach Kephalaion schreiben.
-- `k_playbook_docs_exclude_add` meldet `rejected`, `unsupported` oder ist unbekannt → wie im
-  Abschnitt „Scope“ der Ablage.
+- Ein Werkzeug ist unbekannt (`k_playbook_docs_checkout`, `_scope`, `_orders`), `k-playbook
+  docs` meldet `unbekanntes Kommando` oder `unbekannter Erzeuger "libs"` → die Installation
+  ist älter als dieser Command: melden, `/k-upgrade` nennen, nichts von Hand rechnen oder
+  nach Kephalaion schreiben.
 - `WebFetch` scheitert oder liefert nichts Brauchbares → den Steckbrief aus eigenem Wissen
   schreiben, die Lücke als Unklarheit vorlegen, die URL nicht in `sources` eintragen.
-- `publish` meldet `conflict`, `hints_changed` oder `failed` → wie in Schritt 7.
+- `publish` meldet `conflict`, `hints_changed` oder `failed` → wie im Modul zu `publish`.
 
 ## Anti-Muster (nicht tun)
 
-- **Manifeste selbst scannen.** Die Kandidaten kommen allein aus dem Inventar; fehlt es,
-  wird es erhoben, nicht nachgebaut.
-- **Kandidaten nach dem Scope filtern.** Der Scope begrenzt nur das Zählen im Code.
-- **Abschreiben aus der offiziellen Doku.** Der Wert entsteht aus Pitfall und
-  Projektkontext, nicht aus der Wiedergabe.
-- **„Kann kaputtgehen, wenn X“.** Pitfalls sind konkret; gibt es keinen, steht das so da.
+- **Manifeste selbst scannen** oder **Kandidaten nach dem Scope filtern.** Die Kandidaten
+  kommen allein aus dem Inventar; fehlt es, wird es erhoben, nicht nachgebaut; der Scope
+  begrenzt nur das Zählen im Code.
+- **Abschreiben aus der offiziellen Doku** oder **„Kann kaputtgehen, wenn X“.** Der Wert
+  entsteht aus konkretem Pitfall und Projektkontext.
 - **Web-Recherche für alle.** Nur für A, gezielt, höchstens drei Abrufe je Gegenstand.
 - **Eigene Kopffelder.** Kein `lib`, `version`, `severity`, `last-reviewed`, `type`, `tags`
   oder `status` — Versionen stehen in `sources`, das Gewicht im Text.
 - **Fremde Dokumente löschen oder umschreiben.** Was ein anderer Schreiber angelegt hat,
   bleibt unverändert im Arbeitsverzeichnis — `publish` löscht, was dort fehlt.
-- **`hints` still ändern.** Neue nur nach Bestätigung, und dann mit `allow_hints`.
-- **Konflikte still lösen.** Kein erneutes Schreiben über eine fremde Änderung hinweg,
-  kein `discard` ohne Entscheidung des Nutzers.
-- **Direkt in die Collection schreiben.** Nicht mit Kephalaion `write` oder `create` an
-  `publish` vorbei.
-- **`README.md` oder `index.md` schreiben.** Die README schreibt `publish`, den Index das
-  Indizieren.
-- **Auf die Platte ausweichen.** Ohne Kephalaion gibt es keinen Lauf; eine Datei auf der
-  Platte ist kein gültiger Ort für die Steckbriefe.
+- **`hints` oder Konflikte still ändern.** Neue `hints` nur nach Bestätigung und mit
+  `allow_hints`; kein `discard` ohne Entscheidung des Nutzers.
+- **Direkt in die Collection schreiben, `README.md` oder `index.md` schreiben, auf die
+  Platte ausweichen.** Die README schreibt `publish`, den Index das Indizieren; ohne
+  Kephalaion gibt es keinen Lauf.

@@ -84,20 +84,10 @@ Immer, wenn der Prüfumfang Code enthält. Maßstab ist der Absatz zum Doku-Nach
   keine Änderung nötig ist?
 - **Erzeugte Doku** — `keph:/docs/generated/code/` (Erzeuger `code`) und
   `keph:/docs/generated/libs/` (Erzeuger `tools`). Sie wird nicht von Hand nachgezogen und
-  nicht in diesem Command erzeugt. Je Erzeuger, den die Änderung betrifft:
-  1. Gibt es dort noch keine Dokumente (Kephalaion `list` mit `collection` =
-     `context.kephalaion.address`, `path` = `docs/generated/code` bzw. `docs/generated/libs`),
-     ist nichts nachzuziehen: „noch keine erzeugte Doku“.
-  2. Sonst suchst du mit `k_playbook_doc_grep`, `kind: docs`, Muster
-     `^sitzung: <session>$`, einen offenen rohen Auftrag dieser Sitzung, und prüfst für die
-     Treffer `^erzeuger: code$` bzw. `^erzeuger: tools$`; ein Treffer mit einer Zeile
-     `^dokument: ` ist zerlegt und zählt nicht („Kein Doppel“ in
-     `k-playbook:/instructions/on-demand/doku-auftraege.md`). Gibt es ihn für `tools`:
-     „eingereiht“, mit Verweis. Gibt es ihn für `code`, liest du ihn mit
-     `k_playbook_doc_read`: „eingereiht“, mit Verweis, wenn jeder geänderte Pfad gleich einem
-     seiner `pfade` ist oder darin liegt; sonst „nachzuziehen“ — Schritt 3 ergänzt dann diesen
-     Auftrag, statt einen zweiten anzulegen.
-  3. Sonst: „nachzuziehen“. Das Einreihen bietet Schritt 3 an.
+  nicht in diesem Command erzeugt. Betrifft die Änderung einen Erzeuger (Code im Scope von
+  `code`, Abhängigkeiten oder Werkzeuge für `tools`), lautet der Ausgang „nachzuziehen“.
+  Ob schon ein Auftrag dieser Sitzung deckt („Kein Doppel“) oder noch keine erzeugte Doku
+  liegt, entscheidet das Programm beim Einreihen unten, nicht dieser Text.
 
 Ein veraltetes Dokument unter `libs/`, `versions/` oder `manual/` meldest du nicht als Folge
 einer Codeänderung; die `README.md` eines Erzeuger-Verzeichnisses schreibt `publish`.
@@ -134,22 +124,18 @@ Ist etwas `unklar` oder `fehlt`, nenne die konkrete nächste Aktion
 und frag, bevor du etwas änderst.
 
 **Doku-Auftrag nach Freigabe.** Steht bei `code` oder `tools` „nachzuziehen“, frag, ob der
-Nachzug eingereiht werden soll. Nach Ja, je Erzeuger:
+Nachzug eingereiht werden soll. Nach Ja, je Erzeuger: `k_playbook_docs_order_add` mit
+`projectDir` = `context.project.dir`, `erzeuger` (`code` bzw. `tools`), `pfade` aus dem
+Prüfumfang, so fein wie möglich, `anlass` (ein Satz) und `sitzung` = `session` (ersatzweise
+`k-playbook docs order add <code|tools> --pfad <pfad>… --anlass "<satz>" --sitzung <session>
+--json`). „Kein Doppel“ und „Wann nicht eingereiht wird“ rechnet das Programm nach
+`k-playbook:/instructions/on-demand/doku-auftraege.md`; die Antwort sagt `status`:
 
-1. `k_playbook_doc_create` mit `kind: docs` und einem Kurznamen aus Erzeuger und Anlass; die
-   Antwort nennt den Verweis.
-2. Gleich danach Kephalaion `write` mit `collection` = `context.kephalaion.address`, `name` =
-   Verweis ohne `keph:/`, den Inhalt mit dem Kopf aus
-   `k-playbook:/instructions/on-demand/doku-auftraege.md`: `erzeuger`, `pfade` aus dem
-   Prüfumfang, `anlass`, `sitzung` = `session`, `entstanden` = `context.now.date`.
-3. Nenne den Verweis; im Bericht steht dann „eingereiht“.
-
-Hat die Sitzung für `code` schon einen offenen rohen Auftrag, dem Pfade fehlen, legst du
-keinen zweiten an, sondern ergänzt ihn nach „Kein Doppel“ in `doku-auftraege.md`: seine
-`pfade` mit denen aus dem Prüfumfang vereinigen, den weiteren Anlass als Zeile in den Rumpf,
-Kephalaion `write` mit `base_revision` gleich der Revision aus `k_playbook_doc_read`. Bei
-`stale_revision` neu lesen und auf dem neuen Stand ergänzen; liegt der Auftrag nicht mehr
-offen, einen neuen anlegen wie oben.
+- `created` oder `extended` — eingereiht bzw. der vorhandene Auftrag dieser Sitzung ergänzt:
+  im Bericht „eingereiht“, mit dem Verweis `ref`.
+- `covered` — ein offener Auftrag deckt die Änderung schon: „eingereiht“, mit `ref`.
+- `skipped` — nichts eingereiht: `no_generated_docs` heißt „noch keine erzeugte Doku“,
+  `kephalaion_unavailable` heißt, der Nachzug bleibt offen; der Abschluss nennt es.
 
 Bei Nein bleibt es bei „nachzuziehen“; der Abschluss nennt es als offen. `/k-docs-tools`
 sofort laufen zu lassen bleibt erlaubt. Für `code` gibt es den sofortigen Lauf nur als vollen
@@ -161,15 +147,16 @@ korrigiert wird nur nach Freigabe in derselben Sitzung. Eingereihte Aufträge ar
 
 ## Fehlerfälle
 
-- `k_playbook_doc_create` meldet `invalid_input` für die Sorte `docs` → die Installation ist
-  älter als dieser Command: melden, `/k-upgrade` nennen, nichts von Hand anlegen.
-- `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Bericht nennt den Nachzug
-  als offen. `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`)
-  nachsehen.
+- `k_playbook_docs_order_add` ist unbekannt (`invalid_input` für das Werkzeug) oder `k-playbook
+  docs` meldet `unbekannter Unterbefehl` → die Installation ist älter als dieser Command:
+  melden, `/k-upgrade` nennen, nichts von Hand anlegen oder ersetzen.
+- `skipped` mit `kephalaion_unavailable` beim Einreihen → nicht eingereiht; der Bericht nennt
+  den Nachzug als offen. `outcome_unknown` → nicht wiederholen, mit `k_playbook_doc_list`
+  (`kind: docs`) nachsehen.
 
 ## Anti-Muster (nicht tun)
 
 - **Erzeugte Doku von Hand nachziehen** oder den Erzeuger ungefragt starten. Der Normalfall
   ist der Auftrag, und der kommt nur nach Freigabe.
-- **Einen zweiten Auftrag anlegen**, wenn diese Sitzung schon einen offenen rohen für
-  denselben Erzeuger hat. Für `code` wird der vorhandene ergänzt.
+- **Einen Auftrag von Hand anlegen oder ergänzen.** Das tut `k_playbook_docs_order_add`; es
+  legt keinen zweiten für dieselbe Sitzung an.

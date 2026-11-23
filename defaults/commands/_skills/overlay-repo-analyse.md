@@ -22,6 +22,8 @@ include: k-playbook:/commands/_shared/erster-schritt.md
 
 include: k-playbook:/commands/_shared/docs.md
 
+include: k-playbook:/commands/_docs/schreiblauf.md
+
 Dieser Skill ist ein Schreiber des Erzeugers `code`: sein Verzeichnis ist
 `keph:/docs/generated/code/`, das er sich mit `/k-docs-code` teilt. Seine Dokumente
 erkennst du an `generated.by: ks-overlay-repo-analyse`.
@@ -334,8 +336,8 @@ Jede Datei trägt den Kopf aus dem Abschnitt „Der Kopf“ der Docs-Ablage im e
 Wie dieser Skill ihn belegt, zeigt die Vorlage
 `k-playbook:/commands/_skills/overlay-repo-analyse/overlay-doc.md.template` (lies sie mit
 `k_playbook_doc_read`): `generated: { by: ks-overlay-repo-analyse, at: <GENERATED_AT> }`,
-`GENERATED_AT` wie in der Docs-Ablage. Den Scope der Docs-Ablage wendet dieser Skill nicht
-an; er analysiert die Repos aus Phase 1.
+`GENERATED_AT` wie in der Docs-Ablage. Den Scope der Docs-Erzeuger (`k-playbook docs scope`) wendet
+dieser Skill nicht an; er analysiert die Repos aus Phase 1.
 
 Verwandte Dokumente im selben Verzeichnis nennst du mit ihrem Dateinamen.
 

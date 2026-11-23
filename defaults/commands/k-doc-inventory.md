@@ -203,7 +203,7 @@ Kompakte Zusammenfassung:
   an der nicht gesucht wurde, und die gehört genauso in den Bericht. Kommen auffällig viele
   Abweichungen aus einem einzigen Verzeichnis mit Testmaterial, ist das der Anlass, Frage 4
   aus Schritt 3 zu stellen — nicht der Anlass, still zu filtern.
-- Den Abgleich mit den Tool-Steckbriefen macht `/k-docs` in seinem Schritt 3; hier wird er
+- Den Abgleich mit den Tool-Steckbriefen macht `/k-docs` in seinem Statuslauf; hier wird er
   nicht wiederholt.
 - Folge-Command: keiner. Das Inventar liegt in `keph:/docs/`, und den Index darüber erzeugt
   Kephalaion, nicht ein Command.

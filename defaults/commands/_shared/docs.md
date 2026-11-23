@@ -1,6 +1,6 @@
 ---
 title: Die Docs-Ablage in der Projekt-Collection
-description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, der eine Kopf jedes Dokuments (title, description, generated samt stats, hints, questions, sources, verified), Regeln für einen schreibenden Lauf (Zeitpunkt, Unklarheiten, keine Befunde, Sub-Agenten), der Scope der Erzeuger, die den Code durchsuchen (/k-docs-code und /k-docs-tools), samt dauerhaften Ausschlüssen in docs.exclude, die Doku-Aufträge aus queue/docs/, die bei /k-docs-code den Lauf steuern und die /k-docs-tools im Preflight listet und nach einem erfolgreichen publish abschließt, README.md (aus den Vorlagen unter k-playbook:/docs/, geschrieben vom Programm) und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
+description: Was für jeden Docs-Command gilt — die Ablage unter keph:/docs/ in der Collection des Projekts, ein Schreiber ändert nur seine Dokumente in generated/<erzeuger>/, Erzeuger mit mehreren Dokumenten schreiben über k-playbook docs checkout/publish, der eine Kopf jedes Dokuments (title, description, generated samt stats, hints, questions, sources, verified), die Verweise auf die Regeln eines schreibenden Laufs, auf den Scope und auf die Doku-Aufträge, dauerhafte Ausschlüsse in docs.exclude, README.md (aus den Vorlagen unter k-playbook:/docs/, geschrieben vom Programm) und index.md schreibt kein Command-Text, und ohne Kephalaion gibt es keinen Rückfall auf die Platte.
 ---
 
 Die Projektdokumentation liegt in der Collection des Projekts unter `keph:/docs/`; das ist
@@ -20,32 +20,14 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
   bleibt deshalb dort liegen.
 - Jedes Dokument trägt den Kopf aus dem Abschnitt „Der Kopf“ unten; `hints` sind darin der
   einzige von Hand gepflegte Teil eines erzeugten Dokuments.
-- Schreibst du in einem Lauf selbst erzeugte Dokumente (nicht das Programm, wie beim
-  Inventar), gilt außerdem:
-  - **Zeitpunkt:** `generated.at` ist `GENERATED_AT`, einmal je Lauf aus der Shell gesetzt
-    (`date -Iseconds`) und für alle Dokumente des Laufs derselbe — nie geschätzt, gerundet
-    oder erfunden.
-  - **Unklarheiten** sind etwas anderes als `questions`: `questions` beantwortet das Dokument,
-    eine Unklarheit kann es nicht beantworten. Fragen statt raten — Unklarheiten je Dokument
-    sammeln und **vor `publish`** gebündelt vorlegen, höchstens drei je Dokument, die
-    wichtigsten zuerst. Beantwortetes einarbeiten; was offen bleibt, nennt die
-    Zusammenfassung am Ende.
-  - **Keine Befunde.** Was der Lauf findet — Abweichungen zur bisherigen Fassung, mögliche
-    Fehler, Altlasten —, gehört ins passende Dokument und wird nicht zusätzlich nach
-    `keph:/queue/findings/` geschrieben: Die Doku ist schon die Ablage, in die ein Befund
-    übernommen würde.
-  - **Nicht in die Doku:** Ticket-, Testlauf- und Reviewprotokolle und der Stand laufender
-    Vorhaben; der gehört in die Workbench.
-  - **Sub-Agenten** bekommen `GENERATED_AT`, diese Regeln und den Kopf mit. Sie schreiben
-    höchstens ihre eigenen Dateien im Arbeitsverzeichnis — nicht nach Kephalaion, kein
-    checkout oder publish, keine Befunde, keine Rückfragen an den Nutzer — und melden ihre
-    Unklarheiten und die Stellen zurück, an denen die bisherige Fassung nicht mehr stimmt.
-    Sammeln, vorlegen und veröffentlichen tut nur der Lauf selbst.
+- Schreibt ein Lauf selbst erzeugte Dokumente (nicht das Programm, wie beim Inventar),
+  gelten zusätzlich die Regeln aus `k-playbook:/commands/_docs/schreiblauf.md`: Zeitpunkt,
+  Unklarheiten, keine Befunde, was nicht in die Doku gehört, Sub-Agenten.
 - Dauerhafte Ausschlüsse für den Code-Scan eines Projekts stehen in `docs.exclude` von
   `K-PLAYBOOK.yaml`: gelesen aus `context.docs.exclude`, eingetragen nur über
   `k_playbook_docs_exclude_add` (`k-playbook docs exclude add`) nach Bestätigung durch den
-  Nutzer. Die Datei selbst liest und bearbeitet kein Docs-Command. Wie sie wirken, steht im
-  Abschnitt „Scope“ unten.
+  Nutzer. Die Datei selbst liest und bearbeitet kein Docs-Command. Wie sie wirken, rechnet
+  `k-playbook docs scope`; die Regeln stehen nur im Programm.
 - `docs/manual/` ist von Hand gepflegt, samt `docs/manual/handbook/`, dem Handbuch des
   Projekts, das die Oberfläche zeigt; `docs/sources/` verlinkt Quellen außerhalb von
   Kephalaion. Beides fasst ein Erzeuger nicht an.
@@ -111,149 +93,3 @@ Darüber hinaus schreibt kein Erzeuger ein Kopffeld. Die Felder älterer Fassung
 `tags`, `status`, `lib`, `version`, `version-pin`, `severity`, `last-reviewed`, ein eigener
 Block wie `inventory:` — entfallen oder gehen in diese Felder auf. Die Vorlage eines
 Erzeugers zeigt, wie er diesen Kopf belegt; sie erweitert ihn nicht.
-
-### Scope
-
-Dieser Abschnitt gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` und
-`/k-docs-tools`. `/k-doc-inventory` und `ks-overlay-repo-analyse` binden dieses Modul auch
-ein, wenden den Scope aber nicht an — das Inventar liest seine Quellen nach seinem eigenen
-Vertrag, der Overlay-Skill die Repos, die er analysiert.
-
-Aus dem Briefing brauchst du dafür `context.project.dir`, `context.project.repoRoot`, dazu
-`context.docs.exclude` und `context.docs.problems` — die dauerhaften Ausschlüsse des
-Projekts aus `K-PLAYBOOK.yaml` und die Einträge, die dort verworfen wurden. Der Scope ergibt
-sich aus Briefing und Argument, nicht geraten:
-
-- `SCAN_ROOT = context.project.repoRoot` — immer, nicht das aktuelle Verzeichnis.
-- **Stand** — beschrieben wird der Arbeitsbaum von `SCAN_ROOT`, wie er ausgecheckt ist.
-  Branch und Commit stehen im Preflight (`git -C <SCAN_ROOT> rev-parse --abbrev-ref HEAD`,
-  `git -C <SCAN_ROOT> log -1 --format=%h`, dazu ob `git status --porcelain` leer ist). Ist es
-  nicht der Standard-Branch oder ist der Arbeitsbaum nicht sauber, fragst du im Preflight,
-  welcher Stand beschrieben wird. Ein anderer Stand wird mit `git show <ref>:<pfad>` und
-  `git grep <muster> <ref>` gelesen; der Arbeitsbaum wird nicht umgeschaltet.
-- `$ARGUMENTS` ergänzt den Scope um **genau einen** Pfad, statt ihn zu ersetzen. Er muss
-  existieren und innerhalb von `context.project.dir` liegen; relativ gilt er ab
-  `context.project.dir`. Fehlt er oder liegt er außerhalb, abbrechen und den Pfad nennen —
-  ein anderes Projekt wird dort dokumentiert, nicht von hier. `EXTRA_PATH` ist dieser Pfad,
-  sonst leer.
-- **Immer ausgeschlossen**, auch wenn das Argument hineinzeigt:
-  `<context.project.dir>/.k-playbook/` und
-  `<context.project.dir>/k-playbook/` — Altbestand: ein liegengebliebener Clone von
-  k-playbook aus dem früheren Modell, den `/k-upgrade` löscht; er ist Werkzeug, kein Code
-  des Projekts, und wird nicht dokumentiert. Dazu jedes Verzeichnis `keph-backup/` unter
-  `SCAN_ROOT`, auf jeder Ebene — der Spiegel der Collection, den `k-playbook maintain`
-  schreibt; er ist Doku, kein Code, und gilt unabhängig davon, ob `context.docs.exclude` ihn
-  nennt. Zeigt `$ARGUMENTS` in einen davon, abbrechen und sagen, dass diese Verzeichnisse
-  nie zum Scan gehören.
-- **Versteckte Pfade** sind ausgeschlossen, ohne Rückfrage: jede Datei und jedes
-  Verzeichnis, dessen Name mit `.` beginnt, auf jeder Ebene — etwa `.git/`, `.github/`,
-  `.claude/`, `.opencode/`, `.devcontainer/`, `.venv/`, `.env`. Ein versteckter Pfad kommt
-  nur in den Scan, wenn `$ARGUMENTS` oder ein `hint` ihn ausdrücklich nennt; `.git/` und
-  `.k-playbook/` nie.
-- **Weitere Ausschlüsse**, ohne Rückfrage: `venv/`, `env/`, `node_modules/`, `dist/`,
-  `build/`, `target/`, `_bases/`, `__pycache__/`, `coverage/`, `htmlcov/`,
-  `tests/fixtures/`, `**/*.min.js`, `**/*.lock`, `**/*.bundle.*` — dazu alles, was eine
-  `.gitignore` unter `SCAN_ROOT` ausnimmt (Einträge als Glob-Muster, verschachtelte
-  `.gitignore` nach bestem Vermögen).
-- **Aus `K-PLAYBOOK.yaml`**, ohne Rückfrage: die Muster aus `context.docs.exclude`. Sie
-  gelten wie in einer `.gitignore` unter `SCAN_ROOT`. Ein Pfad, den `$ARGUMENTS`
-  ausdrücklich nennt, wird trotzdem gescannt, auch wenn ein Eintrag ihn ausschließt. Was
-  unter `context.docs.problems` steht, wurde verworfen und gilt nicht; der Preflight nennt
-  es.
-- **Zusatzquelle aus einem `hint`.** Nennt ein `hint` eine Zusatzquelle innerhalb von
-  `context.project.dir`, gehört sie für dieses Dokument zum Scan — mit denselben
-  Ausschlüssen, auch denen aus `context.docs.exclude` und `NEW_EXCLUDES`, nie die immer
-  ausgeschlossenen Verzeichnisse.
-
-**Preflight.** Der Command zeigt den Scope in seinem Preflight mit diesen Zeilen und lässt
-den Preflight **einmal** bestätigen:
-
-```text
-Scope         <SCAN_ROOT> (project.repoRoot)
-Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
-Zusätzlich    <EXTRA_PATH> | —
-Immer außen   k-playbook/, .k-playbook/, keph-backup/, .git/
-Versteckt     ausgeschlossen (.*) | ausgenommen: <aus Argument oder hint>
-Aus K-PLAYBOOK.yaml  <context.docs.exclude, durch Komma getrennt> | —
-              verworfen: <pattern> — <reason>   (je Eintrag aus context.docs.problems)
-Ausschlüsse   <kompakte Liste der übrigen wirksamen Ausschlüsse>
-```
-
-Der Nutzer darf dabei Ausschlüsse ergänzen. Ergänzte Ausschlüsse gelten für diesen Lauf; du
-merkst sie dir als `NEW_EXCLUDES`, Muster wie in einer `.gitignore`, relativ zu `SCAN_ROOT`.
-Ob sie gespeichert werden, fragt erst der Abschluss.
-
-**Ausschlüsse speichern.** Hat der Nutzer im Preflight Ausschlüsse ergänzt
-(`NEW_EXCLUDES`), fragst du im Abschluss einmal, ob sie dauerhaft in `K-PLAYBOOK.yaml`
-gespeichert werden sollen, und nennst sie dabei. Nach Ja rufst du
-`k_playbook_docs_exclude_add` mit `projectDir` = `context.project.dir` und `patterns` =
-`NEW_EXCLUDES` auf (ersatzweise `k-playbook docs exclude add <muster>… --json`) und nennst
-`exclude` und `rejected` aus der Antwort. Danach lädst du das Briefing neu
-(`k-playbook:/instructions/on-demand/briefing-felder.md`, „Neu laden“). Bei Nein, oder wenn
-nichts ergänzt wurde, entfällt dieser Teil. Die Datei liest und bearbeitest du nie selbst.
-
-- `rejected` nennt Einträge → mit `reason` nennen; sie stehen nicht in der Datei, die
-  übrigen sind trotzdem eingetragen.
-- `unsupported` → `docs.exclude` steht in einer Form, die das Programm nicht sicher ergänzt
-  (etwa `exclude: [docs/]`); nichts ist eingetragen. Die Meldung mit Zeile und Grund nennen;
-  der Nutzer stellt die Liste selbst um, du bearbeitest `K-PLAYBOOK.yaml` nicht.
-- Das Werkzeug ist unbekannt, oder `k-playbook docs` meldet `unbekannter Unterbefehl` → die
-  Installation ist älter als der Command: melden, `/k-upgrade` nennen, nichts von Hand in
-  `K-PLAYBOOK.yaml` schreiben.
-
-### Doku-Aufträge
-
-Dieser Abschnitt gilt wie „Scope“ nur für `/k-docs-code` und `/k-docs-tools`. Nach einer
-Codeänderung reiht eine Sitzung den Nachzug als Auftrag in `keph:/queue/docs/` ein, statt den
-Erzeuger sofort laufen zu lassen; Kopf, Reifegrade und Lebenslauf stehen in
-`k-playbook:/instructions/on-demand/doku-auftraege.md`. Ein Erzeuger arbeitet die Aufträge
-seines `erzeuger` ab: `/k-docs-code` die mit `erzeuger: code`, `/k-docs-tools` die mit
-`erzeuger: tools` — dessen Verzeichnis heißt `libs`, der Auftrag `tools`. Die beiden gehen
-verschieden damit um: Bei `code` steuern die Aufträge den Lauf, bei `tools` begründen sie ihn.
-
-Gemeinsam für beide:
-
-- **Suche.** Die offenen Aufträge deines Erzeugers findest du mit `k_playbook_doc_grep` mit
-  `kind: docs` (ohne `done`) und dem Muster `^erzeuger: code$` bzw. `^erzeuger: tools$`
-  (ersatzweise `k-playbook doc grep --kind docs '<muster>' --json`). Jeder Treffer ist ein
-  Auftrag; lies ihn mit `k_playbook_doc_read` und nimm aus dem Kopf `anlass`, `pfade` und
-  `entstanden` — bei `code` dazu `dokument` und `aktion`, wenn der Auftrag sie trägt.
-- **Rückmeldungen.** `wrong_dir` oder `not_found` bei `k_playbook_doc_done` heißt, ein
-  anderer Lauf hat den Auftrag schon abgeschlossen — nennen, nicht wiederholen.
-  `outcome_unknown` heißt, das Verschieben kann angekommen sein: nicht wiederholen, sondern mit
-  `k_playbook_doc_list` (`kind: docs`, `done: true`) nachsehen. Kennt das Werkzeug die Sorte
-  `docs` nicht (`invalid_input`), ist die Installation älter als der Command: melden,
-  `/k-upgrade` nennen; der Lauf selbst bleibt gültig.
-- **Abschluss.** Die Zusammenfassung nennt die abgeschlossenen Aufträge mit Verweis und die,
-  die offen geblieben sind, mit Grund.
-
-**Für `code`: Die Aufträge steuern den Lauf.** Sie bestimmen, welche Dokumente
-`/k-docs-code` schreibt; ohne offene Aufträge läuft es nicht. Ein Auftrag ist roh oder
-zerlegt (`dokument` im Kopf). Einen rohen nimmt der Lauf erst nach der Wartezeit aus
-`doku-auftraege.md`, außer er oder ein anderer offener roher Auftrag trägt `pfade: .`; ein
-zerlegter hat keine Frist. Zusammenlegen, Zerlegen, Abarbeiten und der Abschluss je Auftrag
-stehen in `k-playbook:/commands/k-docs-code.md` und nur dort. Der Rest dieses Abschnitts —
-`ORDERS`, das Abschließen nach einem erfolgreichen `publish` — gilt für `code` nicht.
-
-**Für `tools`: Die Aufträge begründen den Lauf.** Eine Wartezeit gibt es hier nicht.
-
-- **Preflight.** Vor dem Preflight suchst du die offenen Aufträge mit `erzeuger: tools`
-  (Suche oben). Der Preflight listet sie:
-
-  ```text
-  Aufträge      <N> offen | keine
-                <datei> (<entstanden>) — <anlass>
-                  <pfad>, <pfad>, …
-  ```
-
-  Diese Liste merkst du dir als `ORDERS`. Die Aufträge begründen den Lauf; sie engen den
-  Scope nicht ein, der Lauf bleibt ganz.
-- **Abschließen.** Nach einem erfolgreichen `publish` schließt du genau die Aufträge aus
-  `ORDERS` ab, je einen mit `k_playbook_doc_done` (ersatzweise `k-playbook doc done <ref>
-  --json`); sie liegen danach unter `keph:/queue/docs/done/`. Erfolgreich heißt: Die Antwort
-  von `publish` meldet keine offenen Dokumente (`open` leer), und `cleaned` ist wahr.
-  Aufträge, die nach dem Preflight angelegt wurden, stehen nicht in `ORDERS` und bleiben
-  offen; sie gehören zum nächsten Lauf.
-- **Offen lassen.** Bricht der Lauf ab, meldet `publish` einen Konflikt, eine Ablehnung oder
-  `failed`, oder bleibt etwas offen, schließt du keinen Auftrag ab. Ein `publish`, der nach
-  einem behobenen Konflikt doch noch erfolgreich durchläuft, schließt `ORDERS` ab.
