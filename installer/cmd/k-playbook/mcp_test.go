@@ -392,7 +392,7 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
 	if !ok || len(tools) != 30 {
-		t.Fatalf("tools/list meldet nicht neunundzwanzig Werkzeuge: %v", responses[1])
+		t.Fatalf("tools/list meldet nicht genau dreißig Werkzeuge: %v", responses[1])
 	}
 
 	resultsDir := mcpReviewResultsDir(root)

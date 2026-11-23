@@ -318,6 +318,12 @@ Fassung des Dokuments. Beide sagen nur, wo du hinschaust, nie, was in der Doku s
   genannte Bezeichner, jedes Feld, jeder Befehl, jede Option und jede Meldung kommt im Code
   so vor; kein Satz stützt sich allein auf einen Auftrag oder die bisherige Fassung. Was sich
   nicht bestätigen lässt, kommt nicht hinein; ist es wichtig, wird es eine Unklarheit.
+- **Fremde Änderungen während des Laufs.** Taucht nach dem Preflight im Arbeitsbaum eine
+  nicht committete Änderung auf, die nicht vom Lauf selbst stammt (`git status --porcelain`
+  vor `publish` gegen den Preflight), beschreibt der Lauf sie nicht ungefragt: Sie kann
+  halbfertig sein und gehört zu einer anderen Sitzung, die ihren eigenen Auftrag einreiht.
+  Vor `publish` nennst du sie und fragst, ob sie herausgenommen wird. Ist sie inzwischen
+  committet oder veröffentlicht, gehört sie zum Stand.
 - Das gilt auch für Sub-Agenten. Was sie schreiben, prüft der Lauf vor `publish` noch einmal
   nach denselben Punkten — mindestens alle Stellen `pfad:zeile` und alle Bezeichner — und
   berichtigt, was nicht stimmt.

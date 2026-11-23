@@ -1154,18 +1154,23 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 		}
 	}
 	// „Kein Doppel“ zählt nur rohe Aufträge und ergänzt für code den vorhandenen:
-	// dieselbe Regel in /k-enforcement und beim Einreihen von /k-task-run.
+	// dieselbe Regel in /k-enforcement; /k-task-run erzählt sie seit Task 176
+	// nicht mehr nach, sondern verweist beim Einreihen auf doku-auftraege.md.
 	for rel, needles := range map[string][]string{
 		"commands/k-enforcement.md": {"einen offenen rohen Auftrag dieser Sitzung", "`^dokument: `", "statt einen zweiten anzulegen",
 			"Kephalaion `write` mit `base_revision`"},
-		"commands/k-task-run.md": {"nach einem offenen rohen Auftrag", "`^dokument: `", "statt einen zweiten anzulegen",
-			"Kephalaion `write` mit `base_revision`"},
+		"commands/_task-run/doku-nachzug.md": {"`k-playbook:/instructions/on-demand/doku-auftraege.md`", "„Kein Doppel“", "„Wann nicht eingereiht wird“"},
 	} {
 		text := squashSpace(readRepoDefault(t, rel))
 		for _, needle := range needles {
 			if !strings.Contains(text, needle) {
 				t.Errorf("%s nennt %q nicht", rel, needle)
 			}
+		}
+	}
+	for _, stale := range []string{"nach einem offenen rohen Auftrag", "`^dokument: `", "Kephalaion `write` mit `base_revision`"} {
+		if strings.Contains(squashSpace(taskCommandBuendel(t, "k-task-run.md", "_task-run")), stale) {
+			t.Errorf("k-task-run.md erzählt „Kein Doppel“ aus doku-auftraege.md nach: %q", stale)
 		}
 	}
 
@@ -1354,7 +1359,7 @@ func TestDefaultsRegelnAnwenden(t *testing.T) {
 		t.Errorf("Reihenfolge im zusammengebauten Text: Workbench %d, Regeln %d, Tasks %d", workbench, rules, tasks)
 	}
 
-	run := readRepoDefault(t, "commands/k-task-run.md")
+	run := taskCommandBuendel(t, "k-task-run.md", "_task-run")
 	for _, needle := range []string{"`CHANGED_PATHS`", "git diff --cached --name-only \"<SNAPSHOT>\"",
 		"k-playbook:/instructions/on-demand/doku-auftraege.md", "**Doku-Nachzug.**", "die Sub-Agenten laden das Briefing nicht"} {
 		if !strings.Contains(run, needle) {
@@ -1517,7 +1522,8 @@ func TestShareKTaskRefineHuelleNurUngepruefte(t *testing.T) {
 		t.Errorf("description mit „: “ oder „ #“: %q", description)
 	}
 
-	text := readRepoDefault(t, "commands/k-task-refine.md")
+	// Seit Task 176 liegen die Textstellen im Kern oder in einem Modul.
+	text := taskCommandBuendel(t, "k-task-refine.md", "_task", "_task-refine")
 	for _, want := range []string{
 		"Muster `^## Review-Log`",
 		"`nochmal`, `erneut` oder\n`again`",
@@ -1574,27 +1580,32 @@ func TestKTaskRunReviewBefundeWichtigAlsTodo(t *testing.T) {
 		}
 	}
 
-	text := readRepoDefault(t, "commands/k-task-run.md")
-	start := strings.Index(text, "### 5a — Lesen und verstehen")
-	end := strings.Index(text, "### 5a.1 — ")
-	if start < 0 || end < start {
-		t.Fatal("k-task-run.md ohne Abschnitt 5a")
+	// Seit Task 176 liegen die Stellen aus 5a, 5f und Schritt 7 in Modulen.
+	nichtAbgeschlossen := readRepoDefault(t, "commands/_task-run/nicht-abgeschlossen.md")
+	if !strings.Contains(nichtAbgeschlossen, "- (a): Zuerst die Befunde des letzten Laufs holen") {
+		t.Errorf("nicht-abgeschlossen.md ohne Option (a) mit dem Befund-Leser")
 	}
-	fuenfA := text[start:end]
-	for _, want := range []string{"- (a): Zuerst die Befunde des letzten Laufs holen", "**Befund-Leser.**",
+	leser := readRepoDefault(t, "commands/_task-run/befund-leser.md")
+	for _, want := range []string{"# Befund-Leser",
 		"Kritisch:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>\nWichtig:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>",
 		"`Review: kein Abschnitt`"} {
-		if !strings.Contains(fuenfA, want) {
-			t.Errorf("5a in k-task-run.md ohne %q", want)
+		if !strings.Contains(leser, want) {
+			t.Errorf("befund-leser.md ohne %q", want)
 		}
 	}
+	if !strings.Contains(readRepoDefault(t, "commands/_task-run/abschluss.md"), "## Befund-Leser") {
+		t.Errorf("abschluss.md beschreibt den Start des Befund-Lesers nicht")
+	}
+
+	text := readRepoDefault(t, "commands/k-task-run.md")
+	bundle := taskCommandBuendel(t, "k-task-run.md", "_task-run")
 	for _, want := range []string{"Eine Rückgabe ohne `Wichtig:`-Block ist wie jede\n  formwidrige kein gültiges Review.",
-		"**Befunde sammeln**", "`Rückfrage: Befunde als Todo`",
+		"Befunde sammeln", "`Rückfrage: Befunde als Todo`",
 		"Als Todo übernehmen? (alle / keine / alle außer <nummern> / nur <nummern>)",
 		"`origin` ist `Task <NNN> — <TASK_REF_DONE>`", "Todos:         angelegt <kennung>",
 		"`Review: kein Abschnitt im letzten Lauf`"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("k-task-run.md ohne %q", want)
+		if !strings.Contains(bundle, want) {
+			t.Errorf("k-task-run.md samt Modulen ohne %q", want)
 		}
 	}
 	// Die Abfrage steht in Schritt 7 nach dem Doku-Nachzug und vor der Fertig-Meldung.
@@ -1634,20 +1645,21 @@ func TestKTaskRunSperreUndRefine(t *testing.T) {
 	}
 
 	text := readRepoDefault(t, "commands/k-task-run.md")
+	bundle := taskCommandBuendel(t, "k-task-run.md", "_task-run")
 	for _, want := range []string{"## Sperre des Arbeitsbaums", "`LOCK_TOKEN`", "**Wort `refine`.**",
 		"`SCHON_AUSGEFUEHRT`", "**Modus `refine`.**", "### Sperre nehmen", "**Liste neu prüfen.**",
 		"`Rückfrage: Sperre unsicher`", "`Rückfrage: Sperre verloren`", "`Rückfrage: Marke unbekannt`",
 		"k-playbook lock release --force", "Ohne `refine` bleibt Schritt 3", "Sperre:        sofort genommen",
 		"Refine:        <je Ziel"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("k-task-run.md ohne %q", want)
+		if !strings.Contains(bundle, want) {
+			t.Errorf("k-task-run.md samt Modulen ohne %q", want)
 		}
 	}
 	// Die Sperre wird nach Schritt 3 genommen und vor Schritt 6 freigegeben.
 	schritt3 := strings.Index(text, "## Schritt 3 — ")
 	nehmen := strings.Index(text, "### Sperre nehmen")
 	fuenfA := strings.Index(text, "### 5a — Lesen und verstehen")
-	freigeben := strings.Index(text, "Kein weiterer Task — nach dem letzten oder nach einem Anhalten —: Sperre freigeben")
+	freigeben := strings.Index(text, "Kein weiterer Task — nach dem letzten oder nach einem Anhalten —:\nSperre freigeben")
 	schritt6 := strings.Index(text, "## Schritt 6 — ")
 	if schritt3 < 0 || nehmen < schritt3 || fuenfA < nehmen || freigeben < fuenfA || schritt6 < freigeben {
 		t.Errorf("Reihenfolge Schritt 3 (%d) < Sperre nehmen (%d) < 5a (%d) < Freigabe (%d) < Schritt 6 (%d) verletzt",
@@ -1655,9 +1667,9 @@ func TestKTaskRunSperreUndRefine(t *testing.T) {
 	}
 	// check vor jeder Stelle, die den Arbeitsbaum ändert.
 	for _, want := range []string{"(vor einem Wechsel `check` der Sperre)", "Vor dem Anlegen `check` der Sperre.",
-		"Vorher `check` der Sperre, dann die Fortschrittszeilen zählen", "Nach `check` der Sperre bekommt",
+		"Vorher `check` der Sperre, dann die Fortschrittszeilen zählen", "Nach `check` der Sperre startet",
 		"`check` der Sperre, dann pushen."} {
-		if !strings.Contains(text, want) {
+		if !strings.Contains(bundle, want) {
 			t.Errorf("k-task-run.md ohne Prüfstelle %q", want)
 		}
 	}

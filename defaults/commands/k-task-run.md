@@ -5,171 +5,84 @@ Nummernreihenfolge; mit Argument einen `keph:`-Verweis oder eine Tasknummer. Ste
 — oder allein — das Wort `refine`, gehen ungeprüfte Tasks vorher ungefragt durch
 `/k-task-refine` (Schritt 3).
 
-In einem Projekt ändert zu einer Zeit höchstens ein `/k-task-run` den Arbeitsbaum: Vor der
-ersten Änderung nimmt der Lauf die Sperre bei k-playbook, wartet, solange ein anderer Run sie
-hält, und prüft an festen Stellen nach, ob er sie noch hält („Sperre des Arbeitsbaums“).
+In einem Projekt ändert zu einer Zeit höchstens ein `/k-task-run` den Arbeitsbaum: Der Lauf
+nimmt vor der ersten Änderung die Sperre bei k-playbook und prüft an festen Stellen nach, ob er
+sie noch hält („Sperre des Arbeitsbaums“).
 
-Der Hauptkontext steuert und fragt, Sub-Agenten arbeiten und schreiben. Ausführung, Diff
-und Code-Review laufen je Task in Sub-Agenten, die ihre Ergebnisse selbst an das
-Task-Dokument anhängen und dem Hauptkontext nur ein festes, knappes Format zurückgeben. Der
-Hauptkontext sieht pro Task keinen Diff, keine Dateiinhalte außer den Abschnitten des Tasks,
-die er braucht, keine Logs und kein vollständiges Review. Alle Rückfragen an den Nutzer
-bleiben im Hauptkontext.
+Der Hauptkontext steuert und fragt; Ausführung, Diff und Code-Review laufen je Task in
+Sub-Agenten, die selbst an den Task anhängen und ein knappes Format zurückgeben.
 
 Produces:
 
-- An jedem ausgeführten Task den Abschnitt `## Ausführung` mit Kennzeile, Status und
-  Zusammenfassung, die Diff- und Review-Abschnitte des Review-Sub-Agenten und, bei Etappen,
-  die Fortschrittszeilen des Ausführungs-Sub-Agenten — alles angehängt.
-- Erfolgreich abgeschlossene Tasks unter `keph:/user/~/tasks/done/`, verschoben mit
-  `k_playbook_doc_done`.
-- Je Task eine Ref `refs/k-task-run/<TASK_STEM>` in der Ausführungswurzel, bis der Task
-  nach `done/` wandert.
-- Bei `PR required: true` einen Pull Request über `gh`, mit Dienst über `k-playbook github run`
-  (5f.1).
-- Hat der Lauf Code geändert, je Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`,
-  neu angelegt oder — für `code`, wenn die Sitzung schon einen hat — ergänzt
-  (Schritt 7, `k-playbook:/instructions/on-demand/doku-auftraege.md`).
-- Je Review-Befund „wichtig“ oder übergangenem kritischen Befund eines Tasks unter `done/`,
-  den der Nutzer in der Abfrage am Ende übernimmt, ein Todo über `k_playbook_todo_add`
-  (Schritt 7).
-- Für die Dauer von Schritt 5 die Sperre des Arbeitsbaums in
-  `.k-playbook/work/lock/` des Projekts, genommen und freigegeben über `k_playbook_lock`.
+- An jedem ausgeführten Task `## Ausführung` mit Kennzeile, Status und Zusammenfassung, die
+  Diff- und Review-Abschnitte des Review-Sub-Agenten und bei Etappen die Fortschrittszeilen des
+  Ausführungs-Sub-Agenten — alles angehängt.
+- Erfolgreich abgeschlossene Tasks unter `keph:/user/~/tasks/done/`; je Task bis dahin eine Ref
+  `refs/k-task-run/<TASK_STEM>` in der Ausführungswurzel.
+- Bei `PR required: true` einen Pull Request über `gh` (5f.1); hat der Lauf Code geändert, je
+  Erzeuger höchstens einen Doku-Auftrag in `keph:/queue/docs/`, und je übernommenem
+  Review-Befund ein Todo (Schritt 7).
 - Mit `refine` an jedem ungeprüften Task das `## Review-Log` von `/k-task-refine` (Schritt 3).
+
+**Module.** Sonderfälle und Aufträge an Sub-Agenten stehen in Modulen, Verweisen
+`k-playbook:/commands/_task-run/<datei>.md`, `_task/…` und `_task-refine/…`. Der Hauptkontext
+liest ein Modul mit `k_playbook_doc_read` (`projectDir` = `context.project.dir`) erst, wenn der
+Fall eintritt — nie vorsorglich —; einem Sub-Agenten, der ein Modul selbst liest, gibt er den Verweis, die Werte
+des Moduls und `_task/sub-agenten.md` (Briefing-Zeile, Lesewege). Eine gleichnamige Datei unter
+`<context.project.dir>/.k-playbook/commands/` ersetzt ein Modul (Überlagerung nach Dateipfad).
 
 ## Schritt 1 — Briefing und Form
 
 include: _shared/erster-schritt.md
 
 Verbindlich für Ablage, Nummernauflösung, Kennzeilen, Fortschrittszeilen und den Schreibweg
-eines Tasks ist `k-playbook:/instructions/on-demand/tasks.md`. Lies sie mit
-`k_playbook_doc_read`, bevor du einen Task liest; dieser Text wiederholt sie nicht, auch
-nicht die Kennzeilen-Tabelle und den Ersatz ohne MCP in der Shell. Der Command braucht die
-Collection: Steht `context.kephalaion.ok` nicht auf `true`, endet er mit
-`context.kephalaion.message` (Abschnitt „Ohne Kephalaion“ dort).
+eines Tasks ist `k-playbook:/instructions/on-demand/tasks.md`; lies sie mit
+`k_playbook_doc_read`, bevor du einen Task liest. Der Command braucht die Collection: Steht
+`context.kephalaion.ok` nicht auf `true`, endet er mit `context.kephalaion.message`
+(Abschnitt „Ohne Kephalaion“ dort).
 
-**Hauptkontext und Task-Dokument.** Für den Umgang des Hauptkontexts mit einem Task gilt im
-ganzen Command:
+**Hauptkontext und Task-Dokument.** Der Hauptkontext liest einen Task nur mit
+`k_playbook_doc_read` und `section` oder `lines` (nie ganz, nie mit Kephalaion `read`), sucht
+mit `k_playbook_doc_grep` (`count_only` für Anzahl und Revision) und schreibt nur mit
+`k_playbook_doc_append`; er ändert keine bestehende Zeile. Nach dem Kopf (5f, Schritt 2) liest
+er keinen Abschnitt des Tasks mehr — Ausnahme 5a, Option (a): `## Ausführungskontext`
+(`section`, erster Treffer). `### Review: Befunde` liest er nie; die Befunde kennt er nur aus
+Rückgaben: Diff und Review stehen im Task-Dokument, und der Hauptkontext sieht sie nicht.
 
-- **Lesen nur mit `k_playbook_doc_read`** und `section` (eine Überschriftenzeile, etwa
-  `## Intent`) oder `lines` (ein Zeilenbereich) — nie das ganze Dokument, nie mit Kephalaion
-  `read`. Jede Antwort nennt die `revision`.
-- **Suchen mit `k_playbook_doc_grep`**: Kennzeilen, Überschriften, Fortschrittszeilen; mit
-  `count_only` nur die Anzahl und die Revision.
-- **Schreiben nur mit `k_playbook_doc_append`**, jedes Anhängen mit `since_revision`. Der
-  Hauptkontext ändert keine bestehende Zeile.
-- **Nach dem Kopf** (5f, Schritt 2) liest der Hauptkontext keinen Abschnitt des Tasks mehr;
-  er zählt nur noch mit `k_playbook_doc_grep` und hängt an. Die eine Ausnahme ist 5a,
-  Option (a): Dort liest er `## Ausführungskontext` (`section`, erster Treffer) eines schon
-  ausgeführten Tasks, um die Ausführungswurzel für den Abschluss zu bestimmen.
-- **Den Abschnitt `### Review: Befunde` liest er nie.** Die Befunde daraus kennt er nur aus
-  Rückgaben: der des Review-Sub-Agenten (5f, Schritt 4) und der des Befund-Lesers (5a,
-  Option (a)).
+include: _task/revisionskette.md
 
-Der Grund: Diff und Review stehen im Task-Dokument, und der Hauptkontext darf sie nicht
-sehen — sonst wäre jede Rückfrage an den Nutzer von Dateiinhalten und Befunden überlagert,
-und ein zweiter Lauf desselben Tasks läse den ganzen ersten mit. Die Operationen lassen den
-Inhalt im Programm.
-
-**Revisionskette.** Ein Task hat zu einer Zeit einen Schreiber. Wie die Kette gehalten wird —
-`since_revision`, `foreign_change`, der Replica-Nachlauf, das Zählen vor dem Anhängen,
-`outcome_unknown` je Operation und die Übergabe an Sub-Agenten samt den Rückgabezeilen
-`Revision:` und `Foreign-Change:` —, steht in `k-playbook:/instructions/on-demand/tasks.md`,
-Abschnitt „Lesen und schreiben“; dieser Command wiederholt es nicht. Command-eigen ist:
-
-- Der Hauptkontext merkt sich je Task `REVISION`, die Revision seines eigenen letzten
-  Schreibens; vor dem ersten Schreiben die Revision aus dem ersten `k_playbook_doc_grep` in
-  5a, nach dem Wieder-Öffnen in Schritt 2 die aus dessen Antworten.
-- Vor jedem eigenen Anhängen zählt er die Zeile, an der er die Ankunft prüfen würde — die
-  Kennzeile, sonst die erste Zeile des Eintrags —, und vor jeder Übergabe an einen Sub-Agenten
-  die Zeile, die der Sub-Agent schreiben soll. Jede Zählung nennt eine Revision; sie muss
-  `REVISION` sein, sonst gilt der Replica-Nachlauf aus
-  `k-playbook:/instructions/on-demand/tasks.md`.
-- Jeder Sub-Agent bekommt `TASK_REF` und `REVISION`; mit seiner Rückgabe setzt der
-  Hauptkontext `REVISION` neu. Ausgenommen ist der Befund-Leser (5a), der nur liest.
-- `foreign_change` — selbst bekommen oder so gemeldet — führt immer zu demselben Schritt:
-  Fertig-Meldung (`Rückfrage: fremder Schreiber`), dann die Rückfrage mit `revision`,
-  `updatedBy` und `updatedAt`, wer weitermacht. Sagt der Nutzer „weiter“, gilt die Revision
-  aus dieser Antwort als `REVISION`, und der unterbrochene Schritt läuft erneut; sonst endet
-  der Lauf für diesen Task, ohne weiteren Eintrag, und keine weiteren Tasks laufen.
+Command-eigen: Der Hauptkontext merkt sich je Task `REVISION`; vor dem ersten Schreiben ist es
+die Revision aus dem ersten `k_playbook_doc_grep` in 5a (nach dem Wieder-Öffnen die aus dessen
+Antworten). Nach einem `foreign_change` ohne „weiter“ laufen keine weiteren Tasks.
 
 ## Fertig-Meldung
-
-Vor jeder Rückfrage an den Nutzer und am Ende des Commands meldet sich der Hauptkontext auf
-dem Rechner des Nutzers. Die Stellen in diesem Command: die Rückfragen in Schritt 2 (mehrere
-Treffer, erledigter Task), die Rückfrage in Schritt 3, im Modus `refine` jede Rückfrage und
-jedes `Foreign-Change:` eines Refine-Sub-Agenten und ein Hinweis zur Reihenfolge, der der
-Nummernfolge widerspricht (Schritt 3), die Rückfragen der Sperre (`Rückfrage: Sperre
-unsicher`, `Rückfrage: Sperre verloren`, `Rückfrage: Marke unbekannt`, „Sperre des
-Arbeitsbaums“), die Optionen in 5a und 5a.2, der Blocker in 5d, jede Rückfrage nach
-`foreign_change`, die Stopp-Abfrage in 5f, die Abfrage der Befunde als Todo in Schritt 7
-(`Rückfrage: Befunde als Todo`), das Ende nach einer leeren Liste („Liste neu prüfen“) und
-die Zusammenfassung in Schritt 7.
 
 include: _task/fertig-meldung.md
 
 ## Sperre des Arbeitsbaums
 
-Die Sperre hält und vergibt k-playbook, nicht der Hauptkontext: Was das Werkzeug
-`k_playbook_lock` (MCP-Server `k-playbook`, `projectDir` = `context.project.dir`) sagt, gilt
-— auch gegen das, was die Sitzung von sich glaubt. Gesperrt wird je Projekt. Die Sperre nimmt
-und prüft allein der Hauptkontext, nie ein Sub-Agent; Commits eines Sub-Agenten deckt die
-Prüfung vor seiner Delegation ab. Ein Task mit `Target repo` außerhalb des Projekts ist durch
-sie nicht geschützt.
+Die Sperre hält und vergibt k-playbook: Was das Werkzeug `k_playbook_lock` (MCP-Server
+`k-playbook`, `projectDir` = `context.project.dir`) sagt, gilt. Gesperrt wird je Projekt; die
+Sperre nimmt und prüft allein der Hauptkontext, nie ein Sub-Agent. Ein Task mit `Target repo`
+außerhalb des Projekts ist durch sie nicht geschützt.
 
 - **Marke.** `acquire` und `wait` geben bei `state: acquired` eine Marke `token` zurück. Der
   Hauptkontext merkt sie sich als `LOCK_TOKEN` und gibt sie bei `check` und `release` mit;
   sie ist für die Sperre, was `REVISION` für den Task ist. Er nimmt nie neu, solange er eine
   Marke hält, und nie still nach einem Verlust.
-- **Halter.** `state: busy` nennt unter `holder` den Halter: `client`, `session`, `purpose`,
-  `since`, `number` (die Nummer seiner Marke) und `orphaned` — `no`, `yes` oder `uncertain`,
-  mit dem Grund in `orphanedWhy`. Einen sicher verwaisten Halter (`yes`) übernimmt `acquire`
-  selbst und nennt ihn unter `takenOver`.
-- **Ohne MCP-Werkzeug** gilt dasselbe über die Shell: `k-playbook lock <aktion> --json`
-  mit `--token`, `--purpose`, `--session`, `--force`, `--expect` (Exit-Code 3 bei `busy`
-  oder `lost`). So genommen kennt die Sperre keinen langlebigen Halter und gilt nie als
-  sicher verwaist; endet die Sitzung ohne Freigabe, gibt der Nutzer mit
-  `k-playbook lock release --force` frei.
-
-**Prüfen.** `check` mit `LOCK_TOKEN` vor dem Branch-Wechsel in 5a.1, vor jedem Snapshot
-(5b.1), vor jeder Delegation an den Ausführungs- oder Behebungs-Sub-Agenten (5c, 5f
-Stopp-Abfrage (a)), vor dem Push in 5f.1 und nach jeder Antwort des Nutzers während
-Schritt 5 — auch nach einer Antwort, mit der eine unterbrochene Sitzung fortgesetzt wird.
-`state: held` heißt weiter.
-
-**Verloren.** `state: lost` heißt: anhalten, nichts mehr am Arbeitsbaum ändern.
-Fertig-Meldung (`Rückfrage: Sperre verloren`), dann:
-
-```
-Sperre verloren — <reason: freigegeben (released) | vom Nutzer freigegeben (forced) |
-als verwaist übernommen (taken_over) | Sperrdatei fehlte (file_missing) | unbekannt>
-Halter jetzt: <holder in einer Zeile | frei>
-Seit dem letzten check kann noch geschrieben worden sein; ein laufender Sub-Agent wurde nicht
-unterbrochen.
-
-Wie weiter?
-  (a) warten und neu nehmen
-  (b) abbrechen
-```
-
-(a) nimmt neu wie unter „Sperre nehmen“ (Schritt 5), prüft danach die Liste neu und setzt am
-Prüfpunkt fort; (b) verlässt Schritt 5 (Freigeben entfällt, die Sperre gehört dem Lauf nicht
-mehr).
-
-**Marke unbekannt.** Kennt der Hauptkontext `LOCK_TOKEN` nicht mehr — etwa nach einer
-Zusammenfassung des Kontexts —, ruft er `status` und fragt dann immer den Nutzer, gleich, wer
-der Halter ist: Fertig-Meldung (`Rückfrage: Marke unbekannt`), die Frage nennt den Halter aus
-`status` oder „frei“ und bietet (a) neu nehmen (warten, bis frei), (b) freigeben und neu
-nehmen (`release` mit `force` und `expect` = `holder.number`) oder (c) abbrechen. Nie still
-übernehmen oder neu nehmen.
-
-**Freigeben** mit `release` und `LOCK_TOKEN` an genau einer Stelle: wenn der Lauf Schritt 5
-verlässt (5g), also nach 5f.1 des letzten Tasks und vor Schritt 6 — auch nach einem Anhalten,
-Abbruch oder `foreign_change` — und auf jedem Abbruchweg davor, sobald die Sperre genommen
-ist. Bis dahin trägt jeder Task, den dieser Lauf ausgeführt hat, seine Kennzeile „ausgeführt“
-oder „abgebrochen“ oder liegt unter `done/`. Während einer Rückfrage in Schritt 5 bleibt die
-Sperre gehalten. Schritt 6 und 7 schreiben nur in die Collection und laufen ohne Sperre und
-ohne `check`. Meldet `release` `lost`, wird das in Schritt 7 genannt, nicht gefragt.
+- **Sonderfälle** — `acquire` meldet nicht `acquired` (etwa `busy`), `check` meldet nicht
+  `held` (`lost`), `LOCK_TOKEN` ist unbekannt, oder das MCP-Werkzeug fehlt (Shell-Ersatz) —
+  stehen in `k-playbook:/commands/_task-run/sperre.md`; der Hauptkontext liest es dann.
+- **Prüfen.** `check` mit `LOCK_TOKEN` steht an jeder Stelle, die den Arbeitsbaum ändert,
+  dort genannt; dazu nach jeder Antwort des Nutzers während Schritt 5, auch nach einer, mit der
+  eine unterbrochene Sitzung fortgesetzt wird. `state: held` heißt weiter.
+- **Freigeben** mit `release` und `LOCK_TOKEN` an genau einer Stelle: wenn der Lauf Schritt 5
+  verlässt (5g), also nach 5f.1 des letzten Tasks und vor Schritt 6 — auch nach einem
+  Anhalten, Abbruch oder `foreign_change` — und auf jedem Abbruchweg davor, sobald die Sperre
+  genommen ist. Bis dahin trägt jeder ausgeführte Task seine Kennzeile „ausgeführt“ oder
+  „abgebrochen“ oder liegt unter `done/`. Während einer Rückfrage in Schritt 5 bleibt die
+  Sperre gehalten; Schritt 6 und 7 laufen ohne Sperre und ohne `check`. Meldet `release`
+  `lost`, wird das in Schritt 7 genannt, nicht gefragt.
 
 ## Schritt 2 — Tasks sammeln
 
@@ -179,43 +92,21 @@ gleich), nimm es ab und merke `REFINE = ja`; der Rest ist das Argument. Sonst
 
 Das Argument entscheidet:
 
-- **Leer:** die eigenen offenen Tasks aus `k_playbook_doc_list` (Sorte `tasks`, ohne `done`),
-  sortiert nach der Nummer am Anfang des Dateinamens. Keine → „Keine offenen Tasks gefunden“
-  und Schluss.
-- **Ein `keph:`-Verweis** (`keph:/user/…/tasks/<datei>`): genau dieser Task, als Liste mit
-  einem Eintrag — nach den Prüfungen aus `k-playbook:/instructions/on-demand/tasks.md`,
-  „Fremde und erledigte Verweise“, bevor etwas geschrieben oder Code geändert wird. Ein
-  fremder Verweis (User-Pfadteil weder `~` noch `kephalaion.user`) wird abgewiesen, mit
-  `foreign_user` in der Meldung; Schluss. Ein Verweis unter `done/` führt zur Rückfrage unten.
-- **Eine Nummer:** aufgelöst nach `k-playbook:/instructions/on-demand/tasks.md`, „Wohin und
-  Name“ — zuerst unter den eigenen offenen, dann unter den eigenen erledigten Tasks; bei
-  mehreren Treffern alle zeigen und den Nutzer wählen lassen.
-- **Erledigt** — ein Treffer oder Verweis unter `done/`: Der Task ist schon abgeschlossen. Sag
-  das und frage, ob er mit `k_playbook_doc_reopen` wieder geöffnet werden soll; sonst Schluss.
-  Nach dem Wieder-Öffnen gelten der Verweis und die `revision` aus der Antwort als `TASK_REF`
-  und `REVISION`. Dann mit `k_playbook_doc_append` und `since_revision: REVISION` die
-  Kennzeile anhängen (vorher gezählt, Revisionskette in Schritt 1):
+include: _task/ziel-aufloesen.md
 
-  ```text
-  <!-- k-task-run: wieder geöffnet <TASK_FILE> <context.now.date> -->
-  ```
-
-  Ihre Revision ist das neue `REVISION`. Ab dieser Zeile zählt eine frühere Kennzeile
-  „ausgeführt“ nicht mehr (5a). Meldet ein Lesen oder Zählen unter dem neuen Verweis direkt
-  danach `not_found` oder eine ältere Revision, ist das der Replica-Nachlauf aus
-  `k-playbook:/instructions/on-demand/tasks.md`, kein fremder Schreiber.
+- **Erledigt, zusätzlich:** Sag das und frage, ob er mit `k_playbook_doc_reopen` wieder
+  geöffnet werden soll; sonst Schluss. Bei „ja“ liest der Hauptkontext
+  `k-playbook:/commands/_task-run/wieder-oeffnen.md` und folgt ihm.
 - Verzeichnisse und Dateipfade gibt es als Argument nicht; ein solches Argument ist ein
   Fehler.
 
 Je Task merkst du dir `TASK_REF` (der Verweis), `TASK_FILE` (der letzte Pfadteil, etwa
-`014-setup-tts.md`) und `TASK_STEM` (ohne `.md`). Dazu merkst du dir je Task `SCHON_AUSGEFUEHRT`:
-ob die Kennzeile „ausgeführt“ jetzt schon trifft — Suche und Regel aus 5a, ohne etwas zu
-lesen. Daran erkennt die Prüfung nach dem Nehmen der Sperre, was ein anderer Run inzwischen
-ausgeführt hat (5, „Liste neu prüfen“).
+`014-setup-tts.md`) und `TASK_STEM` (ohne `.md`). Dazu merkst du dir je Task
+`SCHON_AUSGEFUEHRT`: ob die Kennzeile „ausgeführt“ jetzt schon trifft — Suche und Regel aus 5a,
+ohne etwas zu lesen. Daran erkennt die Prüfung nach dem Nehmen der Sperre, was ein anderer Run
+inzwischen ausgeführt hat (5, „Liste neu prüfen“).
 
-Kündige die Liste an, bevor etwas beginnt. Prüfe den **letzten** Task auf einen Abschnitt
-`## Intent` (`k_playbook_doc_read` mit `section: "## Intent"`; `section_not_found` heißt:
-kein Intent) und nenne ihn:
+Kündige die Liste an, bevor etwas beginnt, samt Intent und Werkzeugen:
 
 ```
 Tasks:
@@ -228,163 +119,70 @@ Intent (aus letztem Task):
 Tools (zusätzlich): ...
 ```
 
-Lies je Task den Abschnitt `## Tools` (`section: "## Tools"`), sammle alle genannten
-Werkzeuge und zeige sie dem Nutzer vorweg, damit er Rechte erteilen kann, bevor der Lauf
-beginnt. `section` liefert den ersten Treffer; ein Ausschnitt in späteren Diff-Abschnitten
-zählt deshalb nicht. Den Intent behält der Hauptkontext für Schritt 6, wörtlich: Verweise
-darin (`k-playbook:/instructions/on-demand/tasks.md`, „Intent“) löst er nicht auf; sie liest
-erst der Critic in Schritt 6.
+**Intent und Tools lesen.** Prüfe den **letzten** Task auf einen Abschnitt `## Intent`
+(`k_playbook_doc_read` mit `section: "## Intent"`; `section_not_found` heißt: kein Intent).
+Lies je Task `## Tools` (`section: "## Tools"`; der erste Treffer zählt, ein Ausschnitt in
+späteren Diff-Abschnitten nicht), sammle die genannten Werkzeuge und zeige sie dem Nutzer
+vorweg, damit er Rechte erteilen kann. Den Intent behält der Hauptkontext wörtlich für
+Schritt 6; Verweise darin löst er nicht auf. Der Block läuft nach dem Refine (Schritt 3) und
+nach „Liste neu prüfen“ (Schritt 5) erneut; hat sich die Werkzeugliste geändert, nennt der
+Hauptkontext sie erneut.
 
 ## Schritt 3 — Task-Refine-Status prüfen
 
-Ein Task, der nie durch `/k-task-refine` gegangen ist, wurde nie gegengelesen. Prüfe für
-jeden gesammelten Task mit `k_playbook_doc_grep` (`^## Review-Log`, `count_only`), ob er ein
-`## Review-Log` trägt; gelesen wird dafür nichts.
+Prüfe für jeden gesammelten Task mit `k_playbook_doc_grep` (`^## Review-Log`, `count_only`), ob er ein
+`## Review-Log` trägt; gelesen wird dafür nichts. Tragen **alle** Tasks eins: weiter, ohne
+Rückfrage.
 
-Tragen **alle** Tasks ein Review-Log: weiter, ohne Rückfrage. Mit `REFINE = ja` gehen die
-ungeprüften zuerst durch den Modus `refine` (unten); die Rückfrage gilt dann nur den Tasks,
-die dort auf sie zurückfallen, und nennt je Task den Grund.
+Fehlt es mindestens einem: erst die Fertig-Meldung (`Rückfrage: ohne Task-Refine`), dann liest
+der Hauptkontext `k-playbook:/commands/_task-run/ohne-refine.md` und fragt wie dort (`ja`:
+weiter mit Schritt 4, `nein`: abbrechen, `zuerst reviewen`: abbrechen und wörtlich
+`/k-task-refine <TASK_REF>` je Task nennen).
 
-Fehlt es mindestens einem: erst die Fertig-Meldung (`Rückfrage: ohne Task-Refine`), dann die
-betroffenen Tasks in **einer** Nachricht nennen und fragen:
-
-```
-Ohne Task-Refine:
-  - 014-setup-tts.md
-  - 015-integrate-tts.md
-
-Diese Tasks wurden nicht mit /k-task-refine gegengelesen.
-Trotzdem ausführen? (ja / nein / zuerst reviewen)
-```
-
-- `ja` — weiter mit Schritt 4.
-- `nein` — abbrechen, nichts ausführen.
-- `zuerst reviewen` — abbrechen und wörtlich `/k-task-refine <TASK_REF>` je Task nennen,
-  danach `/k-task-run` erneut starten. Den Task-Refine-Command nicht selbst aufrufen.
-
-`/k-task-refine` hängt sein Log an **jeden geprüften** Task an, auch an den, an dem nichts
-zu ändern war (dort mit dem Vermerk „keine Änderungen“). Ein fehlender Block heißt deshalb:
-dieser Task ist nie durch Task-Refine gegangen. Trotzdem bleibt es eine Rückfrage und kein
-Abbruch: Ein von Hand geschriebener oder aus einem anderen Projekt übernommener Task kann
-sachlich in Ordnung sein — das zu entscheiden ist Sache des Nutzers, nicht des Commands.
-
-**Modus `refine`.** Mit `REFINE = ja` fragt Schritt 3 nicht, sondern lässt genau die
-ungeprüften Tasks nach `k-playbook:/commands/k-task-refine.md` prüfen — vor dem Nehmen der
-Sperre, damit sie während des Prüfens nicht gehalten wird. Der Hauptkontext moderiert nicht
-selbst und sieht keine Ausgabe von Critic und Editor; er liest aus dem Refine-Text nur die
-Abschnitte, die er braucht (`k_playbook_doc_read` mit `section`).
-
-- **Ohne zweite Ebene kein Refine.** Jeder Refine läuft in einem Sub-Agenten, der selbst
-  Critic und Editor startet. Kann der Client das nicht — in OpenCode kann ein Sub-Agent in der
-  Grundeinstellung keine Sub-Agenten starten (Rückfall in Schritt 5 des Refine-Texts) —,
-  prüft der Hauptkontext nicht selbst: Alle ungeprüften Tasks fallen auf die Rückfrage oben
-  zurück, mit dem Grund „refine: dieser Client kann keine Sub-Agenten in Sub-Agenten
-  starten“.
-- **Ohne Argument** (`/k-task-run refine`): wie `/k-task-refine` ohne Argument — die
-  ungeprüften Tasks der Liste sind `REVIEW_TARGETS`, die geprüften `UEBRIGE_TASKS`. Der
-  Hauptkontext bildet die Gruppen nach Schritt 3, prüft sie nach Schritt 5 (Übergabe, Regeln,
-  Rückgabe, Auswerten) und lässt danach den Überschneidungs-Critic nach Schritt 15 laufen,
-  jeweils des Refine-Texts. Dessen Schritte 4 und 16 entfallen: keine Startübersicht, keine
-  Schluss-Fertig-Meldung, kein Folge-Command.
-- **Mit Argument** (`/k-task-run <ref-or-number> refine`): Ist das Ziel ungeprüft, prüft es
-  ein Sub-Agent als Gruppe mit einem Task, mit demselben Auftrag, derselben Rückgabe und
-  derselben Fortsetzung wie nach Schritt 5 des Refine-Texts; ohne Überschneidungs-Critic und
-  ohne Hinweise zur Reihenfolge. Ein schon geprüftes Ziel geht nicht in den Refine; die
-  Rückfrage „schon geprüft“ kommt nicht vor.
-- **Rückgaben.** Ausgewertet wie in Schritt 5 des Refine-Texts, „Auswerten“, mit diesen
-  Abweichungen: Ohne Rückfrage weiter geht nur ein Task, für den `Ergebnis: geprüft`
-  zurückkommt, auch nach einer Fortsetzung. Bei `rückfrage` oder `Foreign-Change:`
-  Fertig-Meldung (`Rückfrage: <worum es geht>` bzw. `Rückfrage: fremder Schreiber`), dann die
-  Frage an den Nutzer und je nach Antwort die Fortsetzung dort (neuer Sub-Agent mit
-  `Zwischenstand:`, Revision und Antwort). `keine-subagenten`, `abgebrochen` ohne
-  `Foreign-Change:` und eine fehlende oder formwidrige Rückgabe: Dieser Task fällt auf die
-  Rückfrage oben zurück, die den Grund nennt; der Hauptkontext prüft nie selbst. Lehnt der
-  Nutzer eine Fortsetzung ab, fällt der Task ebenso zurück.
-- **Danach** in der Ausgabe kurz je Ziel `Refine: <TASK_FILE> — <Ergebnis>, Runden <n>,
-  gefixt <n>, offen <n>`, dieselben Zeilen später in Schritt 7. Hinweise zur Reihenfolge aus
-  dem Überschneidungs-Critic werden angezeigt; die Reihenfolge bleibt die nach Nummer.
-  Empfiehlt ein Hinweis eine andere Reihenfolge, ist das eine Rückfrage an den Nutzer
-  (Fertig-Meldung vorher, `Rückfrage: Reihenfolge`): nach Nummer weiter oder abbrechen.
-- Dann liest der Hauptkontext `## Intent` des letzten Tasks und `## Tools` jedes Tasks neu, wie
-  in Schritt 2; hat sich die Werkzeugliste geändert, nennt er sie erneut. Weiter mit der
-  Rückfrage oben für zurückgefallene Tasks, sonst mit Schritt 4, ohne erneute Rückfrage.
-
-Ohne `refine` bleibt Schritt 3, wie oben beschrieben.
+**Modus `refine`.** Mit `REFINE = ja` gehen die ungeprüften Tasks zuerst durch die
+Gruppenprüfung `k-playbook:/commands/_task-refine/gruppen.md`, vor dem Nehmen der Sperre. Der
+Hauptkontext liest dafür `k-playbook:/commands/_task-run/refine-modus.md` und folgt ihm: ohne
+Argument die ungeprüften Tasks der Liste in Gruppen mit Überschneidungs-Critic, mit Argument
+eine Gruppe mit einem Task; danach die Zeilen `Refine: …` (auch für Schritt 7) und das erneute
+„Intent und Tools lesen“. Er moderiert nicht selbst. Die Rückfrage oben gilt dann nur den Tasks,
+die dort zurückfielen, mit dem Grund je Task; sonst weiter mit Schritt 4. Ohne `refine` bleibt Schritt 3 wie oben.
 
 ## Schritt 4 — Diff und Review vorbereiten
 
-Ob ein Task einen Diff und ein Review bekommt, folgt aus dem Briefing — nichts zu
-konfigurieren und nichts zu suchen:
+Ob ein Task einen Diff und ein Review bekommt, folgt aus dem Briefing:
 
-- `context.project.vcs` ist `git`, und `git` steht nicht in `context.baseTools.missing`:
-  `DIFF_ENABLED=true`.
-- `context.project.vcs` ist `git`, aber `git` fehlt: `DIFF_ENABLED=false`. Einmal sagen, dass
-  damit Diff, Review und der Stopp bei kritischen Befunden entfallen, und den Befehl aus
+- `context.project.vcs` ist `git` und `git` steht nicht in `context.baseTools.missing`:
+  `DIFF_ENABLED=true`. Fehlt `git`: `DIFF_ENABLED=false`; einmal sagen, dass damit Diff, Review
+  und der Stopp bei kritischen Befunden entfallen, und den Befehl aus
   `context.baseTools.installCommand` nennen.
 - Sonst: `DIFF_ENABLED=false`, still weiter.
 
-`DIFF_ENABLED` ist kein Guard für ein externes Werkzeug; jeder `git`-Aufruf in einem
-Shell-Codeblock dieses Commands hat seinen eigenen.
-
-Mit `DIFF_ENABLED=true`:
-
-- `DIFF_REVIEW_MODULE = k-playbook:/commands/_task-run/diff-review.md`; eine gleichnamige
-  Datei unter `<context.project.dir>/.k-playbook/commands/_task-run/` ersetzt es nach der
-  Überlagerung von k-playbook. Der Hauptkontext liest das Modul nicht, er gibt nur den Verweis weiter.
-- Grundlage des Diffs ist ein Snapshot je Task (5b.1), kein Commit je Lauf. Er schließt nicht
-  committete und ungetrackte Änderungen ein, auch die der Vorgänger im selben Lauf. Ein
-  schmutziger Arbeitsbaum verfälscht den Diff deshalb nicht; ob schmutzige Dateien für einen
-  Task erwartet sind, klärt der Branch-Preflight in 5a.1. Nicht erfasst sind Dateien, die
-  `.gitignore` ausschließt: Änderungen daran erscheinen weder im Diff noch im Review. Das
-  Task-Dokument liegt in der Collection und ist nie Teil des Diffs.
+Mit `DIFF_ENABLED=true` gilt
+`DIFF_REVIEW_MODULE = k-playbook:/commands/_task-run/diff-review.md`; der Hauptkontext liest
+es nicht, er gibt nur den Verweis weiter. Grundlage des Diffs ist ein Snapshot je Task (5b.1),
+kein Commit je Lauf: Er schließt nicht committete und ungetrackte Änderungen ein, auch die der
+Vorgänger im selben Lauf; nicht erfasst sind Dateien, die `.gitignore` ausschließt. Das
+Task-Dokument ist nie Teil des Diffs.
 
 ## Schritt 5 — Tasks nacheinander ausführen
 
 ### Sperre nehmen
 
 Vor dem ersten Task, vor der ersten Änderung am Arbeitsbaum — nach Schritt 3, im Modus
-`refine` also nach dem Refine —, nimmt der Hauptkontext die Sperre („Sperre des
-Arbeitsbaums“): `k_playbook_lock` mit `action: acquire`, `purpose` =
-`/k-task-run <TASK_FILE> [, <TASK_FILE> …]` und `session` = die Kennung aus der Zeile
-`Sitzung:` des Briefings.
+`refine` also nach dem Refine —, nimmt der Hauptkontext die Sperre: `k_playbook_lock` mit
+`action: acquire`, `purpose` = `/k-task-run <TASK_FILE> [, <TASK_FILE> …]` und `session` = die
+Kennung aus der Zeile `Sitzung:` des Briefings.
 
 - `acquired`: `LOCK_TOKEN` merken. Nennt die Antwort `takenOver`, sagt der Hauptkontext in
   einer Zeile, wessen verwaiste Sperre übernommen wurde.
-- `busy`: melden, ohne Rückfrage, und warten:
+- Sonst (`busy`): `sperre.md`, Abschnitt „Acquire meldet busy“. Die Wartezeit merkt sich der
+  Hauptkontext für Schritt 7.
 
-  ```
-  Arbeitsbaum gesperrt von <client>, Sitzung <session>, wozu: <purpose>, seit <since>.
-  Warte, bis die Sperre frei ist. Abbrechen jederzeit; freigeben nur, wenn der andere Lauf
-  sicher nicht mehr arbeitet: k-playbook lock release --force
-  ```
-
-  Dann `wait` in Schleife (je Aufruf die Frist des Werkzeugs, ohne `seconds`), ohne
-  Zeitgrenze, bis `acquired`. Ist `holder.orphaned` `uncertain`, kommt vorher eine
-  Rückfrage, höchstens einmal je Halter, erkannt an `holder.number`: Fertig-Meldung
-  (`Rückfrage: Sperre unsicher`), dann die Meldung oben mit `orphanedWhy` und der Frage
-  „(a) warten / (b) freigeben und übernehmen / (c) abbrechen“. (a) wartet ohne weitere
-  Rückfrage, bis frei; (b) ruft `release` mit `force` und `expect` = `holder.number`, dann
-  wieder `acquire`; (c) beendet den Lauf ohne Sperre und mit der Fertig-Meldung
-  `abgebrochen`. Die Wartezeit merkt sich der Hauptkontext für Schritt 7.
-
-**Liste neu prüfen.** Nach dem Nehmen, auch nach dem Warten, prüft der Hauptkontext die
-Liste aus Schritt 2 neu. Heraus fällt nur, was sich seit Schritt 2 geändert hat:
-
-- ein Task, der inzwischen unter `done/` liegt oder nicht mehr gefunden wird — ein
-  `not_found` direkt nach dem Wieder-Öffnen in Schritt 2 ist Replica-Nachlauf, kein Grund;
-- ein Task mit `SCHON_AUSGEFUEHRT = nein`, an dem die Kennzeile „ausgeführt“ jetzt trifft
-  (Suche und Regel aus 5a, nur nach der letzten Zeile „wieder geöffnet“).
-
-Ein solcher Task fällt ohne Rückfrage heraus und wird in der Ausgabe genannt. Alles andere
-bleibt und läuft durch 5a wie bisher, auch ein Task, der schon vor Schritt 2 ausgeführt, aber
-nicht abgeschlossen war. Hält der Hauptkontext für einen Task schon eine eigene `REVISION`
-(nach dem Wieder-Öffnen in Schritt 2), vergleicht er sie mit der Revision dieser Prüfung;
-weicht sie nach dem Replica-Nachlauf ab, gilt `foreign_change` (Schritt 1), kein stilles
-Neuholen. Für die übrigen Tasks setzt 5a `REVISION` wie bisher.
-
-Hat sich die Liste geändert, liest der Hauptkontext `## Intent` (letzter Task) und
-`## Tools` neu, wie nach dem Refine. Ist sie leer, gibt er die Sperre frei, meldet das und
-endet mit der Fertig-Meldung `fertig` — Schritt 6 und 7 entfallen.
+**Liste neu prüfen.** Direkt nach dem Nehmen, auch nach dem Warten, liest der Hauptkontext
+`k-playbook:/commands/_task-run/liste-neu-pruefen.md` und folgt ihm: Ein inzwischen erledigter
+oder ausgeführter Task fällt ohne Rückfrage heraus, alles andere bleibt; bei Abweichung der
+eigenen `REVISION` gilt `foreign_change`; eine leere Liste gibt die Sperre frei und endet mit
+der Fertig-Meldung `fertig`.
 
 ### Die Tasks
 
@@ -397,156 +195,50 @@ Zuerst mit `k_playbook_doc_grep` (mit Zeilennummern, ohne `count_only`) die Kenn
 „ausgeführt“ und „wieder geöffnet“ dieses Tasks suchen:
 `^<!-- k-task-run: (ausgeführt <TASK_FILE>|wieder geöffnet <TASK_FILE> [0-9-]+) -->$`, Punkte
 im Dateinamen maskiert. Die Revision aus dieser Antwort ist das erste `REVISION`; nach dem
-Wieder-Öffnen in Schritt 2 muss sie gleich `REVISION` sein (Replica-Nachlauf nach
-`k-playbook:/instructions/on-demand/tasks.md`). Die Kennzeile „ausgeführt“ **trifft**, wenn
+Wieder-Öffnen in Schritt 2 muss sie gleich `REVISION` sein (Revisionskette). Die Kennzeile „ausgeführt“ **trifft**, wenn
 eine solche Zeile nach der letzten Zeile „wieder geöffnet“ steht; gibt es keine Zeile
 „wieder geöffnet“, trifft jede.
 
-**Trifft sie**, ist der Task ausgeführt, aber nicht abgeschlossen: nach der Stopp-Abfrage in
-5f angehalten, oder eine Sitzung endete zwischen Kopf und `done/`. Der Task wird weder
-gelesen noch erneut ausgeführt. Fertig-Meldung (`Rückfrage: nicht abgeschlossen`), dann:
-
-```
-<TASK_FILE>: bereits ausgeführt, nicht abgeschlossen — Review, sein Ergebnis oder
-kritische Befunde offen (siehe ## Ausführung).
-
-Wie weiter?
-  (a) abschließen  - offene Punkte erledigt oder akzeptiert, Task wandert nach done/
-  (b) anhalten     - der Lauf endet hier, keine weiteren Tasks
-```
-
-- (a): Zuerst die Befunde des letzten Laufs holen, ohne sie selbst zu lesen: Der
-  Hauptkontext startet den **Befund-Leser** (unten) mit der Zeilennummer der letzten
-  Kennzeile „ausgeführt“, die oben trifft. Aus seiner Rückgabe sammelt er die Zeilen unter
-  `Kritisch:` und `Wichtig:` für diesen Task, wie nach „(b) trotzdem weiter“ (5f, Schritt 5,
-  „Befunde sammeln“); bei `Review: kein Abschnitt` oder einer Rückgabe in anderer Form
-  sammelt er nichts. Der Leser schreibt nichts, `REVISION` bleibt. Dann mit
-  `k_playbook_doc_append` und `since_revision: REVISION` anhängen:
-
-  ```text
-  **Status nach Review:** abgeschlossen vom Nutzer (<context.now.date>)
-  ```
-
-  Dann weiter wie 5f, Schritt 6 (nach `done/` verschieben, Snapshot freigeben); die
-  Ausführungswurzel dafür ist `Target repo` aus `## Ausführungskontext` (`section`, erster
-  Treffer), sonst die Projektwurzel. 5f.1 läuft nicht; steht dort `PR required: true`, nennt
-  der Command den PR als offenen Schritt. Weiter mit dem nächsten Task.
-- (b): Der Lauf endet, keine weiteren Tasks.
-
-Kein automatisches Beheben, kein erneutes Review, keine erneute Ausführung.
-
-**Befund-Leser.** Ein General-Purpose-Sub-Agent (OpenCode: `general`, Claude Code:
-`general-purpose`), reines Nachschlagen ohne Briefing. Er läuft hier und in 5f, Schritt 5,
-„Befunde sammeln“, wenn ein Task ohne gültige Review-Rückgabe nach `done/` geht. Sein Auftrag,
-mit eingesetzten Werten:
-
-````text
-Lies im Task <TASK_REF> (projectDir <context.project.dir>) den letzten Review-Abschnitt nach
-Zeile <ZEILE> und gib seine Befunde zurück. Du schreibst nichts und fragst niemanden.
-
-1. k_playbook_doc_grep (MCP; in der Shell `k-playbook doc grep`) mit ref <TASK_REF> und
-   pattern `^### Review: Befunde$`, mit Zeilennummern. Maßgeblich ist der letzte Treffer
-   nach Zeile <ZEILE>. Gibt es keinen, ist die Rückgabe allein `Review: kein Abschnitt`.
-2. Lies ab diesem Treffer mit k_playbook_doc_read und `lines` bis vor die nächste Zeile, die
-   mit `#`, `<!-- k-task-run:` oder `**Status nach Review:**` beginnt, sonst bis zum Ende.
-3. Gib aus der Zeile `**Ergebnis:**` und der Tabelle genau das zurück, ohne weiteren Text:
-
-Review: <n> kritisch, <n> wichtig, <n> Hinweis
-Kritisch:
-  - <Ort aus der Tabelle> — <Befund in einem Satz>
-Wichtig:
-  - <Ort aus der Tabelle> — <Befund in einem Satz>
-
-Je Tabellenzeile mit der Einstufung kritisch bzw. wichtig eine Zeile; Hinweise nur als Zahl.
-Ein leerer Block lautet `Kritisch: keine` bzw. `Wichtig: keine`.
-````
-
-Eine Rückgabe ist gültig, wenn sie genau `Review: kein Abschnitt` lautet oder der Form oben
-folgt, mit beiden Blöcken. Der Leser bekommt keine Revision und gibt keine zurück; er hängt
-nichts an.
+**Trifft sie**, ist der Task ausgeführt, aber nicht abgeschlossen; er wird weder gelesen noch
+erneut ausgeführt. Der Hauptkontext liest `k-playbook:/commands/_task-run/nicht-abgeschlossen.md`
+und folgt ihm; er hat `TASK_REF`, `TASK_FILE`, `REVISION` und die Zeilennummer der letzten
+Kennzeile „ausgeführt“, die trifft. „(a) abschließen“ schließt den Task ab, der Lauf geht mit
+dem nächsten weiter; „(b) anhalten“ beendet den Lauf. Den Befund-Leser, der dort und beim
+Abschluss läuft, beschreibt `abschluss.md`.
 
 **Trifft sie nicht**, lies den Task bis vor seine ersten Lauf-Abschnitte, geschnitten nach
 `k-playbook:/instructions/on-demand/tasks.md`, „Rumpf und Lauf-Abschnitte“: mit
-`k_playbook_doc_grep` (mit Zeilennummern) die Zeilen `^## Ausführung$` und
+`k_playbook_doc_grep` (mit Zeilennummern) `^## Ausführung$` und
 `^<!-- k-task-run: (ausgeführt|abgebrochen) <TASK_FILE> -->$` suchen; der Schnitt ist die
-letzte Zeile `## Ausführung` vor der ersten dieser Kennzeilen, ohne Kennzeile die erste Zeile
+letzte Zeile `## Ausführung` vor der ersten Kennzeile, ohne Kennzeile die erste Zeile
 `## Ausführung`. Dann `k_playbook_doc_read` mit `lines: "1-<zeile vor dem Schnitt>"`, ohne
-Schnitt `lines: "1-"`. Das `## Review-Log` kann übersprungene Punkte und Deadlocks aus dem
-Refine tragen, die für die Rückfragen in 5b gebraucht werden. Mehr liest der Hauptkontext von
-diesem Task nicht.
+Schnitt `lines: "1-"`. Das `## Review-Log` kann übersprungene Punkte und Deadlocks tragen, die
+für die Rückfragen in 5b gebraucht werden. Mehr liest der Hauptkontext von diesem Task nicht.
 
 ### 5a.1 — Ausführungskontext und Branch-Preflight
 
-Trägt der Task einen Abschnitt `## Ausführungskontext`, nimm daraus, soweit vorhanden:
+Die Ausführungswurzel (`EXEC_ROOT`) ist die Projektwurzel. Trägt der Task einen Abschnitt
+`## Ausführungskontext`, liest der Hauptkontext
+`k-playbook:/commands/_task-run/ausfuehrungskontext.md` und folgt ihm: Es nennt die Werte
+(`Target repo`, `Base branch`, `Work branch`, `PR required`, `Dirty worktree policy`), löst
+`EXEC_ROOT` auf, führt den Branch-Preflight aus und liefert den Rahmen für den Sub-Agenten;
+`PR required` und `Target repo` merkt sich der Hauptkontext für den Erfolgspfad.
 
-- `Target repo:`
-- `Base branch:`
-- `Work branch:`
-- `PR required:`
-- `Dirty worktree policy:`
-
-Behalte die Werte für den Erfolgspfad. Ist `PR required` wahr, muss der Command nach dem
-lokalen Commit einen PR eröffnen oder genau den fehlenden Schritt nennen, der das verhindert.
-
-`Target repo` wird relativ zu `context.project.repoRoot` aufgelöst, wenn es nicht absolut
-ist. Steht es als Verweis `project:/<pfad>` da — so schreibt es `/k-remediation` —, gilt
-`<context.project.dir>/<pfad>`; `project:/` allein ist die Projektwurzel. Ohne
-`Target repo` ist die Projektwurzel die Ausführungswurzel (`EXEC_ROOT`).
-
-Vor der Delegation der Branch-Preflight in der Ausführungswurzel:
-
-1. Prüfe, dass sie existiert und ein Git-Repository ist (`git rev-parse --is-inside-work-tree`).
-   Wenn nicht: anhalten und den Nutzer fragen.
-2. Prüfe den Dirty-State mit `git status --short`.
-3. Ist er nicht leer: anhalten und die Dateien zeigen. Weiter nur, wenn der Nutzer ausdrücklich
-   bestätigt, dass diese Dateien für den Task erwartet sind; sonst nicht delegieren.
-4. Ist `Work branch` gesetzt (vor einem Wechsel `check` der Sperre):
-   - schon darauf: weiter;
-   - existiert er lokal: `git switch <Work branch>`;
-   - sonst, wenn `Base branch` gesetzt und nicht `<manual>` ist: auf `Base branch` wechseln und
-     `git switch -c <Work branch>`;
-   - sonst anhalten und fragen, welcher Base-Branch gelten soll.
-5. Sind `Base branch` und `Work branch` gesetzt und `Base branch` ist nicht `<manual>`: prüfe
-   mit `git merge-base --is-ancestor <Base branch> HEAD`, dass der Work-Branch darauf aufsetzt.
-   Schlägt das fehl: anhalten und fragen.
-6. Halte das Ergebnis fest und gib es dem Sub-Agenten mit. Ausführungswurzel und Branch sind
-   für ihn verbindlicher Rahmen.
-
-Ohne `## Ausführungskontext` läuft alles wie bisher in der Projektwurzel.
+Ohne `## Ausführungskontext` vor der Delegation: Prüfe, dass `EXEC_ROOT` ein Git-Repository ist
+(`git rev-parse --is-inside-work-tree`; sonst anhalten und fragen), und den Dirty-State mit
+`git status --short`. Ist er nicht leer: anhalten und die Dateien zeigen; weiter nur, wenn der
+Nutzer ausdrücklich bestätigt, dass sie für den Task erwartet sind, sonst nicht delegieren.
 
 ### 5a.2 — Etappen-Fortschritt prüfen
 
-Ein Task darf seine Arbeit in `## Zu bauen` als `### Etappe N — Titel` gliedern. Nur dann
-greift die Fortschrittsverfolgung; ein Task ohne Etappen läuft als Ganzes.
-
-Enthält der Task Etappen (`k_playbook_doc_grep`, `^### Etappe [0-9]+ — `; ihre Zahl ist `m`):
-
-1. Den Stand geben allein die Fortschrittszeilen, gelesen und ausgewertet nach
-   `k-playbook:/instructions/on-demand/tasks.md`, „Fortschritt anhängend“ (Muster, Auswertung
-   je Etappe, alte Tabelle `## Fortschritt`); der Command wiederholt die Regel nicht.
-2. Steht keine Etappe auf erledigt: weiter mit 5b, alle Etappen offen.
-3. Stehen Etappen auf erledigt: Fertig-Meldung (`Rückfrage: Etappen fortsetzen`), den Stand
-   zeigen und fragen:
-
-```
-<TASK_FILE>: Etappen 1-2 von 6 erledigt (zuletzt 2026-08-12).
-
-Wie weiter?
-  (a) ab Etappe 3 fortsetzen   (Default)
-  (b) von vorn beginnen        - erledigte Etappen erneut ausführen
-  (c) diesen Task überspringen
-```
-
-Bei `(b)` vor der Delegation mit `k_playbook_doc_append` und `since_revision: REVISION` die
-Zeile anhängen:
-
-```text
-<!-- k-task-run: fortschritt zurückgesetzt <context.now.date> -->
-```
-
-Der Stand wird **nicht** aus einem Abbruch heraus geraten. Eine offene Etappe gilt als nicht
-ausgeführt, auch wenn Teile davon im Code sichtbar sind — der Sub-Agent prüft zu Beginn der
-Etappe selbst, was schon da ist.
+Ein Task ohne `### Etappe N — Titel` läuft als Ganzes. Enthält der Task Etappen (`k_playbook_doc_grep`, `^### Etappe [0-9]+ — `; ihre Zahl ist `m`):
+Den Stand geben allein die Fortschrittszeilen, gelesen und ausgewertet nach
+`k-playbook:/instructions/on-demand/tasks.md`, „Fortschritt anhängend“. Steht keine Etappe auf
+erledigt, weiter mit 5b, alle Etappen offen. Sonst liest der Hauptkontext
+`k-playbook:/commands/_task-run/etappen-fortsetzen.md` und folgt ihm (Fertig-Meldung
+`Rückfrage: Etappen fortsetzen`, Optionen, Zurücksetzen). Der Stand wird **nicht** aus einem
+Abbruch heraus geraten: Eine offene Etappe gilt als nicht ausgeführt, auch wenn Teile davon im
+Code sichtbar sind.
 
 ### 5b — Vor der Delegation klären
 
@@ -556,149 +248,53 @@ stützen sich allein auf den gelesenen Task; der Hauptkontext liest dafür keine
 sich nur am Code klären lässt, bleibt dem Ausführungs-Sub-Agenten — trifft er dort auf eine
 echte Entscheidung, meldet er sie als Blocker (5d).
 
-Gibt es solche Fragen: **anhalten und den Nutzer fragen** (Fertig-Meldung vorher). Auf die
-Antworten warten. Diesen Schritt nicht überspringen, nicht raten und keine
-Quick-and-dirty-Entscheidung treffen, um die Frage zu vermeiden — Mehrdeutiges wird im
-Hauptkontext geklärt, wo der Nutzer antworten kann.
-
-Weiter erst, wenn alle offenen Fragen beantwortet sind.
+Gibt es solche Fragen: **anhalten und den Nutzer fragen** (Fertig-Meldung vorher) — nicht
+überspringen, nicht raten, keine Quick-and-dirty-Entscheidung. Weiter erst, wenn alle offenen
+Fragen beantwortet sind.
 
 ### 5b.1 — Snapshot des Tasks
 
 Nur mit `DIFF_ENABLED=true`. Der Snapshot hält den Arbeitsbaum der Ausführungswurzel vor dem
-Task fest, samt nicht committeter und ungetrackter Änderungen. Das Review vergleicht später
-den Stand nach dem Task damit, einschließlich neu angelegter Dateien. In den Hauptkontext
-gelangt nur seine Kennung.
+Task fest, samt nicht committeter und ungetrackter Änderungen; das Review vergleicht den Stand
+nach dem Task damit. Er gehört zum Task, nicht zu einer Delegation: Er entsteht beim ersten
+Start unmittelbar vor der ersten Delegation und gilt für jeden weiteren Start (nach 5d und in
+späteren Läufen). Vor dem Anlegen `check` der Sperre.
 
-Vor dem Anlegen `check` der Sperre. Der Snapshot gehört zum Task, nicht zu einer Delegation. Er entsteht beim ersten Start des
-Tasks — unmittelbar vor seiner ersten Delegation, nach dem Branch-Preflight, in der
-Ausführungswurzel — und gilt für jeden weiteren Start: nach 5d und in jedem späteren Lauf,
-ob der offene Etappen fortsetzt oder von vorn beginnt. Ein neuer Snapshot enthielte schon
-die Änderungen des früheren Versuchs; ein kritischer Fehler daraus ginge ungeprüft nach
-`done/`.
-
-1. Mit `k_playbook_doc_grep` die Snapshot-Zeile dieses Tasks suchen
-   (`^<!-- k-task-run: snapshot <TASK_FILE> [0-9a-f]+ -->$`); maßgeblich ist der letzte
-   Treffer.
-2. Trifft sie und lässt sich die Kennung auflösen, wird sie wiederverwendet:
-   `SNAPSHOT=<kennung>`, `REVIEW_SCOPE=ab Task-Beginn`. Die Ref wird dabei gesetzt, falls
-   sie fehlt:
-
-   ```bash
-   if command -v git >/dev/null 2>&1; then
-     git -C "<EXEC_ROOT>" cat-file -e "<SNAPSHOT>^{tree}" &&
-       git -C "<EXEC_ROOT>" update-ref "refs/k-task-run/<TASK_STEM>" "<SNAPSHOT>"
-   fi
-   ```
-
-3. Sonst einen neuen Snapshot anlegen. Er entsteht als Tree-Objekt über einen temporären
-   Index; der echte Index und der Arbeitsbaum bleiben unberührt. Gegen `git gc` bleibt er
-   über die Ref `refs/k-task-run/<TASK_STEM>` erreichbar, die mit dem Verschieben nach
-   `done/` wieder entfernt wird. Die Ausgabe ist allein die Kennung:
-
-   ```bash
-   if command -v git >/dev/null 2>&1; then
-     (
-       cd "<EXEC_ROOT>" || exit 1
-       snap_dir="$(mktemp -d)" || exit 1
-       cp "$(git rev-parse --git-path index)" "$snap_dir/index" 2>/dev/null || true
-       GIT_INDEX_FILE="$snap_dir/index" git add -A &&
-         tree="$(GIT_INDEX_FILE="$snap_dir/index" git write-tree)" &&
-         git update-ref "refs/k-task-run/<TASK_STEM>" "$tree" &&
-         printf '%s\n' "$tree"
-       status=$?
-       rm -rf "$snap_dir"
-       exit "$status"
-     )
-   fi
-   ```
-
-   Dann die Snapshot-Zeile mit `k_playbook_doc_append` und `since_revision: REVISION`
-   anhängen:
-
-   ```text
-   <!-- k-task-run: snapshot <TASK_FILE> <SNAPSHOT> -->
-   ```
-
-   `REVIEW_SCOPE` ist `ab Task-Beginn`, wenn der Task noch nie lief. Lief er schon — das
-   Dokument trägt einen Vermerk aus 5e (die Kennzeile „abgebrochen“ oder, aus der Zeit vor
-   ihr, die Zeile `^\*\*Status:\*\* Teilweise ausgeführt - abgebrochen`), eine Etappe stand
-   auf erledigt, oder eine Snapshot-Zeile ließ sich nicht mehr auflösen —, ist er
-   `nur seit Fortsetzung`: Das Review deckt dann nur die Änderungen seit diesem Snapshot ab,
-   sagt das in Abschnitt und Rückgabe, und 5f fragt vor dem Verschieben nach `done/` (5f,
-   Schritt 5).
-
-Schlägt ein Aufruf fehl, hält der Command vor der Delegation an und fragt den Nutzer, wie in
-5a.1. Führt der Nutzer den Task ohne Snapshot aus, läuft er ohne Diff und Review, wie ohne
-`DIFF_ENABLED`, und Schritt 7 nennt das.
+Der Hauptkontext liest `k-playbook:/commands/_task-run/snapshot.md` und folgt ihm: Es liefert
+`SNAPSHOT` und `REVIEW_SCOPE` — `ab Task-Beginn`, wenn der Task noch nie lief, sonst
+`nur seit Fortsetzung` (das Review deckt dann nur die Änderungen seit diesem Snapshot ab, sagt
+das in Abschnitt und Rückgabe, und 5f fragt vor dem Verschieben nach `done/`). Schlägt ein
+Aufruf fehl, hält der Command vor der Delegation an und fragt den Nutzer, wie in 5a.1. Führt der
+Nutzer den Task ohne Snapshot aus, läuft er ohne Diff und Review, und Schritt 7 nennt das.
 
 ### 5c — An den Sub-Agenten delegieren
 
 Vorher `check` der Sperre, dann die Fortschrittszeilen zählen (`k_playbook_doc_grep`,
 `^<!-- k-task-run: etappe [0-9]+ erledigt `, `count_only`) und Anzahl und Revision merken;
-die Revision muss `REVISION` sein (Revisionskette, Schritt 1, samt Replica-Nachlauf nach
-`k-playbook:/instructions/on-demand/tasks.md`).
+die Revision muss `REVISION` sein (Revisionskette, Schritt 1).
 
 Starte einen General-Purpose-Sub-Agenten (OpenCode: `general`, Claude Code:
-`general-purpose`) für die Ausführung. Er bekommt den Verweis, nicht den Inhalt:
+`general-purpose`) für die Ausführung. Er liest seinen Auftrag selbst:
+`k-playbook:/commands/_task-run/ausfuehrung.md`, Abschnitt „Ausführung“. Du übergibst ihm den
+Verweis und diese Werte, nicht den Inhalt des Tasks:
 
-- an den Anfang seines Auftrags: Führe zuerst `k-playbook briefing` aus und lies die
-  Ausgabe; lies dann alle `CLAUDE.md` und `AGENTS.md` im Projektbaum,
-- `TASK_REF` und `REVISION` — er liest den Task selbst mit `k_playbook_doc_read` und
-  `k-playbook:/instructions/on-demand/tasks.md` dazu,
-- das Arbeitsverzeichnis und `projectDir` für die k-playbook-Werkzeuge
-  (`context.project.dir`, auch wenn die Ausführungswurzel woanders liegt),
+- `TASK_REF` und `REVISION`; das Arbeitsverzeichnis und `projectDir` (`context.project.dir`,
+  auch wenn die Ausführungswurzel woanders liegt),
 - bei `## Ausführungskontext`: die aufgelöste Ausführungswurzel, Base- und Work-Branch,
   PR-Pflicht, die Entscheidung zum schmutzigen Arbeitsbaum und das Ergebnis des
   Branch-Preflights als verbindlichen Rahmen,
 - alle Klärungen aus 5b als zusätzlichen Kontext,
-- bei `### Etappe`-Abschnitten: welche Etappen offen sind, und die Anweisung, **unmittelbar
-  nach Abschluss jeder Etappe** — vor der nächsten, nicht am Ende des Laufs — die
-  Fortschrittszeile `<!-- k-task-run: etappe <n> erledigt <datum> --> <beleg>` mit
-  `k_playbook_doc_append` und `since_revision` anzuhängen, Form nach
-  `k-playbook:/instructions/on-demand/tasks.md`, `<datum>` aus `context.now.date` seines
-  Briefings,
-- die Anweisung, am Task keinen Abschnitt `## Ausführung` und keine andere Kennzeile
-  anzulegen oder zu ändern — die schreibt der Hauptkontext —; was der Task selbst in seinem
-  Dokument verlangt, etwa einen eigenen Abschnitt, hängt der Sub-Agent wie verlangt an,
-- die Regeln zu `foreign_change`, `outcome_unknown` und dem Replica-Nachlauf aus
-  `k-playbook:/instructions/on-demand/tasks.md`: bei `foreign_change` anhalten, nichts weiter
-  schreiben, `Foreign-Change:` zurückgeben,
-- das Rückgabeformat unten.
+- bei `### Etappe`-Abschnitten: welche Etappen offen sind.
 
 Kein Diff und keine Kennung eines Snapshots: Diff und Review sind Sache des
-Review-Sub-Agenten in 5f.
-
-Die Fortschrittszeile schreibt der Sub-Agent selbst, nicht der Hauptkontext. Nur so
-überlebt der Stand einen harten Abbruch: bricht die Sitzung mitten in Etappe 4 ab, stehen
-die Zeilen für 1 bis 3 bereits im Dokument. Ein Fortschritt, den erst der Hauptkontext nach
-Rückkehr des Sub-Agenten schreibt, wäre genau in dem Fall verloren, für den er gedacht ist.
-
-Der Sub-Agent fragt den Nutzer nicht — alle Mehrdeutigkeiten sind geklärt. Trifft er auf
-einen unerwarteten Blocker oder eine Entscheidung, die er nicht sauber auflösen kann, trifft
-er **keine** Quick-and-dirty-Entscheidung, sondern hält an und meldet sie unter „Blocker“,
-damit der Hauptkontext den Nutzer fragen kann.
-
-Die Rückgabe des Sub-Agenten ist genau dieses Format, ausdrücklich ohne Diffs,
-Dateiinhalte und Logs:
-
-```
-Status: erfolgreich | teilweise | blockiert
-Zusammenfassung: <2–3 Sätze>
-Validierung: <Befehl → Ergebnis, je eine Zeile>
-Abgebrochen bei: – | <Schritt oder Etappe, an der die Arbeit stoppte>
-Blocker: keine | <Beschreibung + benötigte Entscheidung>
-Revision: <n>
-```
-
-- `Revision` ist die Revision seines letzten eigenen Anhängens; hat er nichts angehängt, die
-  übergebene. Nach `foreign_change` steht stattdessen
-  `Foreign-Change: <revision> <updatedBy> <updatedAt>`, und `Status` ist `blockiert`.
-- `erfolgreich` führt nach 5f, `blockiert` nach 5d, `teilweise` nach 5e. Eine Rückgabe ohne
-  gültige Zeile `Status:` gilt als `blockiert`.
-- Die Zeilen „Validierung“ gehen in 5f an das Review und speisen den PR-Text in 5f.1.
-- `REVISION` wird nach der Revisionskette aus Schritt 1 gesetzt: aus `Revision:`, nach
-  `Foreign-Change:` erst nach der Rückfrage, ohne beides durch erneutes Zählen.
+Review-Sub-Agenten in 5f. Seine Rückgabe hat das Format des Moduls; ausgewertet werden:
+`Status: erfolgreich | teilweise | blockiert` (`erfolgreich` führt nach 5f, `blockiert` nach
+5d, `teilweise` nach 5e; eine Rückgabe ohne gültige Zeile `Status:` gilt als `blockiert`),
+`Zusammenfassung:`, `Abgebrochen bei:` und `Blocker:` für den Kopf in 5f bzw. 5e und die
+Rückfrage in 5d, `Validierung:` für das Review in 5f und den PR-Text, und `Revision: <n>` bzw.
+nach `foreign_change` `Foreign-Change: <revision> <updatedBy> <updatedAt>` (dann ist `Status`
+`blockiert`): `REVISION` wird nach der Revisionskette gesetzt, nach `Foreign-Change:` erst nach
+der Rückfrage, ohne beides durch erneutes Zählen.
 
 Warte, bis der Sub-Agent fertig ist, bevor der nächste Schritt beginnt.
 
@@ -707,55 +303,28 @@ Warte, bis der Sub-Agent fertig ist, bevor der nächste Schritt beginnt.
 Meldet die Rückgabe `Status: blockiert`: **anhalten und den Nutzer fragen**, mit der Zeile
 „Blocker“ — vorher die Fertig-Meldung (`Rückfrage: Blocker`, der Body nennt ihn). Steht
 `Foreign-Change:` in der Rückgabe, ist das die Rückfrage nach `foreign_change` aus Schritt 1.
-Kein nächster Task, bis das geklärt ist. Dann entscheiden, ob der Task erneut läuft oder
-abgebrochen wird (5e).
-
-Erneut ausführen heißt: 5c noch einmal, mit der Antwort des Nutzers als weiterer Klärung.
-Der Snapshot aus 5b.1 bleibt derselbe.
+Kein nächster Task, bis das geklärt ist. Dann entscheiden, ob der Task erneut läuft (5c noch
+einmal, mit der Antwort des Nutzers als weiterer Klärung; derselbe Snapshot) oder abgebrochen
+wird (5e).
 
 ### 5e — Bei Fehler oder Abbruch
 
 Gilt bei `Status: teilweise`, bei einem nach 5d abgebrochenen Task und wenn 5f eine offene
-Etappe findet — immer vor dem Kopf aus 5f. Mit `k_playbook_doc_append` und
-`since_revision: REVISION` anhängen, die Kennzeile „abgebrochen“ wie in 5f als erste Zeile nach
-`## Ausführung` und der Leerzeile:
-
-```text
-## Ausführung
-
-<!-- k-task-run: abgebrochen <TASK_FILE> -->
-**Status:** Teilweise ausgeführt - abgebrochen  
-**Datum:** <context.now.date>  
-**Abgebrochen bei:** <Schritt oder Etappe aus der Rückgabe>  
-**Grund:** <kurzer Grund>
-```
-
-„Abgebrochen bei“ kommt aus dem gleichnamigen Feld der Rückgabe, „Grund“ aus „Blocker“
-oder, steht dort „keine“, aus der Zusammenfassung.
-
-- Der Task bleibt, wo er ist (nicht nach `done/`).
-- Hat der Task `### Etappe`-Abschnitte: Die Fortschrittszeilen bleiben, wie der Sub-Agent
-  sie angehängt hat. Sie sind der Wiederaufnahmepunkt für den nächsten `/k-task-run` — nie
-  zurücksetzen, nie eine Etappe als erledigt eintragen, die der Sub-Agent nicht selbst
-  eingetragen hat. Füge dem Vermerk oben als letzte Zeile `**Etappen erledigt:** <n> von <m>`
-  an; `<n>` ist die Zahl der Etappen mit Fortschrittszeile nach dem letzten Zurücksetzen
-  (Zählung wie in 5a.2), `<m>` die Zahl der Etappen-Überschriften.
-- Keine weiteren Tasks.
-
-Nach dem Kopf aus 5f kommt 5e nicht mehr vor: Ein Task verlässt den Lauf dann nur nach
-`done/` oder mit der Zeile „angehalten“ (5f, Schritt 5).
+Etappe findet — immer vor dem Kopf aus 5f. Der Hauptkontext liest
+`k-playbook:/commands/_task-run/abbruch.md` und hängt den Abbruchvermerk an. Der Task bleibt
+liegen, die Fortschrittszeilen bleiben; keine weiteren Tasks. Nach dem Kopf aus 5f kommt 5e
+nicht mehr vor: Ein Task verlässt den Lauf dann nur nach `done/` oder mit der Zeile
+„angehalten“ (5f, Schritt 5).
 
 ### 5f — Bei Erfolg
 
-Bei `Status: erfolgreich`, in genau dieser Reihenfolge. So wird kein unvollständiger Task
-reviewt, und innerhalb eines Laufs steht nie ein Erfolgskopf neben einem Abbruchvermerk aus
-5e.
+Bei `Status: erfolgreich`, in genau dieser Reihenfolge.
 
 **1. Etappen prüfen.** Hat der Task `### Etappe`-Abschnitte: die Fortschrittszeilen erneut
 zählen (wie 5a.2). Hat eine Etappe keine Zeile nach dem letzten Zurücksetzen, ist der Lauf
-**nicht** erfolgreich: ohne Kopf und ohne Review weiter nach 5e, mit der ersten offenen
-Etappe unter „Abgebrochen bei“ und dem Grund, dass der Sub-Agent Erfolg meldet, während die
-Etappe offen steht. Ein solcher Widerspruch wird gezeigt, nicht geglättet.
+**nicht** erfolgreich: ohne Kopf und Review weiter nach 5e, mit der ersten offenen Etappe
+unter „Abgebrochen bei“ und dem Grund, dass der Sub-Agent Erfolg meldet, während die Etappe
+offen steht. Der Widerspruch wird gezeigt, nicht geglättet.
 
 **2. Kopf und Kennzeile.** In einem `k_playbook_doc_append` mit `since_revision: REVISION`
 anhängen:
@@ -772,427 +341,83 @@ anhängen:
 Ab hier liest der Hauptkontext keinen Abschnitt des Tasks mehr. Mit `DIFF_ENABLED=false`
 oder ohne Snapshot (5b.1) folgt direkt 5f, Schritt 6 — kein Diff, kein Review.
 
-**3. Rezept bestimmen**, ohne es zu lesen: aus `documents.reviews` des Briefings der Eintrag
-mit `ref` `k-playbook:/reviews/review-code.md`. So greift ein Overlay unter
-`keph:/k-playbook/reviews/`.
+**3. Rezept bestimmen und 4. Review-Sub-Agent.** Der Hauptkontext liest
+`k-playbook:/commands/_task-run/review-starten.md` und folgt ihm: Es bestimmt das Rezept aus
+dem Briefing (ohne es zu lesen), startet den Review-Sub-Agenten — nicht den ausführenden —
+nach `DIFF_REVIEW_MODULE`, prüft die Rückgabe auf Gültigkeit und setzt `REVISION`. Das
+Ergebnis ist einer der Ausgänge der Tabelle.
 
-- Vorhanden, Herkunft nicht `disabled`: `REVIEW_RECIPE = <ref>` — der Sub-Agent führt Teil 1
-  und Teil 2 des Moduls aus.
-- Herkunft `disabled` (leere projekteigene Datei): abgeschaltet. Der Sub-Agent führt nur
-  Teil 1 aus; die Diff-Abschnitte bleiben, das Review entfällt, und Schritt 7 weist
-  „Review: abgeschaltet“ aus. Eine Stopp-Abfrage aus dem Review gibt es dann nicht; meldet
-  Teil 1 `Diff: fehlgeschlagen`, nennt Schritt 7 das dahinter.
-- Fehlt der Eintrag: Der Sub-Agent führt ebenfalls nur Teil 1 aus. Das gilt als ungültiges
-  Review (5f, Schritt 5).
+**Ausgänge des Reviews.** Die Tabelle gilt für die Stopp-Abfrage (Schritt 5), das Sammeln der
+Befunde und die Zeile „Review“ in Schritt 7:
 
-`review.enabled` und `audit.enabled` steuern nur `/k-review` und `/k-audit` und wirken hier
-nicht.
+| Ausgang | Stopp-Abfrage | Für Schritt 7 gesammelt | Zeile „Review“ |
+|---|---|---|---|
+| gültig, ohne kritischen Befund | nein | `Wichtig:` | `Review: <n> kritisch, <n> wichtig, <n> Hinweis` |
+| gültig, mit kritischem Befund | ja | `Wichtig:`, nach „(b) trotzdem weiter“ dazu `Kritisch:` | wie oben |
+| ungültig: Abbruch, Rückgabe nicht im Format oder kein neuer Review-Abschnitt | ja | nach „(b)“ die Zeilen des Befund-Lesers | `Review: kein gültiges Review`, mit „— Befunde nicht gelesen“, wenn der Leser nicht in seiner Form antwortete |
+| Rezept fehlt im Briefing | ja, ohne (a) | nichts | `Review: kein gültiges Review` |
+| Rezept abgeschaltet (Herkunft `disabled`) | nein | nichts | `Review: abgeschaltet` |
+| `DIFF_ENABLED=false` oder ohne Snapshot | nein | nichts | `Review: – (ohne Diff)` |
+| zusätzlich `REVIEW_SCOPE` `nur seit Fortsetzung` | ja, ohne (a) | wie sonst | Zusatz „— nur seit Fortsetzung“ |
 
-**4. Review-Sub-Agent.** Vor dem Start mit `k_playbook_doc_grep` und `count_only` zählen,
-wie oft `^### Review: Befunde$` und `^### Diff: Geänderte Dateien$` im Task stehen; die
-Revision aus dieser Antwort muss `REVISION` sein (Replica-Nachlauf nach
-`k-playbook:/instructions/on-demand/tasks.md`). Dann einen neuen General-Purpose-Sub-Agenten
-starten — nicht den ausführenden: Wer den Code geschrieben hat, prüft ihn nicht selbst. Er
-bekommt:
+Maßgeblich ist das letzte Review des Laufs, auch nach 4a und nach „(a)“. Ein Befund „wichtig“ ist kein Grund für die Stopp-Abfrage; er hält den Lauf nicht an.
 
-- den Verweis `DIFF_REVIEW_MODULE` mit der Anweisung, das Modul mit `k_playbook_doc_read` zu
-  lesen und zu befolgen,
-- `TASK_REF` und `REVISION`, `projectDir` (`context.project.dir`), die Ausführungswurzel,
-  `SNAPSHOT` und `REVIEW_SCOPE`,
-- die Zeilen „Validierung“ aus der letzten Rückgabe von Ausführung oder Behebung,
-- `REVIEW_RECIPE` oder die Anweisung „nur Teil 1“.
-
-Er fragt den Nutzer nicht und hängt seine Abschnitte selbst an den Task an. Seine Rückgabe
-beschreibt das Modul; sie endet mit `Revision: <n>` oder `Foreign-Change: …`. Danach
-dieselben Zeilen erneut zählen:
-
-- Das Review ist **gültig**, wenn die Rückgabe dem Format des Moduls folgt — mit den Blöcken
-  `Kritisch:` und `Wichtig:`, jeder mit Befundzeilen oder `keine` — und `### Review: Befunde`
-  genau einmal mehr dasteht als vorher. Eine Rückgabe ohne `Wichtig:`-Block ist wie jede
-  formwidrige kein gültiges Review. Nie gilt ein Lauf ohne das als „0 kritisch“.
-- Die Diff-Abschnitte hat der Lauf geschrieben, wenn `### Diff: Geänderte Dateien` genau
-  einmal mehr dasteht.
-- `REVISION` wird nach der Revisionskette gesetzt; `Foreign-Change:` führt zur Rückfrage aus
-  Schritt 1, und nach „weiter“ läuft Schritt 4 erneut.
+**4a. Nachbessern.** Bei gültigem Review mit kritischem oder wichtigem Befund und `REVIEW_SCOPE`
+≠ `nur seit Fortsetzung` liest der Hauptkontext `k-playbook:/commands/_task-run/nachbessern.md`
+und folgt ihm (mit `TASK_REF`, `REVISION`, Rahmen aus 5c, `SNAPSHOT`, `REVIEW_SCOPE`,
+`DIFF_REVIEW_MODULE`, Befundzeilen). Sonst, nach der Schleife und nach „(a) beheben lassen“: entfällt.
 
 **5. Stopp-Abfrage** — nach dem Review, vor dem Verschieben nach `done/`, vor 5f.1 und vor
-dem nächsten Task. Sie kommt, sobald einer dieser Gründe vorliegt:
+dem nächsten Task. Sie kommt, sobald ein Ausgang der Tabelle eine Abfrage verlangt: erst die
+Fertig-Meldung (`Rückfrage: <Grund>`, der Body nennt die Zahlen), dann liest der Hauptkontext
+`k-playbook:/commands/_task-run/stopp-abfrage.md` und folgt ihm (Abfrage, beheben lassen bzw.
+Review erneut, trotzdem weiter, anhalten).
 
-| Grund | Die Abfrage nennt | (a) |
-|---|---|---|
-| gültiges Review mit mindestens einem kritischen Befund | die Zeilen unter „Kritisch“ aus der Rückgabe | beheben lassen |
-| kein gültiges Review: Abbruch, Rückgabe nicht im Format oder kein neuer Review-Abschnitt | dass kein gültiges Review vorliegt, dazu eine Zeile `Abbruch:` | Review erneut laufen lassen |
-| Rezept fehlt im Briefing | dass kein gültiges Review vorliegt, weil `review-code` unter `documents.reviews` fehlt | entfällt |
-| `REVIEW_SCOPE` ist `nur seit Fortsetzung` | „Review nur seit Fortsetzung“ | entfällt |
-
-Mehrere Gründe stehen in einer Abfrage; (a) steht zur Wahl, solange einer mit (a) dabei ist.
-Vor der Abfrage die Fertig-Meldung (`Rückfrage: <Grund>`, der Body nennt die Zahlen).
-Fehlt das Rezept, gilt dafür nur die dritte Zeile, nicht die zweite — ein erneutes Review
-fände das Rezept ebenso wenig.
-Für kritische Befunde:
-
-```
-<TASK_FILE>: <n> kritische Review-Befunde
-  - <datei:zeile oder Prüfbefehl> — <ein Satz>
-
-Wie weiter?
-  (a) beheben lassen   - Sub-Agent behebt nur diese Befunde, danach erneutes Review
-  (b) trotzdem weiter  - Task gilt als erledigt, Befunde bleiben dokumentiert
-  (c) anhalten         - Task bleibt liegen, keine weiteren Tasks
-```
-
-Bei den anderen Gründen steht statt der Befundzeilen `<TASK_FILE>: kein gültiges Review —
-<Grund>` bzw. `<TASK_FILE>: Review nur seit Fortsetzung — ein Fehler aus dem früheren
-Versuch bleibt ungeprüft`.
-
-- **(a) beheben lassen.** Nach `check` der Sperre bekommt ein General-Purpose-Sub-Agent `TASK_REF`, `REVISION`, den
-  Rahmen aus 5c (Ausführungswurzel, `projectDir`, Branch, Preflight) und die kritischen
-  Befunde. Er behebt nur diese, schreibt nichts in den Task, fragt den Nutzer nicht, meldet
-  eine offene Entscheidung unter „Blocker“ und gibt das Format aus 5c zurück (`Revision:` ist
-  dann die übergebene).
-  - `erfolgreich`: zurück zu 5f, Schritt 4 — das Review läuft erneut gegen denselben Snapshot
-    mit demselben Umfang und hängt seine Abschnitte an; die früheren bleiben. Bleibt etwas
-    kritisch, wird wieder gefragt.
-  - `blockiert`: fragen wie in 5d. „Erneut“ heißt hier nur, den Behebungs-Sub-Agenten mit
-    der Antwort des Nutzers noch einmal zu starten — nie zurück nach 5a. Wird er nicht
-    erneut gestartet, weiter wie (c) mit dem Grund „Behebung blockiert, kritische
-    Review-Befunde offen“.
-  - `teilweise`: weiter wie (c) mit dem Grund „Behebung unvollständig, kritische
-    Review-Befunde offen“.
-
-  Die Vorlage aus 5e kommt dabei nicht vor.
-- **(a) Review erneut laufen lassen** (kein gültiges Review): zurück zu 5f, Schritt 4 mit
-  denselben Eingaben.
-- **(b) trotzdem weiter.** Weiter mit 5f, Schritt 6. Liegt kein gültiges Review vor und hat der
-  letzte Review-Lauf keine Diff-Abschnitte geschrieben (Zählung aus 5f, Schritt 4), startet der
-  Hauptkontext davor einen Sub-Agenten nur mit Teil 1 des Moduls.
-- **(c) anhalten.** Mit `k_playbook_doc_append` und `since_revision: REVISION` anhängen; die
-  bestehende Statuszeile bleibt stehen:
-
-  ```text
-  **Status nach Review:** angehalten — <Grund>
-  ```
-
-  Grund ist „kritische Review-Befunde offen“, „kein gültiges Review“, „Review nur seit
-  Fortsetzung“ oder der Grund aus (a). Der Task bleibt liegen, die Fortschrittszeilen
-  unverändert; kein PR, keine weiteren Tasks. Die Kennzeile aus 5f, Schritt 2 steht schon im
-  Dokument; den nächsten Lauf regelt 5a.
-
-Ein Befund „wichtig“ ist kein Grund für die Stopp-Abfrage; er hält den Lauf nicht an.
-
-**Befunde sammeln** — für jeden Task, der nach `done/` geht, vor 5f, Schritt 6. Der
-Hauptkontext merkt sich je Task die Befundzeilen für die Zusammenfassung und die Abfrage in
-Schritt 7, unverändert in der Form `<datei:zeile oder Prüfbefehl> — <ein Satz>`, jede
-kritische mit dem Merkmal „kritisch“:
-
-- Maßgeblich ist die Rückgabe des **letzten** Reviews dieses Laufs für diesen Task; nach
-  „(a) beheben lassen“ ist das das erneute.
-- Ist sie gültig: die Zeilen unter `Wichtig:`; nach „(b) trotzdem weiter“ dazu die unter
-  `Kritisch:`.
-- Ist sie nicht gültig und geht der Task trotzdem nach `done/` (nach „(b) trotzdem
-  weiter“): Der Hauptkontext sucht mit `k_playbook_doc_grep` (mit Zeilennummern) die
-  Kennzeile `^<!-- k-task-run: ausgeführt <TASK_FILE> -->$` — der letzte Treffer ist die
-  dieses Laufs — und startet mit ihrer Zeilennummer den Befund-Leser aus 5a. Gesammelt
-  werden die Zeilen unter `Kritisch:` und `Wichtig:` aus dessen Rückgabe. Bei
-  `Review: kein Abschnitt` wird nichts gesammelt; bei einer Rückgabe in anderer Form auch
-  nicht, und die Zeile „Review“ in Schritt 7 bekommt den Zusatz „— Befunde nicht gelesen“.
-  Lief kein Review mit Teil 2 (Rezept fehlt), entfällt der Leser.
-- Ohne Review — `DIFF_ENABLED=false`, ohne Snapshot oder bei abgeschaltetem Rezept — gibt es
-  nichts zu sammeln.
-
-Ein angehaltener Task (c) behält seine Befunde im Dokument; sie werden nicht gesammelt.
-Schließt ein späterer Lauf ihn in 5a mit „(a) abschließen“ ab, sammelt der Befund-Leser sie
-dort.
-
-**6. Abschluss.**
-
-1. `k_playbook_doc_done` mit `TASK_REF`. Die Antwort nennt den neuen Verweis unter `done/`
-   (`TASK_REF_DONE`) und `revision` — das Verschieben erzeugt eine neue Revision, und sie ist
-   ab jetzt `REVISION` für alles, was noch an diesen Task angehängt wird (Schritt 6).
-   `foreign_change` gibt es hier nicht. `outcome_unknown` heißt nach
-   `k-playbook:/instructions/on-demand/tasks.md`, „`outcome_unknown` je Operation“: mit
-   `k_playbook_doc_list` (Sorte `tasks`, `done: true`) nachsehen, ob das Dokument unter
-   `done/` liegt, dann die Revision mit `k_playbook_doc_grep` und `count_only` unter
-   `TASK_REF_DONE` holen; nicht noch einmal verschieben, solange es dort liegt. Ein
-   `not_found` unter `TASK_REF_DONE` direkt nach dem Verschieben ist der Replica-Nachlauf.
-2. Geänderte Pfade merken — nur die Namen, für den Doku-Nachzug in Schritt 7. Mit Snapshot
-   vergleicht ein temporärer Index den Stand nach dem Task mit ihm, neu angelegte Dateien
-   eingeschlossen; Inhalte kommen nicht in den Hauptkontext:
-
-   ```bash
-   if command -v git >/dev/null 2>&1; then
-     (
-       cd "<EXEC_ROOT>" || exit 1
-       tmp_dir="$(mktemp -d)" || exit 1
-       cp "$(git rev-parse --git-path index)" "$tmp_dir/index" 2>/dev/null || true
-       GIT_INDEX_FILE="$tmp_dir/index" git add -A &&
-         GIT_INDEX_FILE="$tmp_dir/index" git diff --cached --name-only "<SNAPSHOT>"
-       status=$?
-       rm -rf "$tmp_dir"
-       exit "$status"
-     )
-   fi
-   ```
-
-   Die Ausgabe ergänzt `CHANGED_PATHS`, die Pfade aller Tasks dieses Laufs, relativ zur
-   Ausführungswurzel. Ohne Snapshot gibt es diese Liste nicht; dann merkst du dir den Task als
-   „Pfade unbekannt“.
-3. Snapshot freigeben — die Ref wird mit dem Verschieben nach `done/` entfernt:
-
-   ```bash
-   if command -v git >/dev/null 2>&1; then
-     git -C "<EXEC_ROOT>" update-ref -d "refs/k-task-run/<TASK_STEM>"
-   fi
-   ```
+**6. Abschluss.** Der Hauptkontext liest `k-playbook:/commands/_task-run/abschluss.md` und folgt
+ihm: Es sammelt die Befunde des Tasks für Schritt 7 (nach der Spalte „Für Schritt 7 gesammelt“),
+verschiebt den Task mit `k_playbook_doc_done` nach `done/` (`TASK_REF_DONE`, neue Revision =
+`REVISION`), ergänzt `CHANGED_PATHS` um die geänderten Pfade gegen den Snapshot (ohne Snapshot:
+„Pfade unbekannt“) und gibt die Snapshot-Ref frei.
 
 ### 5f.1 — PR-Handoff bei `PR required: true`
 
 Erst nach der Stopp-Abfrage aus 5f. Trägt der `## Ausführungskontext` des Tasks
 `PR required: true`, folgt der PR, nachdem der Task abgeschlossen ist und ein lokaler Commit
-existiert.
-
-Zugang: Für Push und PR gilt der folgende Block. Das Ziel-Repo ist das der aufgelösten
-Ausführungswurzel aus 5a.1 (`Target repo`), nicht zwingend das Arbeitsverzeichnis.
-
-include: _shared/gh.md
-
-Merke daraus `GH_SERVICE`, den Dienst für das Ziel-Repo; leer ohne Dienst. Push und PR
-schreiben nach GitHub: Mit Dienst laufen beide über `k-playbook github run <GH_SERVICE> --write`,
-ohne Dienst wie bisher über das aktive Konto. Vorher nennst du den Zugang, wie der Block es
-verlangt.
-
-Preflight:
-
-1. In der aufgelösten Ausführungswurzel aus 5a.1 arbeiten.
-2. Prüfen, dass der Branch `Work branch` ist, wenn einer angegeben war.
-3. Prüfen, dass der Arbeitsbaum sauber ist (`git status --short`); sonst anhalten und melden,
-   dass vor dem PR ein Commit nötig ist.
-4. Prüfen, dass der Branch einen Upstream hat. Ohne Upstream vor dem Push fragen; nie still
-   pushen.
-5. `check` der Sperre, dann pushen. Mit Dienst:
-
-   ```bash
-   k-playbook github run <GH_SERVICE> --write -- git -C "<EXEC_ROOT>" push -u origin <Work branch>
-   ```
-
-   Ohne Dienst derselbe git-Aufruf ohne das vorangestellte `k-playbook github run … --`.
-
-PR-Text:
-
-- Den PR-Text als echtes mehrzeiliges Markdown in eine temporäre Datei schreiben, nicht als
-  zitierten CLI-String mit `\n`.
-- `/tmp/k-task-run-pr-body-<tasknummer-oder-branch-slug>.md`, sofern kein besserer
-  temporärer Pfad schon da ist.
-- Inhalt: kurze Zusammenfassung der Änderung; Befund-IDs oder der Verweis `TASK_REF_DONE`;
-  die Zeilen „Validierung“ aus der letzten Rückgabe von Ausführung oder Behebung; bekannte
-  Restrisiken oder Tests, die nicht laufen konnten.
-
-PR anlegen mit `--body-file <datei>`, mit Dienst so:
-
-```bash
-k-playbook github run <GH_SERVICE> --write -- gh pr create \
-  --base <Base branch> \
-  --head <Work branch> \
-  --title "<knapper Titel>" \
-  --body-file /tmp/k-task-run-pr-body-<slug>.md
-```
-
-Kein `--body "...\n..."`: Bash übergibt in normalen doppelten Anführungszeichen ein
-wörtliches Backslash-n. Ist ein Inline-Body unvermeidlich, ein Heredoc oder ANSI-C-Quoting
-nehmen; `--body-file` bleibt der Weg. Ohne Dienst derselbe Aufruf ohne das vorangestellte
-`k-playbook github run <GH_SERVICE> --write --`.
-
-Gibt es nach dem Block oben keinen nutzbaren Weg — ein Dienst ohne Kanal `api`, ohne Dienst
-`context.gh.ready` falsch — oder scheitert Push oder PR an der Anmeldung, gib den
-genauen Befehl (mit Dienst in der Form mit `k-playbook github run`) und den Inhalt der
-Body-Datei zum Nachmachen aus. Dazu kommt der Hinweis auf die Zugangsdatei samt dem Angebot,
-beim Einrichten zu helfen („Die Zugangsdatei als Abhilfe“ im Block oben).
+existiert: Der Hauptkontext liest `k-playbook:/commands/_task-run/pr.md` und folgt ihm — Zugang
+über `GH_SERVICE`, Preflight (mit `check` der Sperre vor dem Push), Push, PR-Text, PR. Ohne
+`PR required: true` entfällt 5f.1.
 
 ### 5g — Weiter
 
 Weiter mit dem nächsten Task der Liste. Ist ein Task fehlgeschlagen (5e), angehalten (5f,
-Schritt 5, oder 5a, Option (b)) oder nach `foreign_change` liegen geblieben: anhalten — keine
-weiteren Tasks. Auch dann folgen Schritt 6, soweit er greift, und Schritt 7 mit der Abfrage
-der Befunde aus den bis dahin abgeschlossenen Tasks.
-
-Kein weiterer Task — nach dem letzten oder nach einem Anhalten —: Sperre freigeben
-(`release` mit `LOCK_TOKEN`, „Sperre des Arbeitsbaums“), erst dann Schritt 6.
+Schritt 5, oder 5a, Option (b)) oder nach `foreign_change` liegen geblieben: keine weiteren
+Tasks, aber Schritt 6, soweit er greift, und Schritt 7 mit der Abfrage der Befunde der bis
+dahin abgeschlossenen Tasks. Kein weiterer Task — nach dem letzten oder nach einem Anhalten —:
+Sperre freigeben (`release` mit `LOCK_TOKEN`), erst dann Schritt 6.
 
 ## Schritt 6 — Intent-Alignment-Check
 
-Sind alle Tasks nach `done/` gewandert **und** trägt der letzte Task einen `## Intent`:
-prüfen, ob die ausgeführte Arbeit den Intent tatsächlich erreicht.
-
-Dieser Schritt liest keinen Task. Den Intent hat der Hauptkontext aus Schritt 2; was
-ausgeführt wurde, sind die Zusammenfassungen aus den Rückgaben der Sub-Agenten in diesem
-Lauf. Für einen Task, der nach 5a (a) ohne Rückgabe in diesem Lauf abgeschlossen wurde, holt
-der Hauptkontext die erste Zeile `^\*\*Zusammenfassung:\*\*` nach seiner Kennzeile mit
-`k_playbook_doc_grep` (unter `TASK_REF_DONE`).
-
-Der Intent kann Verweise enthalten. Der Hauptkontext löst sie nicht auf; der Prompt nennt dem
-Critic die Lesewege selbst, mit `context.project.dir` eingesetzt.
-
-Spawn a general-purpose subagent (OpenCode: `general`, Claude Code: `general-purpose`)
-as Critic with this prompt:
-
-```
-You are doing a final alignment check after a set of tasks was executed. You are read-only.
-Below is the Intent (the goal the tasks were supposed to achieve) and a summary of what was actually done.
-
-The Intent may contain references with a prefix. Read the ones you need before judging:
-- `k-playbook:/…` and `keph:/…` with the MCP tool `k_playbook_doc_read`
-  (`ref` = the reference, `projectDir` = <context.project.dir>),
-  or in the shell `k-playbook read <reference>`,
-- `project:/<path>` directly from disk, below <context.project.dir>.
-
-## Intent
-<insert intent text>
-
-## Was ausgeführt wurde
-<insert the summaries from the sub-agents' returns, one per task>
-
-Answer only: Does the executed work achieve the stated Intent?
-- Yes -> one sentence why
-- Partially -> what is missing or not yet covered
-- No -> what is misaligned or missing
-
-Output (no intro text):
-| Alignment | Begründung |
-```
-
-Das Ergebnis mit `k_playbook_doc_append` an den letzten Task anhängen, jetzt unter
-`TASK_REF_DONE`, mit `since_revision` = der `revision` aus der Antwort von
-`k_playbook_doc_done`:
-
-```text
-**Intent-Alignment:** <Ja / Teilweise / Nein> - <Begründung>
-```
-
-Ist das Alignment **nicht Ja**: vor der abschließenden Zusammenfassung eine klare Warnung:
-
-```
-WARNUNG: Intent nicht vollständig erreicht: <Begründung>
-```
-
+Sind alle Tasks nach `done/` gewandert **und** trägt der letzte Task einen `## Intent`, liest
+der Hauptkontext `k-playbook:/commands/_task-run/intent-alignment.md` und folgt ihm: Es startet
+den Critic, hängt `**Intent-Alignment:** <Ja / Teilweise / Nein> - <Begründung>` an den letzten
+Task an und warnt vor der abschließenden Zusammenfassung mit
+`WARNUNG: Intent nicht vollständig erreicht: <Begründung>`, wenn das Alignment nicht Ja ist.
 Ohne Intent entfällt dieser Schritt still.
 
 ## Schritt 7 — Abschließende Zusammenfassung
 
 **Doku-Nachzug.** Vor der Zusammenfassung prüft der Hauptkontext, ob der Lauf Code geändert
-hat, und reiht dann den Nachzug der erzeugten Doku ein — er, nicht der
-Ausführungs-Sub-Agent, denn die Sub-Agenten laden das Briefing nicht. Maßgeblich sind der
-Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
-`k-playbook:/instructions/on-demand/doku-auftraege.md`; dieser Text wiederholt sie nicht.
+hat (`CHANGED_PATHS` nicht leer, oder ein Task mit „Pfade unbekannt“). Dann liest er
+`k-playbook:/commands/_task-run/doku-nachzug.md` und folgt ihm, nicht der
+Ausführungs-Sub-Agent; Ergebnis ist die Zeile „Doku“.
 
-- Grundlage ist `CHANGED_PATHS` aus 5f, Schritt 6 — nur Namen, kein Diff. Code für `code` ist
-  Quelltext unter `context.project.repoRoot` außerhalb von `.k-playbook/`,
-  einem liegengebliebenen Clone `k-playbook/` (Altbestand), versteckten Pfaden und
-  `context.docs.exclude`; ein geändertes Manifest oder
-  Lockfile betrifft `tools`.
-- Je betroffenem Erzeuger gilt der Ablauf aus `doku-auftraege.md`: keine erzeugte Doku unter
-  `keph:/docs/generated/code/` bzw. `keph:/docs/generated/libs/` (Kephalaion `list`) → nichts
-  einreihen; sonst mit `k_playbook_doc_grep` (`kind: docs`) nach einem offenen rohen Auftrag
-  mit `sitzung` = `session` aus dem Briefing und demselben `erzeuger` suchen — ein Treffer
-  mit einer Zeile `^dokument: ` ist zerlegt und zählt nicht; fehlt er,
-  `k_playbook_doc_create` mit `kind: docs` und gleich danach Kephalaion `write` mit dem Kopf
-  aus `doku-auftraege.md` — `pfade` aus `CHANGED_PATHS`, so fein wie möglich, `anlass` ein
-  Satz mit den Tasknummern. Gibt es ihn, bleibt es für `tools` dabei; für `code` wird er nach
-  „Kein Doppel“ in `doku-auftraege.md` ergänzt, statt einen zweiten anzulegen: mit
-  `k_playbook_doc_read` lesen, seine `pfade` mit `CHANGED_PATHS` vereinigen, den weiteren
-  Anlass als Zeile in den Rumpf, Kephalaion `write` mit `base_revision` gleich der gelesenen
-  Revision — nichts schreiben, wenn jeder Pfad schon gedeckt ist. Das geschieht ohne
-  Rückfrage: Ein Auftrag ändert keine Doku, er merkt den Nachzug vor.
-- Ändert der Lauf ein Manifest, ist das Inventar sofort nachzuziehen; das tut dieser Command
-  nicht, die Zeile „Doku“ nennt `/k-doc-inventory`.
-- Ohne Kephalaion oder bei einem Task mit „Pfade unbekannt“ wird für ihn nichts eingereiht;
-  die Zeile „Doku“ nennt den Nachzug als offen und `/k-enforcement`.
-
-**Befunde als Todo.** Nach dem Doku-Nachzug und vor der Fertig-Meldung `fertig` oder
-`abgebrochen`. Gibt es keine gesammelten Befunde (5f, Schritt 5, „Befunde sammeln“, und 5a,
-Option (a)), entfällt die Abfrage. Sonst kommt sie genau einmal je Lauf, auch wenn der Lauf
-vorher anhielt oder abbrach (5e, 5g, Stopp-Abfrage (c), `foreign_change`); sie gilt den
-Befunden der bis dahin abgeschlossenen Tasks. Erst die Fertig-Meldung
-(`Rückfrage: Befunde als Todo`, der Body nennt die Zahl der Befunde), dann in **einer**
-Nachricht alle Befunde, nummeriert über den ganzen Lauf, nach Tasks gegliedert:
-
-```
-Review-Befunde aus diesem Lauf:
-  <TASK_FILE>
-    1. kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
-    2. <datei:zeile oder Prüfbefehl> — <ein Satz>
-  <TASK_FILE>
-    3. <datei:zeile oder Prüfbefehl> — <ein Satz>
-
-Als Todo übernehmen? (alle / keine / alle außer <nummern> / nur <nummern>)
-```
-
-Voreingestellt ist `alle`: Eine Antwort wie „ja“ oder „ok“ gilt als `alle`. `<nummern>` sind
-Nummern aus der Liste, getrennt durch Komma oder Leerzeichen, auch Bereiche wie `2-4`. Passt
-eine Antwort auf keine der vier Formen oder nennt sie eine Nummer, die nicht in der Liste
-steht, wird nichts angelegt und einmal nachgefragt, wie sie gemeint ist.
-
-Je übernommenem Befund ein `k_playbook_todo_add` (`projectDir` = `context.project.dir`):
-
-- `text` ist der Befund in einem Satz samt Ort (`datei:zeile` oder Prüfbefehl), so
-  formuliert, dass er ohne Task und Lauf verständlich ist; einen kritischen kennzeichnet der
-  Satz als „Review-Befund kritisch“.
-- `origin` ist `Task <NNN> — <TASK_REF_DONE>`, mit der Nummer des Tasks und seinem Verweis
-  unter `done/`.
-- Kein Verweis auf `keph:/queue/`.
-- `outcome_unknown`: nicht wiederholen, sondern mit `k_playbook_todo_list` und `search` (ein
-  markantes Stück aus `text`) nachsehen; steht das Todo da, gilt seine Kennung, sonst wird es
-  einmal neu angelegt.
-
-Die angelegten Kennungen nennt die Zusammenfassung in der Zeile „Todos“.
+**Befunde als Todo.** Danach, vor der Fertig-Meldung `fertig` oder `abgebrochen`: Hat der Lauf
+Befunde gesammelt (5f, Schritt 6, und 5a, Option (a)), liest der Hauptkontext
+`k-playbook:/commands/_task-run/befunde-als-todo.md` und folgt ihm (eine Abfrage je Lauf,
+Todos über `k_playbook_todo_add`, Zeile „Todos“); sonst entfällt die Abfrage.
 
 Nach allen Tasks zuerst die Fertig-Meldung (`fertig` oder `abgebrochen`; der Body trägt die
-Zeilen „Erfolgreich“, „Angehalten“ und „Abgebrochen“ in Kurzform), dann eine knappe
-Zusammenfassung:
+Zeilen „Erfolgreich“, „Angehalten“ und „Abgebrochen“ in Kurzform), dann die Zusammenfassung
+nach `k-playbook:/commands/_task-run/zusammenfassung.md`, die der Hauptkontext jetzt liest.
 
-```
-Ausgeführt:    <n> Tasks
-Erfolgreich:   <Verweise unter done/>
-  <TASK_FILE>  Review: <n> kritisch, <n> wichtig, <n> Hinweis
-    - kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
-    - <datei:zeile oder Prüfbefehl> — <ein Satz>
-Abgeschlossen: <Tasks, die der Nutzer in 5a, Option (a), abgeschlossen hat>
-  <TASK_FILE>  Review: <n> kritisch, <n> wichtig, <n> Hinweis — letzter Lauf
-    - kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
-Angehalten:    <TASK_FILE> - <Grund>
-Abgebrochen:   <TASK_FILE, falls vorhanden> - <Grund>
-Übersprungen:  <TASK_FILEs, falls vorhanden>
-Refine:        <je Ziel: TASK_FILE — Ergebnis, Runden, gefixt, offen> | – (ohne refine)
-Sperre:        sofort genommen | nach <dauer> Warten auf <holder> | übernommen von <holder>
-               [; verloren — <reason>] [; Freigabe meldete lost]
-Intent:        Ja / Teilweise / Nein / - (kein Intent)
-Todos:         angelegt <kennung> [, <kennung>] | keine übernommen | – (keine Befunde)
-Doku:          eingereiht <verweis> [, <verweis>] | schon eingereiht <verweis> | kein Code geändert
-               | keine erzeugte Doku | offen — <Grund>, /k-enforcement  [; Inventar: /k-doc-inventory]
-```
-
-Die Zeile „Review“ steht je erfolgreichem Task und gibt das letzte gültige Review wieder:
-
-- bei `REVIEW_SCOPE` `nur seit Fortsetzung` mit dem Zusatz „— nur seit Fortsetzung“,
-- `Review: abgeschaltet` bei abgeschaltetem Rezept,
-- `Review: kein gültiges Review` nach (b) ohne gültiges Review, mit dem Zusatz „— Befunde
-  nicht gelesen“, wenn der Befund-Leser nicht in seiner Form antwortete,
-- `Review: – (ohne Diff)` ohne `DIFF_ENABLED` oder ohne Snapshot.
-
-Unter der Zeile „Review“ stehen die für diesen Task gesammelten Befundzeilen, kritische mit
-dem Vorsatz `kritisch:`; ohne gesammelte Befunde keine.
-
-Je Task unter „Abgeschlossen“ steht die Zeile `Review:` aus der Rückgabe des Befund-Lesers mit
-dem Zusatz „— letzter Lauf“, darunter die gesammelten Zeilen wie oben. Bei
-`Review: kein Abschnitt` lautet sie `Review: kein Abschnitt im letzten Lauf`, bei einer
-Rückgabe in anderer Form `Review: Befunde nicht gelesen`.
-
-Die Zeile „Sperre“ nennt die Wartezeit aus „Sperre nehmen“, einen übernommenen Halter und
-einen Verlust samt Grund; „Refine“ die Zeilen aus dem Modus `refine` (Schritt 3), auch für
-Tasks, die auf die Rückfrage zurückfielen.
-
-Bei „Abgeschlossen“ steht ein offener PR-Schritt dabei, wenn der Task `PR required: true`
-trägt. Ein nach `foreign_change` liegen gebliebener Task steht unter „Angehalten“ mit dem
-Grund „fremder Schreiber“.
-
-Folge-Command: **`/k-danke`** — schließt die Sitzung ab: legt die Befunde vor, die während
-der Ausführung festgehalten wurden, und prüft den Docs-Nachzug.
+Folge-Command: **`/k-danke`** — schließt die Sitzung ab.

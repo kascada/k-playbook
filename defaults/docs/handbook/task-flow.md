@@ -232,6 +232,12 @@ task gets the line `**Status nach Review:** angehalten — <reason>` and stays w
 An important finding never stops the run (task 170): `/k-task-run` often runs unattended over
 several tasks, and every stop holds up the whole run.
 
+### Fixing clear findings automatically
+
+After a valid review with at least one critical or important finding (and a review scope other than "only since the resumption"), `/k-task-run` fixes what is clear before it asks (task 177, module `commands/_task-run/nachbessern.md`, step 4a of 5f). A round is one fix by a general-purpose subagent, never the reviewing one, followed by a new review against the same snapshot and scope. The order for the fix lives only in `ausfuehrung.md`, section "Behebung": only unambiguous findings are fixed; what is not fixed is named with the reason under `Zusammenfassung:`, in the unchanged return format. Every round checks the lock before the fix and before the review and carries `REVISION` forward; `Foreign-Change:` or a lost lock ends the loop and leads into the usual question.
+
+There are at most three rounds. A finding that is still or again present after its fix (same file without line number, same core statement; when in doubt it counts as the same) drops out of the loop and counts as remainder, as does every finding the fixer left alone. A technical failure of the fix ends the loop at once. At the end the last valid review of the loop counts: critical remainder goes to the stop question, which names what was tried; important remainder is collected as todos; fixed findings are not collected. "(a) fix" in the stop question stays as an explicit user choice with exactly one fix run and a new review, never back into the loop. The summary carries a line "Nachbessern: <n> Runden, behoben <n>, offen <n>".
+
 ### Findings as todos
 
 Review findings that a run does not fix do not stay hidden in a task under `done/` (task
@@ -300,3 +306,13 @@ Since task 108 two more marker lines exist:
 A reader that wants the task without the sections of earlier runs cuts at the last
 `## Ausführung` line before the first marker "ausgeführt" or "abgebrochen"; without such a
 marker at the first `## Ausführung`, without that the whole task is its body.
+
+## Core and modules
+
+`/k-task-run` and `/k-task-refine` are each a core text that describes the normal flow completely, plus modules that are read only when a case occurs or that a subagent reads itself as its order. The core names at every fork the condition, the module and the values handed over; a module is a reference `k-playbook:/commands/_…/<file>.md` read with `k_playbook_doc_read`. A project-owned file of the same path under `.k-playbook/commands/` replaces it. Tests keep the core at 32,000 bytes and every module at 20,000 bytes with includes resolved.
+
+- `commands/_task/` -- shared by both commands: `fertig-meldung.md`, `revisionskette.md` (since_revision, counting, `foreign_change`, the return lines `Revision:` and `Foreign-Change:`), `sub-agenten.md` (subagent type per client, briefing line, read paths), `ziel-aufloesen.md`.
+- `commands/_task-run/` -- special cases of the main context (`sperre.md`, `nicht-abgeschlossen.md`, `nachbessern.md`, `stopp-abfrage.md`, `snapshot.md`, `abschluss.md`, `review-starten.md`, `pr.md`, `abbruch.md`, `etappen-fortsetzen.md`, `ausfuehrungskontext.md`, `wieder-oeffnen.md`, `liste-neu-pruefen.md`, `ohne-refine.md`, `refine-modus.md`, `intent-alignment.md`, `doku-nachzug.md`, `befunde-als-todo.md`, `zusammenfassung.md`) and orders that a subagent reads itself (`ausfuehrung.md`, `befund-leser.md`, `intent-check.md`, `diff-review.md`).
+- `commands/_task-refine/` -- `dialog.md` (the Critic/Editor dialogue; whoever moderates reads only this, also a group subagent) and `gruppen.md` (forming groups, reviewing them in subagents, the overlap Critic; read by the main context of both commands, with a table of what applies per caller).
+
+The step numbers of `/k-task-run` stay; modules carry sections named by content, and only the core of `/k-task-refine` has step numbers. How the clients follow the module forks is checked by the user after a release.

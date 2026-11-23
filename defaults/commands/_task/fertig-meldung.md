@@ -24,26 +24,18 @@ wenn er fertig ist oder etwas von ihm braucht — mit dem Werkzeug
 | `body` | was passiert ist, ein bis zwei Sätze: Status, Review-Zahlen, der offene Punkt oder die Frage — höchstens 200 Zeichen, der Rest wird abgeschnitten |
 | `sound` | `true` |
 
-Beispiele:
+Beispiel:
 
 ```
-title: omni-gw: 014-setup-tts – fertig
-body:  Ausgeführt, Review: 0 kritisch, 2 wichtig. Task liegt in done/.
-
 title: omni-gw: 015-integrate-tts – Rückfrage: kritische Befunde
 body:  Review meldet 2 kritische Befunde. Beheben lassen, trotzdem abschließen oder anhalten?
-
-title: k-playbook: 3 Tasks – fertig
-body:  Review-Log an 3 Tasks angehängt, 7 Issues gefixt, 1 offen.
 ```
 
 ### Die Antwort
 
 Die Antwort wird nicht ausgewertet und nicht dem Nutzer gezeigt. `ok: false` mit
 `error.code: no_channel` heißt nur, dass dieser Rechner keinen Weg zum Nutzer hat — etwa ein
-Devcontainer; weiter wie geplant, ohne Hinweis und ohne Wiederholung. Dasselbe gilt, wenn
-das Werkzeug fehlt, weil ein älteres Programm läuft. Die Meldung ersetzt keine Ausgabe:
-Frage und Zusammenfassung stehen weiterhin vollständig im Chat. Die Meldung ist nur ein
-zusätzlicher Hinweis und kann unsichtbar bleiben oder unterdrückt werden. Auch `ok: true`
-bestätigt nicht, dass der Nutzer sie gesehen oder gehört hat; daraus weder Kenntnisnahme
-noch Zustimmung ableiten.
+Devcontainer; weiter wie geplant, ohne Hinweis und ohne Wiederholung. Dasselbe gilt, wenn das
+Werkzeug fehlt, weil ein älteres Programm läuft. Die Meldung ersetzt keine Ausgabe: Frage und
+Zusammenfassung stehen weiterhin vollständig im Chat. Auch `ok: true` bestätigt nicht, dass der
+Nutzer sie gesehen hat; daraus weder Kenntnisnahme noch Zustimmung ableiten.
