@@ -705,12 +705,15 @@ func inDocKinds(refPath string, kinds []string) bool {
 
 // docRefKindsText nennt die Lesersorten als Verweise, für Fehlermeldungen —
 // die Meldung ist Hilfe und nennt nur, was eine Sitzung liest; includes/ und
-// testdata/ löst isDocRefKind trotzdem auf.
+// testdata/ löst isDocRefKind trotzdem auf. Dazu kommt das Handbuch
+// (docs/handbook/): docDocsRoot ist keine Lesersorte, weil darunter auch die
+// Vorlagen der README liegen, das Handbuch aber lesbar ist.
 func docRefKindsText() string {
-	refs := make([]string, 0, len(docReaderKinds))
+	refs := make([]string, 0, len(docReaderKinds)+1)
 	for _, kind := range docReaderKinds {
 		refs = append(refs, DocSchemeKPlaybook+":/"+kind+"/")
 	}
+	refs = append(refs, DocSchemeKPlaybook+":/"+KPlaybookHandbookDir+"/")
 	return strings.Join(refs, ", ")
 }
 

@@ -764,6 +764,14 @@ func applyIncludeFile(projectRoot string, link Link) error {
 			return fmt.Errorf("%s ersetzen: %w", link.Path, err)
 		}
 
+	case info.Mode().IsRegular():
+		// Nur ein bekannter alter Stub wird ersetzt; jeder andere Inhalt
+		// bleibt unberührt.
+		data, rerr := os.ReadFile(target)
+		if rerr != nil || !isLegacyClaudeIncludeStub(string(data)) {
+			return nil
+		}
+
 	default:
 		return nil
 	}

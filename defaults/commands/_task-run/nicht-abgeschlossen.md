@@ -25,7 +25,7 @@ Wie weiter?
 - (a): Zuerst die Befunde des letzten Laufs holen, ohne sie selbst zu lesen: Der
   Hauptkontext startet den **Befund-Leser** (`abschluss.md`, Abschnitt „Befund-Leser“) mit der Zeilennummer der letzten
   Kennzeile „ausgeführt“, die oben trifft. Aus seiner Rückgabe sammelt er die Zeilen unter
-  `Kritisch:` und `Wichtig:` für diesen Task, wie nach „(b) trotzdem weiter“ (Tabelle „Ausgänge des
+  `Kritisch:` und `Wichtig:` für diesen Task, dazu getrennt die unter `Hinweise:` (nur zur Anzeige), wie nach „(b) trotzdem weiter“ (Tabelle „Ausgänge des
   Reviews“ im Command, `abschluss.md`, „Befunde sammeln“); bei `Review: kein Abschnitt` oder einer Rückgabe in anderer Form
   sammelt er nichts. Der Leser schreibt nichts, `REVISION` bleibt. Dann mit
   `k_playbook_doc_append` und `since_revision: REVISION` anhängen:

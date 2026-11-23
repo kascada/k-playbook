@@ -276,6 +276,12 @@ Für jedes Ziel unter `keph:/docs/manual/`:
 - Bewertungen tragen eine Bedingung „gilt nicht mehr, wenn …“ und den Befehl, sie zu prüfen.
 - Beim Einarbeiten prüfst du die Nachbaraussagen im selben Abschnitt mit; Falsches
   korrigierst du.
+- Ein Doku-Eintrag trägt die Aussage des Befunds. Was du beim Prüfen am Code zusätzlich
+  findest, nimmst du nur auf, wenn es dieselbe Frage beantwortet und auf `STAND` belegt ist.
+  Alles andere legst du als neuen Befund an (`k_playbook_doc_create`, Sorte `findings`,
+  Aufbau nach `k-playbook:/instructions/on-demand/befunde.md`); ein späterer Lauf prüft ihn
+  wie jeden anderen. Sonst landet in der Doku, was nie auf Relevanz und Nachhaltigkeit
+  geprüft wurde.
 - Keine Personennamen aus Tickets.
 
 ## Schritt 6 — Abschluss

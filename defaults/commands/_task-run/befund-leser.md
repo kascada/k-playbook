@@ -1,6 +1,6 @@
 ---
 title: Befund-Leser
-description: Auftrag des Befund-Lesers von /k-task-run, den ein Sub-Agent selbst liest — im Task den letzten Review-Abschnitt nach einer Zeilennummer finden und seine Befunde (kritisch, wichtig, Hinweis-Zahl) in festem Format zurückgeben, ohne etwas zu schreiben.
+description: Auftrag des Befund-Lesers von /k-task-run, den ein Sub-Agent selbst liest — im Task den letzten Review-Abschnitt nach einer Zeilennummer finden und seine Befunde (kritisch, wichtig, Hinweise) in festem Format zurückgeben, ohne etwas zu schreiben.
 ---
 
 # Befund-Leser
@@ -29,9 +29,11 @@ Kritisch:
   - <Ort aus der Tabelle> — <Befund in einem Satz>
 Wichtig:
   - <Ort aus der Tabelle> — <Befund in einem Satz>
+Hinweise:
+  - <Ort aus der Tabelle> — <Befund in einem Satz>
 ```
 
-Je Tabellenzeile mit der Einstufung kritisch bzw. wichtig eine Zeile; Hinweise nur als Zahl.
-Ein leerer Block lautet `Kritisch: keine` bzw. `Wichtig: keine`.
+Je Tabellenzeile mit der Einstufung kritisch, wichtig bzw. Hinweis eine Zeile. Ein leerer
+Block lautet `Kritisch: keine`, `Wichtig: keine` bzw. `Hinweise: keine`.
 
 Du bekommst keine Revision und gibst keine zurück; du hängst nichts an.

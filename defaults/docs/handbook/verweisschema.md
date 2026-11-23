@@ -152,7 +152,7 @@ What each prefix answers:
   `testdata/`, plus the README templates in `docs/` (see below). A `k-playbook:` path outside these kinds is refused as
   `unsupported` -- `k-playbook:/checks/check_x.sh` is a valid reference whose kind is not
   resolved: checks no longer exist (task 155), skills live with the assistant; nobody reads
-  either through a reference. The message names only the reader kinds. Commands lie with the
+  either through a reference. The message names only what a session reads: the reader kinds and the handbook `docs/handbook/`. Commands lie with the
   assistant only as a hull (frontmatter plus the reference `k-playbook:/commands/<name>.md`);
   their text is resolved like a review recipe, as a single file.
 

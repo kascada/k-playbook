@@ -272,7 +272,7 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 		t.Errorf("AGENTS.md nach dem Lauf:\n%s", content)
 	}
 	claude, err := os.ReadFile(filepath.Join(root, project.ClaudeInstructionsFile))
-	if err != nil || !strings.Contains(string(claude), "\n"+project.ClaudeIncludeLine+"\n") {
+	if err != nil || !strings.Contains("\n"+string(claude), "\n"+project.ClaudeIncludeLine+"\n") {
 		t.Errorf("CLAUDE.md ist keine Include-Datei: %v\n%s", err, claude)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".claude", "commands", "k-test.md")); err != nil {

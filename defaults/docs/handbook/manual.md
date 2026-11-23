@@ -282,7 +282,7 @@ untouched. k-playbook claims only its own directory.
 ## Docs follow-up
 
 The always-instruction "Doku nachziehen" makes every session update the hand-written
-documentation, `README.md` and `AGENTS.md` in the same pass as a code change, before it
+documentation, `README.md` and the project's own rules (instructions and similar, such as skills) in the same pass as a code change, before it
 finishes the change. `/k-enforcement` is the explicit report on the docs follow-up for the
 changed files of the working tree; it is temporarily unavailable while it is rebuilt without
 checks (task 155). After a code

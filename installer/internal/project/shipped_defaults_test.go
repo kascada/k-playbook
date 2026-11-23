@@ -1615,8 +1615,8 @@ func TestKTaskRunReviewBefundeWichtigAlsTodo(t *testing.T) {
 	if !ok {
 		t.Fatal("diff-review.md ohne Abschnitte „Rückgabe“ und „Abbruch“")
 	}
-	for _, want := range []string{"\nKritisch:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nWichtig:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nRevision: <n>\n",
-		"`Wichtig: keine`"} {
+	for _, want := range []string{"\nKritisch:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nWichtig:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nHinweise:\n  - <datei:zeile oder Prüfbefehl> — <ein Satz>\nRevision: <n>\n",
+		"`Wichtig: keine`", "`Hinweise: keine`"} {
 		if !strings.Contains(rueckgabe, want) {
 			t.Errorf("Rückgabe in diff-review.md ohne %q", want)
 		}
@@ -1645,8 +1645,8 @@ func TestKTaskRunReviewBefundeWichtigAlsTodo(t *testing.T) {
 	}
 	leser := readRepoDefault(t, "commands/_task-run/befund-leser.md")
 	for _, want := range []string{"# Befund-Leser",
-		"Kritisch:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>\nWichtig:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>",
-		"`Review: kein Abschnitt`"} {
+		"Kritisch:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>\nWichtig:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>\nHinweise:\n  - <Ort aus der Tabelle> — <Befund in einem Satz>",
+		"`Hinweise: keine`", "`Review: kein Abschnitt`"} {
 		if !strings.Contains(leser, want) {
 			t.Errorf("befund-leser.md ohne %q", want)
 		}
@@ -1655,13 +1655,20 @@ func TestKTaskRunReviewBefundeWichtigAlsTodo(t *testing.T) {
 		t.Errorf("abschluss.md beschreibt den Start des Befund-Lesers nicht")
 	}
 
+	if todo := readRepoDefault(t, "commands/_task-run/befunde-als-todo.md"); !strings.Contains(todo, "Hinweise (`Hinweise:`) gehören nicht dazu") {
+		t.Errorf("befunde-als-todo.md bietet Hinweise nicht ausdrücklich ausgenommen an")
+	}
+	if strings.Contains(module, "Hinweise bleiben allein eine Zahl") || strings.Contains(leser, "Hinweise nur als Zahl") {
+		t.Errorf("Rückgabe zählt Hinweise noch als bloße Zahl")
+	}
+
 	text := readRepoDefault(t, "commands/k-task-run.md")
 	bundle := taskCommandBuendel(t, "k-task-run.md", "_task-run")
 	for _, want := range []string{"Eine Rückgabe ohne `Wichtig:`-Block ist wie jede\n  formwidrige kein gültiges Review.",
 		"Befunde sammeln", "`Rückfrage: Befunde als Todo`",
 		"Als Todo übernehmen? (alle / keine / alle außer <nummern> / nur <nummern>)",
 		"`origin` ist `Task <NNN> — <TASK_REF_DONE>`", "Todos:         angelegt <kennung>",
-		"`Review: kein Abschnitt im letzten Lauf`"} {
+		"`Review: kein Abschnitt im letzten Lauf`", "„— Hinweise nicht übermittelt“", "Vorsatz `Hinweis:`"} {
 		if !strings.Contains(bundle, want) {
 			t.Errorf("k-task-run.md samt Modulen ohne %q", want)
 		}

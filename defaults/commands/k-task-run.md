@@ -352,7 +352,7 @@ Befunde und die Zeile „Review“ in Schritt 7:
 
 | Ausgang | Stopp-Abfrage | Für Schritt 7 gesammelt | Zeile „Review“ |
 |---|---|---|---|
-| gültig, ohne kritischen Befund | nein | `Wichtig:` | `Review: <n> kritisch, <n> wichtig, <n> Hinweis` |
+| gültig, ohne kritischen Befund | nein | `Wichtig:`, `Hinweise:` (nur Anzeige) | `Review: <n> kritisch, <n> wichtig, <n> Hinweis` |
 | gültig, mit kritischem Befund | ja | `Wichtig:`, nach „(b) trotzdem weiter“ dazu `Kritisch:` | wie oben |
 | ungültig: Abbruch, Rückgabe nicht im Format oder kein neuer Review-Abschnitt | ja | nach „(b)“ die Zeilen des Befund-Lesers | `Review: kein gültiges Review`, mit „— Befunde nicht gelesen“, wenn der Leser nicht in seiner Form antwortete |
 | Rezept fehlt im Briefing | ja, ohne (a) | nichts | `Review: kein gültiges Review` |
@@ -360,7 +360,7 @@ Befunde und die Zeile „Review“ in Schritt 7:
 | `DIFF_ENABLED=false` oder ohne Snapshot | nein | nichts | `Review: – (ohne Diff)` |
 | zusätzlich `REVIEW_SCOPE` `nur seit Fortsetzung` | ja, ohne (a) | wie sonst | Zusatz „— nur seit Fortsetzung“ |
 
-Maßgeblich ist das letzte Review des Laufs, auch nach 4a und nach „(a)“. Ein Befund „wichtig“ ist kein Grund für die Stopp-Abfrage; er hält den Lauf nicht an.
+Maßgeblich ist das letzte Review des Laufs, auch nach 4a und nach „(a)“. Ein Befund „wichtig“ ist kein Grund für die Stopp-Abfrage; er hält den Lauf nicht an. Hinweise werden nur angezeigt: weder Stopp-Abfrage noch Todo-Abfrage noch Nachbessern.
 
 **4a. Nachbessern.** Bei gültigem Review mit kritischem oder wichtigem Befund und `REVIEW_SCOPE`
 ≠ `nur seit Fortsetzung` liest der Hauptkontext `k-playbook:/commands/_task-run/nachbessern.md`

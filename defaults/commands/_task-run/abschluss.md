@@ -14,12 +14,14 @@ Liste `CHANGED_PATHS` des Laufs.
 Für jeden Task, der nach `done/` geht, vor dem Verschieben. Der Hauptkontext
 merkt sich je Task die Befundzeilen für die Zusammenfassung und die Abfrage in Schritt 7,
 unverändert in der Form `<datei:zeile oder Prüfbefehl> — <ein Satz>`, jede kritische mit dem
-Merkmal „kritisch“; was gesammelt wird, sagt die Spalte „Für Schritt 7 gesammelt“. Geht ein
+Merkmal „kritisch“; was gesammelt wird, sagt die Spalte „Für Schritt 7 gesammelt“. Die
+Hinweiszeilen merkt er getrennt davon, nur zur Anzeige: Sie gehen nicht in die Abfrage
+„Als Todo übernehmen?“. Geht ein
 Task mit ungültigem Review (nach „(b) trotzdem weiter“) nach `done/`, sucht der Hauptkontext
 mit `k_playbook_doc_grep` (mit Zeilennummern) die Kennzeile
 `^<!-- k-task-run: ausgeführt <TASK_FILE> -->$` — der letzte Treffer ist die dieses Laufs —
 und startet mit ihrer Zeilennummer den Befund-Leser (5a). Gesammelt werden die Zeilen unter
-`Kritisch:` und `Wichtig:` aus dessen Rückgabe; bei `Review: kein Abschnitt` oder einer
+`Kritisch:` und `Wichtig:` aus dessen Rückgabe, getrennt davon die unter `Hinweise:`; bei `Review: kein Abschnitt` oder einer
 Rückgabe in anderer Form nichts. Ein angehaltener Task (c) behält seine Befunde im Dokument;
 sie werden nicht gesammelt. Schließt ein späterer Lauf ihn in 5a mit „(a) abschließen“ ab,
 sammelt der Befund-Leser sie dort.
@@ -31,7 +33,7 @@ liest. Er läuft hier und in `nicht-abgeschlossen.md`. Er bekommt den Verweis
 `k-playbook:/commands/_task-run/befund-leser.md`, `TASK_REF`, `projectDir` und die
 Zeilennummer, nach der er sucht. Seine Rückgabe ist gültig, wenn sie genau
 `Review: kein Abschnitt` lautet oder der Form des Moduls folgt, mit den Blöcken `Kritisch:` und
-`Wichtig:`. Er gibt keine Revision zurück; `REVISION` bleibt.
+`Wichtig:`; fehlt `Hinweise:`, ist sie trotzdem gültig (ohne Hinweiszeilen). Er gibt keine Revision zurück; `REVISION` bleibt.
 
 ## Verschieben, Pfade, Snapshot
 

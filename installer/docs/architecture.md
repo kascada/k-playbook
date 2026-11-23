@@ -938,8 +938,10 @@ Editor, der beim Speichern atomar ersetzt, und die Prüfung meldete danach `bloc
 „echte Datei statt Symlink". Dieser Fall existiert nicht mehr. Der Preis: zwei Dateien,
 die auseinanderlaufen können — was Claude Code nach `CLAUDE.md` schreibt, erreicht die
 anderen nicht, und die Prüfung deckt das als `ok` zu. Das ist bewusst so; der Stub aus
-`claudeIncludeStub()` sagt über der Import-Zeile, dass Projektregeln nach `AGENTS.md`
-gehören.
+`claudeIncludeStub()` besteht nur aus der Import-Zeile; die Regel, dass weder `CLAUDE.md`
+noch `AGENTS.md` Projektregeln tragen, steht in `instructions/always/020-projektregeln-nicht-in-agents.md`
+und erreicht jede Sitzung über das Briefing. Die beiden früheren Stubfassungen mit Hinweistext
+ersetzt `ApplyLinks` durch den neuen Stub, wenn der Inhalt genau einer entspricht.
 
 Geprüft wird am **Inhalt**, nicht an der Bauform: `hasEffectiveInclude()` sucht die
 Import-Zeile als eigenes Wort außerhalb eingezäunter Code-Blöcke und außerhalb von

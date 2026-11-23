@@ -18,6 +18,7 @@ Beispiele:
 
 - `project:/README.md`
 - `k-playbook:/instructions/on-demand/<thema>.md`
+- `k-playbook:/docs/handbook/<seite>.md` (das Handbuch von k-playbook)
 - `keph:/docs/manual/<thema>.md`
 - `keph:/docs/` (ein Verzeichnis)
 

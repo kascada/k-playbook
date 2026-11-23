@@ -1405,6 +1405,10 @@ func TestDocRefSorteIncludes(t *testing.T) {
 	if strings.Contains(err.Error(), "includes") || strings.Contains(err.Error(), "testdata") {
 		t.Errorf("Lesersorten in der Meldung: %v", err)
 	}
+	// Das Handbuch ist lesbar und steht deshalb in der Meldung.
+	if !strings.Contains(err.Error(), "k-playbook:/docs/handbook/") {
+		t.Errorf("Handbuch fehlt in der Meldung: %v", err)
+	}
 	for _, kind := range catalogKinds() {
 		if kind.name == docIncludesRoot || kind.name == docTestdataRoot {
 			t.Errorf("%s im Katalog", kind.name)

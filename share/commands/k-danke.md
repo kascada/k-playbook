@@ -130,7 +130,7 @@ wieder.
 
 Wurde in dieser Sitzung Code geändert, greift der Doku-Nachzug aus
 `k-playbook:/instructions/always/220-regeln-anwenden.md`. Er verlangt den
-Nachzug **im selben Arbeitsgang** — für Handdoku, `README.md` und `AGENTS.md` als Änderung,
+Nachzug **im selben Arbeitsgang** — für Handdoku, `README.md` und die projekteigenen Regeln (Instructions und Ähnliches wie Skills) als Änderung,
 für die erzeugte Doku als eingereihten Auftrag in `keph:/queue/docs/`
 (`k-playbook:/instructions/on-demand/doku-auftraege.md`). Dieser Schritt ist das Auffangnetz,
 nicht der Hauptweg.

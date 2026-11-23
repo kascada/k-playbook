@@ -37,7 +37,7 @@ func TestEinrichtenOrdnetClaudeUndAgentsEin(t *testing.T) {
 	if info, err := os.Lstat(claude); err != nil || !info.Mode().IsRegular() {
 		t.Errorf("CLAUDE.md ist keine reguläre Datei: %v", err)
 	}
-	if claudeContent := readFile(t, claude); !strings.Contains(claudeContent, "\n"+project.ClaudeIncludeLine+"\n") ||
+	if claudeContent := readFile(t, claude); !strings.Contains("\n"+claudeContent, "\n"+project.ClaudeIncludeLine+"\n") ||
 		strings.Contains(claudeContent, "# Unser Projekt") {
 		t.Errorf("CLAUDE.md ist kein reiner Include:\n%s", claudeContent)
 	}

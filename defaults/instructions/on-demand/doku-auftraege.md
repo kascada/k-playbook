@@ -228,7 +228,7 @@ Verarbeiters in `k-playbook:/commands/k-docs-code.md`.
 - **Das Versionsinventar.** `keph:/docs/generated/versions/inventory.md` wird sofort nachgezogen
   (`/k-doc-inventory`); der Lauf ist billig und lässt das Dokument ohne inhaltliche Änderung
   byte-gleich stehen.
-- **Handdoku, `README.md`, `AGENTS.md`.** Sie werden im selben Arbeitsgang angepasst wie der
+- **Handdoku, `README.md`, projekteigene Regeln.** Sie werden im selben Arbeitsgang angepasst wie der
   Code, nicht eingereiht. Eine Handbuchseite unter `keph:/docs/manual/` ändert
   `k_playbook_doc_replace` stellenweise, `k_playbook_doc_append` hängt an — mit
   `since_revision`, der Revision aus `k_playbook_doc_grep` mit `count_only` oder aus

@@ -67,5 +67,8 @@ für Schritt 7 die Zahl der Runden, der behobenen und der offenen Befunde.
   werden nicht mehr gesammelt.
 - Verbleibt nichts: weiter mit 5f, Schritt 6.
 
+Hinweise gehören nicht zur Schleife: Sie gehen weder in die Behebung noch lösen sie eine Runde aus;
+der Hauptkontext zeigt die des letzten gültigen Reviews nur in der Zusammenfassung.
+
 Die Schleife läuft genau einmal je Task und Review; nach „(a) beheben lassen“ in der
 Stopp-Abfrage kommt sie nicht wieder.

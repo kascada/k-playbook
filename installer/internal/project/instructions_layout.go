@@ -29,20 +29,37 @@ const ClaudeInstructionsFile = "CLAUDE.md"
 // Abgeleitet aus RootInstructionsFile, damit beide nicht auseinanderlaufen.
 const ClaudeIncludeLine = "@" + RootInstructionsFile
 
-// claudeIncludeStub ist der Inhalt, den ApplyLinks nach CLAUDE.md schreibt.
-//
-// Der Hinweis über der Import-Zeile ist das Gegengewicht zur Toleranz: was
-// Claude Code über /memory oder # nach CLAUDE.md schreibt, erreicht OpenCode
-// nicht, und die Prüfung meldet Projektinhalt neben dem Include
-// nicht als Konflikt. Die Import-Zeile steht allein auf einer Zeile, ohne
-// Backticks und außerhalb jedes Code-Blocks — nur so wertet Claude Code sie
-// aus. Der Hinweis nennt AGENTS.md bewusst ohne @, sonst wäre er selbst ein
-// zweiter Import.
+// claudeIncludeStub ist der Inhalt, den ApplyLinks nach CLAUDE.md schreibt:
+// nur die Import-Zeile. Sie steht allein auf einer Zeile, ohne Backticks und
+// außerhalb jedes Code-Blocks — nur so wertet Claude Code sie aus. Die Regel,
+// dass weder CLAUDE.md noch AGENTS.md Projektregeln tragen, steht in den
+// Instructions (instructions/always/), nicht in der Datei.
 func claudeIncludeStub() string {
-	return "Diese Datei ist nur der Include für Claude Code. Projektregeln gehören nach\n" +
-		RootInstructionsFile + " — was hier steht, erreicht OpenCode nicht.\n" +
-		"\n" +
-		ClaudeIncludeLine + "\n"
+	return ClaudeIncludeLine + "\n"
+}
+
+// legacyClaudeIncludeStubs sind die früheren Stubtexte mit Hinweis über der
+// Import-Zeile. applyIncludeFile ersetzt eine CLAUDE.md, die (getrimmt) genau
+// einem davon entspricht, durch den heutigen Stub; anderer Inhalt bleibt.
+func legacyClaudeIncludeStubs() []string {
+	const head = "Diese Datei ist nur der Include für Claude Code. Projektregeln gehören nach\n" +
+		RootInstructionsFile + " — was hier steht, erreicht OpenCode "
+	return []string{
+		head + "nicht.\n\n" + ClaudeIncludeLine + "\n",
+		head + "und Cursor nicht.\n\n" + ClaudeIncludeLine + "\n",
+	}
+}
+
+// isLegacyClaudeIncludeStub meldet, ob content (Whitespace getrimmt) genau
+// einer früheren Stubfassung entspricht.
+func isLegacyClaudeIncludeStub(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	for _, legacy := range legacyClaudeIncludeStubs() {
+		if trimmed == strings.TrimSpace(legacy) {
+			return true
+		}
+	}
+	return false
 }
 
 // hasEffectiveInclude meldet, ob content die Import-Zeile so trägt, dass Claude

@@ -47,7 +47,11 @@ dieselben Zeilen erneut zählen:
 - Das Review ist **gültig**, wenn die Rückgabe dem Format des Moduls folgt — mit den Blöcken
   `Kritisch:` und `Wichtig:`, jeder mit Befundzeilen oder `keine` — und `### Review: Befunde`
   genau einmal mehr dasteht als vorher. Eine Rückgabe ohne `Wichtig:`-Block ist wie jede
-  formwidrige kein gültiges Review. Nie gilt ein Lauf ohne das als „0 kritisch“.
+  formwidrige kein gültiges Review. Nie gilt ein Lauf ohne das als „0 kritisch“. Der Block
+  `Hinweise:` gehört zum Format, entscheidet aber nicht über die Gültigkeit: Fehlt er oder ist
+  er formwidrig, oder stimmt die Zahl der Hinweise in `Review: …` nicht mit seinen Zeilen
+  überein, bleibt das Review gültig; es gibt dann keine Hinweiszeilen, und die Zusammenfassung
+  setzt hinter die Zeile „Review“ den Zusatz „— Hinweise nicht übermittelt“.
 - Die Diff-Abschnitte hat der Lauf geschrieben, wenn `### Diff: Geänderte Dateien` genau
   einmal mehr dasteht.
 - `REVISION` wird nach der Revisionskette gesetzt; `Foreign-Change:` führt zur Rückfrage aus

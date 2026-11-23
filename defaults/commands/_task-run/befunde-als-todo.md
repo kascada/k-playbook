@@ -10,6 +10,8 @@ gesammelt hat. Er hat sie je Task als Zeilen `<datei:zeile oder Prüfbefehl> —
 kritische mit dem Merkmal „kritisch“, dazu je Task `TASK_FILE`, `TASK_REF_DONE` und die
 Nummer des Tasks.
 
+Hinweise (`Hinweise:`) gehören nicht dazu; sie stehen nur in der Zusammenfassung.
+
 Die Abfrage kommt genau einmal je Lauf, auch wenn der Lauf vorher anhielt oder abbrach (5e, 5g,
 Stopp-Abfrage (c), `foreign_change`); sie gilt den Befunden der bis dahin abgeschlossenen
 Tasks. Erst die Fertig-Meldung

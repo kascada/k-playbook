@@ -79,7 +79,7 @@ Immer, wenn der Prüfumfang Code enthält. Maßstab ist der Absatz zum Doku-Nach
 `k-playbook:/instructions/always/220-regeln-anwenden.md`; lies ihn mit `k_playbook_doc_read`
 (ersatzweise `k-playbook read <verweis>`), wenn er dir nicht schon aus dem Briefing vorliegt.
 
-- **Handgeschriebene Doku** — Handdoku, `README.md`, `AGENTS.md`, Architektur-, Setup- und
+- **Handgeschriebene Doku** — Handdoku, `README.md`, die projekteigenen Regeln (Instructions und Ähnliches wie Skills), Architektur-, Setup- und
   API-Beschreibungen: Sind sie im selben Arbeitsgang angepasst, oder ist begründet, warum
   keine Änderung nötig ist?
 - **Erzeugte Doku** — `keph:/docs/generated/code/` (Erzeuger `code`) und

@@ -405,11 +405,11 @@ func TestApplyLinksSchreibtIncludeAufAgents(t *testing.T) {
 	if !hasEffectiveInclude(content) {
 		t.Error("der Stub trägt keine wirksame Import-Zeile")
 	}
-	// Der Hinweis über der Import-Zeile: Projektregeln gehören nach AGENTS.md.
-	if !strings.Contains(content, "Projektregeln gehören nach\nAGENTS.md") {
-		t.Errorf("der Hinweis auf AGENTS.md fehlt im Stub:\n%s", content)
+	// Der Stub besteht nur aus der Import-Zeile, ohne Hinweistext.
+	if content != ClaudeIncludeLine+"\n" {
+		t.Errorf("der Stub ist mehr als die Import-Zeile:\n%s", content)
 	}
-	// Genau ein Import: der Hinweis darf nicht selbst einer sein.
+	// Genau ein Import.
 	if strings.Count(content, ClaudeIncludeLine) != 1 {
 		t.Errorf("die Import-Zeile steht nicht genau einmal:\n%s", content)
 	}
@@ -835,5 +835,40 @@ func TestApplyLinksRaeumtEintragAmNeuenOrtAb(t *testing.T) {
 		if _, err := os.Lstat(filepath.Join(root, rel)); err == nil {
 			t.Errorf("%s steht noch", rel)
 		}
+	}
+}
+
+// Beide früheren Stubfassungen werden durch den neuen Stub ersetzt; anderer
+// Inhalt neben dem Include bleibt stehen.
+func TestApplyLinksErsetztAlteStubs(t *testing.T) {
+	legacy := legacyClaudeIncludeStubs()
+	if len(legacy) != 2 {
+		t.Fatalf("%d alte Stubs, erwartet 2", len(legacy))
+	}
+	for i, old := range legacy {
+		root := newProject(t)
+		writeFile(t, filepath.Join(root, "AGENTS.md"), "# Projektregeln\n")
+		writeFile(t, filepath.Join(root, "CLAUDE.md"), old)
+		if _, err := ApplyLinks(root); err != nil {
+			t.Fatalf("Fassung %d: ApplyLinks: %v", i, err)
+		}
+		if got := readFile(t, filepath.Join(root, "CLAUDE.md")); got != claudeIncludeStub() {
+			t.Errorf("Fassung %d: CLAUDE.md = %q, erwartet den neuen Stub", i, got)
+		}
+	}
+	if !strings.Contains(legacy[1], "erreicht OpenCode und Cursor nicht.") ||
+		!strings.Contains(legacy[0], "erreicht OpenCode nicht.") {
+		t.Errorf("alte Stubs nicht wörtlich: %q", legacy)
+	}
+
+	root := newProject(t)
+	writeFile(t, filepath.Join(root, "AGENTS.md"), "# Projektregeln\n")
+	fremd := legacy[0] + "\nEigene Notiz.\n"
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), fremd)
+	if _, err := ApplyLinks(root); err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if got := readFile(t, filepath.Join(root, "CLAUDE.md")); got != fremd {
+		t.Errorf("fremder Inhalt wurde verändert: %q", got)
 	}
 }

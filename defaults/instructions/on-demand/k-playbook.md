@@ -97,7 +97,8 @@ Dokument, das k-playbook liest. Syntax, relative Pfade, Tiefe und Fehler stehen 
 ### Eine `AGENTS.md` aufteilen
 
 In der `AGENTS.md` bleibt nur der Anstoß-Block (Marke `<!-- k-playbook:anstoss -->`), der auf
-das Briefing zeigt. `CLAUDE.md` ist nur der Include mit der Zeile `@AGENTS.md`. Das ist der
+das Briefing zeigt. `CLAUDE.md` ist nur der Include mit der Zeile `@AGENTS.md`; beide Dateien
+tragen keine Projektregeln (`k-playbook:/instructions/always/020-projektregeln-nicht-in-agents.md`). Das ist der
 Zustand nach dem Aufteilen: Das Einrichten selbst hängt den Block an und lässt vorhandenen Text
 einer `AGENTS.md` stehen. Was dort noch steht, gehört an eines dieser Ziele:
 

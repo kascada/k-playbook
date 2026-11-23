@@ -55,9 +55,10 @@ func TestDocRefSorteDocsNurMitgeliefert(t *testing.T) {
 			t.Error("docs/ im Katalog")
 		}
 	}
-	// Die Meldung zu unsupported nennt nur die Lesersorten.
+	// Die Meldung zu unsupported nennt die Lesersorten und das Handbuch, nicht
+	// die Vorlagen der README unter docs/.
 	err = expectDocError(t, layers, "k-playbook:/checks/check_x.sh", DocCodeUnsupported)
-	if strings.Contains(err.Error(), "docs/") {
+	if strings.Count(err.Error(), "docs/") != 1 || !strings.Contains(err.Error(), "k-playbook:/docs/handbook/") {
 		t.Errorf("docs/ in der Meldung: %v", err)
 	}
 }

@@ -15,9 +15,11 @@ Erfolgreich:   <Verweise unter done/>
   <TASK_FILE>  Review: <n> kritisch, <n> wichtig, <n> Hinweis
     - kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
     - <datei:zeile oder Prüfbefehl> — <ein Satz>
+    - Hinweis: <datei:zeile oder Prüfbefehl> — <ein Satz>
 Abgeschlossen: <Tasks, die der Nutzer in 5a, Option (a), abgeschlossen hat>
   <TASK_FILE>  Review: <n> kritisch, <n> wichtig, <n> Hinweis — letzter Lauf
     - kritisch: <datei:zeile oder Prüfbefehl> — <ein Satz>
+    - Hinweis: <datei:zeile oder Prüfbefehl> — <ein Satz>
 Angehalten:    <TASK_FILE> - <Grund>
 Abgebrochen:   <TASK_FILE, falls vorhanden> - <Grund>
 Übersprungen:  <TASK_FILEs, falls vorhanden>
@@ -33,11 +35,13 @@ Doku:          eingereiht <verweis> [, <verweis>] | schon eingereiht <verweis> |
 
 Die Zeile „Review“ steht je erfolgreichem Task und gibt das letzte gültige Review wieder, wie
 die letzte Spalte der Tabelle „Ausgänge des Reviews“ (5f) sie nennt. Unter ihr stehen die für
-diesen Task gesammelten Befundzeilen, kritische mit dem Vorsatz `kritisch:`; ohne gesammelte
-Befunde keine.
+diesen Task gesammelten Befundzeilen, kritische mit dem Vorsatz `kritisch:`, danach die Hinweiszeilen mit dem Vorsatz `Hinweis:`;
+ohne gesammelte Zeilen keine. Fehlt der Block `Hinweise:` oder ist er formwidrig, oder stimmt
+die Zahl in der Zeile nicht mit den Hinweiszeilen überein, steht hinter der Zeile „Review“ der
+Zusatz „— Hinweise nicht übermittelt“.
 
 Je Task unter „Abgeschlossen“ steht die Zeile `Review:` aus der Rückgabe des Befund-Lesers mit
-dem Zusatz „— letzter Lauf“, darunter die gesammelten Zeilen wie oben. Bei
+dem Zusatz „— letzter Lauf“, darunter die gesammelten Zeilen und Hinweise wie oben. Bei
 `Review: kein Abschnitt` lautet sie `Review: kein Abschnitt im letzten Lauf`, bei einer
 Rückgabe in anderer Form `Review: Befunde nicht gelesen`.
 

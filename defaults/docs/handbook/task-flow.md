@@ -188,8 +188,11 @@ With `context.project.vcs: git` and `git` available, every task gets a diff and 
   and `### Review: Befunde` to the task with `k_playbook_doc_append` and `since_revision`.
   Its return to the main context carries the counts, one line per critical finding under
   `Kritisch:` and one line per important finding under `Wichtig:` (`Kritisch: keine` and
-  `Wichtig: keine` when empty); notes stay a number. A return without the `Wichtig:` block
-  counts as malformed, like any other.
+  `Wichtig: keine` when empty) and one line per note under `Hinweise:` (`Hinweise: keine`
+  when empty). A return without the `Wichtig:` block counts as malformed, like any other; a
+  missing or malformed `Hinweise:` block does not invalidate the review, the summary then adds
+  "Hinweise nicht übermittelt". The summary shows the notes under the task's "Review" line;
+  they are never offered as todos and trigger neither the stop prompt nor the fix loop.
   Criteria and the classification into critical, important, and note are defined only in the
   recipe [`reviews/review-code.md`](../../../defaults/reviews/review-code.md), section
   `## Ergebnisform für den Diff eines Tasks`; this page does not repeat them. The recipe is

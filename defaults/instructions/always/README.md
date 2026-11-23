@@ -49,8 +49,13 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
 
 ## Teile
 
-- `010-verweise.md`: Wie Verweise geschrieben werden und wie man sie erreicht. Steht als
+- `010-verweise.md`: Wie Verweise geschrieben werden und wie man sie erreicht, in den Beispielen
+  auch das Handbuch (`k-playbook:/docs/handbook/<seite>.md`). Steht als
   Erstes, weil alle weiteren Teile Verweise benutzen.
+- `020-projektregeln-nicht-in-agents.md`: `CLAUDE.md` und `AGENTS.md` bekommen keine
+  Projektregeln, Notizen oder Hinweise; `CLAUDE.md` ist nur der Include, Projektregeln gehören in
+  die Instructions der Collection. Eigene Datei statt Teil von `030-briefing.md`, damit dieses
+  kürzer als `010-verweise.md` bleibt.
 - `030-briefing.md`: Die Regeln jeder Sitzung zum Briefing — einmal laden, die Handvoll
   Felder, die Umgebungsprüfung `health` in der ersten Antwort nennen und nichts still beheben,
   nichts selbst lesen, Ablegen nur als `keph:`-Verweis oder unter der Projektwurzel, dazu der
@@ -63,7 +68,8 @@ sonst zerteilt. Alle offenen Stellen findet `grep -rn "NACHZIEHEN:"`.
 - `210-workbench.md`: Den Stand eines laufenden Vorhabens in der Workbench führen. Steht
   hinter den Befunden, weil beide sagen, was eine Sitzung während der Arbeit festhält.
 - `220-regeln-anwenden.md`: Doku nachziehen — nach einer Änderung am Code Handdoku,
-  `README.md` und `AGENTS.md` im selben Arbeitsgang nachziehen; für die erzeugte Doku einen
+  `README.md` und die projekteigenen Regeln (Instructions und Ähnliches wie Skills) im selben
+  Arbeitsgang nachziehen; für die erzeugte Doku einen
   Auftrag nach `on-demand/doku-auftraege.md` einreihen; den ausdrücklichen Bericht liefert
   `/k-enforcement`. Steht hinter Befunden und Workbench, weil auch er sagt, was eine Sitzung
   während der Arbeit festhält, und vor den Tasks, weil er für jede Änderung gilt, ob mit Task

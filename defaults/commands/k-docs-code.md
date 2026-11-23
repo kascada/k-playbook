@@ -49,8 +49,8 @@ Voller Lauf: /k-docs code reiht ihn ein, danach /k-docs-code.
 **Aufträge.** Lies `k-playbook:/commands/_docs/auftraege.md` mit `k_playbook_doc_read`
 (`projectDir` = `context.project.dir`) und rufe `k_playbook_docs_orders` mit `erzeuger: code`
 auf. Du merkst dir `RAW_ORDERS` (`rawOrders`), `SPLIT_ORDERS` (`splitOrders`) und `WAITING`
-(`waiting`); meldet `problems` unlesbare Aufträge, nennst du sie im Preflight. Ein Auftrag ist **zerlegt**, wenn er `dokument` trägt, sonst **roh**; offene
-zerlegte heißen, ein früherer Lauf ist unterbrochen, und dieser setzt dort wieder an.
+(`waiting`); meldet `problems` unlesbare Aufträge, nennst du sie im Preflight. Ein Auftrag
+ist **zerlegt**, wenn er `dokument` trägt, sonst **roh**; offene zerlegte heißen, ein früherer Lauf ist unterbrochen, und dieser setzt dort wieder an.
 
 **Nichts zu tun.** Meldet die Antwort `nothingToDo`, endet der Command hier: Gibt es keinen
 offenen Auftrag mit `erzeuger: code`, sag das und nenne `/k-docs code` als Weg zum vollen
@@ -142,7 +142,8 @@ Thema und seine Stellen im Code.
 
 ## Schritt 4 — Analysieren und zerlegen
 
-Setze `GENERATED_AT` jetzt, einmal je Lauf (`date -Iseconds`), wenn du Sub-Agenten einsetzt. Lies `k-playbook:/commands/_docs-code/analyse.md`: worauf die Analyse achtet, was im vollen
+Setze `GENERATED_AT` jetzt, einmal je Lauf (`date -Iseconds`), wenn du Sub-Agenten
+einsetzt. Lies `k-playbook:/commands/_docs-code/analyse.md`: worauf die Analyse achtet, was im vollen
 Lauf und im Teil-Lauf gelesen wird, und wie du bei sehr großen Repos Sub-Agenten je Thema
 einsetzt. In der Wiederaufnahme ohne rohe Aufträge entfällt die Analyse.
 
@@ -223,7 +224,8 @@ seit Schritt 1 dazugekommen sind, bleiben für den nächsten Lauf offen.
 
 ## Schritt 5 — Schreiben, je Auftrag
 
-Setze `GENERATED_AT` wie in den Regeln des schreibenden Laufs (`date -Iseconds`), falls noch nicht in Schritt 4 geschehen.
+Setze `GENERATED_AT` wie in den Regeln des schreibenden Laufs (`date -Iseconds`), falls
+noch nicht in Schritt 4 geschehen.
 Arbeite `WORK_ORDERS` der Reihe nach ab: das älteste `entstanden` zuerst, bei gleichem Datum
 nach `dokument`. Je Auftrag:
 
@@ -303,7 +305,8 @@ ergänzt hat. Kompakte Zusammenfassung:
   schreiben.
 - Das Schreiben eines zerlegten Auftrags scheitert → die rohen Aufträge bleiben offen; der
   Lauf endet vor Schritt 5 und nennt, was schon in der Queue steht. `outcome_unknown` →
-  nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`, `number` oder `name` des geschriebenen Auftrags) nachsehen.
+  nicht wiederholen, mit `k_playbook_doc_list` (`kind: docs`, `number` oder `name` des
+  geschriebenen Auftrags) nachsehen.
 - `publish` meldet `conflict`, `hints_changed` oder `failed` → wie im Modul zu `publish`; die
   betroffenen Aufträge bleiben offen.
 - Der Scan findet keine Kernlogik, nur Framework-Standard → das sagen und keine Doku
@@ -329,8 +332,9 @@ ergänzt hat. Kompakte Zusammenfassung:
   `allow_hints`; kein `discard` und kein erneutes Schreiben über eine fremde Änderung hinweg
   ohne Entscheidung des Nutzers.
 - **Die Doku an `publish` vorbei in die Collection schreiben** oder die Aufträge von Hand
-  anlegen und schließen, die `k_playbook_docs_orders_split` schreibt. Kephalaion `write` ist
-  hier kein Weg für Dokumente.
+  anlegen, ergänzen oder die rohen schließen — das tut `k_playbook_docs_orders_split`.
+  Geschlossen werden von Hand nur die zerlegten, mit `k_playbook_doc_done` nach „Abschluss
+  eines Auftrags“ (Schritt 6). Kephalaion `write` ist hier kein Weg für Dokumente.
 - **`K-PLAYBOOK.yaml` selbst lesen oder bearbeiten, `README.md` oder `index.md` schreiben,
   auf die Platte ausweichen.** Ausschlüsse kommen aus dem Programm; die README schreibt
   `publish`, den Index das Indizieren; ohne Kephalaion gibt es keinen Lauf.
