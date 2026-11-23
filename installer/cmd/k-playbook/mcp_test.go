@@ -316,8 +316,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 31 {
-		t.Fatalf("tools/list meldet nicht genau einunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 35 {
+		t.Fatalf("tools/list meldet nicht genau fünfunddreißig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -350,6 +350,10 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_docs_publish",
 		"k_playbook_docs_readme",
 		"k_playbook_docs_exclude_add",
+		"k_playbook_docs_scope",
+		"k_playbook_docs_orders",
+		"k_playbook_docs_order_add",
+		"k_playbook_docs_orders_split",
 		"k_playbook_briefing",
 		"k_playbook_health",
 		"k_playbook_github_test",
@@ -392,8 +396,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 31 {
-		t.Fatalf("tools/list meldet nicht genau einunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 35 {
+		t.Fatalf("tools/list meldet nicht genau fünfunddreißig Werkzeuge: %v", responses[1])
 	}
 
 	resultsDir := mcpReviewResultsDir(root)
@@ -551,8 +555,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 30 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 30", withProjectDir)
+	if withProjectDir != 34 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 34", withProjectDir)
 	}
 }
 

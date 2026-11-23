@@ -126,3 +126,20 @@ The call occurs at the beginning of every command, but only once per session. It
 `/k-review` works on this set and displays it before working. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
 
 There is no check runner any more: `k-check` and the shipped checks were removed in task 155.
+
+## Docs subcommands for the docs commands
+
+The documentation commands do not compute everything in their text. Four subcommands of
+`k-playbook docs` take over what needs no judgement of the assistant (task 179); each has a
+`--json` form and an MCP tool, described in [`mcp.md`](./mcp.md):
+
+| Subcommand | MCP tool | Does |
+|---|---|---|
+| `k-playbook docs scope [<pfad>] [--check <pfad>…]` | `k_playbook_docs_scope` | computes the scan scope of `/k-docs-code` and `/k-docs-tools`: scan root, state of the work tree, every exclusion by origin, an extra path, and per path whether it is excluded; needs no Kephalaion |
+| `k-playbook docs orders <code\|tools>` | `k_playbook_docs_orders` | reads and rates the open documentation orders: raw or split, waiting (waiting time of two hours, only in the program) or ready, the run, the merged raw orders |
+| `k-playbook docs order add <code\|tools> --pfad … --anlass … --sitzung …` | `k_playbook_docs_order_add` | queues a raw order or extends the open one of the session: `created`, `extended`, `covered`, `skipped` |
+| `k-playbook docs orders split --json` | `k_playbook_docs_orders_split` | writes the split orders from the lines the user confirmed and closes the raw orders they absorbed |
+
+The mapping from path to document, `neu` and `entfaellt` and every decision of the user stay
+with the session. The command texts call these subcommands in a later step; until then they still
+describe the rules in prose.

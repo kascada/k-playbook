@@ -82,6 +82,7 @@ func addDocTools(server *mcp.Server) {
 	addTaskCreateTool(server)
 	addDocEditTools(server)
 	addDocsWorkTools(server)
+	addDocsOrderTools(server)
 }
 
 // projectDocLayers ist austauschbar, damit Tests keph:-Verweise ohne Node

@@ -278,6 +278,17 @@ ihren Vorlagen (Task 137); `docs exclude add <muster>… [--json]` trägt dauerh
 für den Code-Scan in `docs.exclude` von `K-PLAYBOOK.yaml` ein (Task 116). Einzelheiten unter
 „Erzeugte Doku: checkout und publish“ und „README aus Vorlagen“.
 
+`docs scope [<pfad>] [--check <pfad>…] [--json]` rechnet den Scope der Code-Erzeuger
+(`project.DocsScope`, `project/docsscope.go`; die Muster im Stil einer `.gitignore` in
+`project/gitpattern.go`) — lokal, ohne Kephalaion; `docs orders <code|tools>` liest und bewertet die
+offenen Doku-Aufträge (Wartezeit von 2 Stunden nur hier, Zusammenlegen, Lauf voll, Teil oder
+Wiederaufnahme), `docs order add` reiht einen rohen Auftrag ein oder ergänzt den der Sitzung und
+`docs orders split --json` schreibt die zerlegten Aufträge und schließt die rohen
+(`project.DocsOrders`, `project/docsorders.go`, `docsorderadd.go`, `docsordersplit.go`); alles
+Task 179. Das Programm entscheidet nur, was sich rechnen lässt; Zuordnung Pfad → Dokument und
+`neu`/`entfaellt` bleiben bei der Sitzung. Vertrag: Handbuch `mcp.md`, Abschnitt „Scope and
+documentation orders“.
+
 `create` und `rename` tragen je Aufruf von `Client.Create`/`Client.Rename` einen eigenen
 `request_id` (Kephalaion ab v0.3.1; vorher prüft der Client die Version des Nodes per
 `whoami`). Bleibt der Ausgang nach dem Abschicken offen, schickt der Client denselben Aufruf
@@ -613,6 +624,9 @@ installer/
 │   │                            project.DocsWork), k_playbook_docs_readme (Hülle über
 │   │                            project.DocsReadmes) und k_playbook_docs_exclude_add
 │   │                            (Hülle über project.AddDocsExclude)
+│   ├── docsorders.go            Werkzeuge k_playbook_docs_scope (Hülle über project.DocsScope),
+│   │                            k_playbook_docs_orders/order_add/orders_split (Hüllen über
+│   │                            project.DocsOrders)
 │   ├── briefing.go              Werkzeug k_playbook_briefing (Hülle über
 │   │                            project.BuildBriefing)
 │   ├── health.go                Werkzeug k_playbook_health (Hülle über health.Check,

@@ -46,6 +46,12 @@ func runDocs(args []string) error {
 		return runDocsExclude(rest)
 	case "readme":
 		return runDocsReadme(rest)
+	case "scope":
+		return runDocsScope(rest)
+	case "orders":
+		return runDocsOrders(rest)
+	case "order":
+		return runDocsOrder(rest)
 	default:
 		printDocsUsage(os.Stderr)
 		return fmt.Errorf("unbekannter Unterbefehl: docs %s", sub)
@@ -362,13 +368,17 @@ func printDocsPublish(out io.Writer, result project.DocsPublishResult) {
 }
 
 func printDocsUsage(out io.Writer) {
-	fmt.Fprintf(out, `k-playbook docs — erzeugte Doku auschecken und veröffentlichen
+	fmt.Fprintf(out, `k-playbook docs — erzeugte Doku auschecken und veröffentlichen, Scope und Doku-Aufträge
 
 Aufruf:
   k-playbook docs checkout <erzeuger> [--discard] [--json]
   k-playbook docs publish <erzeuger> [--allow-hints] [--json]
   k-playbook docs readme [<pfad>] [--check] [--json]
   k-playbook docs exclude add <muster>… [--json]
+  k-playbook docs scope [<pfad>] [--check <pfad>…] [--json]
+  k-playbook docs orders <code|tools> [--json]
+  k-playbook docs order add <code|tools> --pfad <pfad>… --anlass <satz> --sitzung <kennung> [--title <titel>] [--json]
+  k-playbook docs orders split --json   (Eingabe als JSON von stdin)
 
 Erzeuger: %s. Jeder hat ein Verzeichnis keph:/docs/generated/<erzeuger>/ in
 der Projekt-Collection.
@@ -423,6 +433,58 @@ der Projekt-Collection.
             --json: config, exclude (die Liste danach), added, rejected
             (pattern, reason) und changed. Nach -- zählt alles als Muster.
 
+  scope     Rechnet den Scope der Erzeuger, die den Code durchsuchen (/k-docs-code,
+            /k-docs-tools), nach dem Abschnitt „Scope“ in
+            k-playbook:/commands/_shared/docs.md — ohne Kephalaion, nur lokal:
+            SCAN_ROOT (project.repoRoot), den Stand (Branch, Commit, ob
+            git status --porcelain leer ist), die wirksamen Ausschlüsse nach
+            Herkunft (immer: k-playbook/, .k-playbook/, keph-backup/ auf jeder
+            Ebene, .git/; versteckt; weitere feste; jede .gitignore unter
+            SCAN_ROOT; docs.exclude samt verworfenen Einträgen). Ein <pfad> vor
+            --check ergänzt den Scope um genau einen Pfad (EXTRA_PATH, relativ zu
+            project.dir): Er muss existieren und in project.dir liegen, nicht in
+            einem immer ausgeschlossenen Verzeichnis; ein versteckter Pfad oder
+            einer, den docs.exclude ausnimmt, kommt dadurch in den Scan.
+            --check meldet je Pfad (relativ zu SCAN_ROOT oder absolut), ob er
+            ausgeschlossen ist: Grund always, hidden, further, gitignore, config
+            oder outside und das Muster. Fehlerhafter Zusatzpfad: invalid_input.
+            --json: scanRoot, projectDir, stand, extra, exclude, checks.
+
+  orders    Liest die offenen Doku-Aufträge eines Erzeugers aus keph:/queue/docs/
+            und bewertet sie: je Auftrag roh oder zerlegt, wartend (Restzeit)
+            oder reif. Für code dazu der Lauf (full: ein roher Auftrag mit
+            pfade . nimmt alle rohen auf, auch die wartenden; partial: nur reife;
+            resume: nur offene zerlegte; none), rawOrders (zusammengelegt:
+            abhängige Pfade — gleich oder darin — gelten als ein Auftrag mit
+            vereinigten Pfaden, gesammelten Anlässen und dem ältesten
+            entstanden), splitOrders, waiting und nothingToDo. Die Wartezeit
+            (2 Stunden seit der letzten Änderung, gerechnet mit der Uhr des
+            Programms) steht nur im Programm. Für tools nur die Liste.
+            Braucht Kephalaion (kephalaion_unavailable).
+
+  order add Reiht einen rohen Auftrag ein oder ergänzt den offenen derselben
+            Sitzung (--sitzung ist die Kennung aus dem Briefing): created,
+            extended (Pfade vereinigt, Anlass als Zeile im Rumpf), covered (ein
+            offener Auftrag deckt schon, nichts geschrieben) oder skipped mit
+            Grund — no_generated_docs (noch keine erzeugte Doku) oder
+            kephalaion_unavailable (nicht bereit; kein Fehler, Exit 0). --pfad
+            nimmt mehrere Pfade (relativ zu project.repoRoot), . ist der volle
+            Lauf von /k-docs: Für ihn gelten „Ein Auftrag je Sitzung“ und „Noch
+            keine erzeugte Doku“ nicht. --json: producer, status, ref, revision,
+            pfade, reason, message.
+
+  orders split
+            Liest von stdin, was die Sitzung zerlegt und der Nutzer bestätigt hat:
+            {"sitzung": …, "documents": [{"dokument", "aktion" (neu, umschreiben,
+            entfaellt), "pfade", "anlaesse": [{"datum", "anlass"}], "anlass",
+            "entstanden", "abgelehnt"}], "raw": [<keph:-Verweis>…]}. Legt je
+            Dokument einen zerlegten Auftrag an oder ergänzt den offenen
+            (created, extended, skipped, failed), schließt danach die rohen
+            Aufträge nach done/ — nur wenn jeder zerlegte steht, sonst bleiben sie
+            offen (kept) — und schließt ein abgelehntes neu oder entfaellt gleich.
+            Alles wird vorher geprüft (invalid_input). Ein failed endet nach der
+            Ausgabe mit Exit 1. Ausgabe immer JSON: documents, raw, closedRaw.
+
 Ausgabe von publish: je Dokument Zustand (created, written, deleted,
 unchanged, conflict, failed), Verweis und Revision, durch Tabulatoren
 getrennt. Bleibt etwas offen, endet der Aufruf mit Exit 1. docs readme
@@ -435,7 +497,9 @@ Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts; gebraucht wird
 eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok) und für
 publish und readme ein Node ab v0.3.1; exclude add braucht keine. Dasselbe
 wie die MCP-Werkzeuge k_playbook_docs_checkout, k_playbook_docs_publish,
-k_playbook_docs_readme und k_playbook_docs_exclude_add.
+k_playbook_docs_readme, k_playbook_docs_exclude_add, k_playbook_docs_scope,
+k_playbook_docs_orders, k_playbook_docs_order_add und
+k_playbook_docs_orders_split. scope und exclude add brauchen keine Anbindung.
 
 Fehlercodes stehen in Klammern am Ende der Meldung. kephalaion_unavailable:
 beim Hub ist nichts angekommen, nichts geschrieben. invalid_input: unbekannter
