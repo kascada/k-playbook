@@ -8,7 +8,7 @@ abgeleitet.
 Produces:
 
 - `keph:/user/<user>/tasks/<NNN>-<kurzname>.md` — der Task, angelegt mit
-  `k_playbook_doc_create` und geschrieben mit Kephalaion `write`, erst nach Bestätigung.
+  `k_playbook_task_create`, erst nach Bestätigung.
 
 Nichts sonst. Auf die Platte schreibt dieser Command nichts.
 
@@ -29,8 +29,8 @@ Steht `context.kephalaion.ok` nicht auf `true`, endet der Command hier, wie der 
 Ist ein Argument angegeben, ist es der Kurzname (klein, Wörter mit Bindestrichen). Sonst
 leitest du ihn aus dem Thema des Gesprächs ab: 2–4 Wörter, klein, Bindestriche.
 
-Die Nummer vergibt k-playbook beim Anlegen in Schritt 5; du zählst nichts und gibst keine
-vor. Im Entwurf steht an ihrer Stelle `<NNN>`.
+Die Nummer vergibt `k_playbook_task_create` beim Anlegen in Schritt 5; du zählst nichts und
+gibst keine vor. Im Entwurf steht an ihrer Stelle `<NNN>`.
 
 ## Schritt 3 — Referenzen und Tools bestimmen
 
@@ -47,41 +47,42 @@ Sieh das Gespräch durch nach:
 
 ## Schritt 4 — Entwurf schreiben und bestätigen lassen
 
-Schreibe den Entwurf nach dem Abschnitt „Aufbau“ von
-`k-playbook:/instructions/on-demand/tasks.md`: Frontmatter mit `title` in doppelten
-Anführungszeichen (Regel dort unter „Kopf“, inneres `"` als `\"`), Überschrift
-`# Task <NNN> — <Titel>`, ein Satz zum Ergebnis, dann `## Intent` (Intent-Regel dort, Verweise
-darin mit Präfix), `## Referenzen`, `## Tools`, `## Ziel`, `## Kontext`, `## Zu bauen` mit
-`### Etappe N — Titel`, wenn die Arbeit in Etappen zerfällt. Leere oder nicht zutreffende
-Abschnitte entfallen. Zuschnitt: im Zweifel eine Datei, wie dort begründet.
+Schreibe den Rumpf nach dem Abschnitt „Aufbau“ von
+`k-playbook:/instructions/on-demand/tasks.md`: ein Satz zum Ergebnis, dann `## Intent`
+(Intent-Regel dort, Verweise darin mit Präfix), `## Referenzen`, `## Tools`, `## Ziel`,
+`## Kontext`, `## Zu bauen` mit `### Etappe N — Titel`, wenn die Arbeit in Etappen zerfällt.
+Leere oder nicht zutreffende Abschnitte entfallen. Zuschnitt: im Zweifel eine Datei, wie dort
+begründet. Frontmatter und die Überschrift `# Task <NNN> — <Titel>` schreibst du nicht; die
+baut das Werkzeug, mit Frontmatter mit `title` in doppelten
+Anführungszeichen (Regel in tasks.md unter „Kopf“). Ist der Task in einer Reihe nicht der letzte oder rein mechanisch, setzt du
+`noIntent: true`, sonst nicht.
 
-Zeige den Entwurf dem Nutzer und frage: „Passt das so, oder soll ich etwas anpassen?“ Warte
-auf Bestätigung oder Korrekturen, bevor du etwas anlegst. Korrekturen arbeitest du in den
-Entwurf ein und zeigst ihn erneut.
+Rufe `k_playbook_task_create` mit `dryRun: true` auf (`projectDir` = `context.project.dir`,
+`title`, `name` = Kurzname aus Schritt 2, `body`). Die Antwort trägt den Text, wie er
+geschrieben würde (`rendered`), und die `warnings`. Meldet das Werkzeug `invalid_input`, stehen
+die Verstöße gesammelt in der Meldung: arbeite sie ein und rufe erneut auf, bevor du dem
+Nutzer etwas zeigst. Den Entwurf zeigst du dem Nutzer als `rendered`; Warnungen nennst du dazu.
 
-## Schritt 5 — Anlegen und schreiben
+Frage: „Passt das so, oder soll ich etwas anpassen?“ Warte auf Bestätigung oder Korrekturen,
+bevor du etwas anlegst. Korrekturen arbeitest du in den Rumpf ein und wiederholst den
+Trockenlauf.
 
-Nach der Bestätigung, in dieser Reihenfolge:
+## Schritt 5 — Anlegen
 
-1. `k_playbook_doc_create` mit `kind: tasks` und dem Kurzname aus Schritt 2, `projectDir` =
-   `context.project.dir`. Die Antwort nennt `ref` (den `keph:`-Verweis mit dem echten User),
-   `number` und `name`.
-2. Setze `<NNN>` in der Überschrift auf `number`, dreistellig.
-3. Schreibe den ganzen Entwurf samt Frontmatter mit Kephalaion `write`: `collection` =
-   `context.kephalaion.address`, `name` = der Pfad des Verweises ohne führenden `/`. Die
-   Antwort nennt Revision und Größe; erst damit ist der Task angelegt.
-4. Bestätige in einer Zeile: „Task angelegt: `<ref>`“.
+Nach der Bestätigung genau ein Aufruf: `k_playbook_task_create` ohne `dryRun`, mit denselben
+`title`, `name`, `body` (und `noIntent`). Das Werkzeug vergibt die Nummer, baut Frontmatter
+und Überschrift, prüft noch einmal und legt den Task mit fertigem Inhalt an; ein leeres
+Zwischendokument gibt es nicht. Die Antwort nennt `ref` (den `keph:`-Verweis mit dem echten
+User), `number`, `name` und `revision`. Bestätige in einer Zeile: „Task angelegt: `<ref>`“.
 
 Fehlerfälle:
 
-- `kephalaion_unavailable` bei `k_playbook_doc_create`: wie Schritt 1 — nichts auf die
-  Platte, Meldung mit `context.kephalaion.message`.
+- `invalid_input`: Verstöße gegen den Aufbau; nichts wurde angelegt. Einarbeiten, Entwurf
+  erneut zeigen.
+- `kephalaion_unavailable`: wie Schritt 1 — nichts auf die Platte, Meldung mit
+  `context.kephalaion.message`.
 - `outcome_unknown`: nicht noch einmal anlegen, sondern mit `k_playbook_doc_list` (Sorte
-  `tasks`) nachsehen, ob das Dokument da ist; dann mit `write` weitermachen oder den Nutzer
-  fragen.
-- `write` schlägt fehl: Das leere Dokument bleibt liegen; sag das, nenne den Verweis und
-  wiederhole `write`, bevor du etwas anderes tust. Ein zweites `k_playbook_doc_create` legte
-  einen zweiten Task an.
+  `tasks`) nachsehen, ob der Task da ist; sonst den Nutzer fragen.
 
 Folge-Command: **`/k-task-refine`** — härtet den angelegten Task vor der Ausführung im
 Critic/Editor-Dialog; ohne Argument nimmt er die eigenen offenen Tasks, die noch kein

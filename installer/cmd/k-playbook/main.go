@@ -112,6 +112,9 @@ func run(args []string) error {
 		// Ohne Wirt-Pflege aus demselben Grund wie context: die Ausgabe ist
 		// maschinenlesbar und darf keine Bereinigungsmeldungen tragen.
 		return runTodo(args[1:])
+	case "task":
+		// Ohne Wirt-Pflege wie todo: die Ausgabe ist JSON und sonst nichts.
+		return runTask(args[1:])
 	case "read":
 		// Ohne Wirt-Pflege wie todo: stdout trägt den Inhalt hinter dem
 		// Verweis und sonst nichts.
@@ -343,6 +346,10 @@ Unterkommandos:
             Ausgabe ist JSON auf stdout. Ohne Unterbefehl
             und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
             gelesen oder geschrieben werden.
+  task      Legt Tasks in der Projekt-Collection an: k-playbook task create
+            --title <titel> --name <kurzname> [--dry-run] [--no-intent],
+            Rumpf von stdin. Prüft, nummeriert und schreibt in einem Zug;
+            die Ausgabe ist JSON. Ohne Unterbefehl nur die Kurzhilfe.
   read      Löst einen Verweis im Präfixschema auf und gibt aus, was
             dahinter steht: k-playbook read <verweis> [--raw] [--json].
             project: eine Datei des Projekts, keph: ein Dokument der

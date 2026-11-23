@@ -316,8 +316,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 30 {
-		t.Fatalf("tools/list meldet nicht genau dreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 31 {
+		t.Fatalf("tools/list meldet nicht genau einunddreißig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -338,6 +338,7 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_todo_delete",
 		"k_playbook_doc_read",
 		"k_playbook_doc_create",
+		"k_playbook_task_create",
 		"k_playbook_doc_list",
 		"k_playbook_doc_done",
 		"k_playbook_doc_reopen",
@@ -391,8 +392,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 30 {
-		t.Fatalf("tools/list meldet nicht genau dreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 31 {
+		t.Fatalf("tools/list meldet nicht genau einunddreißig Werkzeuge: %v", responses[1])
 	}
 
 	resultsDir := mcpReviewResultsDir(root)
@@ -550,8 +551,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 29 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 29", withProjectDir)
+	if withProjectDir != 30 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 30", withProjectDir)
 	}
 }
 
@@ -595,6 +596,7 @@ var projectDirCalls = []struct {
 	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
 	{name: "k_playbook_doc_read", args: map[string]any{"ref": "k-playbook:/instructions/always/"}},
 	{name: "k_playbook_doc_create", args: map[string]any{"kind": "tasks", "name": "ohne-projectdir"}},
+	{name: "k_playbook_task_create", args: map[string]any{"title": "T", "name": "ohne-projectdir", "body": "Ein Satz.\n"}},
 	{name: "k_playbook_findings_check", args: map[string]any{}},
 	{name: "k_playbook_lock", args: map[string]any{"action": "status"}},
 }

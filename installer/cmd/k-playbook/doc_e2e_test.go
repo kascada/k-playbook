@@ -92,7 +92,7 @@ func (s *cliDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]kep
 	return out, nil
 }
 
-func (s *cliDocStore) Create(_ context.Context, name, _ string) (kephalaion.Document, error) {
+func (s *cliDocStore) Create(_ context.Context, name, content string) (kephalaion.Document, error) {
 	if s.writeFail != nil {
 		return kephalaion.Document{}, s.writeFail
 	}
@@ -100,6 +100,7 @@ func (s *cliDocStore) Create(_ context.Context, name, _ string) (kephalaion.Docu
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeNameTaken, Message: "belegt"}
 	}
 	s.docs[name] = "kamran"
+	s.content[name] = content
 	return kephalaion.Document{Name: name, Revision: s.bump(name)}, nil
 }
 

@@ -635,6 +635,15 @@ func (u *UserDocs) Create(ctx context.Context, kindName, shortName string) (DocC
 // Fehler von create außer name_taken in den Code des Aufrufers.
 func (u *UserDocs) createNumbered(ctx context.Context, kind DocKind, dir, name, content string,
 	mapErr func(error) error) (DocCreated, kephalaion.Document, error) {
+	return u.createNumberedWith(ctx, kind, dir, name, func(int) string { return content }, mapErr)
+}
+
+// createNumberedWith ist createNumbered mit einem Inhaltsbauer: build bekommt
+// die Nummer jedes Versuchs und liefert den Inhalt dafür. Das braucht ein
+// Dokument, dessen Text die Nummer trägt (die Überschrift eines Tasks) — bei
+// name_taken wird der Inhalt für die nächste Nummer neu gebaut.
+func (u *UserDocs) createNumberedWith(ctx context.Context, kind DocKind, dir, name string, build func(number int) string,
+	mapErr func(error) error) (DocCreated, kephalaion.Document, error) {
 	number, err := u.nextNumber(ctx, kind)
 	if err != nil {
 		return DocCreated{}, kephalaion.Document{}, err
@@ -645,7 +654,7 @@ func (u *UserDocs) createNumbered(ctx context.Context, kind DocKind, dir, name, 
 		if !docNamePattern.MatchString(file) {
 			return DocCreated{}, kephalaion.Document{}, docRefErrorf(DocCodeInvalidInput, "Dateiname %q passt nicht in die Namensregel von Kephalaion", file)
 		}
-		doc, err := u.store.Create(ctx, dir+"/"+file, content)
+		doc, err := u.store.Create(ctx, dir+"/"+file, build(number))
 		if err == nil {
 			created := DocCreated{Ref: DocSchemeKeph + ":/" + dir + "/" + file, Kind: kind.Kind, Number: number, Name: file}
 			if kind.UserArea {

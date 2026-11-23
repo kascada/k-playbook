@@ -38,7 +38,7 @@ New commands become visible only after linking is in place and the assistant has
 | `/k-audit` | Create or continue a complete audit sweep through MCP and triage after the merge — **temporarily unavailable** while the results storage moves; the command only says so | [`review-runs.md`](./review-runs.md) |
 | `/k-remediation` | Bundle findings and turn them into tasks or fixes — **temporarily unavailable** while the results storage moves; the command only says so | [`code-review.md`](./code-review.md) |
 | **Task flow** | | |
-| `/k-task-create` | Create a task file from the conversation context | [`task-flow.md`](./task-flow.md) |
+| `/k-task-create` | Create a task from the conversation context in one step with `k_playbook_task_create` (dry run for the draft, then the real call) | [`task-flow.md`](./task-flow.md) |
 | `/k-task-refine` | Harden task files before execution through a Critic/Editor dialogue; without an argument only unreviewed tasks, in groups of related tasks reviewed in parallel subagents, followed by an overlap check; asks before reviewing an already reviewed target unless `nochmal` follows | [`task-flow.md`](./task-flow.md) |
 | `/k-task-run` | Execute task files sequentially; execution and code review run in subagents, a critical finding stops the run, unfixed findings are offered as todos at the end. Takes the working-tree lock of the project before the first change and waits while another run holds it; with `refine` unreviewed tasks go through `/k-task-refine` first | [`task-flow.md`](./task-flow.md) |
 | `/k-todo` | List, add, edit, complete, and delete the project todos through `k-playbook todo` | |
@@ -83,7 +83,7 @@ No command reads or guesses a path. Every target is a `keph:` reference into the
 
 | Command | writes to |
 |---|---|
-| `/k-task-create`, `/k-task-run` | `keph:/user/<user>/tasks/` in the project collection, completed tasks to `done/` below it (`k_playbook_doc_done`); nothing on disk. `/k-task-run` also keeps one ref `refs/k-task-run/<task>` per task in the execution root until the task moves to `done/`, and while it runs the working-tree lock in `.k-playbook/work/lock/` (the directory ignores itself in git; the file stays after release and keeps the token counter) |
+| `/k-task-create`, `/k-task-run` | `keph:/user/<user>/tasks/` in the project collection, completed tasks to `done/` below it (`k_playbook_doc_done`); `/k-task-create` writes through `k_playbook_task_create`; nothing on disk. `/k-task-run` also keeps one ref `refs/k-task-run/<task>` per task in the execution root until the task moves to `done/`, and while it runs the working-tree lock in `.k-playbook/work/lock/` (the directory ignores itself in git; the file stays after release and keeps the token counter) |
 | `/k-todo` | `todos/` in the project collection, written only through `k-playbook todo` or the MCP tools |
 | `/k-review`, `/k-audit` | `<ergebnisort>`; both commands are paused |
 | `/k-docs-code`, skill `ks-overlay-repo-analyse` | `keph:/docs/generated/code/` in the project collection, only through `k-playbook docs publish code`; in between the machine-local working directory `.k-playbook/work/docs/code/` with the checkout record next to it (`/work` is git-ignored), removed after a complete publish together with `.k-playbook/work/docs/` and `.k-playbook/work/` when they are left empty. `/k-docs-code` also writes the split documentation orders, one per document, to `keph:/queue/docs/`; closed orders move to `keph:/queue/docs/done/` |

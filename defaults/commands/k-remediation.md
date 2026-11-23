@@ -9,6 +9,16 @@ umzieht und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
+Hinweis für den Umbau (Task 178): Beim Wiedereinschalten legt der Command Tasks über
+`k_playbook_task_create` an, nicht mehr über `k_playbook_doc_create` und Kephalaion `write`
+(Schritt „Task anlegen“ unten, mit `k_playbook_doc_create`). Die Hinweise dort zu Nummer,
+Platzhaltern `<NNN>` und `<slug>` und zu den Fehlerfällen entfallen: Das Werkzeug vergibt die
+Nummer, setzt die Überschrift und meldet `invalid_input`, `kephalaion_unavailable` und
+`outcome_unknown`. Seine Prüfungen (Einleitungssatz, Reihenfolge der Abschnitte, Intent,
+Verweise mit Präfix, Etappen) ersetzen die eigenen Formprüfungen des Commands. Der Ablauf des
+Commands bleibt unverändert; `/k-task-create` zeigt den Aufruf. In `allowed-tools` der Hülle
+tritt `mcp__k-playbook__k_playbook_task_create` an die Stelle von `k_playbook_doc_create`.
+
 Arbeitet Befunde aus einer Ergebnisdatei strukturiert ab — üblicherweise die Datei, die
 `/k-review` im Report-Modus erzeugt hat. Vor der Umsetzung wird immer ein Remediation-Plan
 gebildet: welche Findings zusammengehören, was zuerst kommt, was Quick-Win ist und was einen

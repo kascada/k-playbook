@@ -13,11 +13,14 @@ Kephalaion-Revisionen seines Dokuments, nicht in Git.
 
 ### Wohin und Name
 
-- **Anlegen** mit `k_playbook_doc_create`, Sorte `tasks`, Kurzname in 2–4 Worten (klein,
-  Bindestriche; k-playbook normalisiert ihn). Die Antwort nennt den `keph:`-Verweis mit dem
-  echten User, etwa `keph:/user/kamran/tasks/007-audiosocket-server.md`. Den Inhalt schreibst
-  du gleich danach mit Kephalaion `write`, `collection` gleich `kephalaion.address`, Frontmatter
-  eingeschlossen.
+- **Anlegen** mit `k_playbook_task_create` (CLI: `k-playbook task create`): `title`, `name`
+  (Kurzname in 2–4 Worten, klein, Bindestriche; k-playbook normalisiert ihn) und `body`, der
+  Rumpf in Markdown ohne Frontmatter und ohne die Überschrift. Das Werkzeug vergibt die Nummer,
+  baut Frontmatter und die Überschrift `# Task <NNN> — <Titel>` und legt den Task mit fertigem
+  Inhalt in einem Zug an; die Antwort nennt den `keph:`-Verweis mit dem echten User, etwa
+  `keph:/user/kamran/tasks/007-audiosocket-server.md`. Mit `dryRun` kommt derselbe Text samt
+  Warnungen, ohne dass etwas angelegt wird. Ein Task entsteht nicht mehr über `k_playbook_doc_create`
+  und `write`: ein leeres Zwischendokument gibt es nicht.
 - **Die Nummer vergibt k-playbook**, nicht die Sitzung: die höchste Nummer über alle
   `user/*/tasks/` samt `done/` plus eins, dreistellig; die erste ist `001`. Diese Regel steht
   nur hier. Niemand zählt selbst, und niemand gibt eine Nummer vor.
@@ -115,6 +118,16 @@ title: "<Titel>"
 Ein leerer oder nicht zutreffender Abschnitt entfällt. `## Intent` steht vor Referenzen und
 Tools, damit er sofort sichtbar ist. Unter `## Tools` steht nur, was über Read, Write, Edit,
 Bash, Glob und Grep hinausgeht — die sind in `/k-task-run` immer erlaubt.
+
+**Was das Werkzeug prüft.** `k_playbook_task_create` meldet vor dem Schreiben gesammelt als
+`invalid_input`: den fehlenden Einleitungssatz, die Reihenfolge der Abschnitte und leere
+Abschnitte, den fehlenden `## Intent` (außer mit `noIntent: true`), nackte Pfade unter
+`## Referenzen`, relative Markdown-Links im Rumpf, Verweise auf `keph:/queue/…`, Standardwerkzeuge
+unter `## Tools`, nicht fortlaufende Etappen und einen Titel mit „Task <n> —“. Als Warnung
+kommen fehlende `project:`- und `keph:`-Verweise unter `## Referenzen`, eine Etappenzahl
+außerhalb von 4–8 und ein eigener offener Task mit demselben Kurznamen. Das Urteil — Kurzname,
+Intent, Zuschnitt, Etappen, mehrdeutige Pfade — bleibt bei der Sitzung; die Regeln unten sind
+weiter die Beschreibung, nach der sie schreibt.
 
 **Verweise.** Jeder Verweis in einem Task hat die Form aus
 `k-playbook:/instructions/always/010-verweise.md`: ein Pfad mit Präfix, Dateien im Projekt als
@@ -250,7 +263,7 @@ Dokument-Operationen von k-playbook; jede Antwort nennt die Revision des Dokumen
 
 | Was | Werkzeug |
 |---|---|
-| ganzen Inhalt schreiben | nur, wer den Task anlegt: Kephalaion `write` direkt nach `k_playbook_doc_create` |
+| ganzen Inhalt schreiben | nur beim Anlegen, und das tut `k_playbook_task_create`; danach nicht mehr |
 | lesen | `k_playbook_doc_read` mit `section` (etwa `## Intent`) oder `lines`; die Antwort trägt `revision` und `totalLines` |
 | suchen | `k_playbook_doc_grep` mit `ref` und `pattern`; mit `count_only` nur die Anzahl und die Revision |
 | anhängen | `k_playbook_doc_append` mit `content` und `since_revision` |

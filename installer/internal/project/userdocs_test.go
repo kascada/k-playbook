@@ -143,7 +143,7 @@ func (s *fakeDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]ke
 	return out, nil
 }
 
-func (s *fakeDocStore) Create(_ context.Context, name, _ string) (kephalaion.Document, error) {
+func (s *fakeDocStore) Create(_ context.Context, name, content string) (kephalaion.Document, error) {
 	s.creates = append(s.creates, name)
 	if s.fail != nil {
 		return kephalaion.Document{}, s.fail
@@ -154,7 +154,7 @@ func (s *fakeDocStore) Create(_ context.Context, name, _ string) (kephalaion.Doc
 	if _, ok := s.docs[name]; ok {
 		return kephalaion.Document{}, &kephalaion.ToolError{Tool: "create", Code: kephalaion.CodeNameTaken, Message: "belegt"}
 	}
-	doc := s.put(name, "")
+	doc := s.put(name, content)
 	return kephalaion.Document{Name: name, Revision: doc.revision}, nil
 }
 

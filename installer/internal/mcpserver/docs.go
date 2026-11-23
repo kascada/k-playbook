@@ -79,6 +79,7 @@ const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema ste
 func addDocTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{Name: docToolRead, Description: docReadDescription}, docReadTool)
 	addUserDocTools(server)
+	addTaskCreateTool(server)
 	addDocEditTools(server)
 	addDocsWorkTools(server)
 }

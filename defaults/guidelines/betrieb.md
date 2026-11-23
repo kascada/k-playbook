@@ -27,7 +27,7 @@ Schreibweise `.k-playbook/...` richtig; zum Schreiben wird der aufgelöste Pfad 
 
 | Was | Wohin | Wer legt es ab |
 |---|---|---|
-| Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task | `/k-task-create`, `/k-remediation` über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
+| Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task | `/k-task-create` über `k_playbook_task_create`, `/k-remediation` (abgeschaltet) bis zum Umbau über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
 | Task, erledigt | `keph:/user/~/tasks/done/<NNN>-<slug>.md` — in der Projekt-Collection | `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
 | Kurznotiz, unsortiert | `todos/` in der Projekt-Collection | `/k-todo`, `k-playbook todo`, die Oberfläche |
 | Befund aus Analyse oder Fehlersuche | `keph:/queue/findings/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Befund | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`, Nachträge von `/k-danke`; Form nach `k-playbook:/instructions/on-demand/befunde.md` |
