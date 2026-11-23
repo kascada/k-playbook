@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -73,6 +74,9 @@ type DocKind struct {
 	// lehnen sie ab. Nummernvergabe und done/-Behandlung der Tabelle gelten
 	// trotzdem — die eigenen Werkzeuge benutzen sie.
 	OwnTools bool `json:"ownTools,omitempty"`
+	// Unnumbered sagt, dass die Dateinamen der Sorte keine führende Nummer
+	// tragen; der Filter number von List weist sie ab.
+	Unnumbered bool `json:"unnumbered,omitempty"`
 }
 
 // DocKinds ist die Sorten-Tabelle (Task 088, Klärungen 2026-10-14). tasks
@@ -672,6 +676,22 @@ func (u *UserDocs) createNumberedWith(ctx context.Context, kind DocKind, dir, na
 		"%d Nummern nacheinander belegt, zuletzt %s: %w", docCreateAttempts, docFileName(number-1, name), lastErr)}
 }
 
+// Grenzen von List (Task 181): limit gilt nur, wenn es gesetzt ist; die
+// Standardwerte setzen MCP und CLI an der Außenkante, nicht List.
+const (
+	// DocListDefaultLimit ist der Standard von limit an der Außenkante.
+	DocListDefaultLimit = 50
+	// DocListMaxLimit ist das Maximum von limit mit compact.
+	DocListMaxLimit = 200
+	// DocListMaxLimitFull ist das Maximum von limit ohne compact: Ein voller
+	// Eintrag hat etwa 300 Zeichen, 200 davon wären wieder etwa 60 000.
+	DocListMaxLimitFull = 50
+	// DocListMaxChars ist die Zeichenobergrenze der Einträge einer Seite, wenn
+	// limit gesetzt ist. Wird sie vor limit erreicht, bricht die Seite dort
+	// ab; mindestens ein Eintrag kommt immer.
+	DocListMaxChars = 15000
+)
+
 // DocListOptions sind die Eingaben von List.
 type DocListOptions struct {
 	Kind string
@@ -680,6 +700,20 @@ type DocListOptions struct {
 	User string
 	// Done nimmt die Erledigten mit auf.
 	Done bool
+	// Number: nur Dokumente mit dieser Nummer (führende Ziffernfolge des
+	// Dateinamens, als Zahl verglichen); 0 heißt kein Filter.
+	Number int
+	// Name: Teilstring im Dateinamen, ohne Beachtung der Groß- und
+	// Kleinschreibung; leer heißt kein Filter.
+	Name string
+	// Limit: höchstens so viele Einträge; 0 heißt keine Grenze (auch keine
+	// Zeichenobergrenze).
+	Limit int
+	// After ist der Verweis des letzten Eintrags der vorigen Seite; nur eine
+	// Ordnungsgrenze, kein Existenznachweis.
+	After string
+	// Compact liefert nur ref, title und done (und problem, wenn es eines gibt).
+	Compact bool
 }
 
 // DocListItem ist ein Dokument in der Antwort von List.
@@ -698,6 +732,22 @@ type DocListItem struct {
 	// (docTitleTruncated). Leer, wenn nichts auffiel. Gemeldet, nicht
 	// repariert: Das Dokument gehört der Sitzung.
 	Problem string `json:"problem,omitempty"`
+	// compact lässt user, created und updated beim Ausgeben weg.
+	compact bool
+}
+
+// MarshalJSON gibt einen kompakten Eintrag ohne user, created und updated aus.
+func (i DocListItem) MarshalJSON() ([]byte, error) {
+	if i.compact {
+		return json.Marshal(struct {
+			Ref     string `json:"ref"`
+			Title   string `json:"title"`
+			Done    bool   `json:"done"`
+			Problem string `json:"problem,omitempty"`
+		}{i.Ref, i.Title, i.Done, i.Problem})
+	}
+	type plain DocListItem
+	return json.Marshal(plain(i))
 }
 
 // docProblemFrontmatter leitet DocListItem.Problem ein, wenn Kephalaion das
@@ -739,6 +789,21 @@ type DocList struct {
 	Items []DocListItem `json:"items"`
 	// Hint erklärt, warum ein Filter nicht gegriffen hat.
 	Hint string `json:"hint,omitempty"`
+	// Total sind alle Treffer der Filter, unabhängig von After, Limit und
+	// Zeichenobergrenze.
+	Total int `json:"total"`
+	// Truncated sagt, dass die Seite vor dem Ende der Treffer abbricht; dann
+	// ist Next gesetzt. Ein abgeschnittenes Ergebnis ist nie stumm.
+	Truncated bool         `json:"truncated,omitempty"`
+	Next      *DocListNext `json:"next,omitempty"`
+}
+
+// DocListNext sagt, wie es nach einer abgeschnittenen Seite weitergeht.
+type DocListNext struct {
+	// After ist der Wert für After des nächsten Aufrufs.
+	After string `json:"after"`
+	// Hint ist der Satz dazu.
+	Hint string `json:"hint"`
 }
 
 // List listet die Dokumente einer Sorte aus der Replica.
@@ -748,6 +813,10 @@ func (u *UserDocs) List(ctx context.Context, opts DocListOptions) (DocList, erro
 		return DocList{}, err
 	}
 	result := DocList{Kind: kind.Kind, Done: opts.Done, Items: []DocListItem{}}
+	if err := checkDocListOptions(kind, opts); err != nil {
+		return DocList{}, err
+	}
+	nameFilter := strings.ToLower(strings.TrimSpace(opts.Name))
 	user := strings.TrimSpace(opts.User)
 	if kind.UserArea {
 		switch {
@@ -775,7 +844,15 @@ func (u *UserDocs) List(ctx context.Context, opts DocListOptions) (DocList, erro
 		if m.done && !opts.Done {
 			continue
 		}
-		item := DocListItem{Ref: DocSchemeKeph + ":/" + entry.Name, Title: m.file, User: m.user, Done: m.done}
+		if opts.Number > 0 {
+			if n, ok := docNumber(m.file); !ok || n != opts.Number {
+				continue
+			}
+		}
+		if nameFilter != "" && !strings.Contains(strings.ToLower(m.file), nameFilter) {
+			continue
+		}
+		item := DocListItem{Ref: DocSchemeKeph + ":/" + entry.Name, Title: m.file, User: m.user, Done: m.done, compact: opts.Compact}
 		titled := false
 		if title, ok := entry.Frontmatter["title"].(string); ok && strings.TrimSpace(title) != "" {
 			item.Title, titled = strings.TrimSpace(title), true
@@ -803,7 +880,75 @@ func (u *UserDocs) List(ctx context.Context, opts DocListOptions) (DocList, erro
 		result.Items = append(result.Items, item)
 	}
 	sort.SliceStable(result.Items, func(i, j int) bool { return result.Items[i].Ref < result.Items[j].Ref })
+	result.Total = len(result.Items)
+	if opts.After != "" {
+		after := u.expandUserRef(opts.After)
+		start := sort.Search(len(result.Items), func(i int) bool { return result.Items[i].Ref > after })
+		result.Items = result.Items[start:]
+	}
+	if opts.Limit > 0 {
+		result.page(opts.Limit)
+	}
 	return result, nil
+}
+
+// expandUserRef ersetzt einen ganzen Pfadteil ~ durch den eigenen User.
+func (u *UserDocs) expandUserRef(ref string) string {
+	return strings.Replace(ref, "/"+docUserSegment+"/", "/"+u.user+"/", 1)
+}
+
+// page kürzt die Einträge auf limit und die Zeichenobergrenze, mindestens ein
+// Eintrag bleibt, und setzt Truncated und Next, wenn etwas fehlt.
+func (l *DocList) page(limit int) {
+	keep, chars := 0, 0
+	for keep < len(l.Items) && keep < limit {
+		encoded, err := json.Marshal(l.Items[keep])
+		if err != nil {
+			break
+		}
+		if keep > 0 && chars+len(encoded) > DocListMaxChars {
+			break
+		}
+		chars += len(encoded)
+		keep++
+	}
+	if keep >= len(l.Items) {
+		return
+	}
+	l.Items = l.Items[:keep]
+	l.Truncated = true
+	last := l.Items[keep-1].Ref
+	l.Next = &DocListNext{After: last, Hint: fmt.Sprintf(
+		"Die Antwort enthält %d von %d Treffern; für die nächste Seite denselben Aufruf mit after=%s wiederholen.",
+		keep, l.Total, last)}
+}
+
+// checkDocListOptions prüft number, limit und after gegen die Sorte.
+func checkDocListOptions(kind DocKind, opts DocListOptions) error {
+	if opts.Number < 0 {
+		return docRefErrorf(DocCodeInvalidInput, "number %d ist keine Nummer; erwartet wird eine ganze Zahl ab 1", opts.Number)
+	}
+	if opts.Number > 0 && kind.Unnumbered {
+		return docRefErrorf(DocCodeInvalidInput, "die Sorte %s trägt keine Nummer im Dateinamen; number greift nicht", kind.Kind)
+	}
+	if opts.Limit < 0 || opts.Limit > DocListMaxLimit {
+		return docRefErrorf(DocCodeInvalidInput, "limit %d liegt außerhalb von 1 bis %d", opts.Limit, DocListMaxLimit)
+	}
+	if opts.Limit > DocListMaxLimitFull && !opts.Compact {
+		return docRefErrorf(DocCodeInvalidInput,
+			"limit %d ist ohne compact höchstens %d; mit compact bis %d", opts.Limit, DocListMaxLimitFull, DocListMaxLimit)
+	}
+	if opts.After != "" {
+		scheme := DocSchemeKeph + ":/"
+		name, ok := strings.CutPrefix(opts.After, scheme)
+		if ok {
+			_, ok = kind.match(name)
+		}
+		if !ok {
+			return docRefErrorf(DocCodeInvalidInput, "after %q ist kein Verweis der Sorte %s", opts.After, kind.Kind)
+		}
+	}
+	return nil
 }
 
 // DocMoved ist die Antwort von Done und Reopen.
