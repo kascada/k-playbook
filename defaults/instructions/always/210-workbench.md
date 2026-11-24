@@ -18,9 +18,8 @@ Abgrenzung:
 
 Wann:
 
-- Das Briefing nennt deine aktiven Themen unter `work.workbench` — höchstens die 10 zuletzt
-  geänderten; sind es mehr (`work.total.workbench`), liefert `k_playbook_doc_list` (kind
-  `workbench`) alle. Passt eines zu deiner Arbeit, lies es, bevor du anfängst.
+- Das Briefing nennt deine aktiven Themen unter `work.workbench`, zuletzt geänderte zuerst.
+  Passt eines zu deiner Arbeit, lies es, bevor du anfängst.
 - Lege ein Thema an, sobald du einen Plan mit offenen Punkten hast, den du nicht in dieser
   Sitzung abarbeitest.
 - Führe das Thema nach, sobald ein Punkt erledigt ist oder neu hinzukommt, nicht erst am Ende

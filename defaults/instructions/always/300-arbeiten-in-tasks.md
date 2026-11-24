@@ -11,9 +11,7 @@ Das betrifft, wo das Ergebnis einer Planung landet, nicht wie es entsteht; im Pl
 Assistenten zu entwerfen bleibt richtig.
 
 Ein Task ist ein Dokument in `keph:/user/~/tasks/`; erledigt liegt er unter `done/`. Das
-Briefing nennt deine eigenen offenen Tasks unter `work.tasks` — höchstens die 10 mit den
-kleinsten Nummern; sind es mehr (`work.total.tasks`), liefert `k_playbook_doc_list` (kind
-`tasks`) alle. Ohne Kephalaion
+Briefing nennt deine eigenen offenen Tasks unter `work.tasks`, nach Nummer. Ohne Kephalaion
 (`kephalaion.ok` nicht `true`) gibt es keinen Task auf der Platte; sag das, statt auszuweichen.
 
 Wie ein Task aussieht und wie er gelesen und geschrieben wird, steht in

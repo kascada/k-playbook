@@ -5,7 +5,9 @@ das Programm allein kann, in dieser Reihenfolge: Kephalaion — `kephalaion upgr
 aktualisiert es und startet seinen Node neu, soweit Kephalaion das selbst für gefahrlos hält,
 sonst steht in der Ausgabe, was zu tun ist —, dann das Binary, wenn das laufende älter ist als
 das neueste Release, dann `AGENTS.md` (Anstoß), `CLAUDE.md`, die Verlinkung der
-Commands und Skills und die MCP-Einträge. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
+Commands und Skills, die MCP-Einträge und in einem Projekt mit GitHub-Dienst die Berechtigungen der
+Clients, die nacktes `gh` und die Netzbefehle von git sperren und den Weg über
+`k-playbook github run` freigeben. Das tut der Unterbefehl `k-playbook upgrade`, und den führt die Hülle
 dieses Commands schon beim Aufruf aus — vor dem ersten Schritt, damit das Briefing danach
 den neuen Stand sieht und nicht das alte Programm die Verlinkung nach seinen Regeln
 nachzieht. Danach, falls das Projekt eines mitbringt, sein eigenes Umbauskript
@@ -25,7 +27,8 @@ Die Ausgabe von `k-playbook upgrade` steht in der Hülle dieses Commands, unter 
 Fehlermeldungen wie „Download/Install nicht möglich“. Fasse nichts zusammen und lass nichts
 weg. In diesem Schritt führst du nichts anderes aus und änderst keine Datei. Was der Lauf
 nicht von selbst nachziehen konnte, steht in der Ausgabe als Hinweis; nenne ihn, behebe ihn
-nicht.
+nicht. Das gilt auch für die Zeilen zu den GitHub-Berechtigungen: Ein „Widerspruch in …“ ist
+ein Eintrag des Projekts mit Vorschlag; ob er entfernt wird, entscheidet der Nutzer.
 
 Steht dort keine Ausgabe von `k-playbook upgrade` — die Zeile ist leer, nennt nur den Befehl
 selbst oder meldet, dass er nicht gefunden oder nicht ausgeführt wurde —, dann hat der

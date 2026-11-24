@@ -27,7 +27,8 @@ sich nie; nur das Zweite liegt im Projekt.
   Verzeichnis, das `.k-playbook/` enthält, ist die Projektwurzel —, eigene Commands und Skills
   unter `.k-playbook/commands/` und `.k-playbook/skills/` und das, was das Einrichten für die
   Assistenten anlegt (`AGENTS.md`, `CLAUDE.md`, die MCP-Einträge, die Links auf Commands und
-  Skills). Alles Übrige, was das Projekt hervorbringt, liegt in seiner Collection in Kephalaion
+  Skills, in einem Projekt mit GitHub-Dienst die Berechtigungen für GitHub über run in
+  `.claude/settings.local.json` und `.opencode/opencode.jsonc`). Alles Übrige, was das Projekt hervorbringt, liegt in seiner Collection in Kephalaion
   unter `keph:/`: die Projektdoku (`keph:/docs/`), Tasks und Workbench (`keph:/user/~/`),
   Befunde und Doku-Aufträge (`keph:/queue/`), die projekteigenen Anweisungen und Review-Rezepte
   (`keph:/k-playbook/`) und die Todos. Eine Aktualisierung berührt nichts davon.

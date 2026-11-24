@@ -129,7 +129,10 @@ func cleanUpLegacyWrapper() {
 // repairMCPRegistration zieht die MCP-Registrierung des Projekts nach — ein
 // selbsttätiger Weg neben „Aktualisieren“ in der Oberfläche und dem
 // Projektschritt von `k-playbook upgrade`, im selben Umfang wie dieser und
-// weiter als jenes.
+// weiter als jenes. Zum selben Umfang gehören seit Task 190 die
+// Berechtigungen der Clients für GitHub (repairGitHubPermissions): Sie werden
+// nachgezogen und beim Wegfall des Dienstes entfernt, wie bei MCP nur in nicht
+// von git erfassten Dateien.
 //
 // Er ist der Auffangweg für alles, was nicht über die Oberfläche oder
 // `k-playbook upgrade` nachgezogen wurde. Ein Klick auf „Einrichten" ist dafür
@@ -191,6 +194,20 @@ func repairMCPRegistration() {
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: MCP-Registrierung nicht vollständig nachgezogen: %v\n", err)
+	}
+
+	repairGitHubPermissions(environment.ProjectDir)
+}
+
+// repairGitHubPermissions zieht die Berechtigungen der Clients für GitHub nach
+// (project.ApplyGitHubPermissions) und meldet nur, was geschah oder einen
+// Blick braucht: geschriebene, entfernte und aus git ausgenommene Dateien,
+// unberührte Dateien in einem Projekt mit Dienst und Widersprüche des
+// Projekts. Ein Fehler hält den Start nicht auf.
+func repairGitHubPermissions(projectDir string) {
+	report := project.ApplyGitHubPermissions(projectDir)
+	for _, line := range report.Lines() {
+		fmt.Println(line)
 	}
 }
 

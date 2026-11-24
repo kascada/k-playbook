@@ -1,6 +1,6 @@
 ---
 title: GitHub über run
-description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, eine Ablehnung durch Nutzer oder Client, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
+description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, eine Ablehnung durch Nutzer oder Client, die Berechtigungen, die k-playbook in einem Projekt mit Dienst für Claude Code und OpenCode schreibt, samt ihren Lücken und dem Umgang mit Zielen ohne Dienst und einer ausdrücklichen Ansage, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
 ---
 
 ## GitHub über run
@@ -74,6 +74,43 @@ Lokale git-Befehle ohne Netz (Abschnitt „Ausnahmen“) wickelst du nicht in `r
 erreichen GitHub nicht, und eine Freigabe für `run` würde die Regeln des Clients für git
 umgehen.
 
+### Berechtigungen der Clients
+
+In einem Projekt mit Dienst schreibt k-playbook die Berechtigungen von Claude Code
+(`.claude/settings.local.json`) und OpenCode (`.opencode/opencode.jsonc`), beim Einrichten,
+mit `k-playbook upgrade` und beim Start des Programms; beide Dateien bleiben unversioniert.
+Gesperrt sind nacktes `gh` und die Netzbefehle von git (clone, fetch, pull, push, ls-remote,
+remote update, auch mit `git -C <pfad>`). Ohne Rückfrage laufen
+`k-playbook github run <dienst> -- gh …` und `-- git fetch|pull|clone|ls-remote|remote update …`.
+Eine Rückfrage lösen `--write` und schreibende gh-Unterbefehle hinter `--` aus (`pr merge`,
+`pr create`, `pr comment`, `pr review`, `pr close`, `release`, `repo`, `api` mit `-X` oder
+`--method`); jede andere Zeile hinter `run` fragt ebenfalls, in Claude Code mangels Freigabe.
+Fällt der Dienst weg, entfernt k-playbook seine Einträge wieder.
+
+**Ziele ohne Dienst und eine ausdrückliche Ansage.** Die Sperre hängt am Projekt, der Dienst am
+Ziel-Repo. In einem Projekt mit Dienst ist nacktes `gh` deshalb auch dort gesperrt, wo es nach
+„Den Dienst bestimmen“ erlaubt wäre: bei einem Ziel ohne Dienst (`gh … --repo <fremdes repo>`,
+`git clone` eines fremden Repos, ein eingebettetes Repo ohne Dienst) und wenn der Nutzer
+ausdrücklich nacktes `gh` verlangt. Dann sagst du, dass die Berechtigungen des Clients den
+Befehl sperren, und nennst ihn wörtlich; der Nutzer führt ihn selbst aus oder gibt ihn im
+Einzelfall von Hand frei. Die Berechtigungen änderst du nicht, und du nimmst keinen Umweg.
+
+**Lücken, die bleiben.** Die Muster sperren nicht alles. Bekannt und hingenommen:
+
+- Hinter `run` fragt Schreibendes nur, wenn `--write` dasteht oder der Unterbefehl in der Liste
+  oben steht. `-- git push` fragt trotzdem, weil es keine Freigabe hat.
+- `*` trifft auch Text in Anführungszeichen: `run <dienst> -- git commit -m "a -- git fetch"`
+  läuft ohne Rückfrage durch.
+- In OpenCode ist eine Zeile ohne passende Regel erlaubt. Umwege wie `env gh`, `bash -c "gh …"`,
+  ein absoluter Pfad zu `gh` oder ein Teil einer Kette nach `&&`, `;` oder `|` laufen dort
+  durch, soweit keine Regel des Projekts sie trifft. In Claude Code fragt eine Zeile ohne
+  Regel, außer einem Befehl, den Claude Code als nur lesend selbst erlaubt (etwa `ls`), auch
+  als Teil einer Kette.
+- `opencode run --auto` macht jede Rückfrage zur Freigabe; dort hält nur die Sperre.
+
+Eine Lücke ist kein Weg: Die Regel „GitHub über run“ gilt auch dort, wo der Client sie nicht
+durchsetzt.
+
 ### Ohne Dienst
 
 Ohne Dienst gilt der bisherige Weg über das aktive Konto von `gh`: `environment.gh.ready` und das
@@ -104,7 +141,8 @@ In diesen Fällen arbeitest du wie bisher, ohne `run`:
 - **Make-Ziele und Skripte:** Die, die `run` schon selbst rufen, laufen ohne weitere Hülle.
   Die übrigen wickelst du nicht in `run` ein; sie laufen wie bisher.
 - **Eine ausdrückliche Ansage des Nutzers**, etwa einen bestimmten Zugang oder nacktes `gh` zu
-  nehmen.
+  nehmen. In einem Projekt mit Dienst sperren die Berechtigungen des Clients nacktes `gh`
+  trotzdem (Abschnitt „Berechtigungen der Clients“).
 
 ### Verbote
 

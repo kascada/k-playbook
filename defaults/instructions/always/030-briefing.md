@@ -46,12 +46,5 @@ k-playbook selbst: Wie es aufgebaut ist, wie Anweisungen funktionieren und wie e
 aufgeteilt wird, steht in `k-playbook:/instructions/on-demand/k-playbook.md`. Lies es, bevor du
 dazu Auskunft gibst oder eine Projektregel anlegst, änderst, verschiebst oder abschaltest.
 
-Der Abruf `environment`: Umgebungsangaben, die nur einzelne Commands brauchen (`gh`, `github`,
-`baseTools`, `versionSources`, `docs`, `remediation`), stehen nicht im Briefing. Ein Command holt
-sie an der Stelle, an der er sie braucht — `k_playbook_briefing` mit `part: "environment"`,
-ersatzweise `k-playbook briefing --part environment` — und liest sie als `environment.<feld>`.
-Der Abruf vergibt keine Sitzungskennung und ist kein Neuladen des Briefings: Er wird bei Bedarf
-frisch geholt, auch mehrmals je Sitzung. `health` bewertet und nennt Abhilfen, `environment`
-liefert die Rohwerte.
-
-Alles Übrige zu den Feldern: `k-playbook:/instructions/on-demand/briefing-felder.md`.
+Alles Übrige zu den Feldern, auch zum Abruf `environment` für die Umgebungsangaben einzelner
+Commands: `k-playbook:/instructions/on-demand/briefing-felder.md`.

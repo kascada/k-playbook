@@ -877,6 +877,65 @@ Without a service `via.kind` is `account` and the line names the active login
 (`aktives gh-Konto <login>`, or the token variables of the server's environment). A fetch over a
 service answers with the same line in `via`.
 
+## Client permissions
+
+The rule "GitHub über run" is text in the instructions; what a client lets through without
+asking is decided by its permission list. In a project with a service, k-playbook therefore
+writes permission entries for Claude Code and OpenCode (task 190) that block the direct way and
+open the way over `run`:
+
+| Effect | Patterns | Clients |
+|---|---|---|
+| `deny` | `gh *`; `git clone*`, `git fetch*`, `git pull*`, `git push*`, `git ls-remote*`, `git remote update*`, each also as `git -C * <command>*` | both |
+| `ask` | `k-playbook github run *` -- every other line behind `run` asks | OpenCode only, before the `allow` entries |
+| `allow` | `k-playbook github run * -- gh *`; `k-playbook github run * -- git fetch*`, `pull*`, `clone*`, `ls-remote*`, `remote update*` | both |
+| `ask` | `k-playbook github run * --write *`, `k-playbook github run --write *`; behind `run * -- gh`: `pr merge*`, `pr create*`, `pr comment*`, `pr review*`, `pr close*`, `release*`, `repo*`, `api*-X*`, `api*--method*` | both |
+
+The patterns do not name the service, so an embedded repository with a service of its own is
+covered as well. How the clients apply them was measured with Claude Code 2.1.331 and OpenCode
+2.3.0: Claude Code evaluates `deny` before `ask` before `allow` across all files and asks when
+no rule matches, so a broad `ask` there would beat every `allow`; OpenCode takes the last
+matching rule over all configuration files in reading order and allows when no rule matches,
+so it needs the broad `ask` and k-playbook's entries at the end. `*` matches across spaces and
+into quoted text in both; chains with `&&`, `;` and `|` are checked part by part.
+
+- **Where.** Claude Code: `.claude/settings.local.json`, entries `Bash(<pattern>)` under
+  `permissions.allow|ask|deny`. OpenCode: `.opencode/opencode.jsonc`, `permission.bash`, which
+  OpenCode reads after `opencode.json`, `opencode.jsonc` and `.opencode/opencode.json` and which
+  therefore overrides them. Both stay out of version control: the service comes from the
+  personal access file, and a team member without one works with bare `gh`. If git neither
+  tracks nor ignores the file, k-playbook adds it to `.git/info/exclude` (path from the
+  repository root). A file tracked by git, a file reached through a symlink and a file whose
+  permissions are not an object or list stay untouched.
+- **When.** "Einrichten" of the MCP registration in the interface (`POST /api/mcp`), the
+  project step of `k-playbook upgrade` and the start care of the program all write the same:
+  missing entries are added, nothing else in the file changes (comments and foreign keys stay;
+  the file is re-indented once, as with MCP). In OpenCode k-playbook's entries are moved to the
+  end of `permission.bash` as one block. `k-playbook upgrade --check` reports what a run would
+  do.
+- **Without a service.** No access file, no GitHub remote, or no service for the repository:
+  nothing is written, and entries k-playbook wrote earlier are removed again. An entry counts as
+  k-playbook's when it carries exactly one of the patterns above with its effect in a target
+  file, and only if at least one such entry with `k-playbook github run` is there -- a single
+  `gh *` of the user's own stays. A user entry identical to one of k-playbook's next to them is
+  removed with them. When the access file has errors, the question is open, and nothing is
+  written or removed.
+- **Contradictions.** Entries of the project that say otherwise for an example line -- bare
+  `gh` or a network command of git allowed, a line behind `run` that should ask allowed (such as
+  `k-playbook github run*` as a whole), or the way over `run` denied or asking -- are reported
+  with a proposal in `upgrade`, "Einrichten", the start care and the health check, and never
+  changed. A stricter entry (`ask` where `deny` is wanted) is no contradiction. The report says
+  whether k-playbook's entries currently override the contradiction.
+
+Known gaps, accepted in task 190 and named in `defaults/instructions/on-demand/github.md`:
+`*` matches quoted text, so `k-playbook github run x -- git commit -m "a -- git fetch"` runs
+without asking; behind `run`, writing commands outside the list ask only with `--write`;
+OpenCode lets detours like `env gh`, `bash -c "gh …"` or an absolute path through, because a
+line without a rule is allowed there; targets without a service and an explicit wish of the
+user for bare `gh` are blocked as well and need a manual approval; and `git -C * fetch*` also
+blocks a local line that mentions the word after `-C`. `opencode run --auto` turns every `ask`
+into `allow`; only `deny` holds there.
+
 ## Relation to other pages
 
 - `local-github-ssh.md` describes one machine's SSH aliases and deploy keys by hand. That

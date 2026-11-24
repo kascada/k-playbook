@@ -362,13 +362,14 @@ func docsOrderStamp(stamps ...*kephalaion.Stamp) string {
 	return ""
 }
 
-// docsOrderAge rechnet, wie lange ein Zeitpunkt zurückliegt. ok ist false,
-// wenn kein Zeitpunkt vorliegt oder er sich nicht lesen lässt.
-func docsOrderAge(updated string, at time.Time) (time.Duration, bool) {
-	if strings.TrimSpace(updated) == "" {
+// docsOrderAge rechnet, wie lange ein Zeitpunkt zurückliegt — die letzte
+// Änderung oder, als Rückfall, das Anlegen. ok ist false, wenn kein Zeitpunkt
+// vorliegt oder er sich nicht lesen lässt.
+func docsOrderAge(stamp string, at time.Time) (time.Duration, bool) {
+	if strings.TrimSpace(stamp) == "" {
 		return 0, false
 	}
-	parsed, err := time.Parse(time.RFC3339Nano, updated)
+	parsed, err := time.Parse(time.RFC3339Nano, stamp)
 	if err != nil {
 		return 0, false
 	}

@@ -56,7 +56,11 @@ import (
 // CLAUDE.md/AGENTS.md, Anstoß ersetzen, Verlinkung; danach immer die
 // MCP-Einträge
 // (project.RepairMCPReport im Umfang des Starts,
-// MCPWriteOutdatedAndUnversioned).
+// MCPWriteOutdatedAndUnversioned), danach die Berechtigungen der Clients für
+// GitHub (project.ApplyGitHubPermissions, Task 190): in einem Projekt mit
+// Dienst die eigenen Einträge in .claude/settings.local.json und
+// .opencode/opencode.jsonc, ohne Dienst ihr Entfernen; Widersprüche des
+// Projekts werden mit Vorschlag gemeldet.
 // Am Ende der Hinweis auf den Neustart der Sitzung, wenn das Binary
 // gewechselt hat — der MCP-Server der Sitzung behält das alte Programm — und
 // ein eigener, wenn Kephalaion aktualisiert oder sein Node neu gestartet
@@ -223,6 +227,11 @@ type upgradeProjectReport struct {
 	MCPRepaired         []string `json:"mcpRepaired,omitempty"`
 	MCPRepairedPortable []string `json:"mcpRepairedPortable,omitempty"`
 	MCPMessage          string   `json:"mcpMessage,omitempty"`
+	// GitHubPermissions sind die Meldungen zu den Berechtigungen der Clients
+	// für GitHub (Task 190): was geschrieben, entfernt oder aus git
+	// ausgenommen wurde, was unberührt bleibt, und jeder Widerspruch des
+	// Projekts mit Vorschlag.
+	GitHubPermissions []string `json:"githubPermissions,omitempty"`
 	// Pending nennt bei --check, was ein Lauf an AGENTS.md, CLAUDE.md,
 	// Verlinkung und MCP-Einträgen täte.
 	Pending []string `json:"pending,omitempty"`
@@ -688,7 +697,8 @@ func describeKephalaionCheckFailed(check program.KephalaionCheck) []string {
 }
 
 // upgradeProject ist Schritt (2): derselbe Ablauf wie „Einrichten" in der
-// Oberfläche, danach immer die MCP-Einträge.
+// Oberfläche, danach immer die MCP-Einträge und die Berechtigungen der
+// Clients für GitHub.
 //
 // Die MCP-Reparatur läuft auch unter --project-only, immer im Umfang des
 // Starts (MCPWriteOutdatedAndUnversioned): Ein Lauf ersetzt einen veralteten
@@ -717,6 +727,12 @@ func upgradeProject(projectDir string) upgradeProjectReport {
 	repair := project.RepairMCPReport(projectDir, project.MCPWriteOutdatedAndUnversioned)
 	report.MCPRepaired, report.MCPRepairedPortable, report.MCPMessage = repair.Repaired, repair.Portable, repair.Message
 	if len(repair.Repaired) > 0 {
+		report.Changed = true
+	}
+
+	permissions := project.ApplyGitHubPermissions(projectDir)
+	report.GitHubPermissions = permissions.Lines()
+	if len(permissions.Written)+len(permissions.Removed)+len(permissions.Excluded) > 0 {
 		report.Changed = true
 	}
 	return report
@@ -767,6 +783,9 @@ func (r upgradeProjectReport) messages() []string {
 	}
 	if r.MCPMessage != "" {
 		lines = append(lines, "Projekt: "+r.MCPMessage)
+	}
+	for _, line := range r.GitHubPermissions {
+		lines = append(lines, "Projekt: "+line)
 	}
 	if r.Error != "" {
 		lines = append(lines, "Projekt: nicht vollständig nachgezogen — "+r.Error)
@@ -836,6 +855,20 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 		if status.State == project.MCPStateOutdated {
 			report.Pending = append(report.Pending, "veralteter MCP-Eintrag in "+status.Path+" würde korrigiert.")
 		}
+	}
+	permissions := project.CheckGitHubPermissions(projectDir)
+	for _, status := range permissions.Statuses {
+		switch {
+		case status.State == project.GitHubPermissionsMissing:
+			report.Pending = append(report.Pending, "GitHub-Berechtigungen für "+status.Assistant+" würden in "+status.Path+" eingetragen ("+status.Detail+").")
+		case status.State == project.GitHubPermissionsStale:
+			report.Pending = append(report.Pending, "GitHub-Berechtigungen von k-playbook würden aus "+status.Path+" entfernt: dem Projekt ist kein Dienst zugeordnet.")
+		case status.Unexcluded:
+			report.Pending = append(report.Pending, status.Path+" würde in .git/info/exclude eingetragen.")
+		}
+	}
+	for _, conflict := range permissions.Conflicts {
+		report.Pending = append(report.Pending, conflict.Sentence())
 	}
 	if len(report.Pending) == 0 {
 		report.Pending = []string{"nichts zu tun."}

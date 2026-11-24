@@ -62,6 +62,12 @@ func applyMCPHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		message = "Nicht vollständig eingerichtet: " + err.Error()
 	}
+	// Zum Einrichten gehören die Berechtigungen der Clients für GitHub
+	// (Task 190): in einem Projekt mit Dienst geschrieben, ohne Dienst
+	// entfernt; Widersprüche des Projekts kommen mit Vorschlag in die Meldung.
+	if lines := project.ApplyGitHubPermissions(environment.ProjectDir).Lines(); len(lines) > 0 {
+		message += " " + strings.Join(lines, " ")
+	}
 	writeJSON(w, http.StatusOK, mcpState(message))
 }
 

@@ -46,12 +46,45 @@ func TestUsageNenntAlleDocsUnterbefehle(t *testing.T) {
 	if next := regexp.MustCompile(`\n  \S`).FindStringIndex(paragraph); next != nil {
 		paragraph = paragraph[:next[0]]
 	}
-	paragraph = strings.Join(strings.Fields(paragraph), " ")
+	mentioned := docsUsageMentions(paragraph, names)
 	for _, name := range names {
-		if !strings.Contains(paragraph, "k-playbook docs "+name) {
+		if !mentioned[name] {
 			t.Errorf("printUsage nennt im Absatz docs nicht: k-playbook docs %s\n%s", name, paragraph)
 		}
 	}
+}
+
+// docsUsageMentions nennt die Unterbefehle, die ein Text erwähnt: an jeder
+// Stelle „k-playbook docs …“ der längste bekannte Name. So zählt „k-playbook
+// docs orders split“ nur für „orders split“, nicht zugleich für „orders“ — ein
+// Teilstring-Vergleich ließe das Fehlen von „docs orders <code|tools>“ durch.
+func docsUsageMentions(text string, names []string) map[string]bool {
+	known := map[string]bool{}
+	maxWords := 0
+	for _, name := range names {
+		known[name] = true
+		maxWords = max(maxWords, len(strings.Fields(name)))
+	}
+	words := strings.Fields(text)
+	for i := range words {
+		words[i] = strings.TrimRight(words[i], ",.;:")
+	}
+	mentioned := map[string]bool{}
+	for i := 0; i+2 < len(words); i++ {
+		if words[i] != "k-playbook" || words[i+1] != "docs" {
+			continue
+		}
+		longest := ""
+		for n := 1; n <= maxWords && i+2+n <= len(words); n++ {
+			if candidate := strings.Join(words[i+2:i+2+n], " "); known[candidate] {
+				longest = candidate
+			}
+		}
+		if longest != "" {
+			mentioned[longest] = true
+		}
+	}
+	return mentioned
 }
 
 // docsUsageSubcommands liest die Unterbefehle aus dem Block „Aufruf:“ von
