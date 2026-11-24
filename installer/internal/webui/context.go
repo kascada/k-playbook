@@ -6,15 +6,15 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// contextResponse ist der aufgelöste Arbeitsstand, wie ihn auch das
-// Unterkommando `context` ausgibt.
+// contextResponse ist der aufgelöste Arbeitsstand aus project.BuildContext —
+// die Kontextansicht der Oberfläche. Ein Unterkommando dafür gibt es seit
+// Task 188 nicht mehr.
 //
 // Rein lesend und nur auf Anforderung: die Oberfläche ruft ihn erst ab, wenn
 // der Block aufgeklappt wird.
 type contextResponse struct {
 	Available bool `json:"available"`
-	// Context ist der unveränderte Arbeitsstand, damit die Antwort dasselbe
-	// bedeutet wie die des Unterkommandos.
+	// Context ist der unveränderte Arbeitsstand aus BuildContext.
 	Context *project.Context `json:"context,omitempty"`
 	// Display trägt dieselben Pfade in Anzeigeform. Die Kürzung auf ~ braucht
 	// das Home-Verzeichnis und kann deshalb nur hier passieren.
@@ -43,9 +43,9 @@ func contextHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Wie das Unterkommando trägt auch diese Antwort die Anbindung an die
-	// Kephalaion-Collection — aus dem Zwischenspeicher der Statusseite, damit
-	// das Aufklappen den Node nicht ein zweites Mal fragt.
+	// Die Antwort trägt auch die Anbindung an die Kephalaion-Collection — aus
+	// dem Zwischenspeicher der Statusseite, damit das Aufklappen den Node
+	// nicht ein zweites Mal fragt.
 	status, _ := cachedKephalaionStatus(environment.ProjectDir)
 	built.Kephalaion = &status
 

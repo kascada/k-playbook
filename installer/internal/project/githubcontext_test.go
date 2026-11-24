@@ -328,9 +328,9 @@ func TestContextGitHubOhneTokenWert(t *testing.T) {
 	}
 }
 
-// ContextForDir füllt das Feld, BuildContext nicht; das Remote kommt ab dem
+// Der Teilabruf environment füllt das Feld github; das Remote kommt ab dem
 // Startverzeichnis, auch aus einem eigenen Repo unterhalb des Projekts.
-func TestContextForDirFuelltGitHub(t *testing.T) {
+func TestBriefingEnvironmentFuelltGitHub(t *testing.T) {
 	githubFakes(t)
 	githubConfig(t, githubTwoServices)
 	root := newBriefingProject(t)
@@ -344,20 +344,10 @@ func TestContextForDirFuelltGitHub(t *testing.T) {
 	run(t, nested, "git", "init", "-b", "main")
 	run(t, nested, "git", "remote", "add", "origin", "https://github.com/kascada/k-playbook-dev.git")
 
-	built, err := BuildContext(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if built.GitHub != nil {
-		t.Errorf("BuildContext füllt github: %+v", built.GitHub)
-	}
 	for dir, want := range map[string]string{root: "k-playbook", nested: "k-playbook-dev"} {
-		full, err := ContextForDir(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if full.GitHub == nil || strings.Join(full.GitHub.ProjectServices, ",") != want {
-			t.Errorf("ContextForDir(%s): %+v", dir, full.GitHub)
+		environment := BuildBriefingEnvironment(root, dir)
+		if environment.GitHub == nil || strings.Join(environment.GitHub.ProjectServices, ",") != want {
+			t.Errorf("BuildBriefingEnvironment(%s): %+v", dir, environment.GitHub)
 		}
 	}
 }

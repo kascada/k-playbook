@@ -4,9 +4,9 @@
 // erklärt sie.
 //
 // Es gibt genau diese eine Implementierung. Sie wird von mehreren Seiten
-// benutzt: vom Sammler des Inventars, von `k-playbook context`, das den
-// Zustand des Dokuments ausgibt, damit Commands es nicht selbst öffnen müssen,
-// von der Gesundheitsprüfung und von der Oberfläche. Zwei Leser derselben
+// benutzt: vom Sammler des Inventars, vom Teilabruf environment des
+// Briefings, der den Zustand des Dokuments ausgibt, damit Commands es nicht
+// selbst öffnen müssen, von der Gesundheitsprüfung und von der Oberfläche. Zwei Leser derselben
 // Konfiguration wären zwei Auslegungen derselben Vertrauensgrenze.
 //
 // Das Paket liegt neben `project` statt darin, weil `project` es importiert und
@@ -76,7 +76,7 @@ type Source struct {
 	Line int
 	// Valid ist false, wenn `kind` oder `env` unbekannt sind oder `path`
 	// absolut ist. Der Eintrag bleibt
-	// trotzdem in der Liste: die Kontextausgabe zeigt das Dokument so, wie es
+	// trotzdem in der Liste: der Teilabruf environment zeigt das Dokument so, wie es
 	// dasteht. Der Sammler überspringt ihn und führt die Ablehnung sichtbar.
 	Valid bool
 }
@@ -94,7 +94,7 @@ type HelmValue struct {
 	// Line ist die Zeile des Eintrags im Dokument.
 	Line int
 	// Valid ist false, wenn der Eintrag abgelehnt wurde. Wie bei `sources`
-	// bleibt der Eintrag in der Liste, damit die Kontextausgabe das Dokument
+	// bleibt der Eintrag in der Liste, damit der Teilabruf environment das Dokument
 	// zeigt, wie es dasteht.
 	Valid bool
 }
@@ -245,11 +245,11 @@ func IsUnavailable(err error) bool {
 // Der Rückgabefehler ist der abbrechende Fall — Kephalaion nicht erreichbar
 // (UnavailableError), kein lesbares Frontmatter, eine fremde schema_version
 // oder ein Schlüssel `roots`. Alle Aufrufwege bekommen denselben Befund und
-// entscheiden verschieden: der Erhebungslauf bricht ab, `k-playbook context`
-// gibt den Fehler als Zustand aus und läuft weiter. So steht es im Vertrag,
-// Abschnitt „State in the Context Output": context steht am Anfang jedes
-// Commands, und eine defekte Zusatzkonfiguration darf nicht jeden Command
-// lahmlegen.
+// entscheiden verschieden: der Erhebungslauf bricht ab, der Teilabruf
+// environment des Briefings gibt den Fehler als Zustand aus und läuft weiter.
+// So steht es im Vertrag (defaults/docs/handbook/version-inventory.md,
+// Abschnitt „State in the Environment Part“): Eine
+// defekte Zusatzkonfiguration darf nicht jeden Command lahmlegen.
 //
 // Ein fehlendes Dokument ist kein Fehler.
 func Load(ctx context.Context, reader Reader) (Config, error) {

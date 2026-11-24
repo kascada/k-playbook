@@ -51,37 +51,28 @@ func TestReadConfigKephalaionBlock(t *testing.T) {
 	}
 }
 
-// Der Block kephalaion steht in jeder Kontextausgabe und lässt sie nie
-// scheitern — auch nicht bei ungültigem Eintrag oder fehlendem Binary.
-func TestContextForDirTraegtKephalaion(t *testing.T) {
+// KephalaionStatus meldet die Anbindung immer als Zustand und scheitert nie —
+// auch nicht bei ungültigem Eintrag oder fehlendem Binary.
+func TestKephalaionStatusScheitertNie(t *testing.T) {
 	kephtest.NoBinary(t)
 	root := newContextProject(t)
 
-	built, err := ContextForDir(root)
-	if err != nil {
-		t.Fatalf("ContextForDir: %v", err)
-	}
-	if built.Kephalaion == nil || built.Kephalaion.State != kephalaion.StateNotConfigured || built.Kephalaion.Configured ||
-		!strings.Contains(built.Kephalaion.Message, ConfigDisplayName) {
-		t.Fatalf("ohne Eintrag: %+v", built.Kephalaion)
+	status := KephalaionStatus(root)
+	if status.State != kephalaion.StateNotConfigured || status.Configured ||
+		!strings.Contains(status.Message, ConfigDisplayName) {
+		t.Fatalf("ohne Eintrag: %+v", status)
 	}
 
 	withKephalaionBlock(t, root, "kephalaion:\n  hub: vm\n  collection: k-playbook\n")
-	built, err = ContextForDir(root)
-	if err != nil {
-		t.Fatalf("ContextForDir: %v", err)
-	}
-	if built.Kephalaion.State != kephalaion.StateNoKephalaion || built.Kephalaion.Address != "vm:k-playbook" {
-		t.Fatalf("ohne Kephalaion: %+v", built.Kephalaion)
+	status = KephalaionStatus(root)
+	if status.State != kephalaion.StateNoKephalaion || status.Address != "vm:k-playbook" {
+		t.Fatalf("ohne Kephalaion: %+v", status)
 	}
 
 	withKephalaionBlock(t, root, "kephalaion:\n  hub: ../vm\n  collection: k-playbook\n")
-	built, err = ContextForDir(root)
-	if err != nil {
-		t.Fatalf("ungültiger Eintrag bricht den Kontext ab: %v", err)
-	}
-	if built.Kephalaion.State != kephalaion.StateInvalidEntry {
-		t.Fatalf("ungültig: %+v", built.Kephalaion)
+	status = KephalaionStatus(root)
+	if status.State != kephalaion.StateInvalidEntry {
+		t.Fatalf("ungültig: %+v", status)
 	}
 }
 
@@ -102,17 +93,15 @@ func TestBuildContextFragtKephalaionNicht(t *testing.T) {
 }
 
 // Ein Token im Block kephalaion: — als Wert oder als nackte Zeile — erscheint
-// nicht in der Kontextausgabe.
-func TestContextForDirZitiertKeinenDateiinhalt(t *testing.T) {
+// nicht im Zustand der Anbindung, den Briefing und Oberfläche ausgeben.
+func TestKephalaionStatusZitiertKeinenDateiinhalt(t *testing.T) {
 	const token = "keph_CONTEXTLEAKCANARYabcdefghijklmnopqrstuvw1234"
 	kephtest.NoBinary(t)
 	root := newContextProject(t)
 	withKephalaionBlock(t, root, "kephalaion:\n  hub: "+token+"\n  collection: k-playbook\n"+token+"\n  account: "+token+"\n")
 
-	built, err := ContextForDir(root)
-	if err != nil {
-		t.Fatalf("ContextForDir: %v", err)
-	}
+	status := KephalaionStatus(root)
+	built := Context{Kephalaion: &status}
 	data, err := json.Marshal(built)
 	if err != nil {
 		t.Fatal(err)

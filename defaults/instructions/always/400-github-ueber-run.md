@@ -11,8 +11,9 @@ Arbeitsverzeichnisses nennt ihn die Briefing-Zeile `GitHub: dieses Repo = Dienst
 (zusätzlich das Feld `github.projectServices`), für ein anderes Repo
 `k-playbook github show`. Gibt es keinen Dienst oder keine Zugangsdatei, arbeitest du wie bisher.
 
-Schlägt `run` fehl, weichst du nicht still auf nacktes `gh` oder `git` aus und wechselst den
-Zugang nicht ungefragt. Einen Token-Wert gibst du nie aus.
+Schlägt `run` fehl oder lehnen der Nutzer oder die Berechtigungen des Clients den Aufruf ab,
+weichst du nicht auf nacktes `gh` oder `git` aus und wechselst den Zugang nicht ungefragt.
+Einen Token-Wert gibst du nie aus.
 
 Die übrigen Ausnahmen, das Fehlerbild und die Verbote stehen in
 `k-playbook:/instructions/on-demand/github.md`; lies es vor dem ersten GitHub-Zugriff der Sitzung.

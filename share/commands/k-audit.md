@@ -16,6 +16,21 @@ und erst nach dem Umbau wieder geht.
 
 Der Text darunter bleibt als Vorlage für den Umbau stehen.
 
+<!-- NACHZIEHEN: `catalogs.reviews` kam aus der Ausgabe des entfernten context-Befehls; der
+Befehl ist mit Task 188 entfernt, die Stellen unten haben keine Quelle mehr: „Schritt 1 — Pfade
+und Lauf bestimmen“ (`scan-triage` ist kein Eintrag aus `catalogs.reviews`), „Schritt 3 —
+Auswahl für einen neuen Lauf klären“ (aktive AI-Review-Rezepte aus `catalogs.reviews`;
+`scan-triage` nicht daraus abgeleitet) und „Schritt 7 — Katalog-Perspektiven ausführen“
+(Einträge mit `mode: perspective` aus `catalogs.reviews`). Beim Neubau kommt die Rezeptliste
+aus `documents.reviews` des Briefings (je Eintrag `ref`, `title`, `description`, `origin`; die
+Überlagerung ist dort schon gerechnet). Die Modi — die Blöcke `audit` und `review` mit
+`enabled`, `mode`, `ruleIds`, `scope.paths`/`scope.tools`, `resultRequired`, `defaultResult` —
+stehen im Frontmatter des Rezepts, das der Command ohnehin mit `k_playbook_doc_read` liest.
+Offen und beim Neubau zu entscheiden: ob jeder Eintrag in `documents.reviews` zwei kleine
+Schalter bekommt (etwa `modes: [audit, review]`), damit die Auswahl nicht jedes Rezept lesen
+muss; die Regel, was die Modi bedeuten, kommt als Include der Review-Familie
+(`_review-run/rezepte.md`). -->
+
 ## Erster Schritt
 
 Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit

@@ -421,7 +421,7 @@ func openKephClientFor(projectDir string, collection string) (*kephalaion.Client
 }
 
 // openKephClientStatus ist openKephClientFor mit einem Status, den der
-// Aufrufer schon geprüft hat — etwa ContextForDir, das ihn ohnehin ausgibt —,
+// Aufrufer schon geprüft hat — etwa das Briefing, das ihn ohnehin ausgibt —,
 // damit der Node nicht ein zweites Mal gefragt wird.
 func openKephClientStatus(projectDir string, collection string, status kephalaion.Status) (*kephalaion.Client, string, error) {
 	if !status.OK {

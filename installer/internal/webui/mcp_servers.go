@@ -61,7 +61,7 @@ func mcpServersState() mcpServersResponse {
 	inventory, err := project.MCPServerInventoryFor(environment.ProjectDir)
 	response.MCPServerInventory = inventory
 	if err != nil {
-		// `k-playbook context` bricht an derselben Datei ab. Die Oberfläche
+		// BuildContext bricht an derselben Datei ab. Die Oberfläche
 		// bleibt bedienbar, sagt aber ebenso deutlich, dass etwas nicht stimmt.
 		response.RequiredError = err.Error()
 		response.Message = "Pflichtliste nicht lesbar: " + err.Error()

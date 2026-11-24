@@ -6,6 +6,18 @@ von `review-input.json`. Der Audit-Eintrag `scan-triage` gehört nicht zu
 `catalogs.reviews`; er entsteht aus dem effektiven Command-Namensraum
 `commands/_audit/review-scan-triage.md`.
 
+<!-- NACHZIEHEN: `catalogs.reviews` kam aus der Ausgabe des entfernten context-Befehls; der
+Befehl ist mit Task 188 entfernt, die Stelle hat keine Quelle mehr: der Absatz direkt darüber
+am Anfang dieses Moduls (der Audit-Eintrag `scan-triage` gehört nicht zu `catalogs.reviews`).
+Beim Neubau kommt die Rezeptliste aus `documents.reviews` des Briefings (je Eintrag `ref`,
+`title`, `description`, `origin`; die Überlagerung ist dort schon gerechnet). Die Modi — die
+Blöcke `audit` und `review` mit `enabled`, `mode`, `ruleIds`, `scope.paths`/`scope.tools`,
+`resultRequired`, `defaultResult` — stehen im Frontmatter des Rezepts, das der Command ohnehin
+mit `k_playbook_doc_read` liest. Offen und beim Neubau zu entscheiden: ob jeder Eintrag in
+`documents.reviews` zwei kleine Schalter bekommt (etwa `modes: [audit, review]`), damit die
+Auswahl nicht jedes Rezept lesen muss; die Regel, was die Modi bedeuten, kommt als Include der
+Review-Familie (`_review-run/rezepte.md`). -->
+
 Der Ort `_audit/` ist Herkunft, nicht Zuständigkeit: an ihm hängen die Konstante
 `scanTriageModule`, der Eintragsname `scan-triage` und bestehende projektlokale Overlays.
 Das Modul ist nicht audit-exklusiv — beide Wege wenden denselben Wortlaut an.

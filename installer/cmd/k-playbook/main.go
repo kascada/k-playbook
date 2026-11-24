@@ -1,8 +1,8 @@
 // Command k-playbook ist das Werkzeug für die projektlokale k-playbook-Installation.
 //
-// Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `context`
-// gibt den aufgelösten Arbeitsstand als JSON aus, `mcp` bietet dieselbe Auskunft
-// einem Assistenten als MCP-Werkzeug an, `scan` führt die Werkzeug-Einträge
+// Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `mcp`
+// bietet Briefing, Dokumente, Todos und die übrigen Auskünfte einem Assistenten
+// als MCP-Werkzeuge an, `scan` führt die Werkzeug-Einträge
 // eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
 // `inventory` erhebt das Versionsinventar des Projekts, `docs` holt erzeugte
 // Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo` verwaltet die
@@ -20,7 +20,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -31,7 +30,6 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/procgroup"
-	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/release"
 	"github.com/kascada/k-playbook/installer/internal/vscodeext"
 	"github.com/kascada/k-playbook/installer/internal/webui"
@@ -78,10 +76,12 @@ func run(args []string) error {
 	case "config":
 		return runConfig(args[1:])
 	case "context":
-		// Ohne Wirt-Pflege: deren Ausgabe würde die JSON-Ausgabe stören.
-		// Die Assistenten-Verlinkung zieht ContextForDir dabei nach — das ist
-		// projektbezogen und gehört deshalb hierher, nicht in den Startpfad.
-		return printContext()
+		// Entfernt mit Task 188. Kein stilles „unbekanntes Kommando“: Eine
+		// Sitzung in einem Projekt mit altem Anstoß in AGENTS.md ruft den
+		// Befehl noch, bevor Einrichten, Oberfläche oder upgrade den Anstoß
+		// ersetzt haben — sie soll in einem Satz lesen, was an seine Stelle
+		// tritt. Ohne Hilfetext, ohne Wirt-Pflege.
+		return errContextRemoved
 	case "mcp":
 		// Ohne Wirt-Pflege: stdout trägt den JSON-RPC-Strom, und eine einzige
 		// fremde Zeile daneben macht die Verbindung unbrauchbar.
@@ -103,13 +103,12 @@ func run(args []string) error {
 	case "inventory":
 		// Wie scan und merge ohne Wirt-Pflege: die Erhebung liest die
 		// deklarativen Quellen des Projekts und schreibt genau eine Datei
-		// darunter — den Host fasst sie dabei nicht nebenbei an. Dazu kommt der
-		// Grund von context: die Meldungen der Bereinigung gingen nach stdout
-		// und stünden mitten im Bericht des Laufs, in dem jede Ablehnung
-		// sichtbar sein muss.
+		// darunter — den Host fasst sie dabei nicht nebenbei an. Dazu kommt:
+		// die Meldungen der Bereinigung gingen nach stdout und stünden mitten
+		// im Bericht des Laufs, in dem jede Ablehnung sichtbar sein muss.
 		return runInventory(args[1:])
 	case "todo":
-		// Ohne Wirt-Pflege aus demselben Grund wie context: die Ausgabe ist
+		// Ohne Wirt-Pflege wie briefing: die Ausgabe ist
 		// maschinenlesbar und darf keine Bereinigungsmeldungen tragen.
 		return runTodo(args[1:])
 	case "task":
@@ -133,8 +132,9 @@ func run(args []string) error {
 		// Exit-Code.
 		return runFindings(args[1:])
 	case "briefing":
-		// Ohne Wirt-Pflege wie context: die Ausgabe ist das Briefing, als
-		// Klartext oder JSON, und sonst nichts.
+		// Ohne Wirt-Pflege: die Ausgabe ist das Briefing, als Klartext oder
+		// JSON, und sonst nichts — eine Bereinigungsmeldung daneben störte
+		// die JSON-Ausgabe.
 		return runBriefing(args[1:])
 	case "health":
 		// Ohne Wirt-Pflege wie briefing: die Ausgabe ist die Liste der
@@ -167,7 +167,7 @@ func run(args []string) error {
 		// sie entscheidet, ob nachinstalliert wird.
 		return runVersion(os.Stdout, args[1:])
 	case "gui":
-		// Ohne Wirt-Pflege aus demselben Grund wie context und todo: die
+		// Ohne Wirt-Pflege aus demselben Grund wie briefing und todo: die
 		// Ausgabe ist maschinenlesbar und darf keine Meldungen der
 		// Bereinigung tragen. Dazu kommt der Grund von stop, nur umgekehrt:
 		// wer nach dem Zustand fragt, will nichts eingerichtet bekommen.
@@ -281,24 +281,10 @@ func runVersion(out io.Writer, args []string) error {
 	return err
 }
 
-// printContext gibt den Arbeitsstand aus: Pfade, Konfiguration und die
-// aufgelösten Kataloge. Damit muss ein Command die Overlay-Regeln nicht selbst
-// anwenden.
-func printContext() error {
-	workdir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	context, err := project.ContextForDir(workdir)
-	if err != nil {
-		return err
-	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(context)
-}
+// errContextRemoved ist die Antwort auf das entfernte Unterkommando context:
+// ein Satz auf stderr (über main, mit „Fehler: “ davor) und Exit-Code 1.
+var errContextRemoved = errors.New("das Kommando context ist entfernt — an seine Stelle tritt k-playbook briefing, " +
+	"die Umgebungsangaben liefert k-playbook briefing --part environment")
 
 func printUsage() {
 	fmt.Fprint(os.Stderr, `k-playbook
@@ -312,14 +298,9 @@ Unterkommandos:
              Legt K-PLAYBOOK.yaml explizit an. Ohne Hauptverzeichnis wird das
              Arbeitsverzeichnis verwendet; eine vorhandene Datei bleibt immer
              unverändert.
-  context   Gibt den aufgelösten Arbeitsstand als JSON aus: Pfade,
-            Konfiguration und den effektiven Katalog für reviews.
-            Gesucht wird ab dem Arbeitsverzeichnis aufwärts.
-            Zieht dabei die Assistenten-Verlinkung auf den Katalog nach;
-            was sich geändert hat, steht unter "links".
-  mcp       Startet einen MCP-Server über stdin/stdout, der dieselbe Auskunft
-            als Werkzeug anbietet. Gedacht für den Aufruf durch einen
-            Assistenten, nicht für die Hand.
+  mcp       Startet einen MCP-Server über stdin/stdout, der Briefing,
+            Dokumente, Todos und die übrigen Auskünfte als Werkzeuge anbietet.
+            Gedacht für den Aufruf durch einen Assistenten, nicht für die Hand.
   scan      Vorübergehend nicht verfügbar: Die Ablage der Review-Ergebnisse
             wird umgebaut; das Kommando endet mit der Sperre und Exit-Code 1
             und schreibt nichts. Sonst: führt die Werkzeug-Einträge eines

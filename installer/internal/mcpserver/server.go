@@ -1,8 +1,9 @@
-// Package mcpserver bietet den aufgelösten Arbeitsstand als MCP-Werkzeug an.
-//
-// Es ist die dritte Fassade auf project.BuildContext, neben dem Subkommando
-// `context` und dem Web-Endpunkt. Alle drei geben dieselbe Antwort; wer eine
-// vierte Quelle aufmacht, bekommt zwangsläufig eine abweichende.
+// Package mcpserver bietet die Auskünfte und Operationen von k-playbook als
+// MCP-Werkzeuge an: Briefing, Umgebungsprüfung, Dokumente der Collection,
+// Todos, Doku-Aufträge, Sperre, Oberfläche und die gesperrten
+// Review-Werkzeuge. Jedes Werkzeug ist eine Hülle über derselben Funktion
+// wie das gleichnamige Unterkommando; eine eigene Fassung im Server gibt es
+// nicht.
 //
 // Der Paketname ist bewusst nicht `mcp`: so heißt das Paket des SDK.
 package mcpserver
@@ -31,24 +32,6 @@ const (
 	serverVersion = "0.1.0"
 )
 
-// contextInput ist die Eingabe des Werkzeugs.
-//
-// Der Parameter ist der einzige Weg, das Projekt zu bestimmen. Ein
-// stdio-Server wird einmal vom Client gestartet und behält dessen
-// Arbeitsverzeichnis über die ganze Sitzung; die Spec verlangt darum, dass
-// solcher Zustand über einen expliziten Bezeichner läuft und nicht über die
-// Verbindung.
-type contextInput struct {
-	Dir string `json:"dir,omitempty" jsonschema:"Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Ohne Angabe gilt das Arbeitsverzeichnis des Serverprozesses — das ist nicht zwingend das Projekt, an dem gerade gearbeitet wird. Im Zweifel angeben."`
-}
-
-const toolDescription = `Gibt den aufgelösten Arbeitsstand eines k-playbook-Projekts zurück: ` +
-	`Pfade, Remediation-Policy ` +
-	`und den effektiven Katalog für reviews — mitgeliefert und ` +
-	`projekteigen bereits zusammengeführt. Zieht dabei die Assistenten-Verlinkung ` +
-	`auf den Katalog nach und meldet unter "links", was sich geändert hat. ` +
-	`Dieselbe Antwort wie das Subkommando "k-playbook context".`
-
 // Run startet den Server und blockiert, bis der Client die Verbindung schließt
 // oder ctx abgebrochen wird.
 //
@@ -62,10 +45,6 @@ func Run(ctx context.Context) error {
 		Version: serverVersion,
 	}, nil)
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "k_playbook_context",
-		Description: toolDescription,
-	}, contextTool)
 	addReviewTools(server)
 	addTodoTools(server)
 	addDocTools(server)
@@ -193,41 +172,4 @@ const sessionEndMarker = "server is closing"
 // die Tests in cmd/k-playbook verlangen einen sauberen Abgang.
 func isSessionEnd(err error) bool {
 	return strings.Contains(err.Error(), sessionEndMarker)
-}
-
-// contextTool löst den Arbeitsstand bei jedem Aufruf neu auf. Kein
-// Zwischenspeicher über die Sitzung: der Client kann nacheinander nach
-// verschiedenen Projekten fragen, und eine Konfiguration kann sich zwischen
-// zwei Aufrufen ändern.
-//
-// Der Rückgabewert ist any statt project.Context. Damit entsteht kein
-// Ausgabeschema, das sonst bei jedem tools/list mitginge, und der Inhalt ist
-// Zeichen für Zeichen derselbe wie beim Subkommando — nur so lässt sich die
-// Gleichheit beider Fassaden überhaupt prüfen.
-//
-// Ein zurückgegebener Fehler wird vom SDK zum Werkzeugfehler, nicht zum
-// Protokollfehler: der Server bleibt für den nächsten Aufruf ansprechbar.
-func contextTool(ctx context.Context, req *mcp.CallToolRequest, in contextInput) (*mcp.CallToolResult, any, error) {
-	dir := in.Dir
-	if dir == "" {
-		workdir, err := os.Getwd()
-		if err != nil {
-			return nil, nil, fmt.Errorf("Arbeitsverzeichnis ermitteln: %w", err)
-		}
-		dir = workdir
-	}
-
-	built, err := project.ContextForDir(dir)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	encoded, err := json.MarshalIndent(built, "", "  ")
-	if err != nil {
-		return nil, nil, fmt.Errorf("Arbeitsstand kodieren: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: string(encoded)}},
-	}, nil, nil
 }

@@ -49,7 +49,7 @@ var languageManifests = []languageManifest{
 // Keine Rekursion. Geprüft wird nur die oberste Ebene von project.repo_root
 // und, falls verschieden, die oberste Ebene des Hauptverzeichnisses: ein
 // rekursiver Lauf träfe node_modules/, vendor/ und Monorepo-Rauschen und
-// liefe bei jedem `k-playbook context` mit. Eine Ausschlussliste braucht es
+// liefe bei jedem Briefing mit. Eine Ausschlussliste braucht es
 // so nicht — auch ein liegengebliebener Clone <projekt>/k-playbook/ ist ein
 // Verzeichnis, kein Manifest. Ist die Konfiguration nicht lesbar, gilt das
 // Hauptverzeichnis allein.
@@ -109,7 +109,7 @@ func ValidLanguage(language string) bool {
 // erst auf ausdrückliche Wahl.
 //
 // Die Erkennung sitzt hier und nicht in der Oberfläche, damit Oberfläche,
-// `k-playbook context` und der Tool-Preflight dieselbe Antwort geben.
+// Briefing und der Tool-Preflight dieselbe Antwort geben.
 func ReadLanguages(projectDir string) ([]string, bool, error) {
 	data, err := os.ReadFile(ConfigPath(projectDir))
 	if err != nil {

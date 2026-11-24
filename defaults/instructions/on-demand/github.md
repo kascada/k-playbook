@@ -1,6 +1,6 @@
 ---
 title: GitHub über run
-description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
+description: Wie eine Sitzung GitHub über k-playbook github run erreicht — den Dienst nach dem Ziel-Repo bestimmen, --write und das Nennen vor dem Schreiben, das Fehlerbild samt Exit-Codes 125, 126 und 127, eine Ablehnung durch Nutzer oder Client, der Weg ohne Dienst mit der Zugangsdatei als Abhilfe, die vier Ausnahmen, in denen es beim Bisherigen bleibt, die Verbote rund um Token und Anmeldung und Beispiele.
 ---
 
 ## GitHub über run
@@ -16,7 +16,8 @@ Maßgeblich ist das Repo, auf das der Befehl zielt, nicht das Arbeitsverzeichnis
 
 - **Repo des Arbeitsverzeichnisses:** Die Briefing-Zeile `GitHub: dieses Repo = Dienst … —
   run: …` nennt den Dienst, dazu das Feld `github.projectServices`. Beides zeigt den
-  Stand beim Laden des Briefings.
+  Stand beim Laden des Briefings und gilt nur für das Repo an der Projektwurzel. Ein eigenes
+  Repo in einem Unterverzeichnis (etwa ein eingebetteter Clone) ist ein anderes Repo.
 - **Ein anderes Repo** — `gh … --repo <owner>/<repo>`, `gh api` gegen eine andere Org,
   `git clone` eines fremden Repos: `k-playbook github show` nennt alle Dienste, je mit ihrem
   `repo`, und den aktuellen Stand.
@@ -63,6 +64,15 @@ Deutet der Fehler auf die Anmeldung, prüft `k_playbook_github_test` (ersatzweis
 `k-playbook github test <dienst>`) die Zugänge des Dienstes. Eine andere Wahl mit `--use <typ>`
 oder `--skip <typ>` schlägst du vor; du nimmst sie nicht selbst. Nacktes `gh` oder `git` als
 Ersatz gibt es nicht.
+
+Lehnen der Nutzer oder die Berechtigungen des Clients den Aufruf von `run` ab, ist das kein
+Fehler von `run`, von git oder von GitHub. Du nimmst keinen anderen Aufrufweg, der die
+Ablehnung umgeht — weder nacktes `gh` oder `git` noch ein Skript —, sondern nennst den
+abgelehnten Befehl und klärst die Freigabe mit dem Nutzer.
+
+Lokale git-Befehle ohne Netz (Abschnitt „Ausnahmen“) wickelst du nicht in `run`: Sie
+erreichen GitHub nicht, und eine Freigabe für `run` würde die Regeln des Clients für git
+umgehen.
 
 ### Ohne Dienst
 

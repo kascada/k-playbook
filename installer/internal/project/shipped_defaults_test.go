@@ -259,12 +259,17 @@ func TestMitgelieferteTexteNennenKeinLokalesVerzeichnis(t *testing.T) {
 // Commands und Skills unter defaults/ und share/ nennen weder `context.` als
 // Feldpräfix noch `k-playbook context` bzw. `k_playbook_context` als Aufruf
 // noch `k-playbook briefing --json` als Ersatzweg über die Shell — der ist der
-// Klartext. Ein Zeilenumbruch zwischen den Wörtern zählt als Leerzeichen. Das
-// Handbuch unter defaults/docs/handbook/ prüft dieser Test nicht: Es
-// beschreibt Befehl und Werkzeug selbst und darf `--json` weiter nennen. Die
-// Stellen, die `catalogs.reviews` aus der Kontextausgabe holen (die gesperrten
+// Klartext. Ein Zeilenumbruch zwischen den Wörtern zählt als Leerzeichen. Die
+// Stellen, die `catalogs.reviews` aus der Kontextausgabe holten (die gesperrten
 // /k-review und /k-audit mit _audit/review-scan-triage.md), nennen keinen der
-// Aufrufe und bleiben.
+// Aufrufe und bleiben; ihr Vermerk für den Neubau umschreibt den Befehl nur.
+//
+// Seit Task 188 sind Befehl und Werkzeug entfernt, und auch das Handbuch unter
+// defaults/docs/handbook/ wird geprüft, aber nur auf diese beiden Aufrufe: Es
+// nennt `k-playbook context` und `k_playbook_context` nur noch in Absätzen
+// (Text zwischen Leerzeilen), die `superseded` oder `removed` enthalten — die
+// abgelösten Anstoß-Fassungen und das Entfernen selbst. Die übrigen Muster
+// gelten dort nicht: Das Handbuch darf etwa `--json` weiter nennen.
 func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 	patterns := map[string]*regexp.Regexp{
 		"context. als Feldpräfix":       regexp.MustCompile(`(^|[^A-Za-z0-9_./-])context\.[A-Za-z]`),
@@ -284,8 +289,9 @@ func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 			}
 			rel := filepath.ToSlash(strings.TrimPrefix(path, root+string(filepath.Separator)))
 			if entry.IsDir() {
-				// Das Handbuch zieht Etappe 6 nach; testdata sind feste Fälle
-				// für die Includes.
+				// Das Handbuch prüft die Absatzregel unten
+				// (assertHandbookNamesContextOnlyAsRemoved); testdata sind
+				// feste Fälle für die Includes.
 				if dir == "defaults" && (rel == "docs/handbook" || rel == "testdata") {
 					return filepath.SkipDir
 				}
@@ -317,6 +323,7 @@ func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 			t.Fatalf("%s: nur %d Dateien gelesen", dir, files)
 		}
 	}
+	assertHandbookNamesContextOnlyAsRemoved(t)
 	// Das Modul, das `k-playbook context` rief, gibt es nicht mehr.
 	if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", "_shared", "context.md")); !os.IsNotExist(err) {
 		t.Errorf("share/commands/_shared/context.md liegt noch (%v)", err)
@@ -355,6 +362,73 @@ func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 	}
 	if audit := space.ReplaceAllString(readRepoShare(t, "commands/k-audit.md"), " "); !strings.Contains(audit, "Löse aus dem Briefing: - `RESOLVED_PROJECT_DIR` = `project.dir` - `TODAY` = `now.date`") {
 		t.Errorf("k-audit.md löst project.dir und now.date in Schritt 1 nicht aus dem Briefing auf")
+	}
+}
+
+// Die gesperrten Review-Texte tragen einen Vermerk für den Neubau (Task 188):
+// catalogs.reviews hat mit dem entfernten context-Befehl keine Quelle mehr, und
+// der Vermerk nennt documents.reviews als Quelle der Rezeptliste. Er ist ein
+// Kommentar mit der Marke NACHZIEHEN und ändert nichts am Aufruf: Bei /k-review
+// und /k-audit bleibt „Vorübergehend nicht verfügbar“ der erste Abschnitt, der
+// Vermerk steht darin vor „Erster Schritt“.
+func TestGesperrteReviewTexteTragenVermerk(t *testing.T) {
+	comment := regexp.MustCompile(`(?s)<!-- NACHZIEHEN:(.*?)-->`)
+	for _, rel := range []string{"commands/k-review.md", "commands/k-audit.md", "commands/_audit/review-scan-triage.md"} {
+		text := readRepoShare(t, rel)
+		found := false
+		for _, match := range comment.FindAllStringSubmatchIndex(text, -1) {
+			body := text[match[2]:match[3]]
+			if strings.Contains(body, "`catalogs.reviews`") && strings.Contains(body, "`documents.reviews`") {
+				found = true
+				if rel != "commands/_audit/review-scan-triage.md" {
+					paused := strings.Index(text, "\n## Vorübergehend nicht verfügbar\n")
+					first := strings.Index(text, "\n## ")
+					next := strings.Index(text, "\n## Erster Schritt\n")
+					if paused < 0 || paused != first || match[0] < paused || next < 0 || match[0] > next {
+						t.Errorf("share/%s: Vermerk nicht im ersten Abschnitt „Vorübergehend nicht verfügbar“", rel)
+					}
+				}
+			}
+		}
+		if !found {
+			t.Errorf("share/%s trägt keinen Vermerk NACHZIEHEN mit catalogs.reviews und documents.reviews", rel)
+		}
+	}
+}
+
+// assertHandbookNamesContextOnlyAsRemoved prüft die Absatzregel für das
+// Handbuch (Task 188): `k-playbook context` und `k_playbook_context` stehen
+// nur in Absätzen, die `superseded` oder `removed` enthalten. Ein Absatz ist
+// Text zwischen Leerzeilen; Zeilenumbrüche darin zählen als Leerzeichen.
+func assertHandbookNamesContextOnlyAsRemoved(t *testing.T) {
+	t.Helper()
+	calls := regexp.MustCompile(`k-playbook context\b|k_playbook_context`)
+	blank := regexp.MustCompile(`\n[ \t]*\n`)
+	space := regexp.MustCompile(`\s+`)
+	root := filepath.Join("..", "..", "..", "defaults", "docs", "handbook")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("Handbuch lesen: %v", err)
+	}
+	pages := 0
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		pages++
+		for _, paragraph := range blank.Split(string(data), -1) {
+			text := space.ReplaceAllString(paragraph, " ")
+			if calls.MatchString(text) && !strings.Contains(text, "superseded") && !strings.Contains(text, "removed") {
+				t.Errorf("defaults/docs/handbook/%s nennt den entfernten Befehl oder das Werkzeug außerhalb eines Absatzes mit superseded oder removed: %s", entry.Name(), text)
+			}
+		}
+	}
+	if pages < 10 {
+		t.Fatalf("Handbuch: nur %d Seiten gelesen", pages)
 	}
 }
 

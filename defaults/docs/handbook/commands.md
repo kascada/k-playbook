@@ -125,7 +125,7 @@ The output names the date, the resolved directories and the documents that apply
 
 The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of reviews has changed, or work has moved to another project. The partial call is not such a reload: it is fetched fresh whenever a command needs it.
 
-`/k-review` is paused; it still takes the review modes from `catalogs.reviews` of the older call `k-playbook context` until it is rebuilt. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
+`/k-review` is paused; its text stays as the template for the rebuild of the reviews and carries a `NACHZIEHEN` note: the review modes have no source in it any more, and in the rebuild the recipe list comes from the briefing's `documents.reviews` and the modes from each recipe's frontmatter. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
 
 There is no check runner any more: `k-check` and the shipped checks were removed in task 155.
 

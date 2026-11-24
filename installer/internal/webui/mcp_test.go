@@ -67,7 +67,7 @@ func TestProbeMCPServerLaeuftOhneGeerbteShellPath(t *testing.T) {
 	writeExecutable(t, binary, `#!/bin/sh
 printf '%s\n%s\n' "$PATH" "$PWD" > `+beleg+`
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25","serverInfo":{"name":"k-playbook","version":"test"}}}'
-printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"k_playbook_context","description":"Arbeitsstand"}]}}'
+printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"probe_werkzeug","description":"Gespieltes Werkzeug"}]}}'
 `)
 
 	response := probeMCPServer(projectRoot)
@@ -77,8 +77,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"k_playbook_co
 	if response.Command != binary+" "+project.MCPSubcommand {
 		t.Errorf("Command = %q, erwartet %q", response.Command, binary+" "+project.MCPSubcommand)
 	}
-	if len(response.Tools) != 1 || response.Tools[0].Name != "k_playbook_context" {
-		t.Errorf("Werkzeuge = %+v, erwartet k_playbook_context", response.Tools)
+	if len(response.Tools) != 1 || response.Tools[0].Name != "probe_werkzeug" {
+		t.Errorf("Werkzeuge = %+v, erwartet probe_werkzeug", response.Tools)
 	}
 
 	raw, err := os.ReadFile(beleg)

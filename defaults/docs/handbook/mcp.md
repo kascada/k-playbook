@@ -5,15 +5,14 @@ k-playbook includes an MCP server. It gives an assistant the same information th
 apply -- shipped and project-owned already merged --, the own open work in the project's
 collection, and the resolved paths. A catalog for checks no longer exists (task 155).
 
-`k_playbook_briefing` and `k_playbook_context` are the only tools that also write as a side
-effect: they synchronize the project's assistant linking with the catalog, just as the
-subcommands do -- each calls `HealLinks` itself (the briefing since task 187; before that it
-healed only because its transitional section came through `ContextForDir`). They write only when
-writing changes something, and only to symlinks created by k-playbook itself. The response lists
-what happened under `links`; if the field is absent, everything was already up to date. The
-partial call `k_playbook_briefing` with `part: "environment"` writes nothing.
+`k_playbook_briefing` is the only tool that also writes as a side effect: it synchronizes the
+project's assistant linking with the catalog, just as the subcommand does -- it calls `HealLinks`
+itself (since task 187; before that the healing came only with the context output). It writes
+only when writing changes something, and only to symlinks created by k-playbook itself. The
+response lists what happened under `links`; if the field is absent, everything was already up to
+date. The partial call `k_playbook_briefing` with `part: "environment"` writes nothing.
 
-The server offers the working state, the review and todo tools,
+The server offers the review and todo tools,
 `k_playbook_doc_read` for references, the `doc` tools for numbered documents in the
 project's Kephalaion collection -- creating, listing and moving them, changing them without
 their content passing through the session, and searching them --, `k_playbook_briefing` for
@@ -23,9 +22,8 @@ the start of a session,
 `k_playbook_gui_status` for the state and the address
 of the project's interface, `k_playbook_notify` for a desktop notification on the
 machine the server runs on, and `k_playbook_lock` for the working-tree lock of `/k-task-run`.
-`k_playbook_context` has the optional `dir` parameter; all other tools require `projectDir`,
-because a stdio server must not assume that its process working directory is the target
-project. There is no fallback to that directory.
+Every tool requires `projectDir`, because a stdio server must not assume that its process
+working directory is the target project. There is no fallback to that directory.
 
 `projectDir` is required by contract but optional in the input schema, and its description
 starts with `Pflicht.`. The reason is the answer a caller gets: a field marked required in the
@@ -339,7 +337,6 @@ then nothing is written and the interface says so.
 
 | Tool | Purpose |
 |---|---|
-| `k_playbook_context` | return the resolved working state and synchronize assistant linking; no shipped text uses it any more except the paused `/k-review` and `/k-audit`, which take `catalogs.reviews` from it (see "Briefing Contract") |
 | `k_playbook_review_status` | **temporarily unavailable**, answers `reviews_paused` ([below](#review-tools-are-paused)); otherwise: read the selection basis for new runs or the status of an existing run |
 | `k_playbook_review_create` | **temporarily unavailable**, answers `reviews_paused`; otherwise: create a review run or return validated `run.json` in a dry run |
 | `k_playbook_review_scan` | **temporarily unavailable**, answers `reviews_paused`; otherwise: execute a run's tool entries through `review.Execute` |
@@ -1264,7 +1261,7 @@ session has to read that text first — a second call for it would be a detour. 
 `k-playbook briefing` therefore starts with this text, without the list of its parts; the parts
 with their origin are in the JSON only. Every other listed document is read with
 `k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix.
-Since task 187 (version 9) the briefing carries no rest of `k_playbook_context` any more; the
+Since task 187 (version 9) the briefing carries no rest of the context output any more; the
 transitional section `context` of task 091 is gone. What every session needs has sections of its
 own -- `now`, `project`, `kephalaion`, `github.projectServices` and `links` --, built from the
 same readers as the context output (`buildNow`, `ReadConfig`, `KephalaionStatus`,
@@ -1274,13 +1271,16 @@ the configuration, `mcp`, `git`, `project.config`, `baseTools.matrix`, of `gh` e
 `ready` and `account`, and of the Kephalaion binding hub, collection, account, choice, state,
 rights, node and sync. So one call is enough for the start of a session.
 
-`k_playbook_context` and `k-playbook context` still exist, unchanged, and go in a step of their
-own. No shipped text, no script in the repository and no function of the briefing needs them any
-more, with one exception: the paused commands `/k-review` and `/k-audit` (with
-`_audit/review-scan-triage.md`) take `catalogs.reviews` -- the review modes `audit` and `review`
-per recipe -- from the context output until they are rebuilt; the briefing's `documents.reviews`
-lists the recipes without these modes. Giving the modes a place of their own is the precondition
-for removing the context output.
+The tool `k_playbook_context` and the subcommand `k-playbook context` were removed with task 188.
+A call of the subcommand ends with one sentence on stderr that names `k-playbook briefing` and,
+for the environment details, `k-playbook briefing --part environment`, and exit code 1; the tool
+list no longer carries the tool. The paused commands `/k-review` and `/k-audit` (with
+`_audit/review-scan-triage.md`) took `catalogs.reviews` -- the review modes `audit` and `review`
+per recipe -- from that output; their text stays as the template for the rebuild and carries a
+`NACHZIEHEN` comment: the recipe list will come from the briefing's `documents.reviews`, the modes
+from the frontmatter of the recipe the command reads anyway. The internal functions
+`BuildContext` and `BuildContextWithLayers` stay, for the context view of the interface
+(`GET /api/context`) and the catalog of the review tools.
 
 **The partial call `environment`** (task 187). `k_playbook_briefing` with `part: "environment"`
 and `k-playbook briefing --part environment [--json]` return only this part
@@ -1306,7 +1306,8 @@ session, and its fields stand beside those of the loaded briefing without that b
 two loads. Demarcation: `health` (in the plain text "Umgebung:") evaluates and names remedies,
 `environment` delivers the raw values. A test (`TestBriefingTeilabrufEnvironment`,
 `TestBriefingEnvironment`) checks that the partial call carries neither `session` nor `documents`
-nor `work` and that its values equal those of the context output.
+nor `work` and that its values equal those of their readers (`BuildContext`, `contextGitHub`,
+`versionSourcesWithStatus`).
 
 **Size** (task 187, measured 2026-11-24 with Claude Code in its default setting). A shell output
 of 30 000 characters or more is put into a file as a whole, with only a 2 KB preview in the

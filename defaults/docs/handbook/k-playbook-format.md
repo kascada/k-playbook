@@ -310,13 +310,17 @@ then. Contract: [mcp.md](mcp.md#briefing-contract).
 
 ## The resolved working state
 
-`k-playbook context` (MCP: `k_playbook_context`) is the older call. Since task 187
-(2026-11-24) no shipped text, no script and no function of the briefing uses it any more --
-with one exception: the paused commands `/k-review` and `/k-audit` take `catalogs.reviews`
-with the review modes from it until they are rebuilt. It still exists unchanged and goes in a
-step of its own; this section describes its output until then.
+The context view of the interface (`GET /api/context`, the block that loads when it is
+opened) shows the resolved working state, built by `BuildContext`; the review tools read their
+catalog from the same function (`BuildContextWithLayers`). The subcommand `k-playbook context`
+and the MCP tool `k_playbook_context`, which output it before, were removed with task 188: a
+call of the subcommand ends with one sentence on stderr naming `k-playbook briefing` and
+`k-playbook briefing --part environment`, and exit code 1. What commands need comes with the
+briefing and its partial call `environment`. The paused commands `/k-review` and `/k-audit`
+took `catalogs.reviews` with the review modes from that output; they carry a `NACHZIEHEN` note
+for their rebuild.
 
-It outputs as JSON:
+The view's answer carries under `context`:
 
 | Field | Content |
 |---|---|
@@ -331,7 +335,6 @@ It outputs as JSON:
 | `catalogs` | `reviews`, merged with the project-owned side; the catalog `checks` is gone since task 155. The shipped side of `reviews` comes from `<hub>:k-playbook/defaults/` (task 131), the project-owned side from `keph:/k-playbook/reviews/` in the project collection (task 143) |
 | `catalogsProblem` | only when a layer of `reviews` cannot be read (Kephalaion not ready, `<hub>:k-playbook` missing or `defaults/` empty, the project collection not readable): why that list is empty -- it is never shown from one layer alone; the rest of the output stays, and `kephalaion` says more |
 | `kephalaion` | the project's Kephalaion binding and the result of its check: `configured`, `hub`, `collection`, `account`, `address` (`<hub>:<collection>`), `state`, `ok`, `message`; when `ok`, also `rights`, `scopes`, `user`, `node`, `nodeVersion` and `sync` |
-| `links` | only when there is something to report: what assistant-link self-healing updated (`healed`), what remained open (`open`), and what that means for this session (`note`) |
 
 Each catalog entry has `name` (the filename), `key` (the invocation name without
 extension and kind prefix), `path`, `origin` (`dist`, `local`, or `override`), `location` for a project-owned recipe
@@ -360,7 +363,8 @@ which names the remedy: `not-configured`, `invalid-entry`, `kephalaion-missing`,
 `node-unreachable`, `hub-unknown`, `hub-never-synced`, `login-invalid`, `login-missing`,
 `replica-unreadable`, `collection-unreadable` or `ok`. `sync` carries `lastSuccess`,
 `revision`, `lastError` and `neverSynced` as the node reports them. The field is filled by the
-subcommand and the MCP tool; internal callers that only need the catalogs do not ask the node.
+interface from the cache of its status page; internal callers that only need the catalogs do
+not ask the node.
 Details: `installer/docs/architecture.md`, section "Kephalaion-Anbindung".
 
 `gh` is a finding for this particular machine only: `installed`, `path`,
@@ -378,9 +382,9 @@ The invocation is deliberately cheap: it omits the security-tool preflight,
 because it starts `--version` for every tool and takes noticeable time. The gh finding costs
 nothing: it only checks `PATH` and `~/.config/gh/hosts.yml`, without a subprocess.
 
-The search starts at the working directory and proceeds upward. Without
-`.k-playbook/K-PLAYBOOK.yaml`, the call stops with a message; it does the same for a
-`schema_version` other than `3`.
+The interface uses the project it was started for. Without `.k-playbook/K-PLAYBOOK.yaml` the
+view stays empty; a `schema_version` other than `3` stops `BuildContext`, and the view shows
+the message instead.
 
 ## Instructions
 

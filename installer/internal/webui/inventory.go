@@ -41,14 +41,14 @@ import (
 // inventorySourcesState ist die Quellenkonfiguration, wie die Oberfläche sie
 // zeigt: wo sie liegt, in welchem Zustand sie ist, und was sie enthält — als
 // Zahlen, nicht als Formular. Gelesen wird sie mit demselben Leser wie im
-// Sammler und in `k-playbook context` (versionsources.Load,
+// Sammler und im Teilabruf environment des Briefings (versionsources.Load,
 // project.VersionSourcesFrom).
 type inventorySourcesState struct {
 	// Path und DisplayPath sind der keph:-Verweis des Dokuments.
 	Path        string `json:"path"`
 	DisplayPath string `json:"displayPath"`
 	// State ist present, missing, invalid oder unavailable, wie
-	// versionSources.state in der Kontextausgabe.
+	// versionSources.state im Teilabruf environment.
 	State   string `json:"state"`
 	Present bool   `json:"present"`
 	Sources int    `json:"sources"`
@@ -145,8 +145,8 @@ func inventoryOptions(projectDir string) inventory.Options {
 
 // inventorySources macht aus dem Lesen der Quellenkonfiguration den Zustand
 // für die Anzeige. Ein defektes oder unerreichbares Dokument ist hier ein
-// sichtbarer Zustand, kein Abbruch — dieselbe Trennung wie in
-// `k-playbook context`: Auskunft geben ist nicht Erheben.
+// sichtbarer Zustand, kein Abbruch — dieselbe Trennung wie im Teilabruf
+// environment des Briefings: Auskunft geben ist nicht Erheben.
 func inventorySources(projectDir string, config versionsources.Config, err error) inventorySourcesState {
 	read := project.VersionSourcesFrom(config, err)
 	state := inventorySourcesState{

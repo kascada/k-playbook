@@ -83,8 +83,8 @@ type Link struct {
 // ApplyAssistantSetup legt AGENTS.md zwar immer an, der Lesepfad ruft HealLinks
 // aber direkt und legt nie eines an. Dort bleibt es bei StateNoSource:
 // Fixable() schließt den Zustand aus, aus NeedsAction() nimmt ihn allein
-// Optional heraus. Ohne das Flag meldete `k-playbook context` in jedem Projekt
-// ohne AGENTS.md dauerhaft einen offenen, nicht heilbaren Punkt.
+// Optional heraus. Ohne das Flag meldete das Briefing in jedem Projekt ohne
+// AGENTS.md dauerhaft einen offenen, nicht heilbaren Punkt.
 func Links() []Link {
 	return []Link{
 		{Path: shareLinkRel(), Assistant: "Claude Code, OpenCode", IsShare: true},
@@ -107,7 +107,7 @@ const (
 	// verlustfrei ersetzt wird — der Symlink CLAUDE.md -> AGENTS.md aus einer
 	// älteren Fassung, der zur Include-Datei wird, oder der Verzeichnis-Symlink
 	// eines Katalog-Links, der zu Einzel-Links wird. Kein eigener Zustand für
-	// die Migration: er zöge Fixable(), NeedsAction(), Kontextausgabe und
+	// die Migration: er zöge Fixable(), NeedsAction(), Briefing und
 	// Oberfläche mit, für den Gewinn eines Textes. Die Fallunterscheidung
 	// steht im Detail.
 	StateStale LinkState = "stale"
@@ -288,7 +288,7 @@ func checkLink(projectRoot string, link Link) LinkStatus {
 // „AGENTS.md fehlt im Projekt" die falsche Ursache. Und fehlt AGENTS.md,
 // gewinnt StateNoSource auch über den Migrationszweig: sonst wäre der Zustand
 // Fixable(), applyIncludeFile schriebe aber nichts, und HealLinks meldete bei
-// jedem `k-playbook context` erneut Applied.
+// jedem Briefing erneut Applied.
 func checkIncludeFile(projectRoot string, link Link) LinkStatus {
 	status := LinkStatus{Link: link}
 
@@ -615,8 +615,8 @@ func ApplyLinks(projectRoot string) ([]LinkStatus, error) {
 }
 
 // LinkIssue ist ein Ziel, an dem nach dem Einrichten noch etwas zu tun ist.
-// Knapp gehalten, weil es in der Kontextausgabe landet, die am Anfang jedes
-// Commands gelesen wird.
+// Knapp gehalten, weil es im Briefing (links) landet, das am Anfang jeder
+// Sitzung gelesen wird.
 type LinkIssue struct {
 	Path   string    `json:"path"`
 	State  LinkState `json:"state"`
@@ -658,7 +658,9 @@ func (r LinkRepair) Quiet() bool {
 // HealLinks bringt die Registrierung von sich aus auf den Stand des Katalogs
 // und meldet, was danach offen bleibt.
 //
-// Der Aufruf gehört auf den Lesepfad, nicht nur hinter einen Knopf. Welche
+// Der Aufruf gehört auf den Lesepfad, nicht nur hinter einen Knopf: Gerufen
+// wird er vom Briefing (BuildBriefingFrom) am Anfang jeder Sitzung und von der
+// Assistenten-Karte der Oberfläche (GET /api/assistant). Welche
 // Links gelten, hängt am Projekt — an seinem Katalog aus mitgelieferten und
 // projekteigenen Einträgen —, nicht am Weg, auf dem das Programm zu seinem
 // Stand kam: ein Update über die Oberfläche, `k-playbook upgrade`, eine
@@ -673,8 +675,8 @@ func (r LinkRepair) Quiet() bool {
 // Anwenden, das jedes Mal dieselben Links neu schriebe.
 //
 // Ein Symlink CLAUDE.md -> AGENTS.md ist StateStale und damit Fixable(): der
-// Lesepfad ersetzt ihn durch die Include-Datei, jedes `k-playbook context` in
-// einem Bestandsprojekt migriert also von selbst. Weil das eine versionierte
+// Lesepfad ersetzt ihn durch die Include-Datei, jedes Briefing in einem
+// Bestandsprojekt migriert also von selbst. Weil das eine versionierte
 // Datei im Hauptverzeichnis ändert, steht es als IncludeMigrated im Ergebnis.
 // Scheitert das Schreiben — etwa an einem nicht beschreibbaren
 // Projektverzeichnis —, landet der Grund in Error, und gelesen wird trotzdem.

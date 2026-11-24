@@ -130,7 +130,7 @@ func configState(message string) configResponse {
 		response.Message = project.ConfigFileName + " nicht lesbar: " + err.Error()
 		return response
 	}
-	// Anders als bei `context` wird hier nicht abgebrochen: die Oberfläche
+	// Anders als BuildContext bricht die Oberfläche hier nicht ab: die Oberfläche
 	// soll den Zustand zeigen können, gerade wenn etwas nicht stimmt.
 	response.SchemaVersion = config.SchemaVersion
 	response.Schema = project.SchemaState(config)

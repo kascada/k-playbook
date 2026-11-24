@@ -96,7 +96,7 @@ The location of review results is not decided yet; until it is, reviews are paus
 
 ### 2. Register the MCP server
 
-The **k-playbook MCP** section registers the shipped MCP server with both assistants. This gives an assistant the resolved working state as a tool instead of making it retrieve it through the command line:
+The **k-playbook MCP** section registers the shipped MCP server with both assistants. This gives an assistant the briefing, the documents of the project's collection, the todos and the other tools of k-playbook as MCP tools instead of making it retrieve them through the command line:
 
 ```text
 project/

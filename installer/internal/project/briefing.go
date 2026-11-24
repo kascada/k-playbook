@@ -34,9 +34,8 @@ import (
 // der Assistenten-Verlinkung geändert hat). Was nur einzelne Commands lesen —
 // gh, die GitHub-Zugangsdatei, Basis-Werkzeuge, Quellenkonfiguration,
 // docs.exclude, Remediation —, liefert der Teilabruf environment
-// (BuildBriefingEnvironment), nicht das Briefing. `k-playbook context` und
-// k_playbook_context bestehen daneben unverändert, bis sie in einem eigenen
-// Schritt entfallen.
+// (BuildBriefingEnvironment), nicht das Briefing. Das Unterkommando und das
+// MCP-Werkzeug, die die Kontextausgabe lieferten, sind mit Task 188 entfernt.
 //
 // Die Listen kommen aus den vorhandenen Funktionen: die Dokumente über
 // dieselbe Überlagerung wie die Verweise und die Kataloge (overlayDocDir,
@@ -353,7 +352,8 @@ func BuildBriefing(ctx context.Context, projectDir string) (Briefing, error) {
 // und meldet unter Links, was sich geändert hat. Das gehört hierher, weil das
 // Briefing am Anfang jeder Sitzung steht und die Verlinkung dem Katalog dieses
 // Projekts folgt, nicht dem Weg, auf dem das Programm zu seinem Stand kam.
-// Bis Task 187 kam die Heilung nur nebenbei über ContextForDir mit.
+// Bis Task 187 kam die Heilung nur nebenbei über die Kontextausgabe des
+// inzwischen entfernten Unterkommandos mit.
 func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) (Briefing, error) {
 	layers := ProjectDocLayers(projectDir)
 	briefing := Briefing{
@@ -390,7 +390,7 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 	briefing.Project = briefingProject(projectDir)
 	briefing.Kephalaion = briefingKephalaion(KephalaionStatus(projectDir))
 	briefing.GitHub = briefingGitHub(contextGitHub(startDir))
-	// Erst lesen, dann heilen — wie in ContextForDir: Bricht das Lesen an
+	// Erst lesen, dann heilen: Bricht das Lesen an
 	// einer unlesbaren oder zu neuen Konfiguration ab, wird auch nichts
 	// eingerichtet. Ein Werkzeug, das die Fassung nicht versteht, soll die
 	// Registrierung nicht nach seinen Regeln umschreiben.

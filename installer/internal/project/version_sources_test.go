@@ -10,7 +10,7 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/versionsources"
 )
 
-// okStatus ist eine bereite Anbindung, wie ContextForDir sie hätte.
+// okStatus ist eine bereite Anbindung, wie KephalaionStatus sie meldete.
 var okStatus = kephalaion.Status{Configured: true, State: kephalaion.StateOK, OK: true, Message: "Angemeldet."}
 
 // versionSourcesDoc ist der Ort des Dokuments in der Collection eines
@@ -123,28 +123,16 @@ func TestVersionSourcesNichtErreichbarFaelltNichtZurueck(t *testing.T) {
 	}
 }
 
-// ContextForDir trägt versionSources, BuildContext nicht: Die
-// Quellenkonfiguration liegt in der Collection, und Werkzeuge, die nur den
-// Katalog brauchen, fragen den Node dafür nicht.
-func TestContextForDirTraegtVersionSources(t *testing.T) {
+// Der Teilabruf environment trägt versionSources aus der Collection, mit dem
+// Status der Anbindung.
+func TestBriefingEnvironmentTraegtVersionSources(t *testing.T) {
 	root := newContextProject(t)
 	stubKephalaionCheck(t, okStatus)
 	write(t, versionSourcesDoc(root), "---\nschema_version: 3\nexclude:\n  - \"**/testdata/**\"\n---\n")
 
-	built, err := ContextForDir(root)
-	if err != nil {
-		t.Fatalf("ContextForDir: %v", err)
-	}
-	if built.VersionSources == nil || built.VersionSources.State != VersionSourcesPresent ||
-		len(built.VersionSources.Exclude) != 1 || built.VersionSources.Exclude[0] != "**/testdata/**" {
-		t.Fatalf("versionSources = %+v", built.VersionSources)
-	}
-
-	plain, err := BuildContext(root)
-	if err != nil {
-		t.Fatalf("BuildContext: %v", err)
-	}
-	if plain.VersionSources != nil {
-		t.Errorf("BuildContext fragt die Collection nicht: %+v", plain.VersionSources)
+	sources := BuildBriefingEnvironment(root, root).VersionSources
+	if sources == nil || sources.State != VersionSourcesPresent ||
+		len(sources.Exclude) != 1 || sources.Exclude[0] != "**/testdata/**" {
+		t.Fatalf("versionSources = %+v", sources)
 	}
 }

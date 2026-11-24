@@ -16,8 +16,8 @@ import (
 //
 // Die Prüfung steht bewusst nicht in BuildContext: Den rufen auch Werkzeuge,
 // die nur den Katalog brauchen (etwa die Review-Auswahl), und die sollen den
-// Node nicht fragen. ContextForDir — das Unterkommando context und das
-// MCP-Werkzeug — hängt das Ergebnis an.
+// Node nicht fragen. Das Briefing und die Oberfläche (GET /api/context) holen
+// das Ergebnis selbst.
 func KephalaionStatus(projectDir string) kephalaion.Status {
 	return kephalaionCheck(projectDir)
 }

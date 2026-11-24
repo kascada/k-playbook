@@ -2,7 +2,6 @@ package project
 
 import (
 	stdcontext "context"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -12,14 +11,17 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/kephalaion"
 )
 
-// Context ist der aufgelöste Arbeitsstand eines Projekts: alles, was ein
-// Command sonst selbst aus Konfiguration und Dateisystem zusammenrechnen
-// müsste.
+// Context ist der aufgelöste Arbeitsstand eines Projekts, wie BuildContext ihn
+// zusammenstellt: Die Kontextansicht der Oberfläche (GET /api/context) zeigt
+// ihn, die Review-Werkzeuge lesen daraus den Katalog (BuildContextWithLayers).
+// Das Unterkommando und das MCP-Werkzeug, die ihn früher ausgaben, sind mit
+// Task 188 entfernt; was Commands brauchen, liefern Briefing und Teilabruf
+// environment.
 //
 // Die Security-Tools fehlen bewusst — nicht, weil eine Werkzeugprüfung generell
 // zu teuer wäre, sondern weil ihr Preflight je Tool einen Unterprozess startet
-// und dessen --version liest. Dieser Aufruf soll billig genug sein, um am
-// Anfang jedes Commands zu stehen.
+// und dessen --version liest. Dieser Aufruf soll billig genug bleiben, um beim
+// Aufklappen der Ansicht und in jedem Review-Werkzeug zu laufen.
 //
 // Die Anwesenheitsprüfung der Basis-Werkzeuge steht deshalb sehr wohl hier: sie
 // schlägt je Werkzeug nur im PATH nach (exec.LookPath), ohne Unterprozess. Die
@@ -68,40 +70,14 @@ type Context struct {
 	// ohne Kephalaion nicht lesbar. Die lokale Ebene steht dann nicht allein
 	// da — der Katalog bleibt leer. Leer, wenn die Kataloge gelesen wurden.
 	CatalogsProblem string `json:"catalogsProblem,omitempty"`
-	// VersionSources ist der Zustand der Quellenkonfiguration des
-	// Versionsinventars, des Dokuments keph:/k-playbook/inventory.md. Sie
-	// steht hier, weil Commands Konfiguration ausschließlich aus dieser
-	// Ausgabe lesen: eine Konfiguration, die nur der Sammler kennt, wäre für
-	// jeden Command unsichtbar und würde eine zweite, unsichtbare
-	// Konfigurationsquelle aufmachen.
-	//
-	// Das Feld ist ein Zeiger mit omitempty: Gefüllt wird es von
-	// ContextForDir, nicht von BuildContext — es liest aus der Collection,
-	// und die Werkzeuge, die nur den Katalog brauchen, sollen den Node dafür
-	// nicht fragen (wie Kephalaion).
-	VersionSources *VersionSources `json:"versionSources,omitempty"`
 	// Kephalaion ist die Anbindung des Projekts an seine Collection: Hub und
 	// Collection aus dem Block kephalaion: von .k-playbook/K-PLAYBOOK.yaml,
 	// Account samt Herkunft (choice) aus der Auskunft kephalaion node client
 	// und das Ergebnis der Prüfung über MCP am Node dieses Rechners. Ein Fehler
-	// ist ein Zustand, kein Abbruch. Gefüllt wird das Feld von ContextForDir,
-	// nicht von BuildContext — siehe KephalaionStatus.
+	// ist ein Zustand, kein Abbruch. BuildContext füllt das Feld nicht — siehe
+	// KephalaionStatus —; die Oberfläche setzt es in GET /api/context aus dem
+	// Zwischenspeicher ihrer Statusseite.
 	Kephalaion *kephalaion.Status `json:"kephalaion,omitempty"`
-	// Links meldet die Selbstheilung der Assistenten-Registrierung: was dabei
-	// nachgezogen wurde und was offen blieb. Fehlt das Feld, stimmte alles —
-	// eine Meldung, die bei jedem Aufruf dasselbe sagt, liest niemand mehr.
-	Links *ContextLinks `json:"links,omitempty"`
-	// GitHub nennt, welcher Dienst der persönlichen Zugangsdatei
-	// ~/.config/k-playbook/github.yaml zum Repo des Arbeitsstands gehört und
-	// welche Zugänge `k-playbook github run` dafür wählt — dieselbe Quelle
-	// und Auswahl wie `github show`. Anders als GH kostet das Unterprozesse:
-	// drei bis vier git-Aufrufe für das Remote und `ssh -G` je ssh host der Datei
-	// (Frist 3 s je Host), dazu der Blick in die gh-Konfiguration; kein Netz,
-	// kein Token-Wert, nichts geschrieben — auch keine Zugangsdatei, wenn sie
-	// fehlt; die legt nur `k-playbook github init` an. Gefüllt wird das Feld
-	// von ContextForDir, nicht von BuildContext — die Oberfläche und die
-	// Review-Auswahl über MCP tragen die Kosten nicht. Siehe contextGitHub.
-	GitHub *ContextGitHub `json:"github,omitempty"`
 }
 
 type ContextProject struct {
@@ -688,8 +664,8 @@ func isEmptyContent(data []byte) bool {
 	return true
 }
 
-// ContextLinks ist die Selbstheilung der Registrierung, wie sie in der
-// Kontextausgabe steht.
+// ContextLinks ist die Selbstheilung der Registrierung, wie sie im Briefing
+// unter links steht.
 type ContextLinks struct {
 	// Healed nennt die Einträge, die dazukamen, wegfielen oder die Quelle
 	// wechselten.
@@ -700,8 +676,8 @@ type ContextLinks struct {
 	Note string `json:"note,omitempty"`
 }
 
-// contextLinks übersetzt die Selbstheilung in den Teil, der in die
-// Kontextausgabe gehört.
+// contextLinks übersetzt die Selbstheilung in den Teil, der ins Briefing
+// (links) gehört.
 //
 // Der Hinweis auf die laufende Sitzung steht bewusst dabei: Claude Code und
 // OpenCode lesen ihre Command-Liste beim Start. Ein Command, der
@@ -737,40 +713,4 @@ func contextLinks(repair LinkRepair) *ContextLinks {
 		Open:   repair.Open,
 		Note:   strings.Join(notes, " "),
 	}
-}
-
-// ContextForDir stellt den Kontext ab einem Startverzeichnis zusammen und
-// meldet, wenn keine Installation gefunden wurde.
-//
-// Dabei zieht er die Assistenten-Registrierung nach — wie das Briefing
-// (BuildBriefingFrom), das seit Task 187 selbst heilt und am Anfang jeder
-// Sitzung steht. Die Registrierung ist projektbezogen: sie folgt dem Katalog
-// dieses Projekts, nicht dem Weg, auf dem das Programm zu seinem Stand kam.
-func ContextForDir(startDir string) (Context, error) {
-	projectDir, err := Discover(startDir)
-	if errors.Is(err, ErrNotFound) {
-		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
-	}
-	if err != nil {
-		// Der Umzug vom früheren Ort ist gescheitert; „nicht gefunden“ wäre falsch.
-		return Context{}, err
-	}
-
-	// Erst bauen, dann heilen. Bricht der Aufbau an einer unlesbaren oder zu
-	// neuen Konfiguration ab, wird auch nichts eingerichtet: ein Werkzeug, das
-	// die Fassung nicht versteht, soll die Registrierung nicht nach seinen
-	// Regeln umschreiben.
-	built, err := buildContext(projectDir, DocLayers{})
-	if err != nil {
-		return Context{}, err
-	}
-
-	built.Links = contextLinks(HealLinks(projectDir))
-	status := KephalaionStatus(projectDir)
-	built.Kephalaion = &status
-	built.VersionSources = versionSourcesWithStatus(projectDir, status)
-	// Das Remote ab startDir, nicht ab projectDir: Ein eigenes Repo unterhalb
-	// des Projekts hat sein eigenes.
-	built.GitHub = contextGitHub(startDir)
-	return built, nil
 }

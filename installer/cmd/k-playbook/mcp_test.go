@@ -114,7 +114,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// newProject legt ein Projekt an, wie es ContextForDir erwartet.
+// newProject legt ein minimales Projekt mit K-PLAYBOOK.yaml an.
 func newProject(t *testing.T) string {
 	t.Helper()
 
@@ -265,15 +265,10 @@ func result(t *testing.T, response map[string]any) map[string]any {
 	return value
 }
 
-// callContext ruft das Werkzeug auf. Ohne dir gilt das Arbeitsverzeichnis des
-// Serverprozesses.
-func callContext(id int, dir string) string {
-	arguments := "{}"
-	if dir != "" {
-		encoded, _ := json.Marshal(map[string]string{"dir": dir})
-		arguments = string(encoded)
-	}
-	return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":"k_playbook_context","arguments":%s}}`, id, arguments)
+// callEnvironment ruft den Teilabruf environment des Briefings auf — ein
+// Werkzeug, das eigenen Code laufen lässt und ohne Collection antwortet.
+func callEnvironment(id int, dir string) string {
+	return callTool(id, "k_playbook_briefing", map[string]any{"projectDir": dir, "part": "environment"})
 }
 
 func callTool(id int, name string, arguments map[string]any) string {
@@ -310,14 +305,14 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		initialize(1),
 		initialized,
 		`{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
-		callContext(3, root),
+		callEnvironment(3, root),
 	)
 
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 35 {
-		t.Fatalf("tools/list meldet nicht genau fünfunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 34 {
+		t.Fatalf("tools/list meldet nicht genau vierunddreißig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -325,8 +320,11 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		name, _ := tool["name"].(string)
 		found[name] = true
 	}
+	// Das Werkzeug der Kontextausgabe ist mit Task 188 entfernt.
+	if found["k_playbook_context"] {
+		t.Error("tools/list meldet k_playbook_context noch")
+	}
 	for _, name := range []string{
-		"k_playbook_context",
 		"k_playbook_review_status",
 		"k_playbook_review_create",
 		"k_playbook_review_scan",
@@ -367,15 +365,16 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		}
 	}
 
-	var built map[string]any
-	if err := json.Unmarshal([]byte(toolText(t, responses[2])), &built); err != nil {
+	var envelope struct {
+		OK          bool           `json:"ok"`
+		ProjectDir  string         `json:"projectDir"`
+		Environment map[string]any `json:"environment"`
+	}
+	if err := json.Unmarshal([]byte(toolText(t, responses[2])), &envelope); err != nil {
 		t.Fatalf("Werkzeug lieferte kein JSON: %v", err)
 	}
-	if got := built["schemaVersion"]; got != "3" {
-		t.Errorf("schemaVersion ist %v, erwartet 3", got)
-	}
-	if project, ok := built["project"].(map[string]any); !ok || project["dir"] != root {
-		t.Errorf("Arbeitsstand beschreibt nicht %s: %v", root, built["project"])
+	if !envelope.OK || envelope.ProjectDir != root || envelope.Environment["available"] != true {
+		t.Errorf("Teilabruf environment beschreibt nicht %s: %s", root, toolText(t, responses[2]))
 	}
 }
 
@@ -396,8 +395,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 35 {
-		t.Fatalf("tools/list meldet nicht genau fünfunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 34 {
+		t.Fatalf("tools/list meldet nicht genau vierunddreißig Werkzeuge: %v", responses[1])
 	}
 
 	resultsDir := mcpReviewResultsDir(root)
@@ -545,9 +544,7 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 		}
 		property, has := properties["projectDir"].(map[string]any)
 		if !has {
-			if name != "k_playbook_context" {
-				t.Errorf("%s führt projectDir nicht in properties", name)
-			}
+			t.Errorf("%s führt projectDir nicht in properties", name)
 			continue
 		}
 		withProjectDir++
@@ -724,55 +721,32 @@ func TestProjectDirOhneProjektBleibtProjectNotFound(t *testing.T) {
 	}
 }
 
-// TestOhneDirGiltDasArbeitsverzeichnis prüft den zweiten Auflösungsweg: kein
-// Parameter, dafür der Serverprozess im Projekt.
-func TestOhneDirGiltDasArbeitsverzeichnis(t *testing.T) {
-	root := newProject(t)
-
-	stdout := speak(t, root, 2,
-		initialize(1),
-		initialized,
-		callContext(2, ""),
-	)
-
-	responses := decodeResponses(t, stdout, 1, 2)
-
-	var built map[string]any
-	if err := json.Unmarshal([]byte(toolText(t, responses[1])), &built); err != nil {
-		t.Fatalf("Werkzeug lieferte kein JSON: %v", err)
-	}
-	if project, ok := built["project"].(map[string]any); !ok || project["dir"] != root {
-		t.Errorf("Arbeitsstand beschreibt nicht %s: %v", root, built["project"])
-	}
-}
-
-// TestFehlerBleibenWerkzeugfehler prüft alle drei Fehlerfälle. Keiner darf den
-// Server beenden: er muss für den nächsten Aufruf ansprechbar bleiben.
+// TestFehlerBleibenWerkzeugfehler prüft drei Fehlerfälle eines Werkzeugs mit
+// eigenem Code. Keiner darf den Server beenden: er muss für den nächsten
+// Aufruf ansprechbar bleiben.
 func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 	tests := []struct {
 		name string
-		dir  func(t *testing.T) string
+		call func(t *testing.T, id int) string
 	}{
 		{
 			name: "Verzeichnis existiert nicht",
-			dir: func(t *testing.T) string {
-				return filepath.Join(t.TempDir(), "gibt-es-nicht")
+			call: func(t *testing.T, id int) string {
+				return callEnvironment(id, filepath.Join(t.TempDir(), "gibt-es-nicht"))
 			},
 		},
 		{
 			name: "keine K-PLAYBOOK.yaml",
-			dir: func(t *testing.T) string {
+			call: func(t *testing.T, id int) string {
 				// t.TempDir() liegt unter /tmp, dort findet die Aufwärtssuche
 				// keine Konfiguration.
-				return t.TempDir()
+				return callEnvironment(id, t.TempDir())
 			},
 		},
 		{
-			name: "fremde schema_version",
-			dir: func(t *testing.T) string {
-				root := newProject(t)
-				mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 2\n\nproject:\n  repo_root: .\n")
-				return root
+			name: "unbekannter Teil",
+			call: func(t *testing.T, id int) string {
+				return callTool(id, "k_playbook_briefing", map[string]any{"projectDir": newProject(t), "part": "gibt-es-nicht"})
 			},
 		},
 	}
@@ -786,8 +760,8 @@ func TestFehlerBleibenWerkzeugfehler(t *testing.T) {
 			stdout := speak(t, healthy, 3,
 				initialize(1),
 				initialized,
-				callContext(2, test.dir(t)),
-				callContext(3, healthy),
+				test.call(t, 2),
+				callEnvironment(3, healthy),
 			)
 
 			responses := decodeResponses(t, stdout, 1, 2, 3)

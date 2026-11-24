@@ -9,7 +9,8 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/githubaccess"
 )
 
-// ContextGitHub ist das Feld github der Kontextausgabe (Task 119): welcher
+// ContextGitHub ist das Feld github des Teilabrufs environment des Briefings
+// (Task 119, seit Task 187 dort; die Briefing-Zeile GitHub liest es auch): welcher
 // Dienst der persönlichen Zugangsdatei (defaults/docs/handbook/github-access.md) zum Repo des
 // Arbeitsstands gehört und welche Zugänge `k-playbook github run` dafür
 // wählt, dazu die übrigen Dienste. Dieselbe Quelle und dieselbe Auswahl wie

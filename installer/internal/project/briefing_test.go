@@ -616,7 +616,7 @@ func TestBriefingProjektNichtLesbar(t *testing.T) {
 
 // Das Briefing steht am Anfang jeder Sitzung und zieht deshalb selbst die
 // Assistenten-Verlinkung nach (Task 187) — bis dahin kam die Heilung nur
-// nebenbei über ContextForDir mit. Was sich geändert hat, steht unter links;
+// nebenbei über die Kontextausgabe mit. Was sich geändert hat, steht unter links;
 // beim zweiten Briefing gibt es nichts mehr zu melden, und das Feld fehlt.
 func TestBriefingZiehtVerlinkungNach(t *testing.T) {
 	root := newBriefingProject(t)
@@ -694,10 +694,12 @@ func TestBriefingHeiltNichtBeiUnbekannterFassung(t *testing.T) {
 
 // Der Teilabruf environment (Task 187) liefert die Umgebungsangaben, die das
 // Briefing nicht mehr trägt, unter denselben Namen und mit denselben Werten
-// wie die Kontextausgabe — ohne die Felder, die kein Text liest: von gh
-// bleiben ready und account, baseTools verliert matrix; schemaVersion, mcp,
-// git, catalogs, now, project, kephalaion und links gehören nicht dazu. Er
-// trägt weder session noch documents noch work.
+// wie ihre Leser — BuildContext für gh, baseTools, docs und remediation,
+// contextGitHub und versionSourcesWithStatus für github und versionSources —,
+// ohne die Felder, die kein Text liest: von gh bleiben ready und account,
+// baseTools verliert matrix; schemaVersion, mcp, git, catalogs, now, project,
+// kephalaion und links gehören nicht dazu. Er trägt weder session noch
+// documents noch work.
 func TestBriefingEnvironment(t *testing.T) {
 	root := newBriefingProject(t)
 	t.Setenv("GH_TOKEN", "")
@@ -705,9 +707,9 @@ func TestBriefingEnvironment(t *testing.T) {
 	accesstest.Empty(t)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
 
-	full, err := ContextForDir(root)
+	full, err := BuildContext(root)
 	if err != nil {
-		t.Fatalf("ContextForDir: %v", err)
+		t.Fatalf("BuildContext: %v", err)
 	}
 	environment := BuildBriefingEnvironment(root, root)
 	if !environment.Available || environment.Message != "" {
@@ -736,16 +738,16 @@ func TestBriefingEnvironment(t *testing.T) {
 	if strings.Contains(string(encoded), `"matrix"`) {
 		t.Errorf("baseTools trägt matrix: %s", encoded)
 	}
-	// Die übrigen Unterfelder unverändert, wie `k-playbook context` sie ausgibt.
+	// Die übrigen Unterfelder unverändert, wie ihre Leser sie liefern.
 	for name, pair := range map[string][2]any{
-		"github":         {environment.GitHub, full.GitHub},
-		"versionSources": {environment.VersionSources, full.VersionSources},
+		"github":         {environment.GitHub, contextGitHub(root)},
+		"versionSources": {environment.VersionSources, versionSourcesWithStatus(root, KephalaionStatus(root))},
 		"docs":           {environment.Docs, full.Docs},
 		"remediation":    {environment.Remediation, full.Remediation},
 	} {
 		got, want := mustJSON(t, pair[0]), mustJSON(t, pair[1])
 		if string(got) != string(want) {
-			t.Errorf("%s:\n%s\nerwartet (Kontextausgabe)\n%s", name, got, want)
+			t.Errorf("%s:\n%s\nerwartet\n%s", name, got, want)
 		}
 	}
 	if environment.VersionSources.State != VersionSourcesUnavailable || environment.VersionSources.Ref != "keph:/k-playbook/inventory.md" {

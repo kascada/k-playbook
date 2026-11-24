@@ -11,9 +11,10 @@ import (
 // Collection des Projekts, im Dokument versionsources.DocRef
 // (keph:/k-playbook/inventory.md). Gelesen wird sie allein von
 // internal/versionsources; hier wird nur der Zugang geöffnet und der Zustand
-// für Kontextausgabe, Briefing und Gesundheitsprüfung aufbereitet.
+// für den Teilabruf environment des Briefings, die Gesundheitsprüfung und die
+// Oberfläche aufbereitet.
 
-// Die Zustände von versionSources in der Kontextausgabe.
+// Die Zustände von versionSources im Teilabruf environment.
 const (
 	// VersionSourcesPresent: Das Dokument liegt und ist lesbar.
 	VersionSourcesPresent = "present"
@@ -29,8 +30,8 @@ const (
 	VersionSourcesUnavailable = "unavailable"
 )
 
-// VersionSources ist der Zustand der Quellenkonfiguration in der
-// Kontextausgabe. Der Vertrag dazu steht in defaults/docs/handbook/version-inventory.md,
+// VersionSources ist der Zustand der Quellenkonfiguration im Teilabruf
+// environment des Briefings. Der Vertrag dazu steht in defaults/docs/handbook/version-inventory.md,
 // Abschnitt „Source Configuration"; die Feldnamen sind die YAML-Schlüssel
 // des Frontmatters, in camelCase wie überall sonst in dieser Ausgabe.
 //
@@ -61,10 +62,10 @@ type VersionSources struct {
 	// HelmValues sind die konfigurierten Helm-Werte. Wie bei Sources stehen
 	// auch abgelehnte Einträge darin.
 	HelmValues []VersionHelmValue `json:"helmValues,omitempty"`
-	// Error ist gesetzt bei invalid und unavailable: der Grund. Der
-	// Kontextaufruf bricht deswegen nicht ab: er steht am Anfang jedes
-	// Commands, und eine defekte oder unerreichbare Zusatzkonfiguration darf
-	// nicht jeden Command lahmlegen. Der Erhebungslauf des Inventars bricht
+	// Error ist gesetzt bei invalid und unavailable: der Grund. Der Teilabruf
+	// environment bricht deswegen nicht ab: Commands holen ihn, wo sie die
+	// Angaben brauchen, und eine defekte oder unerreichbare
+	// Zusatzkonfiguration darf nicht jeden Command lahmlegen. Der Erhebungslauf des Inventars bricht
 	// sehr wohl ab — so steht es im Vertrag.
 	Error string `json:"error,omitempty"`
 }
@@ -120,10 +121,11 @@ func loadVersionSources(ctx context.Context, projectDir string, status kephalaio
 }
 
 // versionSourcesWithStatus löst den Zustand der Quellenkonfiguration auf, mit
-// dem Status der Anbindung, den ContextForDir schon hat.
+// dem Status der Anbindung, den der Aufrufer (BuildBriefingEnvironment) schon
+// hat.
 //
-// Ein defektes oder unerreichbares Dokument bricht den Kontextaufruf nicht
-// ab: er steht am Anfang jedes Commands, und eine defekte
+// Ein defektes oder unerreichbares Dokument bricht den Teilabruf environment
+// nicht ab: Commands holen ihn, wo sie die Angaben brauchen, und eine defekte
 // Zusatzkonfiguration darf nicht jeden Command lahmlegen. Sichtbar bleibt der
 // Zustand trotzdem — dafür sind state und error da. Der Erhebungslauf des
 // Inventars bricht bei demselben Dokument sehr wohl ab; das ist die Trennung
@@ -135,7 +137,7 @@ func versionSourcesWithStatus(projectDir string, status kephalaion.Status) *Vers
 }
 
 // VersionSourcesFrom macht aus dem Ergebnis von versionsources.Load den
-// Zustand der Kontextausgabe — für Aufrufer, die den Zugang selbst schon
+// Zustand des Teilabrufs environment — für Aufrufer, die den Zugang selbst schon
 // offen haben, etwa die Oberfläche über OpenInventoryStore.
 func VersionSourcesFrom(config versionsources.Config, err error) *VersionSources {
 	state := &VersionSources{Ref: versionsources.DocRef, Present: config.Present}
