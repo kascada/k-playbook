@@ -86,8 +86,8 @@ Erklärung.
 	}
 }
 
-// Eine defekte Zusatzkonfiguration darf nicht jeden Command lahmlegen: der
-// Kontextaufruf steht am Anfang jedes Commands. Sichtbar bleibt der Zustand
+// Eine defekte Zusatzkonfiguration darf nicht jeden Command lahmlegen: Commands
+// holen den Teilabruf environment, wo sie die Angaben brauchen. Sichtbar bleibt der Zustand
 // trotzdem — dafür sind state und error da.
 func TestVersionSourcesDefektIstZustand(t *testing.T) {
 	for name, content := range map[string]string{

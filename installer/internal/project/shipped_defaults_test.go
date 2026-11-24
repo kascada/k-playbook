@@ -915,7 +915,7 @@ func assertDocsScopeModul(t *testing.T) {
 		"Der Scope gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` und `/k-docs-tools`",
 		"`/k-doc-inventory` liest seine Quellen nach seinem eigenen Vertrag", "`k_playbook_docs_scope`",
 		"`k-playbook docs scope [<pfad>] [--check <pfad>…] --json`", "`EXTRA_PATH`", "`SCAN_ROOT`", "**Stand.**", "**Preflight.**",
-		"Immer außen   k-playbook/, .k-playbook/, keph-backup/, .git/", "`NEW_EXCLUDES`", "**Ausschlüsse speichern.**",
+		"Immer außen   /k-playbook/, /.k-playbook/, keph-backup/, .git/", "`NEW_EXCLUDES`", "**Ausschlüsse speichern.**",
 		"`k_playbook_docs_exclude_add`", "„Neu laden“", "`rejected`", "`unsupported`", "`/k-upgrade`",
 	} {
 		if !strings.Contains(scopeText, squashSpace(needle)) {

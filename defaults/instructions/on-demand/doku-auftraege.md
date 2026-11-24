@@ -171,7 +171,9 @@ Ein Schreiber soll seinen Auftrag weiter ergänzen können, bevor der Verarbeite
   Rechnung trägt allein das Programm: `k-playbook docs orders code` nennt ihn als
   `waitMinutes` und je wartendem Auftrag die Restzeit; diese Anweisung nennt ihn nicht.
 - Maßgeblich ist die letzte Änderung des Auftrags, nicht `entstanden` im Kopf, das nur das
-  Datum trägt. Ein Ergänzen beginnt die Frist neu. Ein Kopffeld für die Frist gibt es nicht.
+  Datum trägt. Fehlt die letzte Änderung oder ist sie nicht lesbar, zählt der Anlegezeitpunkt
+  des Dokuments; fehlt auch der, ist der Auftrag reif und steht unter `problems`. Ein Ergänzen
+  beginnt die Frist neu. Ein Kopffeld für die Frist gibt es nicht.
 - Die Frist gilt nur für rohe Aufträge. Zerlegte haben keine: Ein unterbrochener Lauf setzt
   sofort wieder an.
 - Wartende Aufträge nehmen am Zusammenlegen und Zerlegen nicht teil und bleiben unverändert

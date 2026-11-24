@@ -177,6 +177,76 @@ func TestDocsOrdersFrist(t *testing.T) {
 	}
 }
 
+// Ohne lesbare letzte Änderung rechnet die Wartezeit mit dem Anlegezeitpunkt;
+// fehlt auch der, ist der Auftrag reif, steht unter problems und wird
+// trotzdem abgearbeitet — auch wenn entstanden im Kopf von heute ist.
+func TestDocsOrdersFristOhneAenderung(t *testing.T) {
+	at := docsOrdersClock()
+	docsOrdersNow(t, at)
+	today := at.Format("2006-01-02")
+	orders, store := newDocsOrders(t)
+	put := func(name, pfad, created, updated string) {
+		store.Put(name, rawOrder("s", today, pfad))
+		store.Docs[name].Created = created
+		store.Docs[name].Updated = updated
+	}
+	stamp := func(d time.Duration) string { return at.Add(-d).UTC().Format(time.RFC3339Nano) }
+	put("queue/docs/001-frisch.md", "a", stamp(30*time.Minute), "")
+	put("queue/docs/002-alt.md", "b", stamp(DocsOrderWait+time.Minute), "")
+	put("queue/docs/003-kaputt-frisch.md", "c", stamp(30*time.Minute), "gestern")
+	put("queue/docs/004-kaputt-alt.md", "d", stamp(DocsOrderWait), "gestern")
+	put("queue/docs/005-ohne.md", "e", "", "")
+	put("queue/docs/006-ohne-kaputt.md", "f", "nie", "gestern")
+	result, err := orders.Orders(context.Background(), "code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting := map[string]bool{}
+	for _, order := range result.Orders {
+		waiting[strings.TrimPrefix(order.Ref, "keph:/queue/docs/")] = order.Waiting
+	}
+	want := map[string]bool{
+		"001-frisch.md": true, "002-alt.md": false, "003-kaputt-frisch.md": true,
+		"004-kaputt-alt.md": false, "005-ohne.md": false, "006-ohne-kaputt.md": false,
+	}
+	for name, expected := range want {
+		if got, ok := waiting[name]; !ok || got != expected {
+			t.Errorf("%s: wartet %v (da: %v), erwartet %v", name, got, ok, expected)
+		}
+	}
+	for _, item := range result.Waiting {
+		if item.Ref == "keph:/queue/docs/001-frisch.md" && item.RemainingMinutes != 90 {
+			t.Errorf("Restzeit aus dem Anlegezeitpunkt: %+v", item)
+		}
+	}
+	problems := strings.Join(result.Problems, "\n")
+	for _, name := range []string{"005-ohne.md", "006-ohne-kaputt.md"} {
+		if !strings.Contains(problems, "keph:/queue/docs/"+name+": ohne lesbaren Zeitpunkt") ||
+			!strings.Contains(problems, "gilt als reif, wird abgearbeitet") {
+			t.Errorf("%s fehlt unter problems: %q", name, problems)
+		}
+	}
+	for _, name := range []string{"001-frisch.md", "002-alt.md", "003-kaputt-frisch.md", "004-kaputt-alt.md"} {
+		if strings.Contains(problems, name) {
+			t.Errorf("%s steht unter problems: %q", name, problems)
+		}
+	}
+	taken := map[string]bool{}
+	for _, raw := range result.RawOrders {
+		for _, ref := range raw.Refs {
+			taken[strings.TrimPrefix(ref, "keph:/queue/docs/")] = true
+		}
+	}
+	for name, waits := range want {
+		if taken[name] == waits {
+			t.Errorf("%s: in rawOrders %v, wartet %v", name, taken[name], waits)
+		}
+	}
+	if result.Run != DocsRunPartial {
+		t.Errorf("Lauf: %s", result.Run)
+	}
+}
+
 // docsOrderAdd ruft Add mit den üblichen Eingaben.
 func docsOrderAdd(t *testing.T, orders *DocsOrders, producer, session, anlass string, pfade ...string) DocsOrderAddResult {
 	t.Helper()

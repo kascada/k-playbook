@@ -439,8 +439,8 @@ der Projekt-Collection.
             k-playbook:/commands/_docs/scope.md — ohne Kephalaion, nur lokal:
             SCAN_ROOT (project.repoRoot), den Stand (Branch, Commit, ob
             git status --porcelain leer ist), die wirksamen Ausschlüsse nach
-            Herkunft (immer: k-playbook/, .k-playbook/, keph-backup/ auf jeder
-            Ebene, .git/; versteckt; weitere feste; jede .gitignore unter
+            Herkunft (immer: /k-playbook/ und /.k-playbook/ nur direkt unter
+            project.dir, keph-backup/ und .git/ auf jeder Ebene; versteckt; weitere feste; jede .gitignore unter
             SCAN_ROOT, höchstens 200 — greift die Grenze, nennt die Ausgabe sie und
             --json trägt gitignoreTruncated mit der Zahl der nicht gelesenen;
             docs.exclude samt verworfenen Einträgen). Ein <pfad> vor
@@ -461,8 +461,10 @@ der Projekt-Collection.
             abhängige Pfade — gleich oder darin — gelten als ein Auftrag mit
             vereinigten Pfaden, gesammelten Anlässen und dem ältesten
             entstanden), splitOrders, waiting und nothingToDo. Die Wartezeit
-            (2 Stunden seit der letzten Änderung, gerechnet mit der Uhr des
-            Programms) steht nur im Programm. Für tools nur die Liste.
+            (2 Stunden seit der letzten Änderung, ohne lesbare Änderung seit
+            dem Anlegen, gerechnet mit der Uhr des Programms) steht nur im
+            Programm; ohne beide Zeitpunkte ist ein Auftrag reif und steht
+            unter problems. Für tools nur die Liste.
             Braucht Kephalaion (kephalaion_unavailable).
 
   order add Reiht einen rohen Auftrag ein oder ergänzt den offenen derselben

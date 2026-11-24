@@ -97,6 +97,7 @@ type DocsOrder struct {
 	Anlass           string          `json:"anlass"`
 	Sitzung          string          `json:"sitzung,omitempty"`
 	Entstanden       string          `json:"entstanden,omitempty"`
+	Created          string          `json:"created,omitempty"`
 	Updated          string          `json:"updated,omitempty"`
 	Revision         int64           `json:"revision"`
 	Waiting          bool            `json:"waiting,omitempty"`
@@ -258,11 +259,8 @@ func docsPathsCovered(have, add []string) bool {
 // das sich nicht lesen lässt, gibt problem zurück.
 func parseDocsOrder(ref string, entry kephalaion.Entry, read kephalaion.ReadResult) (DocsOrder, string) {
 	order := DocsOrder{Ref: ref, Pfade: []string{}, Revision: read.Revision}
-	if entry.Updated != nil {
-		order.Updated = entry.Updated.At
-	} else if read.Updated != nil {
-		order.Updated = read.Updated.At
-	}
+	order.Created = docsOrderStamp(entry.Created, read.Created)
+	order.Updated = docsOrderStamp(entry.Updated, read.Updated)
 	content := ""
 	if read.Content != nil {
 		content = *read.Content
@@ -354,8 +352,18 @@ func (o *DocsOrders) load(ctx context.Context) ([]DocsOrder, []string, error) {
 	return orders, problems, nil
 }
 
-// docsOrderAge rechnet, wie lange die letzte Änderung zurückliegt. ok ist
-// false, wenn kein Zeitpunkt vorliegt oder er sich nicht lesen lässt.
+// docsOrderStamp ist der erste nicht leere Zeitpunkt aus list und read.
+func docsOrderStamp(stamps ...*kephalaion.Stamp) string {
+	for _, stamp := range stamps {
+		if stamp != nil && strings.TrimSpace(stamp.At) != "" {
+			return stamp.At
+		}
+	}
+	return ""
+}
+
+// docsOrderAge rechnet, wie lange ein Zeitpunkt zurückliegt. ok ist false,
+// wenn kein Zeitpunkt vorliegt oder er sich nicht lesen lässt.
 func docsOrderAge(updated string, at time.Time) (time.Duration, bool) {
 	if strings.TrimSpace(updated) == "" {
 		return 0, false
@@ -387,7 +395,19 @@ func (o *DocsOrders) Orders(ctx context.Context, producer string) (DocsOrdersRes
 			continue
 		}
 		if producer == DocsOrderCode && order.Kind == DocsOrderKindRaw {
-			if age, ok := docsOrderAge(order.Updated, at); ok && age < DocsOrderWait {
+			// Maßgeblich ist die letzte Änderung; fehlt sie oder ist sie nicht
+			// lesbar, der Anlegezeitpunkt. Ohne beide ist der Auftrag reif —
+			// er darf nie dauerhaft warten — und steht unter problems, damit
+			// der Rückfall sichtbar ist. entstanden im Kopf zählt nicht.
+			age, ok := docsOrderAge(order.Updated, at)
+			if !ok {
+				age, ok = docsOrderAge(order.Created, at)
+			}
+			switch {
+			case !ok:
+				result.Problems = append(result.Problems, order.Ref+
+					": ohne lesbaren Zeitpunkt der Änderung und des Anlegens — gilt als reif, wird abgearbeitet")
+			case age < DocsOrderWait:
 				order.Waiting = true
 				order.RemainingMinutes = int((DocsOrderWait - age + time.Minute - 1) / time.Minute)
 			}

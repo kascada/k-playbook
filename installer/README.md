@@ -17,7 +17,6 @@ k-playbook briefing                 # was für dieses Projekt gilt und was anste
 k-playbook upgrade [--check]        # Programm aktualisieren und das Projekt nachziehen
 k-playbook maintain [--only …] [--dry-run] [--commit]
                                      # Wartungslauf ohne KI und Rückfrage, etwa die Doku-Sicherung
-k-playbook context                  # gibt den älteren aufgelösten Arbeitsstand als JSON aus (wird gestrichen)
 k-playbook stop                     # beendet den Hintergrunddienst dieses Projekts
 k-playbook help
 ```
@@ -45,10 +44,9 @@ Projekt und Kephalaion-Anbindung, der Text der immer geltenden Anweisungen, die 
 Leitlinien als Verweise und die eigene offene Arbeit, schon aufgelöst, damit kein Command
 die Overlay-Regeln selbst anwenden muss. Was nur einzelne Commands brauchen — `gh`,
 Basis-Werkzeuge, Quellenkonfiguration, Remediation-Policy —, liefert
-`k-playbook briefing --part environment`. `context` ist der ältere Aufruf: Er besteht
-unverändert, kein mitgelieferter Text nutzt ihn mehr (Task 187), und er wird in einem
-eigenen Schritt gestrichen. Beide räumen bewusst nichts auf — deren Ausgabe würde die
-Antwort stören. `upgrade` zieht Kephalaion, Programm und Projekt nach: das Binary nur,
+`k-playbook briefing --part environment`. Der ältere Aufruf `context` ist mit Task 188
+entfernt; wer ihn noch ruft, bekommt einen Satz mit dem Ersatz und Exit-Code 1. `briefing`
+räumt bewusst nichts auf — die Ausgabe würde die Antwort stören. `upgrade` zieht Kephalaion, Programm und Projekt nach: das Binary nur,
 wenn das laufende älter ist als der neueste Release-Tag auf GitHub — dann direkt aus dem
 Release, geprüft gegen die `SHA256SUMS` des Tags —; dann `AGENTS.md`, `CLAUDE.md`,
 Verlinkung, die fehlenden Felder des Blocks `maintenance:` (Sicherung aus, vorhandene Werte

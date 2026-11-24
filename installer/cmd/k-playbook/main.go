@@ -404,16 +404,25 @@ Unterkommandos:
             Inhalt liest und schreibt man direkt über Kephalaion. Dasselbe
             wie die MCP-Werkzeuge k_playbook_doc_create, _list, _done und
             _reopen.
-  docs      Erzeugte Doku in der Projekt-Collection auschecken und
-            veröffentlichen: k-playbook docs checkout <erzeuger> [--discard]
-            und k-playbook docs publish <erzeuger> [--allow-hints], je mit
-            --json. checkout holt keph:/docs/generated/<erzeuger>/ nach
-            .k-playbook/work/docs/<erzeuger>/, publish gleicht ab und meldet
-            Konflikte, statt zu überschreiben. Erzeuger: code, libs. Dazu
-            k-playbook docs exclude add <muster>… [--json]: trägt dauerhafte
-            Ausschlüsse für den Code-Scan in docs.exclude von K-PLAYBOOK.yaml
-            ein. Dasselbe wie die MCP-Werkzeuge k_playbook_docs_checkout,
-            _publish und _exclude_add.
+  docs      Erzeugte Doku, ihr Scope und die Doku-Aufträge; die Schalter
+            nennt k-playbook docs --help.
+            k-playbook docs checkout <erzeuger> holt
+            keph:/docs/generated/<erzeuger>/ nach
+            .k-playbook/work/docs/<erzeuger>/, k-playbook docs publish
+            <erzeuger> gleicht ab und meldet Konflikte, statt zu
+            überschreiben. Erzeuger: code, libs.
+            k-playbook docs readme schreibt die README.md unter keph:/docs/
+            aus den Vorlagen.
+            k-playbook docs exclude add <muster>… trägt dauerhafte Ausschlüsse
+            für den Code-Scan in docs.exclude von K-PLAYBOOK.yaml ein.
+            k-playbook docs scope rechnet den Scope der Erzeuger, die den
+            Code durchsuchen.
+            k-playbook docs orders <code|tools> liest die offenen
+            Doku-Aufträge, k-playbook docs order add reiht einen ein,
+            k-playbook docs orders split schreibt die zerlegten.
+            Dasselbe wie die MCP-Werkzeuge k_playbook_docs_checkout, _publish,
+            _readme, _exclude_add, _scope, _orders, _order_add und
+            _orders_split.
   upgrade   Aktualisiert Kephalaion und das Programm und zieht das Projekt
             nach: k-playbook upgrade [--check] [--json]. Zuerst Kephalaion
             (kephalaion upgrade --auto; fehlt es im PATH, wird es

@@ -27,9 +27,10 @@ Programm; dieser Text wiederholt sie nicht, und du rechnest sie nicht nach.
 - Ein versteckter Pfad kommt nur in den Scan, wenn `$ARGUMENTS` oder ein `hint` ihn
   ausdrücklich nennt; eine Zusatzquelle aus einem `hint` gehört für dieses Dokument zum Scan,
   mit denselben Ausschlüssen — auch denen aus `NEW_EXCLUDES`, nie den immer ausgeschlossenen
-  Verzeichnissen. Immer ausgeschlossen sind `.k-playbook/` und `k-playbook/` unter
-  `project.dir` und unter `project.repoRoot` sowie `keph-backup/` und `.git/`
-  auf jeder Ebene.
+  Verzeichnissen. Immer ausgeschlossen sind `.k-playbook/` und `k-playbook/` nur direkt unter
+  `project.dir` (in der Antwort mit Anker: `/k-playbook/`, `/.k-playbook/`) — ein tieferes
+  Verzeichnis dieses Namens gehört zum Scan wie jedes andere — sowie `keph-backup/` und
+  `.git/` auf jeder Ebene.
 - Ist `gitignoreTruncated` gesetzt, hat die Grenze von 200 gelesenen `.gitignore` gegriffen: so
   viele Dateien blieben ungelesen; der Scope bleibt gültig, nenne den Hinweis im Preflight.
 
@@ -45,7 +46,7 @@ lässt den Preflight **einmal** bestätigen:
 Scope         <scanRoot> (project.repoRoot)
 Stand         <branch> @ <commit>, sauber | geändert | beschrieben wird <ref>
 Zusätzlich    <extra.path> | —
-Immer außen   k-playbook/, .k-playbook/, keph-backup/, .git/
+Immer außen   /k-playbook/, /.k-playbook/, keph-backup/, .git/
 Versteckt     ausgeschlossen (.*) | ausgenommen: <aus Argument oder hint>
 Aus K-PLAYBOOK.yaml  <exclude.config, durch Komma getrennt> | —
               verworfen: <pattern> — <reason>   (je Eintrag aus exclude.rejected)

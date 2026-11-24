@@ -391,7 +391,8 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 	briefing.Kephalaion = briefingKephalaion(KephalaionStatus(projectDir))
 	briefing.GitHub = briefingGitHub(contextGitHub(startDir))
 	// Erst lesen, dann heilen: Bricht das Lesen an
-	// einer unlesbaren oder zu neuen Konfiguration ab, wird auch nichts
+	// einer unlesbaren oder zu neuen Konfiguration oder an einem unzulässigen
+	// Wert in project.languages ab (briefingProject), wird auch nichts
 	// eingerichtet. Ein Werkzeug, das die Fassung nicht versteht, soll die
 	// Registrierung nicht nach seinen Regeln umschreiben.
 	if briefing.Project.Available {
@@ -451,6 +452,12 @@ func briefingGitHub(access *ContextGitHub) BriefingGitHub {
 	return section
 }
 
+// readBriefingRemediation ist austauschbar, damit ein Test das Scheitern von
+// ReadRemediation nach gelesener Konfiguration nachstellen kann — es liest
+// dieselbe Datei und scheitert sonst nur, wenn sie zwischen beiden Lesern
+// verschwindet.
+var readBriefingRemediation = ReadRemediation
+
 // BuildBriefingEnvironment baut den Teilabruf environment für ein Projekt.
 // startDir ist das Verzeichnis, aus dem der Aufruf kommt: github liest das
 // Remote des Repos, in dem es liegt. Geschrieben wird nichts — keine
@@ -460,7 +467,7 @@ func BuildBriefingEnvironment(projectDir string, startDir string) BriefingEnviro
 	if err != nil {
 		return BriefingEnvironment{Message: err.Error()}
 	}
-	remediation, err := ReadRemediation(projectDir)
+	remediation, err := readBriefingRemediation(projectDir)
 	if err != nil {
 		return BriefingEnvironment{Message: err.Error()}
 	}

@@ -28,7 +28,9 @@ nicht nachgerechnet. Die Antwort trägt:
   `waiting` (die wartenden mit `remainingMinutes`).
 - `nothingToDo` mit `reason` — bei `code`: es gibt nichts abzuarbeiten, der Lauf endet; bei
   `tools` nur: es gibt keine offenen Aufträge, der Lauf kann trotzdem laufen.
-- `problems` — Aufträge, die das Programm nicht lesen konnte; nennen, nicht raten.
+- `problems` — Aufträge, die das Programm nicht lesen konnte (sie fehlen in den Listen), und
+  rohe Aufträge ohne lesbaren Zeitpunkt der Änderung und des Anlegens (sie gelten als reif,
+  stehen in `rawOrders` und werden abgearbeitet); nennen, nicht raten.
 
 Bei `tools` ist jeder offene Auftrag Teil von `orders`; eine Wartezeit gibt es nicht.
 

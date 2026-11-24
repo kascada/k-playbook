@@ -46,8 +46,9 @@ func TestFehlendeQuellenkonfigurationIstKeinFehler(t *testing.T) {
 	}
 }
 
-// Der Erhebungslauf bricht bei defekter Konfiguration ab — anders als
-// `k-playbook context`, der sie als Zustand ausgibt und weiterläuft. Ebenso,
+// Der Erhebungslauf bricht bei defekter Konfiguration ab — anders als der
+// Teilabruf environment des Briefings, der sie als Zustand ausgibt und
+// weiterläuft. Ebenso,
 // wenn die Collection nicht erreichbar ist: kein Rückfall auf die
 // Standardquellen.
 func TestDefekteQuellenkonfigurationBrichtDenLaufAb(t *testing.T) {

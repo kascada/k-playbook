@@ -17,8 +17,12 @@ import (
 // Sitzung. Der Scope liest nur lokal (K-PLAYBOOK.yaml, git, Dateisystem) und
 // braucht keine Kephalaion-Anbindung.
 
-// docsScopeAlways sind die Verzeichnisse, die nie zum Scan gehören.
-var docsScopeAlways = []string{"k-playbook/", ".k-playbook/", "keph-backup/", ".git/"}
+// docsScopeAlways sind die Verzeichnisse, die nie zum Scan gehören, so wie
+// die Ausgabe sie nennt: k-playbook/ und .k-playbook/ nur direkt unter dem
+// Projektverzeichnis (daher der Anker), keph-backup/ und .git/ auf jeder
+// Ebene. Gerechnet wird nicht mit diesen Mustern, sondern mit
+// alwaysExcludedAbs und alwaysExcludedRel.
+var docsScopeAlways = []string{"/k-playbook/", "/.k-playbook/", "keph-backup/", ".git/"}
 
 // docsScopeFurther sind die weiteren Ausschlüsse ohne Rückfrage; sie gelten
 // auf jeder Ebene.
@@ -110,7 +114,6 @@ type DocsScopeOptions struct {
 type docsScope struct {
 	projectDir string
 	scanRoot   string
-	always     []ignoreRule
 	further    []ignoreRule
 	config     []ignoreRule
 	ignores    []docsScopeIgnores
@@ -135,7 +138,6 @@ func DocsScope(ctx context.Context, projectDir string, opts DocsScopeOptions) (D
 	result.Stand = docsScopeStand(ctx, scanRoot)
 
 	scope := &docsScope{projectDir: projectDir, scanRoot: scanRoot}
-	scope.always = compileIgnoreRules(docsScopeAlways, true)
 	scope.further = compileIgnoreRules(docsScopeFurther, true)
 	scope.config = compileIgnoreRules(docs.Exclude, false)
 
@@ -227,7 +229,7 @@ func (s *docsScope) extra(arg string) (DocsScopeExtra, error) {
 	if s.alwaysExcludedAbs(abs, root) {
 		extra.AlwaysExcluded = true
 		return extra, docRefErrorf(DocCodeInvalidInput,
-			"%s liegt in einem Verzeichnis, das nie zum Scan gehört (k-playbook/, .k-playbook/, keph-backup/, .git/)", arg)
+			"%s liegt in einem Verzeichnis, das nie zum Scan gehört (%s)", arg, strings.Join(docsScopeAlways, ", "))
 	}
 	if scanRel, err := filepath.Rel(s.scanRoot, abs); err == nil && !strings.HasPrefix(scanRel, "..") {
 		s.extraRel = filepath.ToSlash(scanRel)
@@ -258,6 +260,26 @@ func (s *docsScope) alwaysExcludedAbs(abs string, projectRoot string) bool {
 	return false
 }
 
+// alwaysExcludedRel ist alwaysExcludedAbs für das Einsammeln der .gitignore:
+// full ist der absolute Pfad, rel derselbe ab SCAN_ROOT. k-playbook/ und
+// .k-playbook/ treffen nur direkt unter dem Projektverzeichnis,
+// keph-backup/ und .git/ auf jeder Ebene unter SCAN_ROOT — ein solcher Name
+// über SCAN_ROOT schließt nichts aus.
+func (s *docsScope) alwaysExcludedRel(full string, rel string) bool {
+	for _, name := range []string{ProjectDirName, "k-playbook"} {
+		dir := filepath.Join(s.projectDir, name)
+		if full == dir || strings.HasPrefix(full, dir+string(filepath.Separator)) {
+			return true
+		}
+	}
+	for _, part := range strings.Split(rel, "/") {
+		if part == "keph-backup" || part == ".git" {
+			return true
+		}
+	}
+	return false
+}
+
 // docsHiddenPath sagt, ob ein Pfadteil mit . beginnt.
 func docsHiddenPath(rel string) bool {
 	for _, part := range strings.Split(rel, "/") {
@@ -270,7 +292,7 @@ func docsHiddenPath(rel string) bool {
 
 // collectGitignores sammelt die .gitignore unter SCAN_ROOT, die Wurzel
 // zuerst. Verzeichnisse, die ohnehin ausgeschlossen sind, werden nicht
-// betreten.
+// betreten; ein tieferes Verzeichnis namens k-playbook gehört nicht dazu.
 func (s *docsScope) collectGitignores() ([]DocsScopeIgnoreFile, int) {
 	files := []DocsScopeIgnoreFile{}
 	truncated := 0
@@ -290,7 +312,7 @@ func (s *docsScope) collectGitignores() ([]DocsScopeIgnoreFile, int) {
 			if rel == "." {
 				return nil
 			}
-			if _, ok := ignoreVerdict(s.always, rel, true); ok {
+			if s.alwaysExcludedRel(full, rel) {
 				return filepath.SkipDir
 			}
 			if strings.HasPrefix(entry.Name(), ".") {
@@ -407,12 +429,12 @@ func (s *docsScope) check(raw string) DocsScopeCheck {
 }
 
 // docsScopeAlwaysName nennt, welches immer ausgeschlossene Verzeichnis einen
-// Pfad trifft.
+// Pfad trifft, in der Schreibweise von docsScopeAlways.
 func docsScopeAlwaysName(abs string, projectDir string) string {
 	for _, name := range []string{ProjectDirName, "k-playbook"} {
 		dir := filepath.Join(projectDir, name)
 		if abs == dir || strings.HasPrefix(abs, dir+string(filepath.Separator)) {
-			return name + "/"
+			return "/" + name + "/"
 		}
 	}
 	for _, part := range strings.Split(filepath.ToSlash(abs), "/") {

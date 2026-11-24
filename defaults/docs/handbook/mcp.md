@@ -1180,7 +1180,8 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   relative to `project.repoRoot` or absolute). Answer: `scanRoot`, `projectDir`, `stand` (`git`, `branch`,
   `commit`, `clean`, `message` when there is no git work tree), `extra` (`path`, `abs`, `exists`,
   `inProject`, `alwaysExcluded`), `exclude` and `checks`. `exclude` has `always` (never scanned:
-  `k-playbook/`, `.k-playbook/`, `keph-backup/` on every level, `.git/`), `hidden` (`excluded`,
+  `/k-playbook/` and `/.k-playbook/` only directly under `project.dir` -- a deeper directory of
+  that name is scanned like any other --, `keph-backup/` and `.git/` on every level), `hidden` (`excluded`,
   `excepted`: a hidden extra path), `further` (the fixed list `venv/`, `node_modules/`, `dist/`,
   `build/`, `tests/fixtures/`, `**/*.min.js`, ...), `gitignore` (per `.gitignore` under
   `project.repoRoot` its `file` and `patterns`; nested files best effort), `config`
@@ -1195,11 +1196,11 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   anchoring, `!`); the fixed list applies on every level.
 - **`k_playbook_docs_orders`** reads the open orders (without `done/`) of `erzeuger` and rates
   them. Each order carries `ref`, `kind` (`raw` or `split`), `title`, `erzeuger`, `dokument` and
-  `aktion` (split only), `pfade`, `anlass`, `sitzung`, `entstanden`, `updated`, `revision`, `lines`
+  `aktion` (split only), `pfade`, `anlass`, `sitzung`, `entstanden`, `created`, `updated`, `revision`, `lines`
   (the body lines `datum -- anlass`) and, for a raw order of `code`, `waiting` with
   `remainingMinutes`. For `code` the answer adds `waitMinutes` (120, the value lives only in the
-  program, which computes with its own clock against `updated`, not against
-  `now.timestamp`), `run` and the lists. `run` is `full` when a raw order has
+  program, which computes with its own clock against `updated`, or against `created` when
+  `updated` is missing or unreadable, not against `now.timestamp`), `run` and the lists. `run` is `full` when a raw order has
   `pfade: .` (it takes every open raw order, waiting ones included, so `waiting` is empty),
   `partial` when ready raw orders exist, `resume` when only split orders are open (an earlier run
   was interrupted) and `none` otherwise. `rawOrders` is the list the run takes after merging:
@@ -1208,8 +1209,9 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   the united `pfade` (`.` swallows all), the collected `anlaesse` (`datum`, `anlass`) and the
   oldest `entstanden`. `splitOrders` are the open split orders, `waiting` the waiting raw ones
   (`ref`, `pfade`, `updated`, `remainingMinutes`). `nothingToDo` with `reason` means no run: no
-  open orders, or only waiting ones. `problems` names orders whose frontmatter cannot be read;
-  they are missing from the list. For `tools` there is only `orders` and `nothingToDo`, no
+  open orders, or only waiting ones. `problems` names orders whose frontmatter cannot be read --
+  they are missing from the list -- and raw orders of `code` without a readable time of change
+  or creation -- they count as ready, stay in the lists and are worked off. For `tools` there is only `orders` and `nothingToDo`, no
   waiting time. Without a ready Kephalaion binding: `kephalaion_unavailable`, no fallback to disk.
 - **`k_playbook_docs_order_add`** inputs: `erzeuger`, `pfade` (relative to `project.repoRoot`,
   `.` is the full run), `anlass` (one sentence), `sitzung` (the identifier from the briefing,

@@ -49,7 +49,8 @@ Voller Lauf: /k-docs code reiht ihn ein, danach /k-docs-code.
 **Aufträge.** Lies `k-playbook:/commands/_docs/auftraege.md` mit `k_playbook_doc_read`
 (`projectDir` = `project.dir`) und rufe `k_playbook_docs_orders` mit `erzeuger: code`
 auf. Du merkst dir `RAW_ORDERS` (`rawOrders`), `SPLIT_ORDERS` (`splitOrders`) und `WAITING`
-(`waiting`); meldet `problems` unlesbare Aufträge, nennst du sie im Preflight. Ein Auftrag
+(`waiting`); meldet `problems` unlesbare Aufträge oder Aufträge ohne lesbaren Zeitpunkt, nennst
+du sie im Preflight — ein Auftrag ohne Zeitpunkt gilt als reif und wird trotzdem abgearbeitet. Ein Auftrag
 ist **zerlegt**, wenn er `dokument` trägt, sonst **roh**; offene zerlegte heißen, ein früherer Lauf ist unterbrochen, und dieser setzt dort wieder an.
 
 **Nichts zu tun.** Meldet die Antwort `nothingToDo`, endet der Command hier: Gibt es keinen

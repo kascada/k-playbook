@@ -14,7 +14,7 @@ import (
 
 // todoListOutput ist die Antwort von `todo list`.
 //
-// Die Ausgabe ist JSON auf stdout wie bei `context`: /k-todo soll sie lesen
+// Die Ausgabe ist JSON auf stdout wie bei `briefing --json`: /k-todo soll sie lesen
 // können, ohne Fließtext zu deuten.
 type todoListOutput struct {
 	Todos []project.Todo `json:"todos"`

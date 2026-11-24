@@ -723,3 +723,30 @@ func TestBriefingKlartextBleibtUnterDerGrenze(t *testing.T) {
 	}
 	t.Logf("Klartext des Briefings über defaults/ mit 40 Tasks und 40 Arbeitsständen: %d Zeichen (Grenze %d)", got, briefingTextLimit)
 }
+
+// Ein total unter der Länge der Liste gilt als die Länge: Die Zahl im Kopf
+// sinkt nie unter die gezeigten Einträge, und eine Zeile „weitere“ entsteht
+// daraus nicht.
+func TestBriefingWorkListTotalUnterLaenge(t *testing.T) {
+	list := []project.BriefingDoc{
+		{Ref: "keph:/user/kamran/workbench/001-a.md", Title: "A"},
+		{Ref: "keph:/user/kamran/workbench/002-b.md", Title: "B"},
+		{Ref: "keph:/user/kamran/workbench/003-c.md", Title: "C"},
+	}
+	for _, total := range []int{0, 1, 2, 3} {
+		var b strings.Builder
+		writeBriefingWorkList(&b, "Aktive Arbeitsstände", "zuletzt geänderte zuerst", "workbench", "kamran", list, total)
+		text := b.String()
+		if !strings.HasPrefix(text, "  Aktive Arbeitsstände (3, zuletzt geänderte zuerst) in keph:/user/kamran/workbench/:\n") {
+			t.Errorf("total %d: Kopf %q", total, strings.SplitN(text, "\n", 2)[0])
+		}
+		if strings.Contains(text, "weitere") {
+			t.Errorf("total %d: Zeile weitere: %q", total, text)
+		}
+		for _, name := range []string{"001-a.md  A", "002-b.md  B", "003-c.md  C"} {
+			if !strings.Contains(text, "    "+name+"\n") {
+				t.Errorf("total %d: %s fehlt: %q", total, name, text)
+			}
+		}
+	}
+}

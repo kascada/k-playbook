@@ -92,7 +92,7 @@ func TestDocsScope(t *testing.T) {
 			t.Errorf("Stand sauber, git sagt: %s", status)
 		}
 	}
-	if got := strings.Join(result.Exclude.Always, " "); got != "k-playbook/ .k-playbook/ keph-backup/ .git/" {
+	if got := strings.Join(result.Exclude.Always, " "); got != "/k-playbook/ /.k-playbook/ keph-backup/ .git/" {
 		t.Errorf("immer ausgeschlossen: %s", got)
 	}
 	if !result.Exclude.Hidden.Excluded || len(result.Exclude.Hidden.Excepted) != 0 {
@@ -121,8 +121,8 @@ func TestDocsScope(t *testing.T) {
 		".hidden/y.md":                {"hidden", "."},
 		"keph-backup/z.md":            {"always", "keph-backup/"},
 		"sub/keph-backup/q.md":        {"always", "keph-backup/"},
-		".k-playbook/K-PLAYBOOK.yaml": {"always", ".k-playbook/"},
-		"k-playbook/old.md":           {"always", "k-playbook/"},
+		".k-playbook/K-PLAYBOOK.yaml": {"always", "/.k-playbook/"},
+		"k-playbook/old.md":           {"always", "/k-playbook/"},
 		"out/o.js":                    {"gitignore", ".gitignore: out/"},
 		"build.log":                   {"gitignore", ".gitignore: *.log"},
 		"keep.log":                    {"", ""},
@@ -150,6 +150,67 @@ func TestDocsScope(t *testing.T) {
 	}
 	if abs := byPath[filepath.Join(root, "src", "a.go")]; abs.Excluded {
 		t.Errorf("absoluter Pfad im Scope: %+v", abs)
+	}
+}
+
+// Ein Verzeichnis, das tiefer im Projekt k-playbook heißt, ist ein Verzeichnis
+// wie jedes andere: Seine .gitignore wird eingesammelt und gilt, eine Datei
+// darin gehört zum Scan. Nur k-playbook/ direkt unter dem Projektverzeichnis
+// bleibt immer ausgeschlossen.
+func TestDocsScopeKPlaybookNurAnDerWurzel(t *testing.T) {
+	root := docsScopeProject(t)
+	for name, content := range map[string]string{
+		"sub/k-playbook/.gitignore":   "secret.txt\n",
+		"sub/k-playbook/secret.txt":   "x",
+		"sub/k-playbook/main.go":      "package main\n",
+		"sub/.k-playbook/notiz.md":    "x",
+		"k-playbook/.gitignore":       "nie.txt\n",
+		"installer/k-playbook/cmd.go": "package cmd\n",
+	} {
+		full := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := DocsScope(context.Background(), root, DocsScopeOptions{Check: []string{
+		"sub/k-playbook/secret.txt", "sub/k-playbook/main.go", "installer/k-playbook/cmd.go",
+		"k-playbook/old.md", "sub/.k-playbook/notiz.md",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, file := range result.Exclude.Gitignore {
+		found[file.File] = true
+	}
+	if !found["sub/k-playbook/.gitignore"] {
+		t.Errorf("sub/k-playbook/.gitignore nicht eingesammelt: %+v", result.Exclude.Gitignore)
+	}
+	if found["k-playbook/.gitignore"] {
+		t.Errorf("k-playbook/.gitignore an der Wurzel eingesammelt: %+v", result.Exclude.Gitignore)
+	}
+	want := map[string][2]string{ // Pfad → Grund, Muster
+		"sub/k-playbook/secret.txt":   {"gitignore", "sub/k-playbook/.gitignore: secret.txt"},
+		"sub/k-playbook/main.go":      {"", ""},
+		"installer/k-playbook/cmd.go": {"", ""},
+		"k-playbook/old.md":           {"always", "/k-playbook/"},
+		"sub/.k-playbook/notiz.md":    {"hidden", "."},
+	}
+	for _, got := range result.Checks {
+		expected, ok := want[got.Path]
+		if !ok {
+			continue
+		}
+		delete(want, got.Path)
+		if got.Excluded != (expected[0] != "") || got.Reason != expected[0] || got.By != expected[1] {
+			t.Errorf("%s: %+v, erwartet %v", got.Path, got, expected)
+		}
+	}
+	for path := range want {
+		t.Errorf("%s fehlt in checks", path)
 	}
 }
 

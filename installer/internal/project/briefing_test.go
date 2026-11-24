@@ -420,8 +420,9 @@ func TestSortBriefingDocsByNumber(t *testing.T) {
 // steht im Briefing unter now, project, kephalaion und github — mit denselben
 // Werten wie in der Kontextausgabe, aber nur mit den Feldern, die ein Text
 // liest. Den Übergangsabschnitt context gibt es nicht mehr, und was der
-// Teilabruf environment liefert, steht nicht im Briefing. `k-playbook context`
-// selbst bleibt unverändert; das sichern die Tests der Kontextausgabe.
+// Teilabruf environment liefert, steht nicht im Briefing. Das Unterkommando
+// der Kontextausgabe ist seit Task 188 entfernt; BuildContext sichern die
+// Tests in context_test.go.
 func TestBriefingTraegtEigeneAbschnitte(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
@@ -689,6 +690,85 @@ func TestBriefingHeiltNichtBeiUnbekannterFassung(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
 		t.Error("bei unlesbarer Konfiguration darf nichts verlinkt worden sein")
+	}
+}
+
+// Ein unzulässiger Wert in project.languages ist ein Zustand wie eine
+// unbekannte Fassung: project.available ist false mit der Meldung, und das
+// Briefing zieht die Verlinkung nicht nach. Mit einem zulässigen Wert zieht
+// derselbe Bau sie nach — so zeigt der Test, dass er das Ausbleiben erkennt.
+func TestBriefingHeiltNichtBeiUnzulaessigerSprache(t *testing.T) {
+	root := newBriefingProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
+	write(t, ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n  languages:\n    - go!\n")
+
+	briefing, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if briefing.Project.Available || briefing.Links != nil {
+		t.Errorf("project %+v, links %+v", briefing.Project, briefing.Links)
+	}
+	if !strings.Contains(briefing.Project.Message, "project.languages") || !strings.Contains(briefing.Project.Message, `"go!"`) {
+		t.Errorf("Meldung: %q", briefing.Project.Message)
+	}
+	if briefing.Project.Dir != root {
+		t.Errorf("project.dir: %q", briefing.Project.Dir)
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
+		t.Error("bei unzulässiger Sprache darf nichts verlinkt worden sein")
+	}
+
+	write(t, ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n  languages:\n    - go\n")
+	briefing, err = BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if !briefing.Project.Available || briefing.Links == nil {
+		t.Errorf("mit zulässiger Sprache: project %+v, links %+v", briefing.Project, briefing.Links)
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".claude")); err != nil {
+		t.Errorf("mit zulässiger Sprache fehlt die Verlinkung: %v", err)
+	}
+}
+
+// Scheitert ReadRemediation nach gelesener Konfiguration, kommt environment
+// mit available false und der Meldung, ohne halbe Felder.
+func TestBriefingEnvironmentOhneRemediation(t *testing.T) {
+	root := newBriefingProject(t)
+	original := readBriefingRemediation
+	readBriefingRemediation = func(string) (Remediation, error) {
+		return Remediation{}, errors.New("remediation nicht lesbar")
+	}
+	t.Cleanup(func() { readBriefingRemediation = original })
+
+	environment := BuildBriefingEnvironment(root, root)
+	if environment.Available || environment.Message != "remediation nicht lesbar" {
+		t.Errorf("environment: %+v", environment)
+	}
+	if environment.GH != nil || environment.GitHub != nil || environment.BaseTools != nil || environment.Docs != nil ||
+		environment.Remediation != nil || environment.VersionSources != nil {
+		t.Errorf("halbe Felder: %+v", environment)
+	}
+}
+
+// Ein fehlender oder nicht lesbarer Zeitpunkt der letzten Änderung zählt als
+// der älteste; untereinander bleibt die Reihenfolge.
+func TestSortBriefingDocsByUpdatedOhneZeitpunkt(t *testing.T) {
+	items := []BriefingDoc{
+		{Ref: "fehlt"},
+		{Ref: "alt", Updated: "2026-11-01T10:00:00Z"},
+		{Ref: "kaputt", Updated: "gestern"},
+		{Ref: "neu", Updated: "2026-11-20T10:00:00+01:00"},
+	}
+	sortBriefingDocsByUpdated(items)
+	got := []string{}
+	for _, item := range items {
+		got = append(got, item.Ref)
+	}
+	if want := []string{"neu", "alt", "fehlt", "kaputt"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Reihenfolge %v, erwartet %v", got, want)
 	}
 }
 

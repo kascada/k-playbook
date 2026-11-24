@@ -103,8 +103,8 @@ func addDocsOrderTools(server *mcp.Server) {
 		Description: "Rechnet den Scope der Docs-Erzeuger, die den Code durchsuchen (/k-docs-code, /k-docs-tools), nach den Regeln " +
 			"in k-playbook:/commands/_docs/scope.md — nur lokal, ohne Kephalaion. Antwort: scanRoot " +
 			"(project.repoRoot), stand (git, branch, commit, clean: `git status --porcelain` leer), bei pfad extra (path, abs, " +
-			"exists, inProject, alwaysExcluded) und exclude: always (nie im Scan: k-playbook/, .k-playbook/, keph-backup/ auf jeder " +
-			"Ebene, .git/), hidden (excluded, excepted), further (die weiteren festen Ausschlüsse), gitignore (je .gitignore unter " +
+			"exists, inProject, alwaysExcluded) und exclude: always (nie im Scan: /k-playbook/ und /.k-playbook/ nur direkt unter " +
+			"project.dir, keph-backup/ und .git/ auf jeder Ebene), hidden (excluded, excepted), further (die weiteren festen Ausschlüsse), gitignore (je .gitignore unter " +
 			"project.repoRoot file und patterns), config (docs.exclude) und rejected (verworfene Einträge mit reason); gitignoreTruncated (nur gesetzt, wenn die Grenze von 200 .gitignore gegriffen hat: die Zahl der nicht gelesenen). pfad ergänzt " +
 			"den Scope um genau einen Pfad; fehlt er, liegt er außerhalb von project.dir oder in einem immer ausgeschlossenen " +
 			"Verzeichnis, ist das invalid_input. check meldet je Pfad checks (path, excluded, reason: always, hidden, further, gitignore, " +
@@ -117,15 +117,16 @@ func addDocsOrderTools(server *mcp.Server) {
 		Description: "Liest die offenen Doku-Aufträge eines Erzeugers (code, tools) aus keph:/queue/docs/ und bewertet sie — " +
 			"die Rechnung aus Schritt 1 von /k-docs-code und aus k-playbook:/instructions/on-demand/doku-auftraege.md. Antwort: " +
 			"orders je Auftrag mit ref, kind (raw oder split), title, erzeuger, dokument und aktion (nur zerlegt), pfade, anlass, " +
-			"sitzung, entstanden, updated, revision, lines (Zeilen des Rumpfs) und bei einem rohen Auftrag für code waiting mit " +
+			"sitzung, entstanden, created, updated, revision, lines (Zeilen des Rumpfs) und bei einem rohen Auftrag für code waiting mit " +
 			"remainingMinutes. Nur für code zusätzlich: waitMinutes (die Wartezeit, 120, nur im Programm; gerechnet mit der Uhr des " +
-			"Programms an updated), run (full: ein roher Auftrag mit pfade . nimmt alle rohen auf, auch die wartenden; partial: nur " +
+			"Programms an updated, ohne lesbares updated am Anlegezeitpunkt created), run (full: ein roher Auftrag mit pfade . nimmt alle rohen auf, auch die wartenden; partial: nur " +
 			"die reifen; resume: nur offene zerlegte, ein früherer Lauf ist unterbrochen; none), rawOrders (RAW_ORDERS: die " +
 			"genommenen rohen Aufträge nach dem Zusammenlegen — abhängige, also Pfad gleich oder darin, gelten als einer mit " +
 			"vereinigten pfade, gesammelten anlaesse, dem ältesten entstanden und den aufgegangenen refs), splitOrders " +
 			"(SPLIT_ORDERS) und waiting (WAITING: ref, pfade, remainingMinutes). nothingToDo (mit reason) heißt: kein Lauf — " +
-			"keine offenen Aufträge oder nur wartende. problems nennt Aufträge, deren Frontmatter nicht lesbar ist; sie fehlen " +
-			"in der Liste. Für tools stehen nur orders und nothingToDo da. Die Zuordnung Pfad → Dokument und jede " +
+			"keine offenen Aufträge oder nur wartende. problems nennt Aufträge, deren Frontmatter nicht lesbar ist (sie fehlen " +
+			"in der Liste), und rohe Aufträge für code ohne lesbaren Zeitpunkt der Änderung und des Anlegens (sie gelten als reif " +
+			"und werden abgearbeitet). Für tools stehen nur orders und nothingToDo da. Die Zuordnung Pfad → Dokument und jede " +
 			"Nutzerentscheidung bleiben bei der Sitzung. kephalaion_unavailable: Anbindung nicht bereit, kein Rückfall auf die " +
 			"Platte. Hülle über `k-playbook docs orders`.",
 	}, docsOrdersTool)

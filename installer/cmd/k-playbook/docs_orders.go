@@ -88,7 +88,7 @@ func printDocsOrders(out io.Writer, result project.DocsOrdersResult) {
 		fmt.Fprintf(out, "roh %d: %s (%s) aus %d Auftrag/Aufträgen\n", i+1, strings.Join(raw.Pfade, ", "), raw.Entstanden, len(raw.Refs))
 	}
 	for _, problem := range result.Problems {
-		fmt.Fprintf(out, "Nicht lesbar: %s\n", problem)
+		fmt.Fprintf(out, "Problem: %s\n", problem)
 	}
 	if result.NothingToDo {
 		fmt.Fprintf(out, "Nichts zu tun: %s.\n", result.Reason)
