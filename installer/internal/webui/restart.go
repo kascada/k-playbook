@@ -158,9 +158,9 @@ func (state *serverState) activeWork() string {
 	return "Noch in Arbeit: " + text + "."
 }
 
-// installAndRestart ist der gemeinsame Ablauf beider POSTs: das Release-Programm
-// des Tags installieren, falls nötig, dann neu starten. Der Leerlaufwächter
-// ruht solange.
+// installAndRestart ist der Ablauf hinter POST /api/update/program, seinem
+// einzigen Aufrufer: das Release-Programm des Tags installieren, falls nötig,
+// dann neu starten. Der Leerlaufwächter ruht solange.
 //
 // Der Kontext ist nicht der der Anfrage: Bricht die Seite die Verbindung ab,
 // soll eine begonnene Installation nicht mitten im Neustart enden. Die Frist

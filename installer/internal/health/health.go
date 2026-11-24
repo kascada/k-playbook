@@ -6,12 +6,13 @@
 // Das Paket prüft selbst nichts. Jede Quelle hängt sich mit Register ein und
 // liefert ihre Probleme; Check ruft alle und sortiert. So stellt sich eine
 // weitere Quelle daneben, ohne dass Briefing, CLI oder GUI sich ändern. Die
-// Quellen stehen bewusst nicht hier: Die ersten vier lesen aus dem Paket
-// project (gh, Basis-Werkzeuge, Quellenkonfiguration, Kephalaion-Anbindung),
-// die fünfte — die persönliche GitHub-Zugangsdatei, Paket githubaccess —
-// wird dort daneben eingehängt, und project trägt den Report im Briefing —
-// dieses Paket darf project darum nicht importieren. project registriert
-// seine Quellen beim Laden (project/health.go).
+// Quellen stehen bewusst nicht hier, sondern alle im Paket project, das sie
+// beim Laden registriert (project/health.go und die Dateien health_*.go
+// daneben). Sie melden acht Bereiche (die Konstanten Area… unten):
+// kephalaion, baseTools, versionSources, github — die persönliche
+// GitHub-Zugangsdatei über das Paket githubaccess und die Berechtigungen der
+// Clients —, share, anchor, frontmatter und program. project trägt den Report
+// im Briefing — dieses Paket darf project darum nicht importieren.
 //
 // Repariert und geschrieben wird nichts — auch die Quelle github legt eine
 // fehlende Zugangsdatei nicht an; das tut nur `k-playbook github init`. Kein

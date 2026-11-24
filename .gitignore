@@ -21,11 +21,6 @@
 #
 # In einem echten Zielprojekt wird .k-playbook/K-PLAYBOOK.yaml committet, hier
 # nicht (siehe oben).
-#
-# /K-PLAYBOOK.yaml ist der frühere Ort. Bis das neue Programm installiert ist,
-# liegt dort ein Link auf die neue Datei, damit das alte das Projekt findet;
-# das neue entfernt den Link beim ersten Aufruf.
-/K-PLAYBOOK.yaml
 
 # Registrierung des MCP-Servers. Ihr Kommando ist der absolute Pfad des Binarys
 # auf diesem Rechner — was hier passt, passt anderswo nicht. Wer die
@@ -33,9 +28,6 @@
 # defaults/docs/handbook/mcp.md nennt den Weg. In einem echten Zielprojekt gehört die Datei
 # dagegen ins Repository.
 /.mcp.json
-
-# Vorübergehend: bleibt, bis das Binary ohne das Cursor-Ziel installiert ist (bis dahin legt das installierte Programm .cursor/commands bei jedem Aufruf neu an).
-/.cursor/
 
 # Secrets and local environment
 .env

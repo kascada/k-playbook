@@ -37,8 +37,7 @@ More examples:
   `instructions/on-demand/` or `instructions/` itself, is read file by file with its name; a
   reference to it ending in `/` lacks the file name and is an error (`invalid_input`).
 - **`k-playbook:` is read only through k-playbook**, never directly from
-  `keph:/k-playbook/` or `.k-playbook/commands/`, and never from `k-playbook/` -- a clone left
-  over from the former model, which the program no longer reads. k-playbook decides whether a
+  `keph:/k-playbook/`, `.k-playbook/commands/` or anywhere on disk. k-playbook decides whether a
   local version replaces or disables the shipped one; whoever looks on their own can pick the
   wrong version.
 - **A reference k-playbook does not know is an error.** The tool reports it with an error
@@ -147,7 +146,7 @@ What each prefix answers:
   there is one (`kephalaion_error` otherwise).
 - **`k-playbook:`** resolves the kinds `instructions/`, `reviews/`, `guidelines/` and
   `commands/` (`docReaderKinds` in `docref.go`; `reviews` and `guidelines` since task 086,
-  `commands` since task 092; the former kind for rules is gone since task 135 and is
+  `commands` since task 092; the kind for rules is gone since task 135 and is
   `unsupported` like any other path outside these kinds) and, as targets of includes, `includes/` and
   `testdata/`, plus the README templates in `docs/` (see below). A `k-playbook:` path outside these kinds is refused as
   `unsupported` -- `k-playbook:/checks/check_x.sh` is a valid reference whose kind is not
@@ -278,8 +277,7 @@ Two layers, compared by name:
 
 The shipped layer is read from Kephalaion since task 131 (`NewKephDefaultsSource` in
 `defaultsdocs.go`): the hub is the one of the project binding, the collection is always
-`k-playbook`, the account is the binding's. No code reads the shipped layer from the clone
-`k-playbook/` any more. Kephalaion is mandatory for it: without a ready binding, or with an
+`k-playbook`, the account is the binding's. Kephalaion is mandatory for it: without a ready binding, or with an
 empty `defaults/` (no `defaults/VERSION`), every `k-playbook:` reference — and the briefing as
 a whole — fails with `kephalaion_unavailable` and a remedy; there is no fallback to the disk,
 and the local layer is never served alone. The shipped instructions exist once, in

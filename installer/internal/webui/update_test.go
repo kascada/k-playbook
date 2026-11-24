@@ -11,14 +11,12 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
-// newProject baut ein Zielprojekt mit Installation darin auf.
+// newProject baut ein Zielprojekt auf; Commands und Skills kommen aus dem
+// mitgelieferten Verzeichnis.
 func newProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
-	// Der Clone steht noch, solange er Regeln und Skripte trägt; die
-	// Commands und Skills kommen schon aus dem mitgelieferten Verzeichnis.
-	writeFile(t, filepath.Join(root, project.PlaybookDirName, "VERSION"), "v0.0.0\n")
 	writeFile(t, filepath.Join(sharetest.Dir(t), "commands", "k-test.md"), "test\n")
 	writeFile(t, filepath.Join(sharetest.Dir(t), "skills", "beispiel", "SKILL.md"), "# Beispiel\n")
 	return root
@@ -49,10 +47,6 @@ func readFile(t *testing.T, path string) string {
 // Terminal: `k-playbook upgrade`. Geprüft wird der ganze Satz, nicht nur ein
 // Wortbestandteil: die Meldung ist die Stelle, an der ein Nutzer erfährt, wie
 // er das Programm von Hand nachholt.
-//
-// Ausdrücklich mitgeprüft wird, was **nicht** mehr dastehen darf: der
-// Bootstrap des Clones. Das Programm kommt aus dem Release, nicht aus dem
-// Clone.
 func TestInstallationsfehlerNenntUpgrade(t *testing.T) {
 	message := installFailureMessage(errors.New("kein Netz"))
 
@@ -65,7 +59,7 @@ func TestInstallationsfehlerNenntUpgrade(t *testing.T) {
 			t.Errorf("in der Meldung fehlt %q: %s", want, message)
 		}
 	}
-	for _, gone := range []string{"make", project.PlaybookDirName + "/bin/install"} {
+	for _, gone := range []string{"make"} {
 		if strings.Contains(message, gone) {
 			t.Errorf("die Meldung nennt noch %q: %s", gone, message)
 		}
@@ -95,8 +89,6 @@ func TestOberflaecheNenntDenselbenWeg(t *testing.T) {
 		}
 	}
 	for _, gone := range []string{
-		"make -C " + project.PlaybookDirName + " install",
-		project.PlaybookDirName + "/bin/install",
 		"program.clone",
 		"älter als die Installation",
 		"zum Clone passende Programm",

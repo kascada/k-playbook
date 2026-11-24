@@ -82,3 +82,15 @@ func TestStaleBinaryNoticeLaesstAnderesInRuhe(t *testing.T) {
 		t.Errorf("Fehler = %v, erwartet %v", err, broken)
 	}
 }
+
+// Der Hinweis sagt, dass die Inhalte bei jedem Aufruf frisch gelesen werden,
+// und nennt dafür keine Quelle: Reviews und Instruktionen kommen aus
+// Kephalaion, nicht von der Platte.
+func TestStaleNoticeNenntDiePlatteNichtAlsQuelle(t *testing.T) {
+	if strings.Contains(staleNotice, "Platte") {
+		t.Errorf("staleNotice nennt die Platte als Quelle: %s", staleNotice)
+	}
+	if !strings.Contains(staleNotice, "bei jedem Aufruf frisch gelesen") {
+		t.Errorf("staleNotice sagt nicht, dass die Inhalte frisch gelesen werden: %s", staleNotice)
+	}
+}

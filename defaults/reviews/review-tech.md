@@ -92,8 +92,8 @@ wie es hier festgelegt ist:
 
 ## Ausschlüsse
 
-Die zentralen Ausschlüsse der Modulsuche — `k-playbook/`, `vendor/`,
-`node_modules/`, `testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
+Die zentralen Ausschlüsse der Modulsuche — `vendor/`, `node_modules/`,
+`testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
 nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
 
 - Generierter Code und abgelegte Kopien alter Stände (`_old/`, `*_generated.go`, `*_pb2.py`).

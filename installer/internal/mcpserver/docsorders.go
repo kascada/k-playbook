@@ -154,7 +154,7 @@ func addDocsOrderTools(server *mcp.Server) {
 			"dokument, aktion, pfade, anlass, sitzung, entstanden, im Rumpf je Anlass eine Zeile Datum — Anlass) oder der offene " +
 			"für dasselbe Dokument ergänzt (pfade vereinigt, aktion neu gesetzt, nur neue Anlass-Zeilen, entstanden bleibt das " +
 			"älteste Datum; Neulesen bei stale_revision). Danach wandern die rohen Aufträge nach done/ — nur wenn jeder zerlegte " +
-			"Auftrag steht, sonst bleiben sie offen (kept). Ein roher Auftrag, der noch wartet (letzte Änderung jünger als die Wartezeit), wird mit invalid_input abgelehnt und nichts geschrieben, außer unter den rohen der Eingabe steht ein voller Lauf (pfade .). Ein abgelehntes neu oder entfaellt (abgelehnt) wird geschrieben und " +
+			"Auftrag steht, sonst bleiben sie offen (kept). Ein roher Auftrag, der noch wartet (Wartezeit nicht um), wird mit invalid_input abgelehnt und nichts geschrieben, außer unter den rohen der Eingabe steht ein voller Lauf (pfade .). Ein abgelehntes neu oder entfaellt (abgelehnt) wird geschrieben und " +
 			"gleich geschlossen, ohne publish. Antwort: documents je Dokument mit status (created, extended, skipped mit reason " +
 			"nothing_to_add, failed mit code und message), ref, revision, closed und doneRef; raw je roher Auftrag mit status " +
 			"(closed mit doneRef, gone: ein anderer Lauf hat ihn schon abgeschlossen, kept, failed); closedRaw, die geschlossenen " +

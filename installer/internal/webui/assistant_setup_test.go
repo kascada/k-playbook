@@ -73,42 +73,6 @@ func TestEinrichtenLegtWurzeldateiAn(t *testing.T) {
 	}
 }
 
-// Ein Bestandsprojekt mit der alten Vorlage kommt über das Einrichten auf die
-// neue, und der Antworttext sagt, was sich an der Projektdatei geändert hat.
-func TestEinrichtenZiehtAlteVorlageNach(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, project.RootInstructionsFile), `# AGENTS.md
-
-<!-- k-playbook:anstoss -->
-## k-playbook
-
-Für dieses Projekt gilt k-playbook. Rufe zu Beginn
-
-    k-playbook context
-
-auf und lies die Dateien aus `+"`instructions`"+` in der angegebenen Reihenfolge,
-bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
-die effektiven Kataloge für Regeln, Reviews und Checks.
-
-## Unsere Regeln
-
-Bleiben.
-`)
-
-	message := setupMessage(root)
-
-	content := readFile(t, filepath.Join(root, project.RootInstructionsFile))
-	if !strings.Contains(content, "\n    k-playbook briefing\n") || strings.Contains(content, "k-playbook context") {
-		t.Errorf("der Anstoß wurde nicht ersetzt:\n%s", content)
-	}
-	if !strings.Contains(content, "## Unsere Regeln\n\nBleiben.\n") {
-		t.Errorf("Projekttext ging verloren:\n%s", content)
-	}
-	if !strings.Contains(message, "k-playbook briefing") {
-		t.Errorf("%q fehlt im Antworttext: %s", "k-playbook briefing", message)
-	}
-}
-
 // Ein Konflikt gehört ebenfalls in den Antworttext — er bedeutet, dass Claude
 // Code das Playbook bis zur Handarbeit nicht kennt.
 func TestEinrichtenMeldetKonflikt(t *testing.T) {
@@ -131,11 +95,8 @@ func TestEinrichtenMeldetKonflikt(t *testing.T) {
 // Fehlerwert im Ergebnis. Hier ohne Anbindung des Testprojekts als Hinweis.
 func TestEinrichtenNenntReadmesAuchImFehlerzweig(t *testing.T) {
 	root := newProject(t)
-	writeFile(t, filepath.Join(root, project.RootInstructionsFile), "# AGENTS.md\n\n<!-- k-playbook:anstoss -->\n## k-playbook\n\n"+
-		"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn\n\n"+
-		"    k-playbook context\n\n"+
-		"auf und lies die Dateien aus `instructions`.\n\n"+
-		"Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n")
+	// .claude ist eine Datei: Die Verlinkung kann darunter nichts anlegen.
+	writeFile(t, filepath.Join(root, ".claude"), "kein Verzeichnis\n")
 
 	message := setupMessage(root)
 	if !strings.Contains(message, "Nicht vollständig eingerichtet") {

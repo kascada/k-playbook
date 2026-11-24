@@ -3,7 +3,6 @@ package webui
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -94,20 +93,12 @@ func setLanguagesHandler(w http.ResponseWriter, r *http.Request) {
 func buildToolsResponse(projectDir string, languages []string, configured bool) toolsResponse {
 	preflight, err := project.CheckTools(projectDir, languages)
 	if err != nil {
-		response := toolsResponse{
+		return toolsResponse{
 			Available:  true,
 			Message:    err.Error(),
 			Languages:  languages,
 			Configured: configured,
 		}
-		if preflightBlockedByVenv(err.Error()) {
-			response.Command = fallbackToolInstallCommand(projectDir, languages, " --method auto")
-			response.CommandVenv = fallbackToolInstallCommand(projectDir, languages, " --method venv")
-			if available, languagesErr := project.ReadToolLanguages(projectDir); languagesErr == nil {
-				response.AvailableLanguages = available
-			}
-		}
-		return response
 	}
 
 	// Die wählbaren Sprachen kommen aus der Tool-Matrix selbst, über dieselbe
@@ -133,20 +124,4 @@ func buildToolsResponse(projectDir string, languages []string, configured bool) 
 		AvailableLanguages:  available,
 		Configured:          configured,
 	}
-}
-
-func preflightBlockedByVenv(message string) bool {
-	return strings.Contains(message, "Python-venv ist aktiv") || strings.Contains(message, "Projekt-venv")
-}
-
-func fallbackToolInstallCommand(projectDir string, languages []string, extra string) string {
-	command := "bash " + shellQuote(project.ToolScript(projectDir))
-	if len(languages) > 0 {
-		command += " --languages " + strings.Join(languages, ",")
-	}
-	return command + " --install missing" + extra
-}
-
-func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }

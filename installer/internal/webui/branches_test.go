@@ -133,39 +133,6 @@ func TestBranchesAPIListeOhneGH(t *testing.T) {
 	}
 }
 
-// Ein alter Block tools.gh entscheidet nichts mehr (Task 128): Mit bereitem gh
-// und ohne Dienst kommen die GitHub-Daten hinzu, auch bei status: unknown oder
-// disabled — der gh-Client wird angelegt.
-func TestBranchesAPIIgnoriertAltenGHBlock(t *testing.T) {
-	for _, value := range []string{"unknown", "disabled"} {
-		t.Run(value, func(t *testing.T) {
-			root, _ := newBranchesProject(t, "")
-			appendLegacyGHBlock(t, root, value)
-			bin := t.TempDir()
-			if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\nexit 99\n"), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			gitPath, _ := exec.LookPath("git")
-			t.Setenv("PATH", bin+string(os.PathListSeparator)+filepath.Dir(gitPath))
-			t.Setenv("GH_CONFIG_DIR", t.TempDir())
-			t.Setenv("GH_TOKEN", "nur-fuer-die-vorpruefung")
-
-			created := 0
-			before := newGitHubClient
-			newGitHubClient = func(dir string, env []string) *github.Client {
-				created++
-				return &github.Client{Runner: &countingRunner{}, Dir: dir, Timeout: github.DefaultTimeout, Env: env}
-			}
-			t.Cleanup(func() { newGitHubClient = before })
-
-			listing := getBranches(t)
-			if listing.State != branches.StateOK || created == 0 || !listing.GitHub.Enabled {
-				t.Errorf("tools.gh.status: %s — State=%q created=%d GitHub=%+v", value, listing.State, created, listing.GitHub)
-			}
-		})
-	}
-}
-
 // ghFake beantwortet die gh-Aufrufe der Seite und reicht git an das echte git.
 type ghFake struct {
 	calls []string

@@ -9,9 +9,11 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/sharedir"
 )
 
-// ProjectDirName ist das Verzeichnis im Projekt, das künftig alles trägt, was
+// ProjectDirName ist das Verzeichnis im Projekt, das alles trägt, was
 // k-playbook im Projekt braucht (Punkt 21 der Arbeitsliste in
-// docs/knowledge-aktuell.md). Heute steht darin nur der Link share.
+// docs/knowledge-aktuell.md): den Anker K-PLAYBOOK.yaml, den Link share, die
+// projekteigenen Commands und Skills (commands/, skills/) und das
+// Arbeitsverzeichnis work/.
 const ProjectDirName = ".k-playbook"
 
 // shareLinkName ist der Link auf ~/.local/share/k-playbook/ (sharedir.Dir) in

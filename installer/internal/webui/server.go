@@ -41,7 +41,7 @@ const (
 
 type serverState struct {
 	shutdown func()
-	// version ist die VERSION der Installation, die dieses Binary gewählt hat,
+	// version ist die ins Binary gestempelte Version (guiproc.OwnVersion),
 	// beim Start festgehalten. Der Client vergleicht sie mit seiner eigenen
 	// und ersetzt einen Server anderer Version.
 	version string
@@ -49,7 +49,7 @@ type serverState struct {
 	// Start festgehalten — und nur so brauchbar: nach `make dev-install` liegt
 	// unter demselben Pfad längst ein anderes Binary, und ein Server, der erst
 	// auf Nachfrage nachsähe, meldete dessen Kennung statt seiner eigenen. Sie
-	// erkennt den Wechsel, den die stillstehende VERSION nicht zeigt.
+	// erkennt den Wechsel, den die stillstehende Version nicht zeigt.
 	build string
 	// registration ist die Laufzeitdatei dieses Servers. Nil in Tests, die
 	// nur die Routen prüfen.
@@ -688,36 +688,63 @@ func renderPage(w http.ResponseWriter, tmpl *template.Template, area string, pag
 //
 // Die Antwort nennt Schlüssel, Version, Build-Kennung und PID, damit ein
 // CLI-Aufruf den Server als seinen eigenen und als denselben Stand erkennt.
-// Der Schlüssel wird je Anfrage neu berechnet: nach einem Umschlüsseln durch
-// POST /api/config muss schon die nächste Antwort den neuen tragen. Version
+// Der Schlüssel ist der, unter dem der Dienst registriert ist
+// (registeredKey), je Anfrage gelesen: nach einem Umschlüsseln durch
+// POST /api/config trägt schon die nächste Antwort den neuen — und nach einem
+// gescheiterten weiter den alten, unter dem die Laufzeitdatei liegt. Version
 // und Kennung dagegen sind die vom Start.
 func (state *serverState) healthHandler(w http.ResponseWriter, r *http.Request) {
-	key, _ := guiproc.Key()
 	writeJSON(w, http.StatusOK, guiproc.Health{
 		Status:  "ok",
-		Key:     key,
+		Key:     state.registeredKey(),
 		Version: state.version,
 		Build:   state.build,
 		PID:     os.Getpid(),
 	})
 }
 
+// registeredKey ist der Schlüssel, unter dem die Laufzeitdatei dieses Dienstes
+// liegt. Er kommt aus der Registrierung und nicht aus einer neuen Berechnung:
+// Scheitert das Umschlüsseln, weichen beide ab, und ein Lebenszeichen mit dem
+// berechneten Schlüssel behauptete eine Registrierung, die es nicht gibt. Ohne
+// Registrierung — in Tests, die nur die Routen prüfen — bleibt der berechnete.
+func (state *serverState) registeredKey() string {
+	if state.registration != nil {
+		return state.registration.Record().Key
+	}
+	key, _ := guiproc.Key()
+	return key
+}
+
 // rekey zieht die Laufzeitdatei auf den aktuellen Schlüssel nach. Nötig nach
 // POST /api/config: die Konfiguration entsteht in einem vom Nutzer gewählten
 // Verzeichnis, und das aufgelöste ProjectDir kann sich dadurch ändern. Bei
 // gleichem Schlüssel passiert nichts.
-func (state *serverState) rekey() {
+//
+// Scheitert es, bleibt der Dienst unter dem alten Schlüssel registriert. Das
+// Ergebnis ist dann der Hinweis für die Antwort von POST /api/config (sonst
+// leer); er steht zusätzlich im Log des Dienstes.
+func (state *serverState) rekey() string {
 	if state.registration == nil {
-		return
+		return ""
 	}
 	key, err := guiproc.Key()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: Schlüssel der Laufzeitdatei nicht bestimmbar: %v\n", err)
-		return
+		return rekeyHint(err)
 	}
 	if err := state.registration.Rekey(key); err != nil {
 		fmt.Fprintf(os.Stderr, "Hinweis: Laufzeitdatei nicht umgeschlüsselt: %v\n", err)
+		return rekeyHint(err)
 	}
+	return ""
+}
+
+// rekeyHint sagt, was ein gescheitertes Umschlüsseln für den Nutzer heißt.
+func rekeyHint(err error) string {
+	return "Hinweis: Die Laufzeitdatei dieses Dienstes ließ sich nicht auf das neue Hauptverzeichnis umschlüsseln (" +
+		err.Error() + "). Der Dienst bleibt unter dem bisherigen Schlüssel registriert; der nächste Aufruf von " +
+		"k-playbook in diesem Projekt findet ihn deshalb nicht und startet einen eigenen."
 }
 
 // shutdownHandler beendet den Dienst für alle Fenster.

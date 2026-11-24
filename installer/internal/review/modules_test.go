@@ -50,11 +50,10 @@ func TestFindModulesOhneManifest(t *testing.T) {
 	}
 }
 
-// Die Ausschlüsse: ausgeliefertes Material, Fremdquellen — und testdata/, wo
+// Die Ausschlüsse: Fremdquellen — und testdata/, wo
 // in Go-Repos echte go.mod-Dateien als Prüfmaterial liegen.
 func TestFindModulesUeberspringtAusschluesse(t *testing.T) {
 	root := modulBaum(t,
-		"k-playbook/installer/go.mod",
 		"installer/internal/review/testdata/kaputt/go.mod",
 		"vendor/fremd/go.mod",
 		"web/node_modules/paket/go.mod",
@@ -196,7 +195,6 @@ func TestFindPythonManifestsNimmtNurRequirementsUndConstraints(t *testing.T) {
 func TestFindPythonManifestsUeberspringtAusschluesse(t *testing.T) {
 	root := modulBaum(t,
 		"requirements.txt",
-		"k-playbook/requirements.txt",
 		"vendor/requirements.txt",
 		"node_modules/requirements.txt",
 		"testdata/requirements.txt",

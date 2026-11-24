@@ -158,33 +158,22 @@ with maintained content is not on this list.
 
 ### Where default detection does not search
 
-Two areas are within the project yet are not searched automatically. This is not a reading
-ban, as the trust boundary continues to allow them, but a statement about what counts as a
-source **of the project** without intervention.
+Besides the directories filled by tools, the areas matched by a pattern from `exclude:` in
+the source configuration are within the project yet are not searched automatically. This
+is not a reading ban, as the trust boundary continues to allow them, but a statement about
+what counts as a source **of the project** without intervention. It lets a project exclude
+its test fixtures and example projects: maintained content whose versions are deliberately
+old or contradictory and say nothing about the project. Only the project knows where such
+material is located and what it is called: `testdata/`, `tests/fixtures/`,
+`spec/fixtures/`. This is why it belongs in the configuration rather than in a list of
+guesses in the tool.
 
-1. **A leftover `<project>/k-playbook/` clone.** This is legacy: until task 156 the
-   installation was a clone of the tool in this directory; today the installation is the
-   binary alone, and `/k-upgrade` deletes a clone that is still there. Until it is gone, the
-   fixed rule `k-playbook/**` stays. Its `go.mod` describes the dependencies of k-playbook,
-   not those of the project; the deviation between it and a package of the same name in the
-   project would be the same in every project and could not be fixed in any of them:
-   `k-playbook/` is never written to. An assertion that is the same everywhere and fixable
-   nowhere is not an insight. The origin of the rule in the inventory file is still called
-   `installation`.
-2. **Every pattern from `exclude:`** in the source configuration. This lets a project
-   exclude its test fixtures and example projects: maintained content whose versions are
-   deliberately old or contradictory and say nothing about the project. Only the project
-   knows where such material is located and what it is called: `testdata/`,
-   `tests/fixtures/`, `spec/fixtures/`. This is why it belongs in the configuration rather
-   than in a list of guesses in the tool.
-
-Both apply **only** to default detection. Anyone who wants a source from them in the
+The patterns apply **only** to default detection. Anyone who wants a source from them in the
 inventory writes it in `sources:`; an explicit entry overrides every exclusion and then
 carries its own environment label.
 
 **No exclusion is silent.** Every rule appears in the "Nicht durchsuchte Bereiche" (areas
-not searched) section of the inventory file, with pattern, origin (`installation` or
-`configured`), reason, and the number of sources skipped as a result. The total
+not searched) section of the inventory file, with pattern, origin (`configured`), reason, and the number of sources skipped as a result. The total
 additionally appears in frontmatter under `generated.stats.sources-excluded` and in the
 "Übersicht" (overview) section as `Nicht durchsuchte Quellen`. A rule without matches is
 included too: "nothing was found here" and "this location was not searched" are two
@@ -503,12 +492,6 @@ is read on other machines. A configuration that still carries `roots`, even an e
 is rejected as a whole (see "Error cases"); an absolute `path` in `sources:` or
 `helm_values:` is rejected as an entry. A file outside the project root cannot be read into
 the inventory.
-
-A leftover clone `<project>/k-playbook/` is not a special root. It is below the project
-root and **may** be read like any other directory; nothing is ever written there anyway.
-That default detection nevertheless does not search it is a separate matter: it is stated
-under "Where default detection does not search" and changes nothing about this boundary: an
-entry in `sources:` that points there is read.
 
 ### Path Normalization
 
@@ -844,11 +827,7 @@ generated:
 The keys under `generated.stats` are fixed identifiers and stay English. `title` and
 `description` are German, in the exact wording the renderer writes.
 
-**Old frontmatter.** Before task 120 the inventory carried `type`, `tags`, `status`, and its
-numbers in a block `inventory:` with the same keys. Such a document is still read until the
-next run: if `generated.stats` is absent, the numbers come from `inventory:`. Such a
-document never equals the new rendering, so the next run rewrites it in the new
-frontmatter.
+Without `generated.stats` the numbers count as missing, and the state names the missing keys.
 
 ### Structure
 

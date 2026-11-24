@@ -161,11 +161,9 @@ vscode-vsix: ## Baut die VSIX der VS-Code-Erweiterung neu (braucht Node)
 #   make release-publish VERSION=v0.1.0   bringt denselben Commit auf main
 #
 # Andersherum zeigte VERSION auf main eine Zeit lang auf einen Tag ohne
-# Downloads. Für Binaries von vor Task 149 ist das weiter der Schutz: Sie
-# installieren erst, wenn VERSION im Clone wechselt, und prüfen danach gegen
-# VERSION und SHA256SUMS des Clones.
+# Downloads.
 #
-# Neuere Programme und bin/install brauchen die Reihenfolge nicht: Sie lesen
+# Das Programm und bin/install brauchen die Reihenfolge nicht: Sie lesen
 # nicht VERSION, sondern das neueste veröffentlichte Release (die
 # Weiterleitung von releases/latest), und CI veröffentlicht es erst, wenn alle
 # Assets hochgeladen sind (.github/workflows/release.yml). Bis dahin sehen sie

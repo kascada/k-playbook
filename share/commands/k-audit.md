@@ -518,5 +518,4 @@ Abarbeitung — einen Zwischenschritt gibt es nicht. Nenne wörtlich:
   `triage.state` nicht `current` ist.
 - Den Zeitvergleich der Bewertung nicht selbst nachrechnen; `triage.state` aus dem Status
   ist die Antwort.
-- Nicht in Mitgeliefertes schreiben: weder nach `~/.local/share/k-playbook/` noch in einen
-  liegengebliebenen Clone `k-playbook/` im Projekt.
+- Nicht in Mitgeliefertes schreiben, also nicht nach `~/.local/share/k-playbook/`.

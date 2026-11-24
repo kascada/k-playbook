@@ -67,8 +67,7 @@ Zwei Auskünfte, beide ohne eigene Dateilektüre:
    `k_playbook_doc_read` (ersatzweise `k-playbook read`). Kommt `not_found`, fehlt das
    Inventar — der Normalzustand vor dem ersten Lauf. Sonst nimm **nur** den YAML-Block
    zwischen den beiden `---`-Zeilen am Anfang — `generated.at` und die Zahlen unter
-   `generated.stats` (ein Inventar im alten Kopf trägt sie noch im Block `inventory:`; der
-   nächste Lauf schreibt es im neuen). Der Markdown-Rumpf wird nie geparst.
+   `generated.stats`. Der Markdown-Rumpf wird nie geparst.
 
 Zeige die Lage kompakt:
 
@@ -107,10 +106,6 @@ Lockfiles, Dockerfiles, Compose, DevContainer, Helm und CI.
 Ohne Angabe läuft die Erhebung mit den Standardquellen; das ist eine gültige
 Antwort und kein Mangel.
 ```
-
-Ein Verzeichnis `k-playbook/` im Projekt — Altbestand: ein liegengebliebener Clone von
-k-playbook aus dem früheren Modell — ist immer ausgenommen und gehört nicht in Frage 4; das
-regelt der Vertrag, nicht die Konfiguration.
 
 Nennt der Nutzer auf Frage 5 Werte, ordne jedem `path`, `key` und `item` zu, wie sie der
 Vertrag unter „Configured Helm values“ beschreibt; der Kontext der Zeile kommt aus der

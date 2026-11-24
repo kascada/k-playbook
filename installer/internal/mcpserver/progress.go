@@ -209,6 +209,12 @@ func (e *progressEmitter) params(message string, force bool) *mcp.ProgressNotifi
 	}
 }
 
+// stopParams baut die Schlussmeldung. Sie geht immer hinaus, ohne Entprellung:
+// Die Entprellung schützt vor einer Flut von Zwischenständen, die
+// Schlussmeldung gibt es je Lauf einmal — und fiele sie ins Fenster der
+// letzten Zwischenmeldung, bliebe der Fortschritt beim Client auf dem
+// vorletzten Stand stehen, obwohl der Lauf fertig ist. Nur ein zweites Stop
+// liefert nichts.
 func (e *progressEmitter) stopParams(message string) *mcp.ProgressNotificationParams {
 	e.mu.Lock()
 	if e.stopped {
@@ -216,13 +222,7 @@ func (e *progressEmitter) stopParams(message string) *mcp.ProgressNotificationPa
 		return nil
 	}
 	e.stopped = true
-	now := e.now()
-	if !e.lastSent.IsZero() && e.debounce > 0 && now.Sub(e.lastSent) < e.debounce {
-		close(e.stop)
-		e.mu.Unlock()
-		return nil
-	}
-	e.lastSent = now
+	e.lastSent = e.now()
 	completed, running := e.countsLocked()
 	params := &mcp.ProgressNotificationParams{
 		ProgressToken: e.token,

@@ -58,7 +58,8 @@ func TestHealthKephalaionNichtEingetragenIstFehler(t *testing.T) {
 	}
 	got := problems[0]
 	if got.Level != health.LevelError || got.Area != health.AreaKephalaion || !strings.HasPrefix(got.Message, "Keine Collection eingetragen") ||
-		!strings.Contains(got.Hint, "k-playbook gui") || !strings.Contains(got.Hint, "mitgelieferten Texte") {
+		!strings.Contains(got.Hint, "/k-gui") || !strings.Contains(got.Hint, "Kephalaion-Collection einrichten") ||
+		strings.Contains(got.Hint, "k-playbook gui") || !strings.Contains(got.Hint, "mitgelieferten Texte") {
 		t.Errorf("Eintrag: %+v", got)
 	}
 	if report := health.Check(context.Background(), root); report.OK || len(report.Problems) != 1 {

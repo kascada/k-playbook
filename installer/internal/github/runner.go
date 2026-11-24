@@ -2,8 +2,8 @@
 //
 // Bewusst ein eigenes Paket neben `internal/project`: dort steht mit `gh.go`
 // der **netzfreie** Host-Befund — liegt gh im PATH, welche Konten sind
-// hinterlegt —, und der soll billig genug bleiben, um in jeder Kontextausgabe
-// zu stehen. Hier dagegen laufen Subprozesse gegen die API, mit Zeitlimit,
+// hinterlegt —, und der soll billig genug bleiben, um bei jedem Teilabruf
+// environment des Briefings und in jedem Kontext der Oberfläche zu stehen. Hier dagegen laufen Subprozesse gegen die API, mit Zeitlimit,
 // Fehlereinordnung und JSON-Auswertung. Zwei Zuständigkeiten, zwei Pakete.
 //
 // Gelesen wird ausschließlich. Kein Aufruf dieses Pakets verändert etwas an

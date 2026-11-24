@@ -1746,3 +1746,68 @@ func TestEvidenceDeckungPathGlobUndRuleIDLocation(t *testing.T) {
 		t.Fatalf("ruleId+location hängt an der Zeile: %+v", got)
 	}
 }
+
+// Die Zeiten eines AI-Eintrags stehen im Ergebnis des Merge (Task 191). Seine
+// Datei trägt sie als startedAt und finishedAt — so schreibt sie
+// k_playbook_review_write_ai_entry —, der Merge las nur started und finished
+// und verlor sie. Umbenannt wird nichts: Der Merge liest beide Namen, started
+// und finished gehen vor; ein Tool-Eintrag bleibt bei seinen Namen.
+func TestBuildLiestZeitenEinesAIEintrags(t *testing.T) {
+	projectDir := t.TempDir()
+	runDir := filepath.Join(projectDir, "results", "2026-11-24")
+	writeJSON(t, filepath.Join(runDir, review.RunFileName), review.Run{
+		SchemaVersion: review.SchemaVersion,
+		Created:       "2026-11-24T12:00:00Z",
+		State:         review.StateCreated,
+		Languages:     []string{"go"},
+		Entries: []review.Entry{
+			{Name: "review-code", Kind: review.KindAI, State: review.StateStart, Mode: review.ModePerspective},
+			{Name: "review-beide", Kind: review.KindAI, State: review.StateStart, Mode: review.ModePerspective},
+			{Name: "ruff", Kind: review.KindTool, State: review.StateStart},
+		},
+	})
+	// Die Form der Entry-Datei eines AI-Eintrags, wie das Werkzeug sie schreibt.
+	writeJSON(t, review.EntryFile(runDir, "review-code"), map[string]any{
+		"name": "review-code", "kind": review.KindAI, "state": review.StateDone,
+		"startedAt": "2026-11-24T12:01:00Z", "finishedAt": "2026-11-24T12:09:00Z",
+	})
+	writeJSON(t, review.EntryFile(runDir, "review-beide"), map[string]any{
+		"name": "review-beide", "kind": review.KindAI, "state": review.StateDone,
+		"started": "2026-11-24T12:10:00Z", "finished": "2026-11-24T12:11:00Z",
+		"startedAt": "2026-11-24T13:00:00Z", "finishedAt": "2026-11-24T13:30:00Z",
+	})
+	// Ein Tool-Eintrag mit den Namen der AI-Einträge: Die liest der Merge dort
+	// nicht.
+	writeJSON(t, review.EntryFile(runDir, "ruff"), map[string]any{
+		"schemaVersion": review.EntrySchemaVersion, "name": "ruff", "kind": review.KindTool, "state": review.StateDone,
+		"startedAt": "2026-11-24T12:01:00Z", "finishedAt": "2026-11-24T12:09:00Z", "jobs": []any{},
+	})
+
+	result, err := Build(Options{ProjectDir: projectDir, RunName: "2026-11-24", RunDir: runDir})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	times := map[string][2]string{}
+	for _, entry := range result.Entries {
+		times[entry.Name] = [2]string{entry.Started, entry.Finished}
+	}
+	want := map[string][2]string{
+		"review-code":  {"2026-11-24T12:01:00Z", "2026-11-24T12:09:00Z"},
+		"review-beide": {"2026-11-24T12:10:00Z", "2026-11-24T12:11:00Z"},
+		"ruff":         {"", ""},
+	}
+	if !reflect.DeepEqual(times, want) {
+		t.Errorf("Zeiten im Merge = %v, erwartet %v", times, want)
+	}
+
+	// Und sie stehen im geschriebenen Review-Input unter started und finished.
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{`"started":"2026-11-24T12:01:00Z"`, `"finished":"2026-11-24T12:09:00Z"`} {
+		if !strings.Contains(string(data), part) {
+			t.Errorf("Ergebnis des Merge trägt %s nicht", part)
+		}
+	}
+}

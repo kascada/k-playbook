@@ -117,7 +117,7 @@ func unplannedReason(boundary *Boundary, resolved string, excludes []string) str
 	}
 	if relative, err := filepath.Rel(boundary.ProjectRoot(), resolved); err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		relative = filepath.ToSlash(relative)
-		for _, pattern := range append([]string{InstallationDirName + "/**"}, excludes...) {
+		for _, pattern := range excludes {
 			if matchExclude(pattern, relative) {
 				return fmt.Sprintf("die Datei ist durch die Ausschlussregel `%s` von der Standarderkennung ausgenommen; als Quelle unter sources: eintragen", pattern)
 			}

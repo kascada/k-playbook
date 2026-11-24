@@ -60,7 +60,7 @@ func TestStartLaesstErfassteDateiUnberuehrt(t *testing.T) {
 	gitRun(t, root, "add", ".mcp.json")
 	gitRun(t, root, "commit", "-qm", "Registrierung")
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestStartLaesstGestageteDateiUnberuehrt(t *testing.T) {
 	writeFile(t, file, fremderEintrag)
 	gitRun(t, root, "add", ".mcp.json")
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestStartErgaenztNichtErfassteDatei(t *testing.T) {
 	file := filepath.Join(root, ".mcp.json")
 	writeFile(t, file, fremderEintrag)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestStartErgaenztNichtErfassteDatei(t *testing.T) {
 	}
 
 	first := readRaw(t, file)
-	repaired, err = RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err = RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("zweiter Lauf: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestStartSchreibtOhneVersionskontrolle(t *testing.T) {
 	file := filepath.Join(root, ".mcp.json")
 	writeFile(t, file, fremderEintrag)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestStartSchreibtAusserhalbDesRepos(t *testing.T) {
 	file := filepath.Join(root, ".mcp.json")
 	writeFile(t, file, fremderEintrag)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestStartSchreibtNichtBeiDefektemRepo(t *testing.T) {
 	file := filepath.Join(root, ".mcp.json")
 	writeFile(t, file, fremderEintrag)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestStartSchreibtNichtOhneGitImPfad(t *testing.T) {
 	writeFile(t, file, fremderEintrag)
 	t.Setenv("PATH", t.TempDir())
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestStartSchreibtNichtBeiUnlesbarerConfig(t *testing.T) {
 	file := filepath.Join(root, ".mcp.json")
 	writeFile(t, file, fremderEintrag)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestStartLegtFehlendeDateiNurBeiSpurAn(t *testing.T) {
 		}
 	}
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestStartLegtFehlendeDateiNurBeiSpurAn(t *testing.T) {
 	writeFile(t, filepath.Join(root, ".claude", "settings.json"), "{}\n")
 	writeFile(t, filepath.Join(root, ".opencode", "eigene.md"), "# eigene\n")
 
-	repaired, err = RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err = RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP mit Spur: %v", err)
 	}
@@ -287,8 +287,8 @@ func TestStartLegtFehlendeDateiNurBeiSpurAn(t *testing.T) {
 	}
 }
 
-// Ein vorhandener Eintrag, der weder veraltet noch akzeptiert ist, bleibt auch
-// beim Start liegen: er kann aus einem fremden $HOME stammen.
+// Ein vorhandener Eintrag, der nicht akzeptiert ist, bleibt beim Start
+// liegen: er kann aus einem fremden $HOME stammen.
 func TestStartLaesstStaleLiegen(t *testing.T) {
 	installTestBinary(t)
 	root := t.TempDir()
@@ -297,7 +297,7 @@ func TestStartLaesstStaleLiegen(t *testing.T) {
 	file := filepath.Join(root, ".mcp.json")
 	writeFile(t, file, stale)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -308,38 +308,6 @@ func TestStartLaesstStaleLiegen(t *testing.T) {
 		t.Errorf("ein fremder Stand wurde verändert:\n%s", readRaw(t, file))
 	}
 }
-
-// Die Oberfläche behält nach „Aktualisieren“ den engen Modus
-// (MCPWriteOutdatedOnly): er zieht nur den abgelösten Wrapper nach und ergänzt
-// keinen fehlenden Eintrag — auch nicht in einer nicht erfassten Datei mit
-// Spur des Assistenten. Der Umfang des Starts (MCPWriteOutdatedAndUnversioned),
-// den der Projektschritt von `k-playbook upgrade` nimmt, ergänzt ihn.
-func TestRepairMCPReportEngerModusErgaenztKeinenFehlendenEintrag(t *testing.T) {
-	projectDir := t.TempDir()
-	installTestBinary(t)
-	writeVCSConfig(t, projectDir, "none")
-	file := filepath.Join(projectDir, ".mcp.json")
-	writeFile(t, file, fremderEintrag)
-	writeFile(t, filepath.Join(projectDir, ".claude", "settings.json"), "{}\n")
-
-	if report := RepairMCPReport(projectDir, MCPWriteOutdatedOnly); len(report.Repaired) != 0 {
-		t.Errorf("Repaired = %v, erwartet nichts", report.Repaired)
-	}
-	if readRaw(t, file) != fremderEintrag {
-		t.Errorf("der enge Modus hat den fehlenden Eintrag ergänzt:\n%s", readRaw(t, file))
-	}
-
-	report := RepairMCPReport(projectDir, MCPWriteOutdatedAndUnversioned)
-	if len(report.Repaired) != 1 || report.Repaired[0] != ".mcp.json" {
-		t.Errorf("Umfang des Starts: Repaired = %v, erwartet [.mcp.json]", report.Repaired)
-	}
-	if readRaw(t, file) == fremderEintrag {
-		t.Error("der Umfang des Starts hat den fehlenden Eintrag nicht ergänzt")
-	}
-}
-
-// veralteterEintrag trägt noch den abgelösten Wrapper — MCPStateOutdated.
-const veralteterEintrag = `{"mcpServers":{"` + MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
 
 // sharedLinkTarget ist das Ziel des Links, den symlinkRepo anlegt.
 var sharedLinkTarget = filepath.Join("geteilt", "mcp.json")
@@ -394,7 +362,7 @@ func gitStatusShort(t *testing.T, root string) string {
 func TestStartUeberspringtSymlinkAufErfassteDatei(t *testing.T) {
 	root, shared, link := symlinkRepo(t)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -426,7 +394,7 @@ func TestStartLegtNichtsAmZielEinesTotenLinksAn(t *testing.T) {
 	link := filepath.Join(root, ".mcp.json")
 	makeSymlink(t, filepath.Join("ziel", "mcp.json"), link)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -463,7 +431,7 @@ func TestStartErgaenztUnterVerlinktemHauptverzeichnis(t *testing.T) {
 	linkedRoot := filepath.Join(t.TempDir(), "projekt")
 	makeSymlink(t, root, linkedRoot)
 
-	repaired, err := RepairMCP(linkedRoot, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(linkedRoot, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -490,54 +458,6 @@ func TestKnopfSchreibtDurchSymlink(t *testing.T) {
 		t.Error("im Linkziel fehlt der eigene Eintrag")
 	}
 	assertSymlink(t, link, sharedLinkTarget)
-}
-
-// Der enge Modus ergänzt auch über einen Link keinen fehlenden Eintrag.
-// Einen Aufrufer im Programm hat er nicht mehr: „Aktualisieren“ in der
-// Oberfläche (POST /api/update) rief RepairMCP mit genau diesem Modus und ist
-// entfernt.
-func TestUpdateLaesstSymlinkEinrichtungUnberuehrt(t *testing.T) {
-	root, shared, link := symlinkRepo(t)
-
-	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
-	if err != nil {
-		t.Fatalf("RepairMCP: %v", err)
-	}
-	if len(repaired) != 0 {
-		t.Errorf("geschrieben = %v, erwartet nichts", repaired)
-	}
-	if readRaw(t, shared) != fremderEintrag || readRaw(t, link) != fremderEintrag {
-		t.Errorf("das Update hat die Symlink-Einrichtung verändert:\n%s", readRaw(t, shared))
-	}
-	assertSymlink(t, link, sharedLinkTarget)
-	if status := gitStatusShort(t, root); status != "" {
-		t.Errorf("git status nicht leer:\n%s", status)
-	}
-}
-
-// Der veraltete Wrapper-Eintrag ist eigener Inhalt und wird auch hinter einem
-// Link korrigiert — wie in v0.8.0.
-func TestStartKorrigiertVeraltetenEintragHinterSymlink(t *testing.T) {
-	installed := installTestBinary(t)
-	root := t.TempDir()
-	writeVCSConfig(t, root, "none")
-	shared := filepath.Join(root, "geteilt.json")
-	writeFile(t, shared, veralteterEintrag)
-	link := filepath.Join(root, ".mcp.json")
-	makeSymlink(t, "geteilt.json", link)
-
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
-	if err != nil {
-		t.Fatalf("RepairMCP: %v", err)
-	}
-	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
-		t.Fatalf("geschrieben = %v, erwartet nur .mcp.json", repaired)
-	}
-	servers := readJSON(t, shared)["mcpServers"].(map[string]any)
-	if entry, ok := servers[MCPServerKey].(map[string]any); !ok || entry["command"] != installed {
-		t.Errorf("Eintrag im Linkziel = %v, erwartet %s", servers[MCPServerKey], installed)
-	}
-	assertSymlink(t, link, "geteilt.json")
 }
 
 // skipIfRepositoryAround steigt aus, wenn das Testverzeichnis in einem
@@ -572,7 +492,7 @@ func revParseFails(t *testing.T, dir string) string {
 func assertNothingWritten(t *testing.T, root string, file string) {
 	t.Helper()
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -700,7 +620,7 @@ func TestStartSchreibtAusserhalbDesReposMitDeutscherSprache(t *testing.T) {
 	_, _, untranslated := runGitUntranslated(t.Context(), root, "rev-parse", "--show-toplevel")
 	t.Logf("git übersetzt: %v (Sprache des Nutzers: %q, ohne Übersetzung: %q)", translated != untranslated, translated, untranslated)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedAndUnversioned)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}

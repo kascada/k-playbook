@@ -1,34 +1,17 @@
 package project
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"slices"
-	"sort"
 	"strings"
-	"time"
 )
 
-// untrackedScanTimeout begrenzt den rein lokalen `git status`-Aufruf, mit dem
-// zusätzliche Dateien im früheren Clone gesucht werden. Hängen kann er nur
-// bei einem blockierten Index.
-const untrackedScanTimeout = 10 * time.Second
-
-// maxReportedPaths begrenzt die gemeldete Dateiliste. Wer dort umfangreich
-// gearbeitet hat, braucht keine vollständige Aufzählung, sondern die
-// Erkenntnis, dass er es getan hat.
-const maxReportedPaths = 20
-
-// ResetConfig sichert eine Konfiguration aus einem abgelösten Modell weg und
-// legt eine frische an.
+// ResetConfig sichert eine Konfiguration mit alter oder fehlender
+// schema_version weg und legt eine frische an — das Neueinrichten.
 //
-// Bewusst kein `migrate`: die Modelle beschreiben verschiedene Verzeichnis-
-// Aufteilungen, und die Felder ineinander umzurechnen hieße, eine Übersetzung
-// zu pflegen, die mit jedem Modell wächst. Zurückgesetzt wird stattdessen auf
-// den Zustand nach dem ersten Anlegen — mit der alten Datei daneben, damit die
-// eigenen Werte nachlesbar bleiben.
+// Bewusst kein `migrate`: die Felder einer älteren Fassung werden nicht
+// umgerechnet. Zurückgesetzt wird auf den Zustand nach dem ersten Anlegen —
+// mit der alten Datei daneben, damit die eigenen Werte nachlesbar bleiben.
 //
 // Bewusst kein Löschen: `remediation`, `tools` und `project.repo_root` stehen
 // nur dort und wären sonst weg.
@@ -40,27 +23,6 @@ type ResetResult struct {
 	// PreviousVersion ist die schema_version, die zurückgesetzt wurde. Leer,
 	// wenn die Datei keine trug.
 	PreviousVersion string `json:"previousVersion"`
-}
-
-// LegacyContentError meldet Projektinhalte, die im Verzeichnis des früheren
-// Clones liegen (<projekt>/k-playbook/).
-//
-// Unter Modell 1 lagen Tasks, Checks, Reviews und die TODO.md in
-// `k-playbook/` — genau dem Verzeichnis, das danach der ersetzbare Clone war
-// und das /k-upgrade (Umstellung 3.8) als Clone ganz löscht. Wird nur die
-// Konfiguration erneuert, sieht das Projekt gesund aus, und die Inhalte gehen
-// mit dem Clone verloren. Deshalb bricht das Zurücksetzen hier ab, statt eine
-// stille Falle zu hinterlassen.
-type LegacyContentError struct {
-	// Paths sind die gefundenen Inhalte, relativ zum Hauptverzeichnis.
-	Paths []string
-}
-
-func (e *LegacyContentError) Error() string {
-	return fmt.Sprintf("in %s/ liegen Projektinhalte aus dem abgelösten Modell (%s); "+
-		"sie sind zuerst an einen Ort außerhalb von %s/ zu sichern — %s/ ist der Ort des "+
-		"früheren Clones, den /k-upgrade löscht",
-		PlaybookDirName, strings.Join(e.Paths, ", "), PlaybookDirName, PlaybookDirName)
 }
 
 // ResetConfig führt das Zurücksetzen aus. Geschrieben wird erst, wenn nichts
@@ -81,13 +43,9 @@ func ResetConfig(projectDir string, repoRoot string) (ResetResult, error) {
 	}
 	state := SchemaState(config)
 	if !state.Resettable() {
-		return ResetResult{}, fmt.Errorf("%s trägt schema_version %s; zurückgesetzt wird nur, "+
-			"was zu einem abgelösten Modell gehört",
+		return ResetResult{}, fmt.Errorf("%s trägt schema_version %s; zurückgesetzt wird nur "+
+			"eine ältere oder fehlende Fassung",
 			ConfigFileName, config.SchemaVersion)
-	}
-
-	if paths := LegacyContent(projectDir); len(paths) > 0 {
-		return ResetResult{}, &LegacyContentError{Paths: paths}
 	}
 
 	backup, err := backupPath(path, config.SchemaVersion)
@@ -131,149 +89,4 @@ func backupPath(configPath string, version string) (string, error) {
 		candidate = fmt.Sprintf("%s%s-%d", configPath, suffix, attempt)
 	}
 	return candidate, nil
-}
-
-// LegacyContent sucht Projektinhalte im Verzeichnis des früheren Clones.
-//
-// Zwei Wege, weil keiner allein reicht: die alte Datei nennt ihre Orte in
-// `paths.*` und ist damit die genaue Auskunft — aber nur, solange sie
-// vollständig ist. Der Zustand des Verzeichnisses selbst fängt den Rest ab.
-// Gemeldet wird die Vereinigung; gelöscht oder verschoben wird nichts.
-func LegacyContent(projectDir string) []string {
-	dir := PlaybookDir(projectDir)
-	if !isDir(dir) {
-		return nil
-	}
-
-	found := legacyPathsFromConfig(projectDir)
-	for _, name := range legacyPathsFromDir(dir) {
-		if !slices.Contains(found, name) {
-			found = append(found, name)
-		}
-	}
-
-	sort.Strings(found)
-	if len(found) > maxReportedPaths {
-		found = found[:maxReportedPaths]
-	}
-	return found
-}
-
-// legacyPathsFromConfig liest den paths-Block der alten Datei und behält, was
-// unterhalb des früheren Clones liegt und wirklich existiert.
-//
-// Zeigt ein Eintrag woandershin, ist der Inhalt nicht gefährdet: gelöscht wird
-// nur das Verzeichnis des Clones.
-func legacyPathsFromConfig(projectDir string) []string {
-	data, err := os.ReadFile(ConfigPath(projectDir))
-	if err != nil {
-		return nil
-	}
-
-	var paths []string
-	section := ""
-	for _, line := range strings.Split(string(data), "\n") {
-		if trimmed := strings.TrimSpace(line); trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		key, value, found := strings.Cut(line, ":")
-		if !found {
-			continue
-		}
-		indented := strings.HasPrefix(key, " ") || strings.HasPrefix(key, "\t")
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-
-		if !indented {
-			section = key
-			continue
-		}
-		// `paths.playbook` ist das Verzeichnis selbst und kein Inhalt darin.
-		if section != "paths" || key == "playbook" || value == "" {
-			continue
-		}
-
-		relative, ok := insidePlaybookDir(value)
-		if !ok || !pathExists(filepath.Join(projectDir, relative)) {
-			continue
-		}
-		if !slices.Contains(paths, relative) {
-			paths = append(paths, relative)
-		}
-	}
-	return paths
-}
-
-// insidePlaybookDir prüft, ob ein Pfad aus der alten Konfiguration im
-// Verzeichnis des früheren Clones liegt, und liefert ihn relativ zum
-// Hauptverzeichnis.
-func insidePlaybookDir(value string) (string, bool) {
-	value = strings.Trim(value, `"'`)
-	if value == "" || filepath.IsAbs(value) {
-		return "", false
-	}
-
-	cleaned := filepath.Clean(value)
-	if cleaned == PlaybookDirName {
-		return "", false
-	}
-	if !strings.HasPrefix(cleaned, PlaybookDirName+string(filepath.Separator)) {
-		return "", false
-	}
-	return cleaned, true
-}
-
-// legacyPathsFromDir liest den Zustand des Verzeichnisses k-playbook/.
-//
-// Unter Modell 1 war es kein Clone, sondern ein reines Projektverzeichnis —
-// dann gehört alles darin dem Projekt. Ist es ein liegengebliebener Clone,
-// gehört ihm alles Verfolgte; projekteigen ist genau das Untracked. Verfolgte
-// Dateien, die lokal geändert wurden, bleiben außen vor: sie sind kein
-// Grund, das Zurücksetzen zu blockieren.
-func legacyPathsFromDir(dir string) []string {
-	if isDir(filepath.Join(dir, ".git")) {
-		return untrackedInPlaybookDir(dir)
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-
-	var paths []string
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
-		paths = append(paths, filepath.Join(PlaybookDirName, name))
-	}
-	return paths
-}
-
-func untrackedInPlaybookDir(dir string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), untrackedScanTimeout)
-	defer cancel()
-
-	output, err := GitOutput(ctx, dir, "status", "--porcelain")
-	if err != nil {
-		return nil
-	}
-
-	var paths []string
-	for _, line := range strings.Split(output, "\n") {
-		code, path, found := strings.Cut(strings.TrimSpace(line), " ")
-		if !found || code != "??" {
-			continue
-		}
-		path = strings.TrimSpace(path)
-		if path == "" {
-			continue
-		}
-		// Git meldet ein unverfolgtes Verzeichnis mit Schrägstrich am Ende; für
-		// die Anzeige ist der Name genug.
-		paths = append(paths, filepath.Join(PlaybookDirName, strings.TrimSuffix(path, "/")))
-	}
-	return paths
 }

@@ -48,8 +48,8 @@ import (
 // Abschnitt context, Fassung 3 den Text der immer geltenden Anweisungen in
 // documents.always.content, Fassung 4 den Abschnitt health, Fassung 5 die
 // Sitzungskennung session; in Fassung 6 entfällt documents.rules, die Sorte
-// rules gibt es nicht mehr; in Fassung 7 entfällt context.playbook, den Clone
-// k-playbook/ im Projekt gibt es nicht mehr; in Fassung 8 entfällt
+// rules gibt es nicht mehr; in Fassung 7 entfällt context.playbook; in
+// Fassung 8 entfällt
 // context.local, Projekteigenes liegt in der Collection und unter
 // .k-playbook/. In Fassung 9 (Task 187) entfällt der Abschnitt context ganz:
 // now, project, kephalaion, github und links sind eigene Abschnitte, die
@@ -399,6 +399,17 @@ func BuildBriefingFrom(ctx context.Context, projectDir string, startDir string) 
 		briefing.Links = contextLinks(HealLinks(projectDir))
 	}
 	return briefing, nil
+}
+
+// BriefingProjectState ist der Abschnitt project, wie das Briefing ihn baut
+// (briefingProject) — für Aufrufer außerhalb des Pakets, die unter derselben
+// Bedingung handeln sollen wie das Briefing. Available heißt: Die
+// Konfiguration ist lesbar, ihre Fassung akzeptiert und project.languages
+// trägt nur zulässige Werte; sonst nennt Message den Grund. Die Oberfläche
+// zieht die Verlinkung nur damit nach (GET /api/assistant), statt eine eigene
+// Prüfung zu führen.
+func BriefingProjectState(projectDir string) BriefingProject {
+	return briefingProject(projectDir)
 }
 
 // briefingProject baut den Abschnitt project aus der Konfiguration. Jeder

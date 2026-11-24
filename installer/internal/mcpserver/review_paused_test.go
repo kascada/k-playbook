@@ -13,7 +13,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/review"
 )
 
@@ -206,16 +205,12 @@ func TestReviewWerkzeuglisteNenntDieSperre(t *testing.T) {
 	}
 }
 
-// Ohne den Clone <projekt>/k-playbook/ antwortet der Handler hinter
-// k_playbook_review_status wie sonst, statt mit „k-playbook-Installation
-// fehlt“; der Umschlag trägt weder playbookDir noch localDir oder
-// reviewRunsDir. Über die Werkzeugliste antworten alle fünf Werkzeuge auch
-// dort mit reviews_paused (Task 154).
-func TestReviewWerkzeugeOhneClone(t *testing.T) {
+// Der Handler hinter k_playbook_review_status antwortet ohne Installation im
+// Projekt; der Umschlag trägt weder playbookDir noch localDir oder
+// reviewRunsDir. Über die Werkzeugliste antworten alle fünf Werkzeuge mit
+// reviews_paused (Task 154).
+func TestReviewWerkzeugeOhneInstallation(t *testing.T) {
 	root := newReviewProject(t)
-	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
-		t.Fatalf("%s entfernen: %v", project.PlaybookDirName, err)
-	}
 
 	result, _, err := reviewStatusTool(context.Background(), nil, reviewStatusInput{reviewBaseInput: reviewBaseInput{ProjectDir: root}, Mode: "available"})
 	if err != nil {
@@ -223,7 +218,7 @@ func TestReviewWerkzeugeOhneClone(t *testing.T) {
 	}
 	envelope := decodeReviewEnvelope(t, result)
 	if !envelope.OK {
-		t.Fatalf("%s ohne Clone: %+v", reviewToolStatus, envelope.Error)
+		t.Fatalf("%s: %+v", reviewToolStatus, envelope.Error)
 	}
 	if envelope.Project.Root != root {
 		t.Errorf("Projekt = %+v, erwartet root %s", envelope.Project, root)

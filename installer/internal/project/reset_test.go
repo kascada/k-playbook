@@ -1,26 +1,13 @@
 package project
 
 import (
-	"errors"
 	"os"
-	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
 
-// legacyConfig ist eine Konfiguration aus Modell 1: zentrale Basisinstallation,
-// paths.* zeigen ins k-playbook-Verzeichnis.
-const legacyConfig = `schema_version: 1
-layout: fixed-project-k-playbook
-
-k_playbook:
-  repo: ~/dev/k-playbook
-
-paths:
-  playbook: k-playbook
-  tasks: k-playbook/tasks
-  todo: k-playbook/TODO.md
+// outdatedConfig ist eine Konfiguration mit alter schema_version.
+const outdatedConfig = `schema_version: 1
 
 project:
   repo_root: code
@@ -29,7 +16,7 @@ project:
 
 func TestResetConfigSichertAlteDateiWeg(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, ConfigPath(root), legacyConfig)
+	writeFile(t, ConfigPath(root), outdatedConfig)
 
 	result, err := ResetConfig(root, "code")
 	if err != nil {
@@ -47,7 +34,7 @@ func TestResetConfigSichertAlteDateiWeg(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sicherung lesen: %v", err)
 	}
-	if string(backup) != legacyConfig {
+	if string(backup) != outdatedConfig {
 		t.Error("die Sicherung trägt nicht den alten Inhalt")
 	}
 
@@ -67,7 +54,7 @@ func TestResetConfigSichertAlteDateiWeg(t *testing.T) {
 // einzigen Werte enthalten, die es noch gibt.
 func TestResetConfigUeberschreibtSicherungNicht(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, ConfigPath(root), legacyConfig)
+	writeFile(t, ConfigPath(root), outdatedConfig)
 	writeFile(t, ConfigPath(root)+".v1-alt", "aus einem früheren Versuch\n")
 
 	result, err := ResetConfig(root, ".")
@@ -84,35 +71,6 @@ func TestResetConfigUeberschreibtSicherungNicht(t *testing.T) {
 	}
 	if string(first) != "aus einem früheren Versuch\n" {
 		t.Error("die erste Sicherung wurde überschrieben")
-	}
-}
-
-// Liegen Projektinhalte in der Installation, wird nichts geschrieben: sie
-// müssen zuerst umziehen, sonst nimmt das nächste Update sie mit.
-func TestResetConfigBlocktBeiProjektinhalten(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, ConfigPath(root), legacyConfig)
-	writeFile(t, filepath.Join(root, PlaybookDirName, "tasks", "001-etwas.md"), "# Aufgabe\n")
-
-	_, err := ResetConfig(root, ".")
-	if err == nil {
-		t.Fatal("Projektinhalte in der Installation wurden übergangen")
-	}
-
-	var legacy *LegacyContentError
-	if !errors.As(err, &legacy) {
-		t.Fatalf("Fehlertyp = %T, erwartet *LegacyContentError", err)
-	}
-	if want := filepath.Join(PlaybookDirName, "tasks"); !slices.Contains(legacy.Paths, want) {
-		t.Errorf("Paths = %v, erwartet einen Eintrag %q", legacy.Paths, want)
-	}
-
-	data, err := os.ReadFile(ConfigPath(root))
-	if err != nil {
-		t.Fatalf("Konfiguration lesen: %v", err)
-	}
-	if string(data) != legacyConfig {
-		t.Error("die alte Datei wurde trotz Blockade angefasst")
 	}
 }
 
@@ -139,36 +97,6 @@ func TestResetConfigLehntNeuereFassungAb(t *testing.T) {
 	}
 }
 
-// Der paths-Block nennt die Orte genau; zeigt einer aus der Installation
-// heraus, ist der Inhalt dort nicht gefährdet.
-func TestLegacyContentIgnoriertPfadeAusserhalb(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, ConfigPath(root), `schema_version: 1
-
-paths:
-  playbook: k-playbook
-  tasks: eigene/tasks
-`)
-	writeFile(t, filepath.Join(root, "eigene", "tasks", "001-etwas.md"), "# Aufgabe\n")
-	if err := os.MkdirAll(filepath.Join(root, PlaybookDirName), 0o755); err != nil {
-		t.Fatalf("Installation anlegen: %v", err)
-	}
-
-	if found := LegacyContent(root); len(found) > 0 {
-		t.Errorf("LegacyContent = %v, erwartet nichts", found)
-	}
-}
-
-// Ohne Installationsverzeichnis gibt es nichts zu verlieren.
-func TestLegacyContentOhneInstallation(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, ConfigPath(root), legacyConfig)
-
-	if found := LegacyContent(root); len(found) > 0 {
-		t.Errorf("LegacyContent = %v, erwartet nichts", found)
-	}
-}
-
 func TestSchemaState(t *testing.T) {
 	cases := map[string]SchemaStatus{
 		SchemaVersion: SchemaOK,
@@ -176,6 +104,7 @@ func TestSchemaState(t *testing.T) {
 		"1":           SchemaOutdated,
 		"2":           SchemaOutdated,
 		"9":           SchemaNewer,
+		"x":           SchemaNewer,
 	}
 
 	for version, want := range cases {
@@ -188,7 +117,7 @@ func TestSchemaState(t *testing.T) {
 		t.Error("eine zu alte Datei muss sich zurücksetzen lassen")
 	}
 	if SchemaNewer.Resettable() || SchemaOK.Resettable() {
-		t.Error("nur abgelöste Fassungen dürfen zurückgesetzt werden")
+		t.Error("nur ältere oder fehlende Fassungen dürfen zurückgesetzt werden")
 	}
 }
 
@@ -198,7 +127,12 @@ func TestCheckSchemaNenntDenAusweg(t *testing.T) {
 	if err == nil {
 		t.Fatal("schema_version 1 wurde akzeptiert")
 	}
-	if !strings.Contains(err.Error(), "k-playbook gui") {
+	if !strings.Contains(err.Error(), "`k-playbook` ohne Argument") || !strings.Contains(err.Error(), "/k-gui") {
 		t.Errorf("Meldung nennt den Weg nicht: %v", err)
+	}
+	// `k-playbook gui` ohne Unterkommando endet mit einem Fehler und startet
+	// nichts; als Ausweg taugt es nicht.
+	if strings.Contains(err.Error(), "k-playbook gui") {
+		t.Errorf("Meldung empfiehlt k-playbook gui: %v", err)
 	}
 }

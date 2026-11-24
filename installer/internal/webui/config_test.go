@@ -9,22 +9,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kascada/k-playbook/installer/internal/guiproc"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// legacyProject legt ein Projekt mit einer Konfiguration aus Modell 1 an und
-// macht es zum Arbeitsverzeichnis: die Handler leiten ihr Projekt über
-// project.Detect() daraus ab.
-func legacyProject(t *testing.T) string {
+// outdatedProject legt ein Projekt mit einer Konfiguration alter
+// schema_version an und macht es zum Arbeitsverzeichnis: die Handler leiten
+// ihr Projekt über project.Detect() daraus ab.
+func outdatedProject(t *testing.T) string {
 	t.Helper()
 
 	root := t.TempDir()
 	writeFile(t, project.ConfigPath(root), `schema_version: 1
-layout: fixed-project-k-playbook
-
-paths:
-  playbook: k-playbook
-  tasks: k-playbook/tasks
 
 project:
   repo_root: code
@@ -70,12 +66,12 @@ func postReset(t *testing.T, body string) (int, configResponse) {
 
 // Eine unbrauchbare Konfiguration darf nicht als eingerichtet durchgehen: der
 // Block bliebe sonst verborgen, und alles Weitere wäre Anzeige ohne Grundlage.
-func TestConfigHandlerMeldetAbgeloesteFassung(t *testing.T) {
-	legacyProject(t)
+func TestConfigHandlerMeldetAlteFassung(t *testing.T) {
+	outdatedProject(t)
 
 	response := getConfig(t)
 	if response.Installed {
-		t.Error("Installed = true, obwohl die Fassung abgelöst ist")
+		t.Error("Installed = true, obwohl die Fassung alt ist")
 	}
 	if response.Schema != project.SchemaOutdated {
 		t.Errorf("Schema = %q, erwartet %q", response.Schema, project.SchemaOutdated)
@@ -83,17 +79,17 @@ func TestConfigHandlerMeldetAbgeloesteFassung(t *testing.T) {
 	if response.SchemaVersion != "1" {
 		t.Errorf("SchemaVersion = %q, erwartet %q", response.SchemaVersion, "1")
 	}
-	if response.LegacyModel == "" {
-		t.Error("das abgelöste Modell wird nicht benannt")
+	if !strings.Contains(response.Message, "bitte neu einrichten") {
+		t.Errorf("Message = %q, erwartet „bitte neu einrichten“", response.Message)
 	}
-	// Die Lage des Repositorys ändert sich durch den Modellwechsel nicht.
+	// Die Lage des Repositorys ändert sich durch das Neueinrichten nicht.
 	if response.Suggestion == nil || response.Suggestion.RepoRoot != "code" {
 		t.Errorf("Suggestion = %+v, erwartet repo_root aus der alten Datei", response.Suggestion)
 	}
 }
 
 func TestResetConfigHandlerLegtNeuAn(t *testing.T) {
-	root := legacyProject(t)
+	root := outdatedProject(t)
 
 	status, response := postReset(t, `{"repoRoot":"code"}`)
 	if status != http.StatusOK {
@@ -118,28 +114,115 @@ func TestResetConfigHandlerLegtNeuAn(t *testing.T) {
 	}
 }
 
-// Liegen Projektinhalte in der Installation, wird nichts geschrieben — und die
-// Antwort nennt sie, damit der Umzug möglich ist.
-func TestResetConfigHandlerBlocktBeiProjektinhalten(t *testing.T) {
-	root := legacyProject(t)
-	writeFile(t, filepath.Join(root, project.PlaybookDirName, "tasks", "001-etwas.md"), "# Aufgabe\n")
+// rekeyFixture stellt einen Dienst hin, der in einem Unterverzeichnis ohne
+// Konfiguration gestartet wurde und dort registriert ist: Legt
+// POST /api/config die Konfiguration im Verzeichnis darüber an, ändert sich
+// das aufgelöste Hauptverzeichnis und damit der Schlüssel.
+func rekeyFixture(t *testing.T) (state *serverState, root string, startKey string) {
+	t.Helper()
 
-	status, response := postReset(t, `{"repoRoot":"code"}`)
-	if status != http.StatusConflict {
-		t.Fatalf("Status = %d, erwartet %d", status, http.StatusConflict)
-	}
-	if response.Installed {
-		t.Error("Installed = true, obwohl nichts geschrieben wurde")
-	}
-	if len(response.LegacyContent) == 0 {
-		t.Error("die Antwort nennt die Projektinhalte nicht")
-	}
-
-	config, err := project.ReadConfig(root)
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
-		t.Fatalf("ReadConfig: %v", err)
+		t.Fatal(err)
 	}
-	if config.SchemaVersion != "1" {
-		t.Errorf("SchemaVersion = %q, die alte Datei wurde angefasst", config.SchemaVersion)
+	workdir := filepath.Join(root, "sub")
+	if err := os.Mkdir(workdir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	chdir(t, workdir)
+
+	startKey, err = guiproc.Key()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if startKey != workdir {
+		t.Fatalf("Schlüssel vor dem Anlegen = %q, erwartet %q", startKey, workdir)
+	}
+	registration, err := guiproc.Register(guiproc.Record{Key: startKey, Addr: "127.0.0.1:1", PID: os.Getpid(), Version: "v1"})
+	if err != nil {
+		t.Fatalf("Registrierung: %v", err)
+	}
+	t.Cleanup(func() { _ = registration.Remove() })
+	return &serverState{version: "v1", registration: registration}, root, startKey
+}
+
+func postConfig(t *testing.T, state *serverState, projectDir string) (int, configResponse) {
+	t.Helper()
+
+	body, err := json.Marshal(createConfigRequest{ProjectDir: projectDir, RepoRoot: "."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	state.createConfigHandler(recorder, httptest.NewRequest(http.MethodPost, "/api/config", strings.NewReader(string(body))))
+	var response configResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
+	}
+	return recorder.Code, response
+}
+
+func healthKey(t *testing.T, state *serverState) string {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	state.healthHandler(recorder, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	var health guiproc.Health
+	if err := json.Unmarshal(recorder.Body.Bytes(), &health); err != nil {
+		t.Fatalf("Antwort lesen: %v", err)
+	}
+	return health.Key
+}
+
+// Nach POST /api/config liegt die Laufzeitdatei unter dem neuen Schlüssel,
+// und /api/health meldet ihn.
+func TestConfigAnlegenSchluesseltUm(t *testing.T) {
+	state, root, startKey := rekeyFixture(t)
+	if got := healthKey(t, state); got != startKey {
+		t.Fatalf("key vor dem Anlegen = %q, erwartet %q", got, startKey)
+	}
+
+	status, response := postConfig(t, state, root)
+	if status != http.StatusOK || !response.Installed {
+		t.Fatalf("Anlegen: %d %+v", status, response)
+	}
+	if strings.Contains(response.Message, "Hinweis") {
+		t.Errorf("Hinweis ohne Anlass: %q", response.Message)
+	}
+	if got := healthKey(t, state); got != root {
+		t.Errorf("key nach dem Umschlüsseln = %q, erwartet %q", got, root)
+	}
+}
+
+// Scheitert das Umschlüsseln — hier, weil unter dem neuen Schlüssel schon eine
+// Laufzeitdatei liegt —, ist die Konfiguration trotzdem angelegt, die Antwort
+// trägt den Hinweis, und /api/health meldet weiter den Schlüssel, unter dem
+// der Dienst wirklich registriert ist (Task 191). Vorher stand der Fehler nur
+// im Log, und das Lebenszeichen nannte den neuen Schlüssel.
+func TestConfigAnlegenMeldetGescheitertesUmschluesseln(t *testing.T) {
+	state, root, startKey := rekeyFixture(t)
+	other, err := guiproc.Register(guiproc.Record{Key: root, Addr: "127.0.0.1:2", PID: os.Getpid(), Version: "v1"})
+	if err != nil {
+		t.Fatalf("zweite Registrierung: %v", err)
+	}
+	t.Cleanup(func() { _ = other.Remove() })
+
+	status, response := postConfig(t, state, root)
+	if status != http.StatusOK || !response.Installed {
+		t.Fatalf("Anlegen: %d %+v", status, response)
+	}
+	if !strings.HasPrefix(response.Message, project.ConfigFileName+" angelegt.") ||
+		!strings.Contains(response.Message, "Hinweis") || !strings.Contains(response.Message, "nicht auf das neue Hauptverzeichnis umschlüsseln") {
+		t.Errorf("Message trägt den Hinweis nicht: %q", response.Message)
+	}
+	if now, err := guiproc.Key(); err != nil || now != root {
+		t.Fatalf("berechneter Schlüssel = %q (%v), erwartet %q", now, err, root)
+	}
+	if got := healthKey(t, state); got != startKey {
+		t.Errorf("key nach gescheitertem Umschlüsseln = %q, erwartet den registrierten %q", got, startKey)
+	}
+	if _, err := os.Stat(state.registration.Path()); err != nil {
+		t.Errorf("die Laufzeitdatei unter dem alten Schlüssel fehlt: %v", err)
 	}
 }

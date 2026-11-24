@@ -67,9 +67,6 @@ func updateCheckLookup(r *http.Request) program.Lookup {
 // updateCheckHandler prüft das laufende Programm gegen den neuesten
 // Release-Tag. Rein lesend: heruntergeladen wird hier nie etwas. Den Tag nimmt
 // er aus dem Cache, mit fresh=1 fragt er frisch (updateCheckLookup).
-//
-// Einen Stand im Projekt prüft er nicht mehr (Task 156): Ein Verzeichnis
-// k-playbook/ wird weder gelesen noch genannt.
 func (state *serverState) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {

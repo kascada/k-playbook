@@ -72,8 +72,7 @@ func applyMCPHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // mcpState liest den aktuellen Zustand. Der Server liefert seine Inhalte vom
-// Hub und aus SharedDir(); den früheren Clone k-playbook/ verlangt er seit
-// Task 154 nicht mehr.
+// Hub und aus SharedDir().
 func mcpState(message string) mcpResponse {
 	environment := project.Detect()
 
@@ -305,7 +304,7 @@ func probeMCPCommand(projectRoot string, binary string, args []string, env []str
 
 	// WaitDelay begrenzt, wie lange Wait() auf die Rohre wartet, nachdem der
 	// Prozess weg ist. Ohne das hinge es an einem Kindeskind, das sie geerbt hat
-	// und weiterlebt — der Wrapper könnte eines hinterlassen.
+	// und weiterlebt — ein Startprogramm wie npx könnte eines hinterlassen.
 	command.WaitDelay = mcpWaitDelay
 
 	if err := command.Start(); err != nil {
@@ -713,8 +712,8 @@ const mcpInstallTimeoutHint = "Wird der Server über npx oder uvx gestartet, kan
 	"dann „Erneut messen“."
 
 // mcpFailureMessage sagt, woran es lag. Die Ausgabe auf stderr kommt mit, wenn
-// es eine gibt: dort steht bei einem gescheiterten Wrapper der eigentliche
-// Grund. timeoutHint gilt nur, wenn die Frist der Grund war.
+// es eine gibt: dort steht bei einem gescheiterten Startprogramm wie npx der
+// eigentliche Grund. timeoutHint gilt nur, wenn die Frist der Grund war.
 func mcpFailureMessage(ctx context.Context, err error, stderr string, timeoutHint string) string {
 	if ctx.Err() != nil {
 		return mcpTimeoutMessage(timeoutHint)

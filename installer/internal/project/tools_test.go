@@ -149,7 +149,7 @@ func TestCheckToolsErklaertVeralteteInstallation(t *testing.T) {
 			t.Errorf("Fehler = %q, erwartet einen Hinweis auf %q", got, want)
 		}
 	}
-	for _, unwanted := range []string{"Update prüfen", "git pull", PlaybookDirName + "/"} {
+	for _, unwanted := range []string{"Update prüfen", "git pull"} {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("Fehler = %q, enthält noch %q", got, unwanted)
 		}

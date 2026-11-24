@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
-	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/mcpserver"
 	"github.com/kascada/k-playbook/installer/internal/procgroup"
 	"github.com/kascada/k-playbook/installer/internal/release"
@@ -76,18 +75,18 @@ func run(args []string) error {
 	case "config":
 		return runConfig(args[1:])
 	case "context":
-		// Entfernt mit Task 188. Kein stilles „unbekanntes Kommando“: Eine
-		// Sitzung in einem Projekt mit altem Anstoß in AGENTS.md ruft den
-		// Befehl noch, bevor Einrichten, Oberfläche oder upgrade den Anstoß
-		// ersetzt haben — sie soll in einem Satz lesen, was an seine Stelle
-		// tritt. Ohne Hilfetext, ohne Wirt-Pflege.
+		// Entfernt mit Task 188. Kein stilles „unbekanntes Kommando“: Wer den
+		// Befehl ruft, soll in einem Satz lesen, was an seine Stelle tritt.
+		// Ohne Hilfetext, ohne Wirt-Pflege.
 		return errContextRemoved
 	case "mcp":
 		// Ohne Wirt-Pflege: stdout trägt den JSON-RPC-Strom, und eine einzige
 		// fremde Zeile daneben macht die Verbindung unbrauchbar.
-		// Mit Signal-Handler: Ein SIGINT oder SIGTERM beendet erst die
-		// Prozessgruppen, die ein Werkzeugaufruf gestartet hat, dann den
-		// Server (Task 152). Der Kontext reicht bis in die Werkzeugaufrufe.
+		// Mit Signal-Handler (Task 152): Der Kontext reicht bis in die
+		// Werkzeugaufrufe. Eine Prozessgruppe, die das Signal vorher zu
+		// beenden hätte, startet heute kein Werkzeug: procgroup.Run erreicht
+		// nur `upgrade` (program/kephalaion.go). Ohne laufende Gruppe endet
+		// der Server bei SIGINT oder SIGTERM sofort.
 		ctx, stop := procgroup.NotifyContext(context.Background())
 		defer stop()
 		return mcpserver.Run(ctx)
@@ -102,8 +101,9 @@ func run(args []string) error {
 		return runMerge(args[1:])
 	case "inventory":
 		// Wie scan und merge ohne Wirt-Pflege: die Erhebung liest die
-		// deklarativen Quellen des Projekts und schreibt genau eine Datei
-		// darunter — den Host fasst sie dabei nicht nebenbei an. Dazu kommt:
+		// deklarativen Quellen des Projekts und schreibt das Inventar und die
+		// README seines Verzeichnisses in die Collection des Projekts — auf
+		// der Platte nichts, und den Host fasst sie nicht nebenbei an. Dazu kommt:
 		// die Meldungen der Bereinigung gingen nach stdout und stünden mitten
 		// im Bericht des Laufs, in dem jede Ablehnung sichtbar sein muss.
 		return runInventory(args[1:])
@@ -323,10 +323,10 @@ Unterkommandos:
             ab (kephalaion_unavailable); einen Rückfall auf die Platte gibt
             es nicht. Vertrag: k-playbook:/docs/handbook/version-inventory.md.
   todo      Verwaltet die Todos des Projekts in der Projekt-Collection
-            (todos/): k-playbook todo list|add|update|delete|import. Die
-            Ausgabe ist JSON auf stdout. Ohne Unterbefehl
-            und mit --help erscheint nur die Kurzhilfe, ohne dass dabei Daten
-            gelesen oder geschrieben werden.
+            (todos/): k-playbook todo list|add|update|delete. Die Ausgabe
+            ist JSON auf stdout. Ohne Unterbefehl und mit --help erscheint
+            nur die Kurzhilfe, ohne dass dabei Daten gelesen oder
+            geschrieben werden.
   task      Legt Tasks in der Projekt-Collection an: k-playbook task create
             --title <titel> --name <kurzname> [--dry-run] [--no-intent],
             Rumpf von stdin. Prüft, nummeriert und schreibt in einem Zug;
@@ -369,10 +369,10 @@ Unterkommandos:
             MCP-Werkzeug k_playbook_briefing.
   health    Nennt Fehler und Warnungen über die Umgebung des Projekts:
             k-playbook health [--json]. Je Eintrag Stufe (error, warning),
-            Bereich (kephalaion, gh, baseTools, versionSources, github,
-            program), ein
-            Satz und die Abhilfe; alle auf einmal, nichts wird repariert
-            oder angelegt, kein Token oder Wert steht darin. Ohne Problem die eine Zeile
+            Bereich (kephalaion, baseTools, versionSources, github, share,
+            anchor, frontmatter, program), ein Satz und die Abhilfe; alle
+            auf einmal, nichts wird repariert oder angelegt, kein Token
+            oder Wert steht darin. Ohne Problem die eine Zeile
             „Umgebung: keine Probleme“ — derselbe Block wie im Briefing.
             Exit-Code 0 ohne Fehler (Warnungen zählen nicht), 1 mit
             Fehler, 2 bei Aufruffehlern. Dasselbe wie das MCP-Werkzeug
@@ -479,21 +479,4 @@ Unterkommandos:
             MCP-Werkzeug k_playbook_lock.
   help      Diese Übersicht.
 `)
-}
-
-// cleanUpLegacy räumt die host-globale Registrierung des alten Modells weg.
-// Sie läuft bei jedem Start und meldet sich nur, wenn tatsächlich etwas
-// wegfällt — auf einem sauberen Rechner bleibt sie still. Ein Fehler dabei
-// hält den Start nicht auf: die Oberfläche ist auch mit Altlasten bedienbar.
-func cleanUpLegacy() {
-	removals, err := legacy.RemoveGlobalLinks()
-	if len(removals) > 0 {
-		fmt.Printf("Alte globale Verlinkung entfernt (%d):\n", len(removals))
-		for _, removal := range removals {
-			fmt.Printf("  - %s\n", removal)
-		}
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: alte globale Verlinkung nicht vollständig entfernt: %v\n", err)
-	}
 }

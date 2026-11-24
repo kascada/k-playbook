@@ -18,9 +18,14 @@ bei jedem Aufruf die Prüfsumme des eingebetteten Inhalts mit der Datei
 dort sind schreibgeschützt.
 
 Die Projekte verlinken die Einträge durch `.k-playbook/share` (siehe
-`installer/docs/architecture.md`, „Der Umweg-Link `.k-playbook/share`“). Ein
-Command nennt ein Modul mit dem verlinkten Pfad, etwa
-`.claude/commands/_audit/review-scan-triage.md`.
+`installer/docs/architecture.md`, „Der Umweg-Link `.k-playbook/share`“).
+Verlinkt werden nur die Commands und Skills selbst. Die Fragmente unter
+`commands/_audit/` und `commands/_review-run/` stehen nicht in den
+Verzeichnissen der Assistenten (`.claude/commands/`, `.opencode/commands/`);
+im Projekt liegen sie nur hinter dem Umweg-Link, etwa
+`.k-playbook/share/commands/_audit/review-scan-triage.md`. Ein Command nennt
+ein solches Modul relativ zu diesem Verzeichnis, etwa
+`commands/_audit/review-scan-triage.md`.
 
 Hier ist die einzige Fassung; `commands/` und `skills/` oben im Repo gibt es seit
 2026-10-25 nicht mehr. Eine Änderung hier ändert das Binary und verlangt damit

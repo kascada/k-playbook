@@ -327,8 +327,10 @@ func TestBriefingTeilabrufEnvironment(t *testing.T) {
 func TestBriefingOptionen(t *testing.T) {
 	briefingProject(t)
 
-	if _, err := runBriefingCaptured(t, "--nein"); err == nil || !strings.Contains(err.Error(), "unbekannte Option") {
-		t.Errorf("unbekannte Option: %v", err)
+	// Eine unbekannte Option ist ein Aufruffehler und endet mit 2, wie bei
+	// k-playbook health.
+	if _, err := runBriefingCaptured(t, "--nein"); err == nil || !strings.Contains(err.Error(), "unbekannte Option") || exitCodeOf(err) != briefingExitUsage {
+		t.Errorf("unbekannte Option: %v (Exit-Code %d)", err, exitCodeOf(err))
 	}
 	// Ein unbekannter oder fehlender Teil ist ein Fehler, kein volles
 	// Briefing.

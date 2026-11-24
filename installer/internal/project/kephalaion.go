@@ -31,7 +31,7 @@ var kephalaionCheck = func(projectDir string) kephalaion.Status {
 	binding, err := ProjectBinding(projectDir)
 	if err != nil {
 		return kephalaion.Status{Configured: true, State: kephalaion.StateInvalidEntry,
-			Message: err.Error() + " Abhilfe: die Datei prüfen (k-playbook gui, Abschnitt Projektkonfiguration)."}
+			Message: err.Error() + " Abhilfe: die Datei prüfen (Oberfläche: k-playbook ohne Argument oder /k-gui, Abschnitt Projektkonfiguration)."}
 	}
 	return kephalaion.Check(context.Background(), binding, ConfigDisplayName)
 }

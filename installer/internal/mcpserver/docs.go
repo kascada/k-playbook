@@ -14,8 +14,9 @@ import (
 // k_playbook_doc_read ist eine dünne Hülle über project.ResolveDocRef, dem
 // Zugriffsweg, den auch das Subkommando `k-playbook read` benutzt. Der
 // Verweis im Präfixschema (defaults/docs/handbook/verweisschema.md) ist der dauerhafte Vertrag
-// des Werkzeugs: welche Quelle dahinter liegt — heute die Platte —, sieht der
-// Aufrufer nicht.
+// des Werkzeugs: welche Quelle dahinter liegt — die Collection des Projekts,
+// die mitgelieferten Texte in Kephalaion oder eine Datei des Projekts —,
+// sieht der Aufrufer nicht. Gelesen wird bei jedem Aufruf frisch.
 const docToolRead = "k_playbook_doc_read"
 
 // docReadInput trägt projectDir wie die übrigen Familien: Pflicht im Vertrag,

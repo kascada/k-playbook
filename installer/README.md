@@ -31,13 +31,11 @@ curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install
 ```
 
 Das ist die ganze Installation: ein Binary je Host oder DevContainer. Ins Projekt wird
-nichts vom Werkzeug kopiert; einen Clone `k-playbook/` im Projekt gibt es nicht mehr.
+nichts vom Werkzeug kopiert.
 
 Ohne Argument öffnet das Programm die lokale Oberfläche. Der Server dahinter läuft als
 Hintergrunddienst je Projekt weiter, das Terminal ist sofort wieder frei; ein zweiter
-Aufruf findet ihn und öffnet nur den Browser, `stop` beendet ihn. Davor räumt der Aufruf
-die globale Assistenten-Verlinkung des alten Modells sowie Reste der früheren
-Wrapper-Installation weg.
+Aufruf findet ihn und öffnet nur den Browser, `stop` beendet ihn.
 
 `briefing` ist der Einstieg jeder Sitzung — der Aufruf, den `AGENTS.md` nennt: Datum,
 Projekt und Kephalaion-Anbindung, der Text der immer geltenden Anweisungen, die Reviews und
@@ -60,8 +58,7 @@ Es gibt genau zwei Versionsquellen: die eigene Version im Binary und den neueste
 Release-Tag. `k-playbook version` nennt die erste, `k-playbook version --all` zusätzlich
 die mitgereiste VS-Code-Erweiterung und die zweite; die Umgebungsprüfung
 (`k-playbook health`, das Briefing) warnt, wenn das Programm älter ist als das neueste
-Release. `VERSION`, `SHA256SUMS` und `bin/install` des früheren Clones im Projekt liest
-und ruft das Programm dafür nicht mehr (Pakete `internal/release`, `internal/version`).
+Release (Pakete `internal/release`, `internal/version`).
 
 Zum Entwickeln:
 
@@ -80,14 +77,12 @@ ohnehin nur die gestartet wird.
 | Schritt | Ergebnis |
 |---|---|
 | Konfiguration anlegen | `.k-playbook/K-PLAYBOOK.yaml` im Hauptverzeichnis |
-| Assistenten verlinken | `.claude/`, `.opencode/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink aus einer älteren Fassung durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
+| Assistenten verlinken | `.claude/`, `.opencode/`, Anstoß in `AGENTS.md`, `CLAUDE.md` als Include-Datei mit der Zeile `@AGENTS.md`; eine mitgebrachte echte `CLAUDE.md` wird dabei nach `AGENTS.md` umbenannt, ein Symlink `CLAUDE.md -> AGENTS.md` durch den Include ersetzt, nicht auflösbare Lagen werden als Konflikt gemeldet |
 | VS-Code-Erweiterung installieren | „k-playbook Workspace Tools“ im VS-Code-Server der Umgebung; beim Start des Dienstes im Hintergrund, ausdrücklich mit `k-playbook vscode install` |
 
 Dazu kommen ein rein lesender Block für die Security-Tools, die Remediation-Policy, die
 mitgelieferte Doku, der aufgelöste Kontext und das Aktualisieren des Programms aus dem
-neuesten Release. Den früheren Clone `k-playbook/` im Projekt zieht das Werkzeug nicht
-mehr nach und sperrt ihn nicht mehr; einen liegengebliebenen löscht `/k-upgrade`
-(Umstellung 3.8).
+neuesten Release.
 
 Geschrieben wird ausschließlich nach Bestätigung, Schritt für Schritt. Eine vorhandene
 `K-PLAYBOOK.yaml` wird nie überschrieben.
@@ -108,7 +103,6 @@ liegendes Repository entgegen.
 installer/
 ├── cmd/k-playbook/main.go
 ├── internal/project/          Anker, Config, Verlinkung, Kontext, Update, Tools
-├── internal/legacy/           host-globale Altlasten des alten Modells entfernen
 ├── internal/guiproc/          Laufzeitdatei des Hintergrunddienstes, Prozessidentität, Abkoppeln
 ├── internal/webui/            Server, Endpunkte, eingebettete Oberfläche
 ├── internal/vscodeext/        die eingebettete VS-Code-Erweiterung: Erkennen, CLI wählen,

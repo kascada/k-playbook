@@ -26,31 +26,9 @@ var skippedDirs = map[string]bool{
 
 func skippedDir(name string) bool { return skippedDirs[name] }
 
-// InstallationDirName ist der Name des früheren Clones von k-playbook
-// innerhalb eines Projekts (Altbestand: bis Task 156 lag die Installation
-// dort, /k-upgrade löscht ihn). Er ist fest; `project` bindet ihn als
-// PlaybookDirName ein zweites Mal an denselben Wert.
-//
-// Der Sammler importiert `project` bewusst nicht: `project` benutzt
-// `versionsources` und soll später den Sammler benutzen können, ohne dass ein
-// Zyklus entsteht. Deshalb steht der Name hier noch einmal — die einzige
-// Doppelung, und sie ist an eine Konstante gebunden, die sich nicht ändert.
-const InstallationDirName = "k-playbook"
-
-// Herkunft eines Ausschlusses.
-const (
-	// ExclusionInstallation ist die feste Regel: ein liegengebliebener Clone
-	// des Werkzeugs im Projekt ist keine Standardquelle. Die Herkunftsangabe
-	// heißt weiter "installation".
-	ExclusionInstallation = "installation"
-	// ExclusionConfigured ist ein Muster aus `exclude:` der Quellenkonfiguration.
-	ExclusionConfigured = "configured"
-)
-
-// installationReason begründet die feste Regel in der Inventardatei. Sie steht
-// dort wörtlich, damit ein Leser den Ausschluss nicht im Werkzeug nachschlagen
-// muss.
-const installationReason = "Clone des Werkzeugs aus dem früheren Modell (Altbestand); sagt nichts über dieses Projekt"
+// Herkunft eines Ausschlusses: ein Muster aus `exclude:` der
+// Quellenkonfiguration.
+const ExclusionConfigured = "configured"
 
 // excluder entscheidet, was bei der Standarderkennung übergangen wird, und
 // zählt dabei mit.
@@ -64,11 +42,7 @@ type excluder struct {
 }
 
 func newExcluder(patterns []string) *excluder {
-	rules := []*Exclusion{{
-		Pattern: InstallationDirName + "/**",
-		Origin:  ExclusionInstallation,
-		Reason:  installationReason,
-	}}
+	rules := []*Exclusion{}
 	for _, pattern := range patterns {
 		rules = append(rules, &Exclusion{
 			Pattern: pattern,

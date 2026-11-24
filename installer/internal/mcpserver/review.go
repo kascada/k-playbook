@@ -353,14 +353,6 @@ func reviewWriteAIEntryTool(ctx context.Context, req *mcp.CallToolRequest, input
 	}), nil, nil
 }
 
-func reviewNotImplemented(tool string, inputDir string) *mcp.CallToolResult {
-	return reviewErrorResult(tool, reviewProjectEnvelope{InputDir: inputDir}, reviewToolError{
-		Code:    "execution_failed",
-		Message: "Werkzeug noch nicht implementiert.",
-		Details: map[string]any{"tool": tool},
-	})
-}
-
 func reviewAvailableStatus(env reviewEnvironment) (map[string]any, reviewToolError) {
 	base, toolErr := buildSelectionBase(env)
 	if toolErr.Code != "" {
@@ -2350,17 +2342,6 @@ func ensureEntryName(name string) reviewToolError {
 		Message: "Eintragsname ist ungültig.",
 		Details: map[string]any{"entry": name},
 	}
-}
-
-func readJSONFile(path string, target any) reviewToolError {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return wrapError(err, "read_failed", "Datei ist nicht lesbar.", map[string]any{"path": path})
-	}
-	if err := json.Unmarshal(data, target); err != nil {
-		return wrapError(err, "read_failed", "JSON-Datei ist nicht lesbar.", map[string]any{"path": path})
-	}
-	return reviewToolError{}
 }
 
 func resultPath(path string) string {

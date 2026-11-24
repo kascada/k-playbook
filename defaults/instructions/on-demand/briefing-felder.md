@@ -72,10 +72,7 @@ welchem Zustand es ist, `present`, ob es da ist, `schemaVersion`, welche Vertrag
 erklärt (gelesen wird nur `3`), `sources` die konfigurierten Zusatzquellen (`path`, `kind`,
 `env`, `note`, `optional` je Eintrag), `exclude` die Muster, die der Standardlauf übergeht, und
 `helmValues` die konfigurierten Helm-Werte (`path`, `key`, `item` je Eintrag). Jeder Pfad steht
-relativ zur Projektwurzel; gelesen wird nur unterhalb von ihr. Ein Verzeichnis `k-playbook/` im
-Projekt — ein liegengebliebener Clone aus dem früheren Modell — durchsucht der Standardlauf
-nicht, und es steht nicht in `exclude`: Diese Regel kommt aus dem Vertrag, nicht aus dem
-Dokument.
+relativ zur Projektwurzel; gelesen wird nur unterhalb von ihr.
 
 `state` ist einer von vier Werten:
 

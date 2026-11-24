@@ -164,7 +164,7 @@ func (s *kephCollectionSource) index() error {
 	if err != nil {
 		return docRefErrorf(DocCodeKephalaionUnavailable,
 			"die mitgelieferten Texte hinter k-playbook: liegen in %s/%s/ und sind ohne Kephalaion nicht erreichbar: %w — "+
-				"Abhilfe: Kephalaion einrichten über /k-gui (k-playbook gui, Abschnitt Kephalaion)",
+				"Abhilfe: Kephalaion einrichten auf der Statusseite der Oberfläche, Karte „Kephalaion-Collection einrichten“ (k-playbook ohne Argument oder /k-gui)",
 			address, defaultsDirName, err)
 	}
 	entries, err := store.List(s.ctx, kephalaion.ListRequest{Path: defaultsDirName, Recursive: true})

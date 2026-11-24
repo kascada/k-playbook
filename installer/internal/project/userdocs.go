@@ -22,8 +22,10 @@ import (
 // nur die Spalten ab; eine neue Sorte ist ein neuer Eintrag.
 //
 // Nummer und Liste lesen die Replica des Nodes, Anlegen und Verschieben gehen
-// über den Hub. Den Inhalt liest und schreibt die Sitzung direkt über
-// Kephalaion; dafür gibt es hier nichts.
+// über den Hub. Für den Inhalt gibt es die doc-Werkzeuge daneben (docedit.go):
+// lesen über k_playbook_doc_read und k_playbook_doc_grep, anhängen, ersetzen
+// und Frontmatter setzen über k_playbook_doc_append, _replace und _set_field.
+// Als Ganzes schreibt eine Sitzung ein Dokument weiter direkt über Kephalaion.
 
 // DocCounting ist der Zählbereich einer Sorte: aus welchen Verzeichnissen die
 // höchste Nummer stammt. done/ zählt immer mit.
@@ -421,8 +423,10 @@ func openKephClientFor(projectDir string, collection string) (*kephalaion.Client
 }
 
 // openKephClientStatus ist openKephClientFor mit einem Status, den der
-// Aufrufer schon geprüft hat — etwa das Briefing, das ihn ohnehin ausgibt —,
-// damit der Node nicht ein zweites Mal gefragt wird.
+// Aufrufer schon geprüft hat, damit der Node nicht ein zweites Mal gefragt
+// wird. Ihren Status geben nur die Versionsquellen mit (LoadVersionSources,
+// für den Abruf environment) und die Vorprüfung der Befunde
+// (findingscheck.go); das Briefing tut es nicht.
 func openKephClientStatus(projectDir string, collection string, status kephalaion.Status) (*kephalaion.Client, string, error) {
 	if !status.OK {
 		return nil, "", &DocRefError{Code: DocCodeKephalaionUnavailable, err: &KephalaionNotReadyError{Status: status}}

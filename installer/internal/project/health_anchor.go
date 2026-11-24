@@ -8,17 +8,10 @@ import (
 )
 
 // Die Quelle anchor der Umgebungsprüfung: Sie meldet den Stand des Ankers
-// .k-playbook/K-PLAYBOOK.yaml im Repository des Projekts, mit zwei Befunden:
-//
-//   - Der Anker liegt in einem Git-Worktree und ist dort weder versioniert
-//     noch ignoriert. Das ist ein Zustand, kein vermuteter Umzug: Er trifft
-//     auch ein frisch angelegtes Projekt vor dem ersten Commit und einen
-//     Anker, der absichtlich lokal bleibt. Die Abhilfe nennt beide Wege.
-//   - Am früheren Ort, K-PLAYBOOK.yaml direkt im Hauptverzeichnis, steht noch
-//     eine Datei im Index. Discover hat sie beim ersten Aufruf des neuen
-//     Programms nach .k-playbook/ gezogen (migrateConfig); der Index weiß
-//     davon nichts, bis der Umzug committet ist. Nur dieser Befund spricht
-//     vom Umzug.
+// .k-playbook/K-PLAYBOOK.yaml im Repository des Projekts: Der Anker liegt in
+// einem Git-Worktree und ist dort weder versioniert noch ignoriert. Das
+// trifft auch ein frisch angelegtes Projekt vor dem ersten Commit und einen
+// Anker, der absichtlich lokal bleibt. Die Abhilfe nennt beide Wege.
 //
 // Die Quelle spricht nur bei positivem Befund. Still bleibt sie ohne Git,
 // außerhalb eines Worktrees, bei project.vcs ungleich git, bei ignoriertem
@@ -59,15 +52,6 @@ func anchorProblems(ctx context.Context, projectDir string) []health.Problem {
 				"soll die Datei absichtlich lokal bleiben, " + anchorRepoPath + " in .gitignore aufnehmen.",
 		})
 	}
-	if gitIndexHas(ctx, projectDir, ConfigFileName) {
-		problems = append(problems, health.Problem{
-			Level: health.LevelWarning,
-			Area:  health.AreaAnchor,
-			Message: ConfigFileName + " steht am früheren Ort im Hauptverzeichnis noch im Index; " +
-				"der Anker ist nach " + anchorRepoPath + " umgezogen.",
-			Hint: "git rm --cached " + ConfigFileName + " ausführen und den Umzug committen (git add " + anchorRepoPath + ").",
-		})
-	}
 	return problems
 }
 
@@ -77,13 +61,4 @@ func anchorProblems(ctx context.Context, projectDir string) []health.Problem {
 func gitIgnored(ctx context.Context, dir string, path string) bool {
 	_, code, _ := runGit(ctx, dir, "check-ignore", "-q", "--", path)
 	return code != 1
-}
-
-// gitIndexHas fragt ls-files --error-unmatch in dir nach path und zählt nur
-// Exit 0 als Treffer. Anders als gitLsFilesTracked fällt eine unbeantwortete
-// Frage hier auf „nicht im Index": Der Befund „alter Ort noch im Index" ist
-// ein positiver, und den gibt es nur mit Antwort.
-func gitIndexHas(ctx context.Context, dir string, path string) bool {
-	_, code, _ := runGit(ctx, dir, "ls-files", "--error-unmatch", "--", path)
-	return code == 0
 }

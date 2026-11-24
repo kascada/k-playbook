@@ -7,14 +7,13 @@ import (
 	"testing"
 )
 
-// withInstallation legt im Projekt einen liegengebliebenen Clone des Werkzeugs
-// an (Altbestand): `k-playbook/` liegt neben den eigenen Quellen und bringt
-// eigene mit.
-func withInstallation(t *testing.T) Options {
+// withFremdquelle legt im Projekt ein Verzeichnis werkzeug/ mit eigener
+// go.mod an und schließt es über `exclude:` von der Standarderkennung aus.
+func withFremdquelle(t *testing.T) Options {
 	t.Helper()
 
 	options := newRunProject(t)
-	installation := filepath.Join(options.ProjectDir, InstallationDirName, "installer")
+	installation := filepath.Join(options.ProjectDir, "werkzeug", "installer")
 	if err := os.MkdirAll(installation, 0o755); err != nil {
 		t.Fatalf("anlegen: %v", err)
 	}
@@ -25,69 +24,16 @@ func withInstallation(t *testing.T) Options {
 	return options
 }
 
-// Ein liegengebliebener Clone des Werkzeugs (Altbestand) ist keine
-// Standardquelle: seine Versionsangaben beschreiben das Werkzeug, nicht das
-// Projekt.
-func TestInstallationIstKeineStandardquelle(t *testing.T) {
-	options := withInstallation(t)
-
-	result, err := Collect(options)
-	if err != nil {
-		t.Fatalf("Collect: %v", err)
-	}
-	for _, source := range result.Sources {
-		if strings.HasPrefix(source.File, InstallationDirName+"/") {
-			t.Errorf("die Installation wurde als Standardquelle gelesen: %+v", source)
-		}
-	}
-	for _, entry := range result.Entries {
-		if entry.Group == "go/example.com/fremd" {
-			t.Errorf("ein Eintrag aus der Installation: %+v", entry)
-		}
-	}
-}
-
-// Der Ausschluss ist nicht still: er steht mit Muster, Herkunft, Grund und der
-// Zahl der übergangenen Quellen in der Inventardatei.
-func TestAusschlussDerInstallationStehtSichtbarInDerDatei(t *testing.T) {
-	options := withInstallation(t)
-
-	result, err := Collect(options)
-	if err != nil {
-		t.Fatalf("Collect: %v", err)
-	}
-	var rule Exclusion
-	for _, exclusion := range result.Exclusions {
-		if exclusion.Origin == ExclusionInstallation {
-			rule = exclusion
-		}
-	}
-	if rule.Pattern != InstallationDirName+"/**" {
-		t.Fatalf("die feste Regel fehlt im Ergebnis: %+v", result.Exclusions)
-	}
-	if rule.Skipped != 1 {
-		t.Errorf("übergangene Quellen = %d, erwartet 1", rule.Skipped)
-	}
-
-	rendered := Render(result, "2026-09-05T12:00:00+02:00")
-	for _, needle := range []string{
-		"## Nicht durchsuchte Bereiche", "`" + InstallationDirName + "/**`",
-		ExclusionInstallation, "sources-excluded: 1", "- Nicht durchsuchte Quellen: 1",
-	} {
-		if !strings.Contains(rendered, needle) {
-			t.Errorf("in der Datei fehlt %q", needle)
-		}
-	}
-}
-
 // Gesperrt ist nichts: wer eine Quelle aus einem ausgeschlossenen Bereich im
 // Inventar haben will, schreibt sie in `sources:`. Der Ausschluss wirkt nur auf
 // die Standarderkennung.
 func TestAusdruecklicheQuelleSchlaegtDenAusschluss(t *testing.T) {
-	options := withInstallation(t)
+	options := withFremdquelle(t)
 	options.Config = sourcesConfig(t, `schema_version: 3
+exclude:
+  - werkzeug/**
 sources:
-  - path: k-playbook/installer/go.mod
+  - path: werkzeug/installer/go.mod
     kind: go
     env: lokal
     note: Abhängigkeiten des Werkzeugs, ausdrücklich gewollt
@@ -107,7 +53,7 @@ sources:
 		}
 	}
 	if !found {
-		t.Error("eine ausdrücklich konfigurierte Quelle wird gelesen, auch aus der Installation")
+		t.Error("eine ausdrücklich konfigurierte Quelle wird gelesen, auch aus einem ausgeschlossenen Bereich")
 	}
 }
 
@@ -193,11 +139,11 @@ func TestMatchExcludeVergleichtSegmentweise(t *testing.T) {
 		path    string
 		want    bool
 	}{
-		{"k-playbook/**", "k-playbook/installer/go.mod", true},
-		{"k-playbook/**", "k-playbook/go.mod", true},
+		{"werkzeug/**", "werkzeug/installer/go.mod", true},
+		{"werkzeug/**", "werkzeug/go.mod", true},
 		// Ein Nachbar mit gleichem Präfix ist nicht gemeint.
-		{"k-playbook/**", "k-playbook-notizen/go.mod", false},
-		{"k-playbook/**", "installer/k-playbook/go.mod", false},
+		{"werkzeug/**", "werkzeug-notizen/go.mod", false},
+		{"werkzeug/**", "installer/werkzeug/go.mod", false},
 		// Ohne Wildcard trifft das Muster den Pfad selbst und alles darunter.
 		{"testdata", "testdata/projekt/go.mod", true},
 		{"testdata", "testdata2/projekt/go.mod", false},

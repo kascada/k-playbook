@@ -35,8 +35,7 @@
 #            Bezugspunkt ist der des Jobs: bei workdir module das Modul, sonst {target}.
 #            Gezählt wird je Bezugspunkt und Sorte einmal im ganzen Lauf. Die Zahl ist
 #            eine Obergrenze und keine Abdeckungsmessung: die werkzeugeigenen Ausschlüsse
-#            aus args kennt die Zählung nicht, den generischen (k-playbook/) schon —
-#            verankert am Bezugspunkt, sonst fiele installer/cmd/k-playbook/ mit heraus.
+#            aus args kennt die Zählung nicht.
 #            Warum eine eigene Spalte: die Sorte steht in keiner vorhandenen. languages
 #            ist der Sprachfilter des Laufs, ihr * heißt „sprachunabhängig" und gerade
 #            nicht „alle Dateien". Im Go-Code stünde die Zuordnung als Sonderfall je
@@ -47,9 +46,11 @@
 #            wäre eine Näherung nach Dateinamensmuster, die eher Falschalarme erzeugte,
 #            als dass sie einordnete.
 # sarif      native (das Werkzeug kann SARIF selbst), convert (braucht einen Konverter)
-#            oder none (erzeugt kein SARIF). Es läuft ausschließlich native; die
-#            anderen werden mit Grund übersprungen, solange die Konverter fehlen.
-#            Sonst läge unter raw/ rohes JSON mit der Endung .sarif.
+#            oder none (erzeugt kein SARIF). native läuft immer, convert dann, wenn
+#            es für das Werkzeug einen Konverter gibt (heute trufflehog und
+#            pip-audit); ein convert-Job ohne Konverter und jeder none-Job werden
+#            mit Grund übersprungen. Sonst läge unter raw/ rohes JSON mit der
+#            Endung .sarif.
 # output     file, wenn das Werkzeug selbst nach {out} schreibt; stdout, wenn der
 #            Ausführer den Strom dorthin umleiten muss. govulncheck ist dieser Fall.
 # timeout    Obergrenze je Job als Go-Dauer (10m, 90s). Ohne sie hielte ein hängender
@@ -141,33 +142,17 @@
 #
 # Dasselbe gilt für die Kandidatenzählung hinter candidates: auch ihre Ausschlüsse stehen
 # im Go-Code (installer/internal/review/candidates.go). Sie ruft ebenfalls kein Werkzeug
-# auf, und sie kann nur den generischen Ausschluss anwenden — die werkzeugeigenen aus
-# args sind ihr nicht zugänglich. Deshalb gilt: Kandidaten ≥ tatsächlich geprüfte
+# auf, und die werkzeugeigenen Ausschlüsse aus args sind ihr nicht zugänglich. Deshalb gilt: Kandidaten ≥ tatsächlich geprüfte
 # Dateien.
 #
-# Ausgeschlossen wird überall dort, wo das Werkzeug es zulässt:
-#   k-playbook/                Altbestand: ein liegengebliebener Clone des Werkzeugs aus
-#                              dem früheren Modell (/k-upgrade löscht ihn). Sein
-#                              ausgeliefertes Beispielmaterial ist kein Code des Projekts.
-# Dazu für Python S101 (assert) und die Testverzeichnisse: an ~/dev/Aiva/kascada
+# Ausgeschlossen werden für Python S101 (assert) und die Testverzeichnisse: an ~/dev/Aiva/kascada
 # gemessen 97,3 % der Befunde, siehe defaults/docs/handbook/migration.md, „Gemessen".
 #
 # Die gitleaks- und njsscan-Jobs nennen als Ziel . statt {target}, obwohl beides
 # dasselbe Verzeichnis meint. Grund: beide Werkzeuge können Pfade nur über ihre eigene
-# Konfiguration ausnehmen, und deren Muster laufen gegen den gemeldeten Pfad. Bei
-# absolutem Ziel ist der absolut — in einem Projekt, das selbst k-playbook heißt, träfe
-# ein Muster für einen solchen Clone dann die ganze Projektwurzel, und der Lauf fände
-# nichts mehr. Mit . sind die gemeldeten Pfade relativ zur Wurzel, und die Muster
-# greifen genau dort, wo sie sollen: gitleaks.toml mit ^ verankert, njsscan.yaml über
-# den Teilstring k-playbook/, der libsast genügt.
-#
-# osv-scanner braucht diesen Umweg nicht und behält {target}: sein
-# --experimental-exclude nimmt einen exakten Verzeichnisnamen und wird nicht auf die
-# Scan-Wurzel angewandt. Nachgemessen in einem Repo, dessen Wurzel k-playbook heißt —
-# mit und ohne Flag dieselben 331 Verzeichnisse und dieselben vier Manifeste. Der
-# Schalter ist trotz des Namens experimental die einzige Ausschlussmöglichkeit des
-# Werkzeugs; ohne ihn meldet es die Abhängigkeiten eines liegengebliebenen Clones mit,
-# dessen testdata/ dort nicht gitignored ist.
+# Konfiguration ausnehmen, und deren Muster laufen gegen den gemeldeten Pfad. Mit .
+# sind die gemeldeten Pfade relativ zur Wurzel, und ein Muster in gitleaks.toml oder
+# njsscan.yaml greift genau dort, wo es soll.
 #
 # syft hat mit Absicht keine Zeile: es erzeugt eine SBOM und damit keine Befunde. Als
 # Eintrag eines Laufs endet es deshalb als skipped mit Grund. docker ebenso — es ist
@@ -175,15 +160,15 @@
 job	tool	languages	candidates	sarif	output	timeout	soft_skip	workdir	args
 gitleaks-git	gitleaks	*	any	native	file	10m		target	git . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
 gitleaks-dir	gitleaks	*	any	native	file	10m		target	dir . --config {scripts}/gitleaks.toml --report-format sarif --report-path {out} --no-banner --log-level error
-ruff	ruff	python	source	native	file	10m		target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py,k-playbook --output-format sarif --output-file {out} {target}
-semgrep	semgrep	python,go,javascript,typescript	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=k-playbook --exclude=node_modules --exclude=tests --exclude=test {target}
-trivy-fs	trivy	*	manifest	native	file	15m		target	fs --format sarif --output {out} --skip-dirs k-playbook {target}
-trivy-config	trivy	*	none	native	file	15m		target	config --format sarif --output {out} --skip-dirs k-playbook {target}
+ruff	ruff	python	source	native	file	10m		target	check --isolated --select S --ignore S101 --exclude tests,test,testing,conftest.py --output-format sarif --output-file {out} {target}
+semgrep	semgrep	python,go,javascript,typescript	source	native	file	20m		target	scan --config p/security-audit --metrics=off --sarif --sarif-output={out} --exclude=node_modules --exclude=tests --exclude=test {target}
+trivy-fs	trivy	*	manifest	native	file	15m		target	fs --format sarif --output {out} {target}
+trivy-config	trivy	*	none	native	file	15m		target	config --format sarif --output {out} {target}
 gosec	gosec	go	source	native	file	15m		module	-fmt=sarif -out={out} ./...
 govulncheck	govulncheck	go	manifest	native	stdout	15m		module	-format sarif ./...
 njsscan	njsscan	javascript,typescript	source	native	file	15m		target	--sarif -o {out} -c {scripts}/njsscan.yaml .
-osv-scanner	osv-scanner	python,go,javascript,typescript	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --experimental-exclude k-playbook --format sarif --output-file {out} {target}
-grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out} --exclude ./k-playbook/**
+osv-scanner	osv-scanner	python,go,javascript,typescript	manifest	native	file	15m	128:No package sources found	target	scan source --recursive --format sarif --output-file {out} {target}
+grype	grype	*	manifest	native	file	15m		target	dir:{target} --output sarif --file {out}
 golangci-lint	golangci-lint	go	source	native	file	15m		module	run --output.sarif.path {out} --output.text.path stderr ./...
 trufflehog-git	trufflehog	*	any	convert	stdout	15m		target	git file://{target} --json --no-update
 pip-audit	pip-audit	python	manifest	convert	stdout	15m		module-file	--format json --progress-spinner off -r {module}

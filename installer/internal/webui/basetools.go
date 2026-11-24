@@ -16,9 +16,8 @@ import (
 // leitet insbesondere nicht ab, welcher Weg root braucht: das entscheidet das
 // Skript beim Laufen, je Eintrag und erst nach `command -v apt-get`. Läge die
 // Rangfolge auch hier, stünde sie zweimal im Repo und liefe nach der ersten
-// einseitigen Änderung auseinander. Dasselbe Muster wie bei
-// fallbackToolInstallCommand(): nur der Aufruf, keine je Werkzeug ausgerechnete
-// Entscheidung.
+// einseitigen Änderung auseinander. Die Karte trägt deshalb nur den Aufruf,
+// keine je Werkzeug ausgerechnete Entscheidung.
 type baseToolsResponse struct {
 	Available bool `json:"available"`
 	// Present meldet, ob die Matrix gelesen werden konnte. Fehlt sie, zeigt die

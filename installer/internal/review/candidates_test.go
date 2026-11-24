@@ -91,12 +91,10 @@ func TestCountCandidatesManifeste(t *testing.T) {
 	}
 }
 
-// Die Ausschlüsse: die Installationskopie — an ihrem Ort und nicht über den
-// bloßen Namen —, dazu alles mit führendem Punkt.
+// Die Ausschlüsse: alles mit führendem Punkt.
 func TestCountCandidatesUeberspringtAusschluesse(t *testing.T) {
 	root := dateiBaum(t,
 		"haupt.go",
-		"k-playbook/installer/beispiel.go",
 		"notizen/notiz.go",
 		".git/objects/etwas.go",
 		"unten/.venv/lib/paket.go",
@@ -109,26 +107,6 @@ func TestCountCandidatesUeberspringtAusschluesse(t *testing.T) {
 	}
 	if got := zähle(t, root, CandidateAny, "*"); got != 2 {
 		t.Errorf("alle Dateien = %d, erwartet 2", got)
-	}
-}
-
-// Der Fehler aus Task 004, in neuer Gestalt: ein Ausschluss über den bloßen
-// Namen fräße installer/cmd/k-playbook/ mit — Code dieses Projekts. Verankert
-// ist er, und tiefer im Baum trifft er nichts.
-func TestCountCandidatesAusschlussIstVerankert(t *testing.T) {
-	root := dateiBaum(t,
-		"k-playbook/beispiel.go",
-		"installer/cmd/k-playbook/haupt.go",
-		"dienste/k-playbook/eigen.go",
-	)
-
-	if got := zähle(t, root, CandidateSource, "go"); got != 2 {
-		t.Errorf("Quelldateien = %d, erwartet 2", got)
-	}
-	// Und vom Modul aus gesehen liegt die Installationskopie gar nicht darunter.
-	modul := filepath.Join(root, "installer")
-	if got := zähle(t, modul, CandidateSource, "go"); got != 1 {
-		t.Errorf("Quelldateien im Modul = %d, erwartet 1", got)
 	}
 }
 
@@ -308,8 +286,7 @@ func TestCountCandidatesNodeManifeste(t *testing.T) {
 	}
 }
 
-// node_modules/ fällt über den Namen heraus, auf jeder Ebene — anders als die
-// verankerten Ausschlüsse aus candidateExcluded. Sonst stünden die wenigen
+// node_modules/ fällt über den Namen heraus, auf jeder Ebene. Sonst stünden die wenigen
 // echten Dateien eines Node-Projekts gegen die tausenden seiner Abhängigkeiten.
 func TestCountCandidatesNodeModulesZähltNicht(t *testing.T) {
 	root := dateiBaum(t,

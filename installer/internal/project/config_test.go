@@ -22,14 +22,14 @@ func TestSuggestRepoRootFindetRepoImHauptverzeichnis(t *testing.T) {
 	}
 }
 
-// Das Repo liegt parallel zur Installation, nicht im Hauptverzeichnis selbst.
+// Das Repo liegt eine Ebene unter dem Hauptverzeichnis, nicht darin selbst.
 func TestSuggestRepoRootFindetParallelesRepo(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "G", ".git"), 0o755); err != nil {
 		t.Fatalf("G/.git anlegen: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, PlaybookDirName), 0o755); err != nil {
-		t.Fatalf("Installation anlegen: %v", err)
+	if err := os.MkdirAll(filepath.Join(root, "notizen"), 0o755); err != nil {
+		t.Fatalf("Nachbarverzeichnis anlegen: %v", err)
 	}
 
 	repoRoot, _ := suggestRepoRoot(root)
@@ -53,18 +53,6 @@ func TestSuggestRepoRootBleibtBeiMehrerenLeer(t *testing.T) {
 	}
 	if len(candidates) != 2 {
 		t.Errorf("candidates = %v, erwartet zwei Einträge", candidates)
-	}
-}
-
-func TestSuggestRepoRootIgnoriertInstallation(t *testing.T) {
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, PlaybookDirName, ".git"), 0o755); err != nil {
-		t.Fatalf("Installation anlegen: %v", err)
-	}
-
-	repoRoot, candidates := suggestRepoRoot(root)
-	if repoRoot != "" || len(candidates) != 0 {
-		t.Errorf("repoRoot = %q, candidates = %v, erwartet leer", repoRoot, candidates)
 	}
 }
 
@@ -255,7 +243,7 @@ func TestCheckSchema(t *testing.T) {
 	if err := CheckSchema(Config{}); err == nil {
 		t.Error("fehlende schema_version wurde akzeptiert")
 	}
-	// Die 2 beschreibt das abgelöste Layout; ihre Werte bedeuten etwas anderes.
+	// Eine ältere Fassung wird abgelehnt: das Projekt ist neu einzurichten.
 	if err := CheckSchema(Config{SchemaVersion: "2"}); err == nil {
 		t.Error("schema_version 2 wurde akzeptiert")
 	}
@@ -275,7 +263,7 @@ func TestCheckSchemaNeuereFassungNenntUpgrade(t *testing.T) {
 	if !strings.Contains(got, "k-playbook upgrade") {
 		t.Errorf("Fehler = %q, erwartet den Hinweis auf k-playbook upgrade", got)
 	}
-	for _, unwanted := range []string{"git pull", PlaybookDirName + "-Verzeichnis"} {
+	for _, unwanted := range []string{"git pull"} {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("Fehler = %q, enthält noch %q", got, unwanted)
 		}
@@ -295,5 +283,60 @@ func TestCreateConfigSchreibtGueltigesSchema(t *testing.T) {
 	}
 	if err := CheckSchema(config); err != nil {
 		t.Errorf("selbst erzeugte Konfiguration ist ungültig: %v", err)
+	}
+}
+
+// ReadConfig nimmt einem Skalar ein Paar umschließender Anführungszeichen ab
+// (Task 191): schema_version: "3" wurde vorher als neuere Fassung abgelehnt
+// („hat schema_version "3", dieses Werkzeug versteht 3“).
+func TestReadConfigNimmtAnfuehrungszeichenAb(t *testing.T) {
+	for _, test := range []struct {
+		name, content         string
+		schema, vcs, repoRoot string
+	}{
+		{"doppelte", "schema_version: \"3\"\nproject:\n  repo_root: \"src\"\n  vcs: \"git\"\n", "3", "git", "src"},
+		{"einfache", "schema_version: '3'\nproject:\n  repo_root: 'src'\n  vcs: 'git'\n", "3", "git", "src"},
+		{"ohne", "schema_version: 3\nproject:\n  repo_root: src\n  vcs: git\n", "3", "git", "src"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeFile(t, ConfigPath(root), test.content)
+			config, err := ReadConfig(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if config.SchemaVersion != test.schema || config.VCS != test.vcs || config.RepoRoot != test.repoRoot {
+				t.Errorf("gelesen: schema_version %q, vcs %q, repo_root %q", config.SchemaVersion, config.VCS, config.RepoRoot)
+			}
+			if err := CheckSchema(config); err != nil {
+				t.Errorf("die Fassung wird abgelehnt: %v", err)
+			}
+		})
+	}
+}
+
+// Nur ein Paar zählt: Ein Wert mit einem einzelnen Anführungszeichen, vorn
+// oder hinten, oder mit zwei verschiedenen bleibt unverändert — mehr YAML
+// versteht ReadConfig nicht, und es rät nicht.
+func TestReadConfigLaesstEinzelnesAnfuehrungszeichenStehen(t *testing.T) {
+	for _, value := range []string{`"3`, `3"`, `'3`, `"3'`, `"`} {
+		root := t.TempDir()
+		writeFile(t, ConfigPath(root), "schema_version: "+value+"\nproject:\n  vcs: "+value+"\n")
+		config, err := ReadConfig(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if config.SchemaVersion != value || config.VCS != value {
+			t.Errorf("Wert %s: gelesen schema_version %q, vcs %q", value, config.SchemaVersion, config.VCS)
+		}
+	}
+	root := t.TempDir()
+	writeFile(t, ConfigPath(root), "schema_version: \"3\n")
+	config, err := ReadConfig(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckSchema(config); err == nil {
+		t.Error("schema_version mit einem einzelnen Anführungszeichen wurde akzeptiert")
 	}
 }

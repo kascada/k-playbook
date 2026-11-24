@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -202,18 +201,14 @@ func TestHilfeVerweiseZeigenInDieDoku(t *testing.T) {
 	}
 }
 
-// Der Kopf nennt keine Installation im Projekt mehr (Task 157): kein Eintrag
-// „Installation:“, auch wenn ein liegengebliebener Clone k-playbook/ daliegt,
-// und GET /api/context trägt weder unter context noch unter display ein Feld
+// Der Kopf nennt keine Installation im Projekt (Task 157): kein Eintrag
+// „Installation:“, und GET /api/context trägt weder unter context noch unter display ein Feld
 // playbook. Auch ein Feld local gibt es dort nicht (Task 159): die einzige
 // Wurzel ist project.
 func TestKopfUndKontextNennenKeineInstallation(t *testing.T) {
 	root := t.TempDir()
 	if err := project.CreateConfig(root, "."); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
-		t.Fatal(err)
 	}
 	chdir(t, root)
 	// Die Kontextantwort trägt die Anbindung; der Node dieses Rechners wird

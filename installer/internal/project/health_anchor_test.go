@@ -2,7 +2,6 @@ package project
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -113,46 +112,5 @@ func TestHealthAnchorOhneVCSGitSchweigt(t *testing.T) {
 
 	if problems := anchorProblemsOf(t, root); len(problems) != 0 {
 		t.Errorf("Probleme = %+v, erwartet keines", problems)
-	}
-}
-
-// Der Anker lag am früheren Ort und war committet; Discover hat ihn
-// verschoben, der Index kennt noch den alten Pfad. Der neue Ort ist schon
-// aufgenommen, damit nur der Umzugsbefund spricht.
-func TestHealthAnchorAlterOrtNochImIndexWarnt(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git nicht verfügbar")
-	}
-	root := t.TempDir()
-	run(t, root, "git", "init", "-q", "-b", "main")
-	run(t, root, "git", "config", "user.email", "test@example.com")
-	run(t, root, "git", "config", "user.name", "Test")
-	writeFile(t, legacyConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
-	run(t, root, "git", "add", ConfigFileName)
-	run(t, root, "git", "commit", "-q", "-m", "alter Ort")
-
-	if _, err := Discover(root); err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	if _, err := os.Lstat(legacyConfigPath(root)); !os.IsNotExist(err) {
-		t.Fatalf("alter Ort nicht geräumt: %v", err)
-	}
-	run(t, root, "git", "add", ".k-playbook/K-PLAYBOOK.yaml")
-
-	problems := anchorProblemsOf(t, root)
-	if len(problems) != 1 {
-		t.Fatalf("Probleme = %+v, erwartet eines", problems)
-	}
-	got := problems[0]
-	if got.Level != health.LevelWarning || got.Area != health.AreaAnchor ||
-		!strings.Contains(got.Message, "früheren Ort") || !strings.Contains(got.Message, "umgezogen") ||
-		!strings.Contains(got.Hint, "git rm --cached K-PLAYBOOK.yaml") || !strings.Contains(got.Hint, "committen") {
-		t.Errorf("Eintrag: %+v", got)
-	}
-
-	// Ohne das git add sprechen beide Befunde.
-	run(t, root, "git", "rm", "-q", "--cached", ".k-playbook/K-PLAYBOOK.yaml")
-	if problems := anchorProblemsOf(t, root); len(problems) != 2 {
-		t.Errorf("Probleme = %+v, erwartet zwei", problems)
 	}
 }

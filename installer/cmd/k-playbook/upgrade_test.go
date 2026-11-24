@@ -21,37 +21,22 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/sharedir/sharetest"
 )
 
-// alteAgentsVorlage ist eine AGENTS.md mit dem Wrapper-Anstoß, wie das Binary
-// ihn früher schrieb, dahinter eigene Prosa ohne Überschrift.
+// alteAgentsVorlage ist eine AGENTS.md des Projekts ohne Anstoß, nur mit
+// eigener Prosa.
 const alteAgentsVorlage = `# AGENTS.md
 
-<!-- k-playbook:anstoss -->
-## k-playbook
-
-Für dieses Projekt gilt k-playbook. Rufe zu Beginn
-
-    k-playbook/bin/k-playbook context
-
-auf und lies die Dateien aus ` + "`instructions`" + ` in der angegebenen Reihenfolge,
-bevor du arbeitest. Die Ausgabe nennt außerdem die aufgelösten Verzeichnisse und
-die effektiven Kataloge für Regeln, Reviews und Checks.
-
-Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.
+Diese Zeilen gehören dem Projekt und stehen ohne Überschrift darin.
 `
 
-// upgradeProject baut ein Projekt mit altem Verzeichnis k-playbook/ (ohne Git)
-// und alter AGENTS.md auf und macht es zum Arbeitsverzeichnis. latest ist der
-// neueste Release-Tag: Eine Ersatzquelle nennt ihn, ohne Assets — kein Test
-// fragt das echte GitHub. Das Verzeichnis k-playbook/ liegt bewusst da, mit
-// abweichender VERSION: Der Lauf liest es nicht und fasst es nicht an.
+// upgradeProject baut ein Projekt mit einer AGENTS.md ohne Anstoß auf und
+// macht es zum Arbeitsverzeichnis. latest ist der neueste Release-Tag: Eine
+// Ersatzquelle nennt ihn, ohne Assets — kein Test fragt das echte GitHub.
 func upgradeProjectDir(t *testing.T, latest string) string {
 	t.Helper()
 
 	root := todoProject(t)
-	playbook := filepath.Join(root, project.PlaybookDirName)
 	releasetest.Serve(t).AddTag(latest)
 	for _, file := range []struct{ path, content string }{
-		{filepath.Join(playbook, "VERSION"), "v0.0.1\n"},
 		{filepath.Join(sharetest.Dir(t), "commands", "k-test.md"), "test\n"},
 		{filepath.Join(sharetest.Dir(t), "skills", "beispiel", "SKILL.md"), "# Beispiel\n"},
 		{filepath.Join(root, project.RootInstructionsFile), alteAgentsVorlage},
@@ -182,7 +167,7 @@ func TestUpgradeCheckMeldetUndSchreibtNicht(t *testing.T) {
 	})
 	for _, erwartet := range []string{
 		"Programm-Stand: nichts zu tun",
-		"veraltete Anstoß in AGENTS.md würde auf k-playbook briefing gebracht",
+		"der Anstoß würde an AGENTS.md angehängt",
 		"Verlinkung würde eingerichtet",
 	} {
 		if !strings.Contains(stdout, erwartet) {
@@ -201,41 +186,7 @@ func TestUpgradeCheckMeldetUndSchreibtNicht(t *testing.T) {
 	}
 }
 
-// Ein veralteter Anstoß, dessen Ende sich nicht bestimmen lässt, bleibt bei
-// einem Lauf stehen — und --check sagt genau das: nur der Hinweis, kein „würde
-// ersetzt".
-func TestUpgradeCheckMeldetUnbestimmbarenBlockNurAlsHinweis(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.16.8")
-	setOwnVersion(t, "v0.16.8")
-	agents := filepath.Join(root, project.RootInstructionsFile)
-	eigen := "# AGENTS.md\n\n<!-- k-playbook:anstoss -->\n## k-playbook\n\n" +
-		"Für dieses Projekt gilt k-playbook, bei uns umformuliert. Rufe zu Beginn\n\n" +
-		"    k-playbook context\n\n" +
-		"auf und lies die Dateien aus `instructions`.\n\n" +
-		"Diese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n"
-	if err := os.WriteFile(agents, []byte(eigen), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	stdout := captureStdout(t, func() {
-		if err := runUpgrade([]string{"--check"}); err != nil {
-			t.Errorf("upgrade --check: %v", err)
-		}
-	})
-	for _, erwartet := range []string{"von Hand:", "Anstoßblocks", "bleibt unangetastet"} {
-		if !strings.Contains(stdout, erwartet) {
-			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
-		}
-	}
-	if strings.Contains(stdout, "würde auf k-playbook briefing gebracht") {
-		t.Errorf("--check verspricht den Ersatz, obwohl ein Lauf den Anstoß stehen ließe:\n%s", stdout)
-	}
-	if content, _ := os.ReadFile(agents); string(content) != eigen {
-		t.Error("--check hat AGENTS.md verändert")
-	}
-}
-
-// Der Lauf zieht das Projekt nach — AGENTS.md auf die neue Vorlage, Prosa
+// Der Lauf zieht das Projekt nach — der Anstoß kommt an AGENTS.md, Prosa
 // bleibt, CLAUDE.md ist die Include-Datei —, und der zweite Lauf hat nichts zu
 // tun. Einen Pull gibt es nicht mehr, auch keine Zeile dazu.
 func TestUpgradeZiehtProjektNach(t *testing.T) {
@@ -249,7 +200,7 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 	})
 	for _, erwartet := range []string{
 		"Programm-Stand: nichts zu tun",
-		"veraltete Anstoß in AGENTS.md wurde auf k-playbook briefing gebracht",
+		"der Anstoß steht jetzt in AGENTS.md",
 		"Verlinkung eingerichtet",
 		// Ohne Anbindung des Testprojekts: der README-Schritt nur als Hinweis.
 		"Projekt: README unter keph:/docs/: nicht versucht, Kephalaion ist für dieses Projekt nicht bereit",
@@ -267,8 +218,8 @@ func TestUpgradeZiehtProjektNach(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(content), "\n    k-playbook briefing\n") ||
-		strings.Contains(string(content), "k-playbook context") ||
-		!strings.HasSuffix(string(content), "Was du sonst brauchst, erreichst du über die Verweise darin.\n\nDiese Zeilen gehören dem Projekt und stehen ohne Überschrift dahinter.\n") {
+		!strings.HasPrefix(string(content), alteAgentsVorlage+"\n<!-- k-playbook:anstoss -->\n") ||
+		!strings.HasSuffix(string(content), "Was du sonst brauchst, erreichst du über die Verweise darin.\n") {
 		t.Errorf("AGENTS.md nach dem Lauf:\n%s", content)
 	}
 	claude, err := os.ReadFile(filepath.Join(root, project.ClaudeInstructionsFile))
@@ -303,8 +254,7 @@ func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 	setOwnVersion(t, "v0.16.8")
 
 	stub := filepath.Join(t.TempDir(), "k-playbook-neu")
-	// Das neue Programm repariert die MCP-Einträge im Projektschritt selbst:
-	// kein --repair-mcp.
+	// Das neue Programm bekommt genau upgrade --project-only.
 	script := "#!/bin/sh\n" +
 		"[ \"$1\" = upgrade ] && [ \"$2\" = --project-only ] && [ $# = 2 ] || exit 7\n" +
 		"printf 'Projekt: nachgezogen vom Stub.\\n'\n" +
@@ -341,27 +291,6 @@ func TestUpgradeFuehrtProjektschrittMitNeuemProgrammAus(t *testing.T) {
 	}
 }
 
-// --repair-mcp war der Schalter des Re-Exec und gilt nur mit --project-only.
-// Dort wird er weiter angenommen — ein Binary von vor Task 149 startet das neu
-// installierte Programm noch so —, entscheidet aber nichts mehr: Der
-// Projektschritt läuft mit und ohne ihn gleich.
-func TestUpgradeRepairMCPNurMitProjectOnly(t *testing.T) {
-	upgradeProjectDir(t, "v0.16.8")
-	err := runUpgrade([]string{"--repair-mcp"})
-	if err == nil || !strings.Contains(err.Error(), "--project-only") {
-		t.Errorf("erwartet eine Ablehnung von --repair-mcp ohne --project-only, bekommen: %v", err)
-	}
-
-	stdout := captureStdout(t, func() {
-		if err := runUpgrade([]string{"--project-only", "--repair-mcp"}); err != nil {
-			t.Errorf("upgrade --project-only --repair-mcp: %v", err)
-		}
-	})
-	if !strings.Contains(stdout, "Verlinkung eingerichtet") || strings.Contains(stdout, "Programm") {
-		t.Errorf("--project-only --repair-mcp zieht das Projekt nicht nach oder fasst das Programm an:\n%s", stdout)
-	}
-}
-
 // Scheitert Download oder Install, bleibt das eine eigene Meldung mit dem Weg
 // im Terminal; Schritt (2) läuft trotzdem, mit dem laufenden Programm.
 func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
@@ -383,7 +312,7 @@ func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
 		// Der Ausweg ist die Erstinstallation: upgrade selbst ist gescheitert.
 		"Nachholen im Terminal: " + project.FirstInstallCommand,
 		"Geladen: https://example.invalid/k-playbook",
-		"veraltete Anstoß in AGENTS.md wurde auf k-playbook briefing gebracht",
+		"der Anstoß steht jetzt in AGENTS.md",
 	} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
@@ -391,9 +320,6 @@ func TestUpgradeInstallfehlerIstEigeneMeldung(t *testing.T) {
 	}
 	if strings.Contains(stdout, "neu starten") {
 		t.Errorf("ohne Binärwechsel kein Neustart-Hinweis:\n%s", stdout)
-	}
-	if strings.Contains(stdout, "make -C "+project.PlaybookDirName+" install") {
-		t.Errorf("die Meldung nennt noch bin/install des Clones:\n%s", stdout)
 	}
 }
 
@@ -485,7 +411,7 @@ func TestUpgradeJSON(t *testing.T) {
 			t.Errorf("upgrade --check --json: %v", err)
 		}
 	})
-	for _, erwartet := range []string{`"schemaVersion": "3"`, `"check": true`, `"hasOutdatedAnstoss": true`, `"messages": [`} {
+	for _, erwartet := range []string{`"schemaVersion": "4"`, `"check": true`, `"hasMarker": false`, `"messages": [`} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
 		}
@@ -794,19 +720,9 @@ func TestUpgradeProjectOnlyFasstKephalaionNichtAn(t *testing.T) {
 	}
 }
 
-// removeClone nimmt dem Projekt das Verzeichnis k-playbook/ — Binary-only.
-func removeClone(t *testing.T, root string) {
-	t.Helper()
-	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Ohne Clone geht der Schritt Kephalaion trotzdem über --auto, wenn
-// kephalaion da ist.
-func TestUpgradeOhneCloneRuftAuto(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.16.8")
-	removeClone(t, root)
+// Der Schritt Kephalaion geht über --auto, wenn kephalaion da ist.
+func TestUpgradeRuftAuto(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
 	setOwnVersion(t, "v0.16.8")
 	fake := fakeKephalaionUpgrade(t)
 	fake.SetAuto(t, kephtest.JSON(t, program.KephalaionAuto{Outcome: "current", From: "v0.4.1", To: "v0.4.1"}), "", 0)
@@ -822,13 +738,11 @@ func TestUpgradeOhneCloneRuftAuto(t *testing.T) {
 	}
 }
 
-// Ohne Clone und ohne kephalaion läuft der Schritt Kephalaion trotzdem: ein
-// Lauf installiert es über das install.sh von Kephalaion, und --check meldet
+// Ohne kephalaion läuft der Schritt Kephalaion trotzdem: ein Lauf installiert es über das install.sh von Kephalaion, und --check meldet
 // das, statt nur auf die Installation von Hand zu verweisen. --check
 // installiert nicht.
-func TestUpgradeOhneCloneInstalliertKephalaion(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.16.8")
-	removeClone(t, root)
+func TestUpgradeInstalliertKephalaion(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
 	setOwnVersion(t, "v0.16.8")
 	installs := 0
 	stubKephalaion(t, kephalaionFehlt, func(context.Context) (program.KephalaionResult, error) {
@@ -869,7 +783,7 @@ func TestUpgradeOhneCloneInstalliertKephalaion(t *testing.T) {
 		"  Installiert: /home/u/.local/bin/kephalaion",
 		"Programm-Stand: nichts zu tun",
 	)
-	for _, gone := range []string{"installiert dieser Lauf es nicht", "bin/install-kephalaion", "Installation fehlt", "der Pull entfällt"} {
+	for _, gone := range []string{"installiert dieser Lauf es nicht", "Installation fehlt", "der Pull entfällt"} {
 		if strings.Contains(messages, gone) {
 			t.Errorf("die Meldung nennt noch %q:\n%s", gone, messages)
 		}
@@ -877,11 +791,10 @@ func TestUpgradeOhneCloneInstalliertKephalaion(t *testing.T) {
 }
 
 // Derselbe Weg mit dem echten program.InstallKephalaion gegen eine
-// Ersatzquelle: ohne Clone lädt der Lauf das Ersatz-install.sh und findet
+// Ersatzquelle: der Lauf lädt das Ersatz-install.sh und findet
 // kephalaion danach im eigenen HOME. Kein Test lädt das echte install.sh.
-func TestUpgradeOhneCloneLaedtInstallSkriptVonKephalaion(t *testing.T) {
-	root := upgradeProjectDir(t, "v0.16.8")
-	removeClone(t, root)
+func TestUpgradeLaedtInstallSkriptVonKephalaion(t *testing.T) {
+	upgradeProjectDir(t, "v0.16.8")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
 	source := releasetest.Serve(t)
@@ -923,15 +836,6 @@ const (
 	kUpgradeHinweis  = "Neue Version geholt: die Umstellungen, die eine Beurteilung brauchen, zieht /k-upgrade nach"
 	kUpgradeVorschau = "Ein Lauf holt Neues; bringt er eine neue Version, zieht danach /k-upgrade"
 )
-
-// withClone gibt dem Verzeichnis k-playbook/ ein .git-Verzeichnis: ein alter
-// Clone, wie ihn frühere Versionen nachgezogen haben.
-func withClone(t *testing.T, root string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func lastLine(text string) string {
 	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
@@ -1057,73 +961,6 @@ func TestUpgradeCheckVorschauAufKUpgrade(t *testing.T) {
 			}
 			if strings.Contains(stdout, kUpgradeHinweis) || strings.Contains(stdout, "neuere Version") {
 				t.Errorf("--check gibt den Hinweis eines Laufs aus:\n%s", stdout)
-			}
-		})
-	}
-}
-
-// Task 156: upgrade, upgrade --check und --json nennen keinen Clone mehr —
-// weder mit einem alten Clone im Projekt noch ohne Verzeichnis k-playbook/.
-// Kein Pull, kein Schreibschutz, keine Meldung „Installation fehlt“; ein alter
-// Clone bleibt unberührt liegen, sein Löschen ist Sache von /k-upgrade.
-//
-// Der Testname trägt das Wort bewusst nicht: Er steht im Pfad des
-// Testverzeichnisses, und den nennt die JSON-Antwort.
-func TestUpgradeNenntDasPlaybookVerzeichnisNicht(t *testing.T) {
-	for _, fall := range []struct {
-		name  string
-		clone bool
-	}{
-		{"mit altem Verzeichnis samt .git", true},
-		{"ohne Verzeichnis", false},
-	} {
-		t.Run(fall.name, func(t *testing.T) {
-			t.Setenv(viaCommandEnv, "")
-			root := upgradeProjectDir(t, "v0.16.8")
-			setOwnVersion(t, "v0.16.8")
-			playbook := filepath.Join(root, project.PlaybookDirName)
-			if fall.clone {
-				withClone(t, root)
-			} else {
-				removeClone(t, root)
-			}
-
-			outputs := map[string]string{
-				"--check":        runUpgradeText(t, "--check"),
-				"--check --json": runUpgradeText(t, "--check", "--json"),
-				"Lauf":           runUpgradeText(t),
-				"--json":         runUpgradeText(t, "--json"),
-			}
-			for name, output := range outputs {
-				if !strings.Contains(output, "Programm-Stand: nichts zu tun — laufend v0.16.8, neuestes Release v0.16.8") {
-					t.Errorf("%s: die Zeile zum Programm-Stand fehlt:\n%s", name, output)
-				}
-				for _, gone := range []string{
-					"Clone", "Pull", "pull", "Installation fehlt", "Installation:", "die Installation",
-					" " + project.PlaybookDirName + "/", "Remote",
-					`"update"`, `"pulled"`, `"pullOutput"`, `"remoteSwitched"`,
-				} {
-					if strings.Contains(output, gone) {
-						t.Errorf("%s nennt noch %q:\n%s", name, gone, output)
-					}
-				}
-			}
-
-			info, err := os.Stat(playbook)
-			if !fall.clone {
-				if err == nil {
-					t.Errorf("%s/ wurde angelegt", project.PlaybookDirName)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("der alte Clone ist weg: %v", err)
-			}
-			if info.Mode().Perm()&0o200 == 0 {
-				t.Errorf("der alte Clone ist schreibgeschützt: %v", info.Mode().Perm())
-			}
-			if content, err := os.ReadFile(filepath.Join(playbook, "VERSION")); err != nil || string(content) != "v0.0.1\n" {
-				t.Errorf("VERSION im alten Clone: %q, %v", content, err)
 			}
 		})
 	}

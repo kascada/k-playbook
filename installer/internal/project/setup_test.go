@@ -737,33 +737,3 @@ func TestZeile2SetztKatalogLinksTrotzdem(t *testing.T) {
 		t.Errorf("Detailtext nennt die falsche Ursache: %s", status.Detail)
 	}
 }
-
-// Das Einrichten zieht die alte Vorlage mit dem Wrapper-Anstoß auf die neue
-// und meldet den ersetzten Anstoß. Der zweite Lauf meldet nichts mehr.
-func TestEinrichtenZiehtAlteVorlageNach(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, RootInstructionsFile),
-		veralteterAnstoss+"\n## Unsere Regeln\n\nBleiben.\n")
-
-	setup, err := ApplyAssistantSetup(root)
-	if err != nil {
-		t.Fatalf("ApplyAssistantSetup: %v", err)
-	}
-	if !setup.RootRefreshed {
-		t.Errorf("der ersetzte Anstoß wird nicht gemeldet: %+v", setup)
-	}
-	if setup.Root.NeedsRefresh() || setup.Root.Hint != "" {
-		t.Errorf("nach dem Lauf ist noch etwas nachzuziehen: %+v", setup.Root)
-	}
-	if content := readFile(t, filepath.Join(root, RootInstructionsFile)); content != rootInstructionsTemplate()+"\n## Unsere Regeln\n\nBleiben.\n" {
-		t.Errorf("AGENTS.md nach dem Lauf:\n%q", content)
-	}
-
-	again, err := ApplyAssistantSetup(root)
-	if err != nil {
-		t.Fatalf("zweiter Lauf: %v", err)
-	}
-	if again.RootRefreshed {
-		t.Errorf("der zweite Lauf meldet eine Änderung: %+v", again)
-	}
-}

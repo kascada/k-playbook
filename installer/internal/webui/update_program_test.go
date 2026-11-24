@@ -41,8 +41,7 @@ func versionScript(version string) string {
 	return "#!/bin/sh\nif [ \"$1\" = version ]; then echo " + version + "; exit 0; fi\nexit 1\n"
 }
 
-// updateProject baut ein Projekt — nur die Konfiguration, kein Verzeichnis
-// k-playbook/ — und stellt eine Ersatzquelle hin, die latest als neuesten
+// updateProject baut ein Projekt — nur die Konfiguration — und stellt eine Ersatzquelle hin, die latest als neuesten
 // Release-Tag nennt, ohne Assets; wer eines braucht, legt es mit
 // releasetest.Serve selbst an.
 func updateProject(t *testing.T, latest string) string {
@@ -52,37 +51,6 @@ func updateProject(t *testing.T, latest string) string {
 	projectDir := t.TempDir()
 	writeFile(t, project.ConfigPath(projectDir), "schema_version: 3\n")
 	return projectDir
-}
-
-// oldClone legt im Projekt ein Verzeichnis k-playbook/ an, wie ein alter Clone
-// es hinterlässt: mit .git und einer Datei. Zurück kommt die Datei.
-func oldClone(t *testing.T, projectDir string) string {
-	t.Helper()
-
-	dir := filepath.Join(projectDir, project.PlaybookDirName)
-	writeFile(t, filepath.Join(dir, ".git", "HEAD"), "ref: refs/heads/main\n")
-	file := filepath.Join(dir, "VERSION")
-	writeFile(t, file, "v0.0.1\n")
-	return file
-}
-
-// assertCloneUntouched prüft, dass die Datei des alten Clones unverändert und
-// beschreibbar daliegt: kein Pull, kein Schreibschutz.
-func assertCloneUntouched(t *testing.T, file string) {
-	t.Helper()
-
-	if got := readFile(t, file); got != "v0.0.1\n" {
-		t.Errorf("%s wurde verändert: %q", file, got)
-	}
-	for _, path := range []string{file, filepath.Dir(file)} {
-		info, err := os.Stat(path)
-		if err != nil {
-			t.Fatalf("%s lesen: %v", path, err)
-		}
-		if info.Mode().Perm()&0o200 == 0 {
-			t.Errorf("%s ist schreibgeschützt: %v", path, info.Mode().Perm())
-		}
-	}
 }
 
 func getUpdate(t *testing.T, state *serverState) updateResponse {
@@ -159,39 +127,6 @@ func TestUpdatePruefungOhneVersionUndOhneTag(t *testing.T) {
 	if code != http.StatusConflict || !strings.Contains(post.Message, "Der neueste Release-Tag ist unbekannt") {
 		t.Errorf("Knopf bei unbekanntem Tag: Status %d, Meldung %q", code, post.Message)
 	}
-}
-
-// Die Prüfung kennt keinen Clone mehr (Task 156): Liegt ein altes Verzeichnis
-// k-playbook/ im Projekt, liest sie es nicht, und die Antwort trägt weder
-// dessen Stand noch eine Meldung dazu — nur den Programmvergleich.
-func TestUpdatePruefungNenntKeinenClone(t *testing.T) {
-	target := isolateHome(t)
-	writeExecutable(t, target, versionScript("v0.9.3"))
-	projectDir := updateProject(t, "v0.9.4")
-	file := oldClone(t, projectDir)
-	chdir(t, projectDir)
-
-	recorder := httptest.NewRecorder()
-	state := &serverState{version: "v0.9.3"}
-	state.updateCheckHandler(recorder, httptest.NewRequest(http.MethodGet, "/api/update", nil))
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(recorder.Body.Bytes(), &fields); err != nil {
-		t.Fatalf("Antwort lesen: %v\n%s", err, recorder.Body.String())
-	}
-	for _, gone := range []string{"available", "branch", "local", "remote", "output"} {
-		if _, ok := fields[gone]; ok {
-			t.Errorf("die Antwort trägt noch %q: %s", gone, recorder.Body.String())
-		}
-	}
-
-	response := getUpdate(t, state)
-	if response.Message != "" {
-		t.Errorf("Meldung = %q, erwartet keine", response.Message)
-	}
-	if !response.Program.Outdated || !response.Program.Installable || response.Program.Latest != "v0.9.4" {
-		t.Errorf("Program = %+v", response.Program)
-	}
-	assertCloneUntouched(t, file)
 }
 
 // Zeigt `k-playbook` im PATH auf ein anderes Programm oder auf keins, gibt es

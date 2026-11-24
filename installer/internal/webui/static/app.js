@@ -150,7 +150,7 @@ async function loadConfig() {
   }
 }
 
-// Liegt eine Konfiguration aus einem abgelösten Modell vor, schreibt derselbe
+// Liegt eine Konfiguration mit alter schema_version vor, schreibt derselbe
 // Knopf über einen anderen Endpunkt: `POST /api/config` geht nie über eine
 // vorhandene Datei, und diese Grenze soll auch hier sichtbar bleiben.
 let configOutdated = false;
@@ -264,26 +264,16 @@ function renderConfig(data) {
   setBlockState(elements.configPill, elements.configCreate, "todo", CONFIG_LABELS);
 }
 
-// Die vorhandene Datei beschreibt ein abgelöstes Modell. Der Block erklärt,
-// was sie beschreibt und was mit ihr geschieht — beides braucht es, weil hier
+// Die vorhandene Datei trägt eine alte oder keine schema_version; das Projekt
+// ist neu einzurichten. Der Block sagt, was mit der Datei geschieht, weil hier
 // als Einziges in der Oberfläche etwas Vorhandenes ersetzt wird.
 function renderOutdatedConfig(data) {
   addFact(elements.configFacts, "Gefundene Datei", data.configPath || "");
   addFact(
     elements.configFacts,
     "schema_version",
-    data.schemaVersion ? `${data.schemaVersion} — ${data.legacyModel || "abgelöst"}` : "fehlt",
+    data.schemaVersion ? `${data.schemaVersion} — bitte neu einrichten` : "fehlt — bitte neu einrichten",
   );
-
-  const legacy = data.legacyContent || [];
-  if (legacy.length > 0) {
-    // Das Sichern geht vor: k-playbook/ ist der Ort des früheren Clones, den
-    // /k-upgrade löscht, und was dort liegt, wäre danach weg.
-    addFact(elements.configFacts, "Zuerst außerhalb von k-playbook/ sichern", legacy.join(", "));
-    setBlockState(elements.configPill, elements.configCreate, "blocked", RESET_LABELS);
-    elements.configPill.textContent = "Veraltet";
-    return;
-  }
 
   addFact(elements.configFacts, "Die alte Datei", "wird daneben gesichert, nicht gelöscht");
   setBlockState(elements.configPill, elements.configCreate, "todo", RESET_LABELS);
@@ -292,8 +282,7 @@ function renderOutdatedConfig(data) {
 
 // Der umgekehrte Fall: die Datei ist neuer als das Werkzeug. Zurücksetzen wäre
 // hier genau falsch — es würde die neuere Konfiguration wegwerfen. Was hilft,
-// ist k-playbook upgrade; einen Clone, in dem ein git pull etwas holte, gibt es
-// dafür nicht mehr (Task 154).
+// ist k-playbook upgrade.
 function renderNewerConfig(data) {
   elements.configCard.classList.remove("hidden");
   elements.configForm.classList.add("hidden");
@@ -359,17 +348,11 @@ async function applyAssistant() {
   }
 }
 
-// Der Zustand der Wurzeldatei in einem Halbsatz. Ein Anstoß mit abgelöstem
-// Aufruf ist kein Fehler — „Einrichten“ zieht ihn nach —, gehört aber sichtbar
-// daneben; was sich nicht von selbst nachziehen lässt, sagt der Hinweis.
+// Der Zustand der Wurzeldatei in einem Halbsatz.
 function describeRootInstructions(root) {
   if (!root.present) return "nicht vorhanden";
   if (!root.hasMarker) return "vorhanden, Anstoß fehlt";
-  let detail = root.hasOutdatedAnstoss
-    ? "enthält den Anstoß; nachzuziehen: Anstoß veraltet"
-    : "enthält den Anstoß";
-  if (root.hint) detail += ` — ${root.hint}`;
-  return detail;
+  return "enthält den Anstoß";
 }
 
 function renderAssistant(data) {
@@ -412,7 +395,6 @@ const MCP_STATE_LABELS = {
   "no-command": "kein installiertes k-playbook gefunden",
   "missing-file": "Datei nicht vorhanden",
   "missing-entry": "Eintrag fehlt",
-  outdated: "zeigt auf den abgelösten Wrapper",
   stale: "zeigt woandershin",
   unreadable: "kein lesbares JSON, bleibt unangetastet",
   "ambiguous-target": "zwei Konfigurationen, nur opencode.json wird gepflegt",
@@ -462,8 +444,7 @@ function renderMCP(data) {
   elements.mcpWorkdir.classList.toggle("warn", Boolean(data.workdirMismatch));
 
   // Ohne Projektkonfiguration gibt es nichts einzurichten, der Button bleibt
-  // grau. Den früheren Clone k-playbook/ braucht der Server seit Task 154
-  // nicht mehr.
+  // grau.
   const environment = data.environment || {};
   const usable = Boolean(environment.installed);
   const state = !usable ? "blocked" : data.ok ? "ok" : "todo";

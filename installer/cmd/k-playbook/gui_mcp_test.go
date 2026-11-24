@@ -10,11 +10,10 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
-// Die Startmeldung hängt an der geschriebenen Form: in einer erfassten Datei
-// steht nach der Korrektur der bloße Name, und die Meldung nennt ihn samt
-// Dock/Finder-Hinweis. In einer nicht erfassten Datei bleibt der absolute Pfad,
-// und der Hinweis fehlt.
-func TestStartmeldungNenntDiePortableForm(t *testing.T) {
+// Der Start ergänzt einen fehlenden Eintrag nur in einer nicht erfassten
+// Datei und meldet ihn samt dem Hinweis, dass die Datei einen
+// rechnerbezogenen Pfad trägt. In einer erfassten Datei schreibt er nichts.
+func TestStartErgaenztNurNichtErfassteDatei(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("kein git im Pfad")
 	}
@@ -36,8 +35,8 @@ func TestStartmeldungNenntDiePortableForm(t *testing.T) {
 			runRepairTestGit(t, root, "config", "user.name", "Test")
 			writeRepairTestFile(t, project.ConfigPath(root),
 				"schema_version: "+project.SchemaVersion+"\n\nproject:\n  repo_root: .\n  vcs: git\n", 0o644)
-			writeRepairTestFile(t, filepath.Join(root, ".mcp.json"),
-				`{"mcpServers":{"`+project.MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n", 0o644)
+			before := `{"mcpServers":{}}` + "\n"
+			writeRepairTestFile(t, filepath.Join(root, ".mcp.json"), before, 0o644)
 			if tracked {
 				runRepairTestGit(t, root, "add", ".mcp.json")
 				runRepairTestGit(t, root, "commit", "-qm", "Registrierung")
@@ -46,16 +45,23 @@ func TestStartmeldungNenntDiePortableForm(t *testing.T) {
 
 			out := captureStdout(t, repairMCPRegistration)
 
-			want := installed
-			if tracked {
-				want = project.InstalledCommandName
+			written := strings.Contains(out, "MCP-Registrierung eingetragen: .mcp.json\n")
+			if written == tracked {
+				t.Errorf("eingetragen = %v bei erfasst = %v:\n%s", written, tracked, out)
 			}
-			if !strings.Contains(out, "Veraltete MCP-Registrierung korrigiert: .mcp.json -> "+want+"\n") {
-				t.Errorf("Korrekturzeile fehlt oder nennt eine andere Form:\n%s", out)
+			hint := strings.Contains(out, "rechnerbezogenen Pfad")
+			if hint == tracked {
+				t.Errorf("Hinweis auf den rechnerbezogenen Pfad = %v bei erfasst = %v:\n%s", hint, tracked, out)
 			}
-			hint := strings.Contains(out, "bloße Name") && strings.Contains(out, "Dock oder Finder")
-			if hint != tracked {
-				t.Errorf("Hinweis auf die portable Form = %v, erwartet %v:\n%s", hint, tracked, out)
+			content, err := os.ReadFile(filepath.Join(root, ".mcp.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tracked && string(content) != before {
+				t.Errorf("die erfasste Datei wurde verändert:\n%s", content)
+			}
+			if !tracked && !strings.Contains(string(content), installed) {
+				t.Errorf("der absolute Pfad fehlt in der ergänzten Datei:\n%s", content)
 			}
 		})
 	}

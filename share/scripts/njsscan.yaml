@@ -5,14 +5,9 @@
 # libsast vergleicht ignore-paths als reinen Teilstring gegen den Pfad
 # (scanner.py: `any(pp in path.as_posix() for pp in self.ignore_paths)`) — ohne
 # Anker. Deshalb nennt die Job-Zeile in scanners.tsv als Ziel `.` und nicht
-# {target}: bei absolutem Ziel träfe `k-playbook/` in einem Projekt, das selbst
-# so heißt, den kompletten Pfad, und der Job fände überhaupt nichts mehr. Genau
-# die Falle, die dort für gitleaks beschrieben ist.
-ignore-paths:
-  # Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem früheren Modell
-  # (/k-upgrade löscht ihn). Sein ausgeliefertes JavaScript unter
-  # installer/internal/webui/static/ ist kein Code des Projekts.
-  - k-playbook/
+# {target}: bei absolutem Ziel träfe ein Muster auch Teile des Pfads über der
+# Projektwurzel. Zurzeit nimmt die Datei nichts aus.
+ignore-paths: []
 
 # node_modules, bower_components und .git stehen bewusst nicht hier: njsscan
 # führt sie in seinen eigenen Voreinstellungen (settings.py, IGNORE_PATHS).

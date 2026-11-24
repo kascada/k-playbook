@@ -30,10 +30,23 @@ type assistantResponse struct {
 // Was das Einrichten nicht auflösen kann, bleibt liegen und steht weiter in der
 // Karte. Der Knopf bleibt deshalb: er tut mehr als die Heilung — er ordnet auch
 // das Paar CLAUDE.md/AGENTS.md ein und legt den Anstoß an.
+//
+// Geheilt wird unter derselben Bedingung wie im Briefing
+// (project.BriefingProjectState, dort BuildBriefingFrom): nur bei lesbarer
+// Konfiguration in akzeptierter Fassung mit zulässigem project.languages. Ein
+// Werkzeug, das die Fassung nicht versteht, soll die Registrierung nicht nach
+// seinen Regeln umschreiben — vorher tat die Karte genau das, während das
+// Briefing desselben Projekts nichts anfasste. Gelesen wird der Zustand
+// trotzdem; die Meldung nennt, warum nichts nachgezogen wurde.
 func assistantHandler(w http.ResponseWriter, r *http.Request) {
 	environment := project.Detect()
 	if !environment.Installed {
 		writeJSON(w, http.StatusOK, assistantState(""))
+		return
+	}
+
+	if state := project.BriefingProjectState(environment.ProjectDir); !state.Available {
+		writeJSON(w, http.StatusOK, assistantState("Die Verlinkung wird nicht nachgezogen: "+state.Message))
 		return
 	}
 
@@ -118,16 +131,6 @@ func describeSetup(setup project.AssistantSetup) string {
 	case setup.RootExtended:
 		parts = append(parts, "Der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
 	}
-	if setup.RootRefreshed {
-		parts = append(parts, "Der veraltete Anstoß in "+project.RootInstructionsFile+
-			" wurde auf den aktuellen Aufruf gebracht ("+project.InstalledCommandName+" briefing).")
-	}
-	if len(setup.ConfigBlocksRemoved) > 0 {
-		parts = append(parts, project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
-	}
-	// Ein Anstoß, der sich nicht abgrenzen ließ (Root.Hint), steht nicht hier:
-	// er kommt als Fehler aus ApplyAssistantSetup und damit ohnehin in den
-	// Text; beim Lesen der Karte zeigt ihn der Zustand der Wurzeldatei.
 	if note := project.DescribeSetupReadmes(setup.Readmes); note != "" {
 		parts = append(parts, note)
 	}

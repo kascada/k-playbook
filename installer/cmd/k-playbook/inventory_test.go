@@ -104,15 +104,15 @@ func TestPrintInventoryNenntNichtDurchsuchteBereiche(t *testing.T) {
 	printInventory(&out, inventory.Options{ProjectDir: "/projekt"},
 		inventory.Result{
 			Exclusions: []inventory.Exclusion{
-				{Pattern: "k-playbook/**", Origin: "installation", Reason: "Clone des Werkzeugs", Skipped: 3},
+				{Pattern: "werkzeug/**", Origin: "configured", Reason: "Werkzeug ausgenommen", Skipped: 3},
 				{Pattern: "tests/fixtures/**", Origin: "configured", Reason: "ausgenommen", Skipped: 0},
 			},
 		},
 		inventory.Outcome{Path: inventory.DocRef, At: "2026-09-05T12:00:00Z"})
 
 	text := out.String()
-	for _, want := range []string{"Nicht durchsuchte Quellen:    3", "k-playbook/**",
-		"installation", "Clone des Werkzeugs"} {
+	for _, want := range []string{"Nicht durchsuchte Quellen:    3", "werkzeug/**",
+		"configured", "Werkzeug ausgenommen"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("%q fehlt im Bericht:\n%s", want, text)
 		}

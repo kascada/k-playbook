@@ -42,9 +42,10 @@ func docsOrderGeneratedDir(producer string) string {
 }
 
 // DocsOrderWait ist die Wartezeit eines rohen Auftrags für code: Der
-// Verarbeiter nimmt ihn erst, wenn seine letzte Änderung so lange
-// zurückliegt. Der Wert steht nur hier (Task 179); gerechnet wird mit der
-// Uhr des Programms, nicht mit context.now.timestamp.
+// Verarbeiter nimmt ihn erst, wenn seine letzte Änderung — ohne lesbare
+// Änderung das Anlegen (docsRawOrderAge) — so lange zurückliegt. Der Wert
+// steht nur hier (Task 179); gerechnet wird mit der Uhr des Programms, nicht
+// mit dem Zeitstempel des Briefings.
 const DocsOrderWait = 2 * time.Hour
 
 // Die Zustände eines Laufs von /k-docs-code.
@@ -362,9 +363,21 @@ func docsOrderStamp(stamps ...*kephalaion.Stamp) string {
 	return ""
 }
 
-// docsOrderAge rechnet, wie lange ein Zeitpunkt zurückliegt — die letzte
-// Änderung oder, als Rückfall, das Anlegen. ok ist false, wenn kein Zeitpunkt
-// vorliegt oder er sich nicht lesen lässt.
+// docsRawOrderAge ist das Alter eines rohen Auftrags, an dem die Wartezeit
+// (DocsOrderWait) gemessen wird: Maßgeblich ist die letzte Änderung; fehlt
+// sie oder ist sie nicht lesbar, der Anlegezeitpunkt. ok ist false, wenn
+// keiner von beiden vorliegt — „kein Zeitpunkt“. Orders und der Wartewächter
+// von Split rechnen beide hiermit, damit ein Auftrag nicht hier als wartend
+// gelistet und dort als reif zerlegt wird. entstanden im Kopf zählt nicht.
+func docsRawOrderAge(order DocsOrder, at time.Time) (time.Duration, bool) {
+	if age, ok := docsOrderAge(order.Updated, at); ok {
+		return age, true
+	}
+	return docsOrderAge(order.Created, at)
+}
+
+// docsOrderAge rechnet, wie lange ein Zeitpunkt zurückliegt. ok ist false,
+// wenn kein Zeitpunkt vorliegt oder er sich nicht lesen lässt.
 func docsOrderAge(stamp string, at time.Time) (time.Duration, bool) {
 	if strings.TrimSpace(stamp) == "" {
 		return 0, false
@@ -396,14 +409,10 @@ func (o *DocsOrders) Orders(ctx context.Context, producer string) (DocsOrdersRes
 			continue
 		}
 		if producer == DocsOrderCode && order.Kind == DocsOrderKindRaw {
-			// Maßgeblich ist die letzte Änderung; fehlt sie oder ist sie nicht
-			// lesbar, der Anlegezeitpunkt. Ohne beide ist der Auftrag reif —
+			// Ohne lesbaren Zeitpunkt (docsRawOrderAge) ist der Auftrag reif —
 			// er darf nie dauerhaft warten — und steht unter problems, damit
-			// der Rückfall sichtbar ist. entstanden im Kopf zählt nicht.
-			age, ok := docsOrderAge(order.Updated, at)
-			if !ok {
-				age, ok = docsOrderAge(order.Created, at)
-			}
+			// der Rückfall sichtbar ist.
+			age, ok := docsRawOrderAge(order, at)
 			switch {
 			case !ok:
 				result.Problems = append(result.Problems, order.Ref+

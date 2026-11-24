@@ -24,10 +24,8 @@ Beispiele:
 
 Regeln:
 
-- **`k-playbook:` liest du nur über k-playbook**, nie selbst aus `k-playbook/` — einem
-  liegengebliebenen Clone aus dem früheren Modell, falls das Projekt noch einen hat; das
-  Programm liest ihn nicht mehr. k-playbook entscheidet, ob eine lokale Fassung die
-  mitgelieferte ersetzt oder abschaltet. Wer selbst nachsieht, kann die falsche Fassung
+- **`k-playbook:` liest du nur über k-playbook**, nie selbst von der Platte. k-playbook
+  entscheidet, ob eine lokale Fassung die mitgelieferte ersetzt oder abschaltet. Wer selbst nachsieht, kann die falsche Fassung
   erwischen.
 - **Ein Verweis, der auf `/` endet, meint ein Verzeichnis.** Zusammengebaut wird nur
   `k-playbook:/instructions/always/`: Du bekommst alle Dateien darin als einen Text, in der

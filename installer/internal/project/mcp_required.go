@@ -17,9 +17,12 @@ func ValidMCPServerName(name string) bool {
 	return mcpServerNamePattern.MatchString(name)
 }
 
-// MCPRequirements ist der MCP-Teil der Kontextausgabe: die Pflichtliste aus
-// tools.mcp.required und ob der Block dastand. Objektform statt bloßer Liste,
-// damit weitere MCP-Angaben Platz finden, ohne das Feld umzubenennen.
+// MCPRequirements ist der MCP-Teil des Kontexts, den BuildContext für die
+// Oberfläche baut (Context.MCP): die Pflichtliste aus tools.mcp.required und
+// ob der Block dastand. Das Kommando context, das ihn früher ausgab, ist
+// entfernt; der Teilabruf environment des Briefings trägt ihn nicht.
+// Objektform statt bloßer Liste, damit weitere MCP-Angaben Platz finden, ohne
+// das Feld umzubenennen.
 type MCPRequirements struct {
 	Required   []string `json:"required"`
 	Configured bool     `json:"configured"`

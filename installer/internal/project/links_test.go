@@ -114,8 +114,8 @@ func TestApplyLinksIstIdempotent(t *testing.T) {
 	}
 }
 
-// Fassungen bis 0.4 haben das ganze Verzeichnis verlinkt. Damit käme nur eine
-// Quelle an; der Link muss weichen.
+// Ein Symlink auf das ganze Verzeichnis ließe nur eine Quelle ankommen; der
+// Link muss weichen.
 func TestApplyLinksErsetztVerzeichnisSymlink(t *testing.T) {
 	root := newProject(t)
 
@@ -123,7 +123,7 @@ func TestApplyLinksErsetztVerzeichnisSymlink(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		t.Fatalf("Verzeichnis anlegen: %v", err)
 	}
-	if err := os.Symlink(filepath.Join("..", PlaybookDirName, "commands"), target); err != nil {
+	if err := os.Symlink(filepath.Join("..", "anderswo", "commands"), target); err != nil {
 		t.Fatalf("Symlink anlegen: %v", err)
 	}
 
@@ -443,7 +443,7 @@ func TestHealLinksMigriertSymlinkZurIncludeDatei(t *testing.T) {
 	if status.State != StateStale {
 		t.Fatalf("State = %q, erwartet %q", status.State, StateStale)
 	}
-	if !strings.Contains(status.Detail, "älteren Fassung") || !strings.Contains(status.Detail, ClaudeIncludeLine) {
+	if !strings.Contains(status.Detail, "Symlink auf") || !strings.Contains(status.Detail, ClaudeIncludeLine) {
 		t.Errorf("Detailtext benennt die Migration nicht: %s", status.Detail)
 	}
 	if !status.Fixable() {
@@ -835,41 +835,6 @@ func TestApplyLinksRaeumtEintragAmNeuenOrtAb(t *testing.T) {
 		if _, err := os.Lstat(filepath.Join(root, rel)); err == nil {
 			t.Errorf("%s steht noch", rel)
 		}
-	}
-}
-
-// Beide früheren Stubfassungen werden durch den neuen Stub ersetzt; anderer
-// Inhalt neben dem Include bleibt stehen.
-func TestApplyLinksErsetztAlteStubs(t *testing.T) {
-	legacy := legacyClaudeIncludeStubs()
-	if len(legacy) != 2 {
-		t.Fatalf("%d alte Stubs, erwartet 2", len(legacy))
-	}
-	for i, old := range legacy {
-		root := newProject(t)
-		writeFile(t, filepath.Join(root, "AGENTS.md"), "# Projektregeln\n")
-		writeFile(t, filepath.Join(root, "CLAUDE.md"), old)
-		if _, err := ApplyLinks(root); err != nil {
-			t.Fatalf("Fassung %d: ApplyLinks: %v", i, err)
-		}
-		if got := readFile(t, filepath.Join(root, "CLAUDE.md")); got != claudeIncludeStub() {
-			t.Errorf("Fassung %d: CLAUDE.md = %q, erwartet den neuen Stub", i, got)
-		}
-	}
-	if !strings.Contains(legacy[1], "erreicht OpenCode und Cursor nicht.") ||
-		!strings.Contains(legacy[0], "erreicht OpenCode nicht.") {
-		t.Errorf("alte Stubs nicht wörtlich: %q", legacy)
-	}
-
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, "AGENTS.md"), "# Projektregeln\n")
-	fremd := legacy[0] + "\nEigene Notiz.\n"
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), fremd)
-	if _, err := ApplyLinks(root); err != nil {
-		t.Fatalf("ApplyLinks: %v", err)
-	}
-	if got := readFile(t, filepath.Join(root, "CLAUDE.md")); got != fremd {
-		t.Errorf("fremder Inhalt wurde verändert: %q", got)
 	}
 }
 

@@ -59,15 +59,16 @@ type Link struct {
 //
 // CLAUDE.md ist eine Include-Datei mit der Import-Zeile @AGENTS.md, weil Claude
 // Code ausschließlich CLAUDE.md liest und OpenCode AGENTS.md bevorzugt.
-// Früher war es ein Symlink: der hielt beide Dateien zwangsläufig
-// gleich, brach aber bei jedem Editor, der beim Speichern atomar ersetzt, und
-// die Prüfung meldete danach „echte Datei statt Symlink". Der Import kennt
-// diesen Fall nicht. Sein Preis: zwei Dateien, die auseinanderlaufen können —
+// Ein Symlink hielte beide Dateien zwangsläufig gleich, bräche aber bei jedem
+// Editor, der beim Speichern atomar ersetzt. Der Import kennt diesen Fall
+// nicht. Sein Preis: zwei Dateien, die auseinanderlaufen können —
 // was Claude Code über /memory oder # nach CLAUDE.md schreibt, erreicht die
 // anderen Assistenten nicht, und die Prüfung deckt das als StateOK zu. Das ist
 // bewusst in Kauf genommen; die Gegenrichtung hieße, jeden Projektinhalt neben
-// dem Include zum Konflikt zu erklären. Als Gegengewicht sagt der erzeugte Stub
-// über der Import-Zeile, dass Projektregeln nach AGENTS.md gehören.
+// dem Include zum Konflikt zu erklären. Der erzeugte Stub ist nur die
+// Import-Zeile (claudeIncludeStub) und trägt keinen Hinweis; das Gegengewicht
+// ist die Regel in den immer geltenden Anweisungen, dass weder CLAUDE.md noch
+// AGENTS.md Projektregeln tragen.
 //
 // Die Richtung ist überall dieselbe. Bringt ein Projekt nur eine echte
 // CLAUDE.md mit, wird sie beim Einrichten nach AGENTS.md umbenannt statt
@@ -103,9 +104,9 @@ const (
 	StateOK LinkState = "ok"
 	// StateMissing: nichts vorhanden.
 	StateMissing LinkState = "missing"
-	// StateStale: vorhanden, aber in einer Bauform, die nicht mehr gilt und
-	// verlustfrei ersetzt wird — der Symlink CLAUDE.md -> AGENTS.md aus einer
-	// älteren Fassung, der zur Include-Datei wird, oder der Verzeichnis-Symlink
+	// StateStale: vorhanden, aber in einer Bauform, die nicht gilt und
+	// verlustfrei ersetzt wird — der Symlink CLAUDE.md -> AGENTS.md, der zur
+	// Include-Datei wird, oder der Verzeichnis-Symlink
 	// eines Katalog-Links, der zu Einzel-Links wird. Kein eigener Zustand für
 	// die Migration: er zöge Fixable(), NeedsAction(), Briefing und
 	// Oberfläche mit, für den Gewinn eines Textes. Die Fallunterscheidung
@@ -323,7 +324,7 @@ func checkIncludeFile(projectRoot string, link Link) LinkStatus {
 		status.Detail = err.Error()
 
 	case info.Mode()&os.ModeSymlink != 0:
-		// Ein Symlink ist die ältere Bauform. Zeigt er auf AGENTS.md, ist das
+		// Ein Symlink gilt nicht als Include. Zeigt er auf AGENTS.md, ist das
 		// die Migration; alles andere ist ein Rest — ein Fremdlink mit
 		// vorhandenem Ziel wäre oben als Konflikt herausgefallen.
 		status.State = StateStale
@@ -332,7 +333,7 @@ func checkIncludeFile(projectRoot string, link Link) LinkStatus {
 		case err != nil:
 			status.Detail = "Symlink mit unlesbarem Ziel, wird durch die Include-Datei ersetzt"
 		case destination == relativeSource(target, source):
-			status.Detail = "Symlink auf " + link.Source + " aus einer älteren Fassung, wird durch eine Include-Datei mit " +
+			status.Detail = "Symlink auf " + link.Source + ", wird durch eine Include-Datei mit " +
 				ClaudeIncludeLine + " ersetzt"
 		default:
 			status.Detail = "toter Symlink auf " + destination + ", wird durch die Include-Datei ersetzt"
@@ -435,10 +436,10 @@ func checkRegistryLink(projectRoot string, link Link) LinkStatus {
 		return status
 
 	case info.Mode()&os.ModeSymlink != 0:
-		// Fassungen bis 0.4 haben das ganze Verzeichnis verlinkt. Damit gilt
-		// immer nur eine Quelle; projekteigene Einträge kämen nie an.
+		// Ein Symlink auf das ganze Verzeichnis ließe immer nur eine Quelle
+		// gelten; projekteigene Einträge kämen nie an.
 		status.State = StateStale
-		status.Detail = "Verzeichnis-Symlink aus einer älteren Fassung, wird durch Einzel-Links ersetzt"
+		status.Detail = "Verzeichnis-Symlink, wird durch Einzel-Links ersetzt"
 		return status
 
 	case !info.IsDir():
@@ -533,11 +534,9 @@ func staleRegistryLinks(projectRoot string, target string, wanted []RegistryEntr
 	return stale
 }
 
-// ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link, in die
-// projekteigenen Quellen .k-playbook/commands/ und .k-playbook/skills/ oder in
-// den früheren Clone k-playbook/ zeigen — also die, die von uns stammen. Der
-// Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere
-// erkannt und umgesetzt werden statt als Projektinhalt liegen zu bleiben.
+// ownedLinks sammelt rekursiv die Symlinks, die in den Umweg-Link oder in die
+// projekteigenen Quellen .k-playbook/commands/ und .k-playbook/skills/ zeigen —
+// also die, die von uns stammen.
 func ownedLinks(projectRoot string, dir string, prefix string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -548,7 +547,6 @@ func ownedLinks(projectRoot string, dir string, prefix string) []string {
 		ShareLink(projectRoot),
 		ProjectAssetDir(projectRoot, KindCommands),
 		ProjectAssetDir(projectRoot, KindSkills),
-		PlaybookDir(projectRoot),
 	}
 	names := []string{}
 
@@ -660,7 +658,8 @@ func (r LinkRepair) Quiet() bool {
 //
 // Der Aufruf gehört auf den Lesepfad, nicht nur hinter einen Knopf: Gerufen
 // wird er vom Briefing (BuildBriefingFrom) am Anfang jeder Sitzung und von der
-// Assistenten-Karte der Oberfläche (GET /api/assistant). Welche
+// Assistenten-Karte der Oberfläche (GET /api/assistant) — von beiden nur bei
+// lesbarer, akzeptierter Konfiguration (BriefingProjectState). Welche
 // Links gelten, hängt am Projekt — an seinem Katalog aus mitgelieferten und
 // projekteigenen Einträgen —, nicht am Weg, auf dem das Programm zu seinem
 // Stand kam: ein Update über die Oberfläche, `k-playbook upgrade`, eine
@@ -675,8 +674,8 @@ func (r LinkRepair) Quiet() bool {
 // Anwenden, das jedes Mal dieselben Links neu schriebe.
 //
 // Ein Symlink CLAUDE.md -> AGENTS.md ist StateStale und damit Fixable(): der
-// Lesepfad ersetzt ihn durch die Include-Datei, jedes Briefing in einem
-// Bestandsprojekt migriert also von selbst. Weil das eine versionierte
+// Lesepfad ersetzt ihn durch die Include-Datei, jedes Briefing migriert also
+// von selbst. Weil das eine versionierte
 // Datei im Hauptverzeichnis ändert, steht es als IncludeMigrated im Ergebnis.
 // Scheitert das Schreiben — etwa an einem nicht beschreibbaren
 // Projektverzeichnis —, landet der Grund in Error, und gelesen wird trotzdem.
@@ -732,8 +731,8 @@ func openIssues(statuses []LinkStatus) []LinkIssue {
 
 // applyIncludeFile schreibt die Include-Datei. Eine echte Datei wird nie
 // überschrieben: mit wirksamem Include ist sie eingerichtet, ohne ist sie der
-// Konflikt aus der Fallmatrix. Ein alter Symlink weicht vorher — der Inhalt
-// steht in AGENTS.md, das Ersetzen ist verlustfrei.
+// Konflikt aus der Fallmatrix. Ein Symlink weicht vorher — der Inhalt steht
+// in AGENTS.md, das Ersetzen ist verlustfrei.
 //
 // Kein Include ins Leere: fehlt AGENTS.md, wird nichts geschrieben. Im
 // Einrichten-Pfad kommt das nicht vor, dort legt ApplyAssistantSetup die Datei
@@ -761,20 +760,13 @@ func applyIncludeFile(projectRoot string, link Link) error {
 		return fmt.Errorf("%s prüfen: %w", link.Path, err)
 
 	case info.Mode()&os.ModeSymlink != 0:
-		// Migration von der älteren Bauform, oder ein Rest-Link ins Leere.
+		// Ein Symlink auf AGENTS.md, oder ein Rest-Link ins Leere.
 		if err := os.Remove(target); err != nil {
 			return fmt.Errorf("%s ersetzen: %w", link.Path, err)
 		}
 
-	case info.Mode().IsRegular():
-		// Nur ein bekannter alter Stub wird ersetzt; jeder andere Inhalt
-		// bleibt unberührt.
-		data, rerr := os.ReadFile(target)
-		if rerr != nil || !isLegacyClaudeIncludeStub(string(data)) {
-			return nil
-		}
-
 	default:
+		// Eine echte Datei bleibt unberührt.
 		return nil
 	}
 
@@ -837,7 +829,7 @@ func applyRegistryLink(projectRoot string, link Link) error {
 }
 
 // prepareRegistryDir sorgt dafür, dass am Ziel ein echtes Verzeichnis steht.
-// Der Verzeichnis-Symlink älterer Fassungen weicht dabei.
+// Ein Verzeichnis-Symlink weicht dabei.
 func prepareRegistryDir(target string, displayPath string) error {
 	info, err := os.Lstat(target)
 	switch {

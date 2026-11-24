@@ -52,9 +52,7 @@ weiterblättern). Daraus, ohne ein Dokument einzeln zu lesen:
   `generated.by`.
 - Das Inventar `docs/generated/versions/inventory.md`: `generated.at` und die Zahlen aus
   `generated.stats` (`entries`, `deviations`, `sources-read`, `sources-configured`,
-  `rejected`). Ein Inventar im alten Kopf trägt sie noch unter `inventory.*`; dann gilt
-  das, und Schritt 3 meldet den alten Kopf. Der Stand kommt nur aus dem Kopf, nie aus dem
-  Rumpf.
+  `rejected`). Der Stand kommt nur aus dem Kopf, nie aus dem Rumpf.
 - Dokumente unter `docs/` außerhalb der Bereiche der Tabelle: unsortiert.
 
 Dazu der Stand der `README.md` gegen ihre Vorlagen: `k_playbook_docs_readme` mit

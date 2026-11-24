@@ -16,15 +16,6 @@ type AssistantSetup struct {
 	RootCreated bool `json:"rootCreated,omitempty"`
 	// RootExtended: der Anstoß wurde einer vorhandenen Datei angehängt.
 	RootExtended bool `json:"rootExtended,omitempty"`
-	// RootRefreshed: der Anstoßblock trug einen abgelösten Aufruf und wurde
-	// durch die aktuelle Fassung ersetzt. Das ist eine Änderung an einer
-	// Projektdatei und gehört deshalb in die Antwort, nicht nur ins Log.
-	RootRefreshed bool `json:"rootRefreshed,omitempty"`
-	// ConfigBlocksRemoved nennt die abgelösten Blöcke, die aus K-PLAYBOOK.yaml
-	// entfernt wurden — heute nur LegacyGHBlockName (Task 128). Wie bei
-	// RootRefreshed ist das eine Änderung an einer Projektdatei und steht
-	// deshalb in der Antwort, nicht nur im Log.
-	ConfigBlocksRemoved []string `json:"configBlocksRemoved,omitempty"`
 	// Maintenance ist das Ergänzen des Blocks maintenance: (Task 161): was
 	// fehlte und mit den Vorgaben (Sicherung aus) ergänzt wurde, oder warum
 	// nichts ergänzt wurde. Auch das ist eine Änderung an einer Projektdatei.
@@ -39,8 +30,7 @@ type AssistantSetup struct {
 
 // ApplyAssistantSetup richtet einen Assistenten vollständig ein: Einordnen und
 // Auflösen der Instruktionsdateien, dann der Anstoß, dann die Verlinkung,
-// dann das Entfernen abgelöster Blöcke aus K-PLAYBOOK.yaml und das Ergänzen
-// des Blocks maintenance:.
+// dann das Ergänzen des Blocks maintenance:.
 //
 // Die Reihenfolge steckt bewusst hier und nicht in ApplyLinks. Im
 // Einrichten-Pfad läuft ApplyLinks nach ApplyRootInstructions — dann hätte die
@@ -71,7 +61,6 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	// os.ReadFile nur in den Fehlerzweig; die Einordnung kennt den Fall bereits.
 	if result.runInstructions {
 		before := CheckRootInstructions(projectDir)
-		outdatedBefore := before.HasMarker && before.HasOutdatedAnstoss
 		root, err := applyRootInstructions(projectDir, result.MayCreate)
 		if err != nil {
 			errs = append(errs, err)
@@ -79,7 +68,6 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 		setup.Root = root
 		setup.RootCreated = !before.Present && root.Present
 		setup.RootExtended = before.Present && !before.HasMarker && root.HasMarker
-		setup.RootRefreshed = outdatedBefore && !root.HasOutdatedAnstoss
 	} else {
 		setup.Root = CheckRootInstructions(projectDir)
 	}
@@ -90,21 +78,10 @@ func ApplyAssistantSetup(projectDir string) (AssistantSetup, error) {
 	}
 	setup.Links = statuses
 
-	// Der alte Block tools.gh fällt ohne Rückfrage und ohne Schritt in
-	// /k-upgrade: Gelesen wird er nicht mehr, und er entscheidet nichts. Das
-	// geschieht nur hier im Schreibweg des Einrichtens, nicht in Discover —
-	// Kontext, Briefing und MCP lesen nur.
-	removed, err := RemoveLegacyGHBlock(projectDir)
-	if err != nil {
-		errs = append(errs, err)
-	}
-	if removed {
-		setup.ConfigBlocksRemoved = append(setup.ConfigBlocksRemoved, LegacyGHBlockName)
-	}
-
 	// Der Block maintenance: wird ergänzt, nie überschrieben: Fehlende Felder
 	// kommen mit den Vorgaben dazu (Sicherung aus), vorhandene Werte und
-	// fremde Inhalte bleiben. Wie das Entfernen oben nur im Schreibweg.
+	// fremde Inhalte bleiben. Das geschieht nur im Schreibweg des Einrichtens,
+	// nicht in Discover — Kontext, Briefing und MCP lesen nur.
 	maintenance, err := EnsureMaintenanceBlock(projectDir)
 	if err != nil {
 		errs = append(errs, err)

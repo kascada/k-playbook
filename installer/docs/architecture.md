@@ -19,8 +19,7 @@ dieses Programm.
 Das Werkzeug ist ein eigenständiges Go-Modul unter `installer/`. Ausgeliefert wird es
 als ein Binary je Plattform; im Betrieb liegt es unter `~/.local/bin/k-playbook` und wird
 unter dem bloßen Namen `k-playbook` aufgerufen. Einen Einstiegspunkt im Projekt gibt es
-nicht mehr, und auch keinen Clone des Werkzeugs dort — `bin/install` ist der Bootstrap,
-nicht der Aufruf.
+nicht — `bin/install` ist der Bootstrap, nicht der Aufruf.
 
 ## Acht Einstiege
 
@@ -33,8 +32,8 @@ es gibt nur diese Übersicht aus. Das frühere Subkommando `context` ist mit Tas
 (removed): Ein Aufruf endet mit einem Satz auf stderr, der `k-playbook briefing` und für die
 Umgebungsangaben `k-playbook briefing --part environment` nennt, und Exit-Code 1
 (`errContextRemoved` in `cmd/k-playbook/main.go`), ohne Hilfe und ohne Wirt-Pflege. Kein
-stilles „unbekanntes Kommando“: Eine Sitzung in einem Projekt mit altem Anstoß in `AGENTS.md`
-ruft es noch, bevor Einrichten, Oberfläche oder `upgrade` den Anstoß ersetzt haben.
+stilles „unbekanntes Kommando“: Wer `context` aufruft, liest in einem Satz, was an seine Stelle
+tritt.
 
 ```go
 if len(args) == 0 {
@@ -65,24 +64,18 @@ und Installation aus dem Release“) und — nur wenn das laufende Programm ält
 Tags. Ein Build über dem neuesten Tag (`make dev-install VERSION=…`) gilt als aktuell, und
 herabgestuft wird nie. Ohne eigene Version wird der Tag nicht abgerufen; ist er unbekannt — ohne Netz,
 ohne git, Zeitüberschreitung —, sagt die Meldung das, und das Projekt wird trotzdem
-nachgezogen. Einen Pull gibt es nicht mehr (Task 156): Der Pull, die Prüfung des
-Remote-Stands und der Schreibschutz sind entfallen, ein Verzeichnis `k-playbook/` im Projekt fasst der Lauf
-nicht an und nennt es nicht — weder mit `upgrade` noch mit `--check` oder `--json`. Einen
-alten Clone löscht /k-upgrade (Umstellung 3.8).
+nachgezogen.
 
 Der Projektschritt: `ApplyAssistantSetup()`, dann immer die MCP-Einträge:
 `project.RepairMCPReport()` mit der
-Schreibregel des Starts (`MCPWriteOutdatedAndUnversioned`), auch unter `--project-only`.
-Ein Lauf ersetzt einen veralteten Eintrag und ergänzt auch einen fehlenden Eintrag bzw. eine
-fehlende Datei, wenn die
-Zieldatei nicht von git erfasst ist. Hat die Installation das Binary ersetzt, führt
+Schreibregel des Starts (`MCPWriteUnversioned`), auch unter `--project-only`.
+Ein Lauf ergänzt einen fehlenden Eintrag bzw. eine fehlende Datei, wenn die
+Zieldatei nicht von git erfasst ist; ein vorhandener Eintrag bleibt. Hat die Installation das Binary ersetzt, führt
 nicht der noch laufende alte Prozess den Projektschritt aus — er hätte alte Vorlagen und
 alte Erkennung —, sondern er startet das neu installierte Programm mit
 `upgrade --project-only` als Subprozess (`reexecProjectStep()`); im Klartext gehen dessen
 Zeilen direkt durch, mit `--json` wird seine Antwort als `project` eingebettet, so wie sie
-kam. Den Schalter `--repair-mcp` nimmt `--project-only` weiter an, er entscheidet aber
-nichts mehr: Ein Binary von vor Task 149 gab damit mit, dass sein Pull entfiel, und startet
-das neu installierte Programm noch so.
+kam.
 
 Je Schritt eine Meldung, ohne Netz eine klare Meldung statt eines
 Abbruchs, ein gescheiterter Download oder Install eine eigene — mit der Erstinstallation
@@ -121,7 +114,7 @@ verwaiste Datei wird dabei entfernt.
 aktuellen Verzeichnis an. Mit `mcp` der Server für einen
 Assistenten, mit `scan` die Ausführung eines Review-Laufs, mit `merge` seine
 Zusammenfassung, mit `inventory` die Erhebung des Versionsinventars — und diese wie `stop`
-**ohne** `cleanUpLegacy()` und die Migrationsbereinigung: deren Meldungen gehen nach stdout
+**ohne** die Wirt-Pflege (`careForHost()`): deren Meldungen gehen nach stdout
 und würden die Ausgabe stören. Bei `mcp` wiegt das schwerer als bei `briefing`: dort trägt
 stdout einen JSON-RPC-Strom, der über die ganze Sitzung offen bleibt, und eine einzige
 fremde Zeile macht ihn unbrauchbar. Bei `scan`, `merge` und `inventory` zählt ein anderer
@@ -154,11 +147,9 @@ Quellen — Manifeste, Lockfiles, Container-, DevContainer-, Helm- und CI-Dateie
 unterhalb der Projektwurzel, dazu die im Frontmatter der Quellenkonfiguration
 `keph:/k-playbook/inventory.md` konfigurierten (Task 144; `inventory.Run` liest sie über
 denselben Store, über den es schreibt) —, fragt kein Netz und führt
-kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei ein Verzeichnis
-`<projekt>/k-playbook/` — Altbestand: ein liegengebliebener Clone des Werkzeugs aus dem
-früheren Modell, dessen Manifeste nichts über das Projekt sagen — und die Muster aus
-`exclude:` der Quellenkonfiguration; beide Ausschlüsse
-stehen mit der Zahl der übergangenen Quellen im Inventar, und ein Eintrag in `sources:`
+kein gefundenes Werkzeug aus. Nicht durchsucht werden dabei die Muster aus
+`exclude:` der Quellenkonfiguration; jeder Ausschluss
+steht mit der Zahl der übergangenen Quellen im Inventar, und ein Eintrag in `sources:`
 holt jede Quelle daraus wieder herein. Eine Quelle, die gelesen, aber als Ganzes nicht
 ausgewertet werden konnte — eigener Parse-Fehler, fehlendes Wurzelpaket einer
 `package-lock.json`, fehlendes oder ausgeschlossenes Manifest eines Lockfiles —, steht als
@@ -480,8 +471,6 @@ installer/
 │   ├── guard.go                 Marke K_PLAYBOOK_NO_VSCODE_INSTALL im Testlauf setzen,
 │   │                            damit kein Test das echte VS Code anfasst
 │   └── vsix/                    die eingecheckte VSIX, gebaut mit `make vscode-vsix`
-├── internal/legacy/
-│   └── global.go                host-globale Registrierung des alten Modells entfernen
 ├── internal/sharedir/
 │   ├── sharedir.go              share/ (eigenes Modul, go:embed) nach
 │   │                            ~/.local/share/k-playbook/ entpacken, Prüfsumme statt Version
@@ -508,7 +497,6 @@ installer/
 │   ├── context.go               Arbeitsstand auflösen: Pfade, Kataloge, Instruktionen
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    gh-Befund dieses Rechners, Zeilenhelfer für verschachtelte Blöcke
-│   ├── gh_legacy.go             alten Block tools.gh beim Einrichten entfernen (Task 128)
 │   ├── kephalaion.go            KephalaionStatus: die Prüfung für Briefing und Oberfläche,
 │   │                            ProjectBinding (Hub, Collection aus K-PLAYBOOK.yaml)
 │   ├── kephalaion_block.go      Block kephalaion: zeilenweise lesen und schreiben
@@ -576,8 +564,7 @@ installer/
 │   │                            Variable
 │   ├── health_anchor.go         Quelle anchor der Umgebungsprüfung: warnt, wenn der
 │   │                            Anker .k-playbook/K-PLAYBOOK.yaml im Worktree weder
-│   │                            versioniert noch ignoriert ist oder K-PLAYBOOK.yaml
-│   │                            am früheren Ort noch im Index steht (Task 106)
+│   │                            versioniert noch ignoriert ist (Task 106)
 │   ├── todos.go                 Todos als Dokumente unter todos/ der Collection
 │   │                            (Task 097): List/Add/Update/Delete/Search über TodoStore
 │   ├── todo_doc.go              Dokumentformat eines Todos: Frontmatter, Rumpf = Text
@@ -778,25 +765,17 @@ Der zentrale Mechanismus, in `project/discover.go`:
 1. Ab `startDir` aufwärts, ein Kandidat je Ebene: `<dir>/.k-playbook/K-PLAYBOOK.yaml`
    (`ConfigPath`).
 2. Fund: `ProjectDir = <dir>`. Einen zweiten Pfad für eine Installation im Projekt gibt
-   es nicht mehr (Task 157); `PlaybookDir(<dir>)` nennt nur noch den Ort eines früheren
-   Clones, für den Code, der Altbestand erkennt.
+   es nicht (Task 157).
 3. Grenze sind `$HOME` und `/`, jeweils einschließlich.
 4. Nichts gefunden: `ErrNotFound`. Nicht raten, nichts anlegen.
 
 Der Anker ist die **Datei**, nicht das Verzeichnis `.k-playbook/`: Die Link-Pflege
-(`sharelink.go`) legt das Verzeichnis auch ohne Konfiguration an, und ein liegengebliebener
-Clone `<projekt>/k-playbook/` kann es aus einem älteren Stand des Quell-Repos tragen. Am
-Verzeichnis allein fände `Discover` ein Projekt, wo keines ist.
+(`sharelink.go`) legt das Verzeichnis auch ohne Konfiguration an. Am Verzeichnis allein
+fände `Discover` ein Projekt, wo keines ist.
 
-**Umzug vom früheren Ort.** Bis 2026-11 lag der Anker als `<dir>/K-PLAYBOOK.yaml` direkt
-im Hauptverzeichnis (`legacyConfigPath`). `Discover` ruft vor der Prüfung jeder Ebene
-`migrateConfig`: Liegt am neuen Ort schon eine Datei, wird die alte gelöscht (bei einem
-Symlink nur der Link); sonst wird sie verschoben (bei einem Symlink die Datei, auf die er
-zeigt, und der Link entfernt). `CreateConfig` zieht ebenso um, bevor es anlegt. Es gibt
-keine Phase, in der beide Orte gelesen werden — ein Release genügt, und ein älteres
-Programm findet ein umgezogenes Projekt nicht mehr; jede Umgebung des Projekts braucht dann
-das neue. Die Quelle `anchor` der Umgebungsprüfung meldet, wenn der Umzug im Index noch
-nicht nachvollzogen ist (siehe „Umgebungsprüfung: `health`“).
+Eine `K-PLAYBOOK.yaml` direkt im Hauptverzeichnis ist kein Anker: `Discover` liest sie
+nicht, verschiebt sie nicht und meldet sie nicht; das Projekt gilt dann als nicht
+eingerichtet.
 
 **Die Suche darf nicht am Git-Worktree-Root abbrechen.** Das Repository des Projekts kann
 unterhalb des Hauptverzeichnisses liegen (`project.repo_root`) und ist dann ein eigener
@@ -813,8 +792,7 @@ Für das Entwicklungsrepo heißt das: der Anker ist `<repo>/.k-playbook/K-PLAYBO
 Arbeitsstand im Repo und die installierte Fassung: das Binary unter `~/.local/bin`, was
 es nach `~/.local/share/k-playbook/` entpackt, und die Texte auf dem Hub. Dass beide
 auseinanderlaufen können, wird bewusst in Kauf genommen; gearbeitet wird am Repo-Stand,
-aufgelöst wird gegen die installierte Fassung. Bis Task 156 war die installierte Fassung
-ein eigener Clone unter `<repo>/k-playbook/`.
+aufgelöst wird gegen die installierte Fassung.
 
 ## Ort vorschlagen, wenn nichts gefunden wurde
 
@@ -826,10 +804,9 @@ erst nach Bestätigung. Kandidaten in dieser Reihenfolge:
    in aller Regel in dem Projekt, das er meint. Der stärkste Hinweis.
 2. Das Arbeitsverzeichnis.
 
-Ein früherer Ansatz leitete das Hauptverzeichnis allein aus dem Binary-Pfad ab und
-prüfte, ob das Zwischenverzeichnis `k-playbook` heißt. Das ging im Entwicklungsrepo
-schief: dort heißt das Hauptverzeichnis selbst so, und der Vorschlag landete eine Ebene
-zu hoch.
+Aus dem Binary-Pfad allein lässt sich das Hauptverzeichnis nicht ableiten: im
+Entwicklungsrepo heißt das Hauptverzeichnis selbst `k-playbook`, und ein Vorschlag über
+den Namen eines Zwischenverzeichnisses landete eine Ebene zu hoch.
 
 `suggestRepoRoot()` beantwortet eine andere Frage — nicht wo das Hauptverzeichnis `A`
 liegt, sondern was in `project.repo_root` gehört:
@@ -840,10 +817,9 @@ liegt, sondern was in `project.repo_root` gehört:
 | `A/G/.git`, `A` selbst ohne `.git` | `A` | `G` |
 | mehrere Kandidaten unter `A` | `A` | leer, der Nutzer wählt |
 
-Ein Unterverzeichnis `k-playbook` zählt dabei nie als Kandidat: Ein liegengebliebener Clone
-des Werkzeugs aus dem früheren Modell hat ein `.git` und wäre sonst das „Repository“ des
-Projekts. Der Kommentar, den `renderConfig()` in jede neue `K-PLAYBOOK.yaml` schreibt, nennt
-keine Installation im Projekt mehr (Task 157).
+Verzeichnisse mit führendem Punkt zählen nicht als Kandidat. Der Kommentar, den
+`renderConfig()` in jede neue `K-PLAYBOOK.yaml` schreibt, nennt keine Installation im
+Projekt (Task 157).
 
 ## Config lesen ohne YAML-Parser
 
@@ -856,23 +832,19 @@ Werkzeug nicht kennt.
 
 `CreateConfig()` schreibt nie über eine vorhandene Datei. `schema_version` ist `3`.
 
-`SchemaState()` ordnet die gefundene Fassung ein — `ok`, `missing`, `outdated`, `newer`.
-Die Oberfläche braucht den Fall und nicht nur den Fehlertext von `CheckSchema()`: nur
-bei `outdated`/`missing` steht das Zurücksetzen zur Wahl. Bei `newer` wäre es genau
+`SchemaState()` ordnet die gefundene Fassung ein — `ok`, `missing`, `outdated` (eine
+kleinere Zahl), `newer` (eine größere oder keine Zahl). Eine ältere Fassung wird nicht
+erkannt oder umgerechnet; `CheckSchema()` meldet „bitte neu einrichten“. Die Oberfläche
+braucht den Fall und nicht nur den Fehlertext: nur bei `outdated`/`missing` steht das
+Zurücksetzen zur Wahl. Bei `newer` wäre es genau
 falsch, dort ist die Installation hinterher; Meldung und Seite nennen dann
 `k-playbook upgrade`.
 
 `ResetConfig()` in `project/reset.go` ist der einzige Weg, der eine vorhandene
-Konfiguration ersetzt. Der Ablauf: Fassung prüfen, `LegacyContent()` prüfen, alte Datei
+Konfiguration ersetzt — das Neueinrichten. Der Ablauf: Fassung prüfen, alte Datei
 umbenennen, `CreateConfig()`. Scheitert der letzte Schritt, wird die Sicherung
 zurückbenannt — sonst stünde das Projekt ohne Konfiguration da, und die Oberfläche böte
 das Anlegen an, als wäre nie eine dagewesen.
-
-`LegacyContent()` sucht Projektinhalte im Installationsverzeichnis, weil Modell 1 sie
-dort ablegte und dieses Verzeichnis heute ersetzbar ist. Zwei Wege, weil keiner allein
-reicht: der `paths.`-Block der alten Datei nennt die Orte genau, und der Zustand des
-Verzeichnisses fängt den Rest ab — ohne `.git` gehört alles darin dem Projekt, mit
-`.git` ist es das Untracked. Gemeldet wird die Vereinigung; verschoben wird nichts.
 
 ## Die Review-Wege pausieren
 
@@ -892,8 +864,8 @@ neue Ablage steht.
 Die Sperre hat eine Quelle: `review.Paused()` in `review/paused.go` mit `PausedCode` und
 `PausedMessage`. Die Subkommandos fragen dort als Erstes nach; die fünf MCP-Werkzeuge sind
 in `addReviewTools()` über `pausedReviewTool()` angemeldet, das vor dem Handler antwortet —
-vor jeder Prüfung der Eingabe und vor dem Auflösen des Projekts, damit auch kein Umzug des
-Ankers geschieht; sein Umschlag nennt nur das übergebene `projectDir`. Namen und Schema der
+vor jeder Prüfung der Eingabe und vor dem Auflösen des Projekts; sein Umschlag nennt nur
+das übergebene `projectDir`. Namen und Schema der
 Werkzeuge bleiben in der Werkzeugliste, ein offenes Statuswerkzeug gibt es nicht.
 `reviewsHandler()` in `webui/reviews.go` liest ebenfalls nichts und setzt `PausedMessage`
 ein. Der Review-Code darunter (`internal/review`, die Handler in `mcpserver/review.go`)
@@ -913,15 +885,14 @@ Der Umschlag der Review-Werkzeuge (`reviewProjectEnvelope`) trägt `inputDir`, `
 
 Wer die Sperre aufhebt, braucht zusätzlich zwei Dinge: den Ort und einen Ausschluss dieses
 Orts für die Scanner, damit sie Rohausgaben früherer Läufe nicht lesen. Heute schließt die
-Kandidatenzählung (`candidateExcluded` in `review/candidates.go`) über den Pfad nur
-`k-playbook` aus, die Modulsuche (`moduleSearchExcluded` in `review/modules.go`)
-`k-playbook`, `vendor`, `node_modules` und `testdata`.
+Kandidatenzählung (`candidateExcludedByName` in `review/candidates.go`) über den Namen nur
+`node_modules` und Punkt-Verzeichnisse aus, die Modulsuche (`moduleSearchExcluded` in
+`review/modules.go`) `vendor`, `node_modules` und `testdata`.
 
 ## Commands und Skills auflösen
 
-`project/registry.go` führt zusammen, was mitgeliefert wird — seit Stufe 2 von Punkt 20
-der Arbeitsliste aus `~/.local/share/k-playbook/`, nicht mehr aus dem Clone `k-playbook/`
-— und was das Projekt unter `.k-playbook/commands/` und `.k-playbook/skills/` dazulegt
+`project/registry.go` führt zusammen, was mitgeliefert wird — aus
+`~/.local/share/k-playbook/` — und was das Projekt unter `.k-playbook/commands/` und `.k-playbook/skills/` dazulegt
 (`ProjectAssetDir()`, versioniert neben der Konfiguration; das Einrichten legt beide nicht
 an). Es ist dieselbe Overlay-Regel wie bei
 reviews: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
@@ -975,16 +946,15 @@ Skills stehen nur einmal: OpenCode durchsucht neben `.opencode/skills/` auch
 
 `CLAUDE.md` ist eine erzeugte reguläre Datei, die `AGENTS.md` über die Import-Zeile
 `ClaudeIncludeLine` (`"@" + RootInstructionsFile`) einbindet, weil Claude Code
-ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt. Früher
-war es ein Symlink: der hielt beide Dateien zwangsläufig gleich, brach aber bei jedem
-Editor, der beim Speichern atomar ersetzt, und die Prüfung meldete danach `blocked` mit
-„echte Datei statt Symlink". Dieser Fall existiert nicht mehr. Der Preis: zwei Dateien,
+ausschließlich `CLAUDE.md` liest und OpenCode `AGENTS.md` bevorzugt. Ein Symlink hielte
+beide Dateien zwangsläufig gleich, bräche aber bei jedem Editor, der beim Speichern atomar
+ersetzt. Der Preis der Include-Datei: zwei Dateien,
 die auseinanderlaufen können — was Claude Code nach `CLAUDE.md` schreibt, erreicht die
 anderen nicht, und die Prüfung deckt das als `ok` zu. Das ist bewusst so; der Stub aus
 `claudeIncludeStub()` besteht nur aus der Import-Zeile; die Regel, dass weder `CLAUDE.md`
 noch `AGENTS.md` Projektregeln tragen, steht in `instructions/always/020-projektregeln-nicht-in-agents.md`
-und erreicht jede Sitzung über das Briefing. Die beiden früheren Stubfassungen mit Hinweistext
-ersetzt `ApplyLinks` durch den neuen Stub, wenn der Inhalt genau einer entspricht.
+und erreicht jede Sitzung über das Briefing. Eine vorhandene echte `CLAUDE.md` überschreibt
+`ApplyLinks` nie, auch nicht mit dem Stub.
 
 Geprüft wird am **Inhalt**, nicht an der Bauform: `hasEffectiveInclude()` sucht die
 Import-Zeile als eigenes Wort außerhalb eingezäunter Code-Blöcke und außerhalb von
@@ -1022,7 +992,10 @@ verbraucht davon eine.
 `HealLinks()` in `project/links.go` prüft, richtet ein, was sich einrichten lässt, und
 meldet als `LinkRepair`, was danach offen bleibt. Gerufen wird es von zwei Stellen, die
 beide **lesen** wollen: `assistantHandler()` (`GET /api/assistant`) und `BuildBriefingFrom()` —
-das Briefing, als Subkommando wie als MCP-Werkzeug, seit Task 187 mit eigenem Aufruf. Die
+das Briefing, als Subkommando wie als MCP-Werkzeug, seit Task 187 mit eigenem Aufruf.
+Beide heilen unter derselben Bedingung, `Project.Available` aus `briefingProject()` (für die
+Oberfläche `BriefingProjectState()`): lesbare Konfiguration in akzeptierter Fassung mit
+zulässigem `project.languages`; sonst liest die Karte nur und nennt den Grund. Die
 dritte, die Kontextausgabe des Subkommandos `context` und des MCP-Werkzeugs, ist mit Task 188
 entfernt (removed).
 
@@ -1043,8 +1016,8 @@ Zwei Eigenschaften halten das billig und harmlos:
 - **`blocked` und `conflict` lösen kein Anwenden aus.** Beide sind für `ApplyLinks()`
   unauflösbar und stehen stattdessen in `LinkRepair.Open`.
 
-Eine Ausnahme von „nur registrieren" ist die Migration von `CLAUDE.md`: ein Symlink auf
-`AGENTS.md` ist `stale` und damit `Fixable()`, der Lesepfad ersetzt ihn durch die
+Eine Ausnahme von „nur registrieren" ist ein Symlink `CLAUDE.md` auf `AGENTS.md`: er ist
+`stale` und damit `Fixable()`, der Lesepfad ersetzt ihn durch die
 Include-Datei — die eine Stelle, an der er eine versionierte Datei im Hauptverzeichnis
 ändert (git zeigt den Modewechsel `120000` → `100644`). `LinkRepair.IncludeMigrated`
 trägt das; `contextLinks()` und `describeRepair()` benennen es eigens, und der Hinweis auf
@@ -1168,8 +1141,8 @@ Reihe nach einrichtet.
   ersetzen; deshalb bleibt die Verlinkung im Projekt.
 
 Ein Verzeichnis-Symlink zeigt auf genau eine Quelle; damit käme entweder nur die
-Installation oder nur das Projekt an. Bis Fassung 0.4 war das so. `checkRegistryLink()`
-erkennt einen solchen Link und meldet ihn als `stale`; `ApplyLinks()` baut ihn um.
+Installation oder nur das Projekt an. `checkRegistryLink()` erkennt einen solchen Link und
+meldet ihn als `stale`; `ApplyLinks()` baut ihn um.
 
 ### Soll gegen Ist
 
@@ -1190,10 +1163,7 @@ das er nicht einlöst, ist schlechter als ein Hinweis.
 
 Die Gegenrichtung — `stale` — braucht ein Kriterium dafür, welche Links von uns stammen.
 `ownedLinks()` löst jeden Symlink auf und nimmt nur die, die nach `.k-playbook/share`,
-`.k-playbook/commands/`, `.k-playbook/skills/` oder in den früheren Clone `k-playbook/`
-zeigen. Der Clone steht dabei, damit die Links aus der Zeit vor Stufe 2 als unsere gelten:
-was noch im Katalog steht, ist `wrong` und wird umgesetzt, was nicht, ist `stale` und
-verschwindet. Alles andere im Verzeichnis gehört dem Projekt und wird weder bewertet noch
+`.k-playbook/commands/` oder `.k-playbook/skills/` zeigen. Alles andere im Verzeichnis gehört dem Projekt und wird weder bewertet noch
 angefasst.
 
 `ApplyLinks()` räumt erst die verwaisten Links weg und setzt dann die des Katalogs. Die
@@ -1207,7 +1177,7 @@ Zustände in `LinkState`:
 |---|---|
 | `ok` | alles steht so, wie es stehen soll |
 | `missing` | nichts vorhanden |
-| `stale` | eine ältere Bauform, die verlustfrei ersetzt wird: der Symlink `CLAUDE.md -> AGENTS.md`, der zur Include-Datei wird, oder der Verzeichnis-Symlink eines Katalog-Links, der zu Einzel-Links wird; die Oberfläche beschriftet ihn „alte Form, wird ersetzt" |
+| `stale` | eine Bauform, die nicht gilt und verlustfrei ersetzt wird: der Symlink `CLAUDE.md -> AGENTS.md`, der zur Include-Datei wird, oder der Verzeichnis-Symlink eines Katalog-Links, der zu Einzel-Links wird; die Oberfläche beschriftet ihn „alte Form, wird ersetzt" |
 | `incomplete` | das Verzeichnis steht, sein Inhalt weicht vom Katalog ab |
 | `blocked` | etwas Echtes steht im Weg; wird nicht angefasst |
 | `no-source` | es gibt nichts zu verlinken; an `CLAUDE.md` nennt der Detailtext, ob ein Stub schon ins Leere zeigt |
@@ -1217,8 +1187,7 @@ Zustände in `LinkState`:
 
 Seit Task 131 liest das Binary die mitgelieferte Ebene hinter `k-playbook:` — und damit die
 Texte im Briefing, `k-playbook read`, `k_playbook_doc_read` und den Katalog `reviews` — aus
-der öffentlichen Collection `<hub>:k-playbook` unter `defaults/`, nicht mehr
-aus dem Clone `<projekt>/k-playbook/`. Die Kette: Der Release packt `defaults/` und `VERSION`
+der öffentlichen Collection `<hub>:k-playbook` unter `defaults/`. Die Kette: Der Release packt `defaults/` und `VERSION`
 nach `k-playbook-defaults.tar.gz` (`.github/scripts/pack-defaults.sh`), der Hub holt das
 Archiv aus dem neuesten Release nach `<hub>:k-playbook/defaults/` (`fetch_release` in
 Kephalaion), der Node gleicht die Collection auf den Rechner ab. Darunter gilt derselbe Pfad
@@ -1242,8 +1211,8 @@ wie unter `k-playbook:` — `k-playbook:/guidelines/betrieb.md` ist
   `k-playbook:`-Verweis mit lokaler Datei scheitert. Die Umgebungsprüfung meldet eine nicht
   eingetragene Anbindung deshalb als `error`.
 - **Laufzeit.** Ein `read` am Node dauert einige Millisekunden, das Briefing liest einige
-  Dutzend Dokumente. Gemessen am 2026-11-08 im Quell-Repo: vorher (Clone von der Platte) im
-  Median rund 0,17–0,20 s, mit einer Sitzung je Dokument 0,55–0,77 s. Darum bündelt die
+  Dutzend Dokumente. Gemessen am 2026-11-08 im Quell-Repo: mit einer Sitzung je Dokument im
+  Median 0,55–0,77 s. Darum bündelt die
   Quelle: Der Store ist ein `kephalaion.ReaderPool` mit 8 Sitzungen, die erst bei Bedarf
   angemeldet werden; `List` liest die Dateien eines Verzeichnisses nebeneinander voraus (wer
   ein Verzeichnis listet, liest danach dessen Dateien); damals nahm auch der inzwischen
@@ -1253,13 +1222,11 @@ wie unter `k-playbook:` — `k-playbook:/guidelines/betrieb.md` ist
   Binary, die Texte vom Hub. Der Hub holt einen neuen Release nur beim Anlegen der
   Collection, von Hand oder auf Anfrage — ein neueres Binary kann also auf ältere Texte
   treffen (am 2026-11-08: Binary aus dem Arbeitsbaum nach v0.16.32, `defaults/VERSION` auf
-  dem Hub v0.16.31). Eine Versionsprüfung gibt es nicht; sie ist ein offener Punkt des
-  Vorhabens „Clone abschaffen“. Im Quell-Repo selbst gilt damit der veröffentlichte Stand vom
-  Hub, nicht der Arbeitsbaum `defaults/` — wie vorher mit dem Clone.
+  dem Hub v0.16.31). Eine Versionsprüfung gibt es nicht. Im Quell-Repo selbst gilt damit der
+  veröffentlichte Stand vom Hub, nicht der Arbeitsbaum `defaults/`.
 - **Tests** fragen den Node nicht: Das Paket `project` setzt in `TestMain` einen
   `kephtest.Store` ein, gefüllt beim Öffnen aus dem Baum, den ein Test in seinem
-  Testprojekt unter `test-defaults/` anlegt (`isolateDefaults`, `testDefaultsDir`; bis
-  Task 157 lag er unter `k-playbook/defaults/`); die anderen Pakete nehmen dafür
+  Testprojekt unter `test-defaults/` anlegt (`isolateDefaults`, `testDefaultsDir`); die anderen Pakete nehmen dafür
   `project/defaultstest` mit derselben Konstante `DefaultsDir`. Tests gegen den echten Lieferumfang füllen den Store aus dem
   `defaults/` des Repos (`kephtest.Defaults`).
 
@@ -1330,8 +1297,7 @@ Ebenen; zusammengebaut wird nur, was in `docAssembledDirs` steht, heute nur `alw
 `NewKephDefaultsSource` in `project/defaultsdocs.go`) — ebenso jede andere Sorte unter
 `k-playbook:`: `commands`, deren Text in `defaults/commands/` liegt, während die Hülle für den
 Assistenten aus dem Binary kommt (Task 092), die Include-Sorten `includes` und `testdata`
-(Task 093) und `reviews`, `guidelines`. Aus dem früheren Clone `k-playbook/` im Projekt
-liest keine Ebene mehr. Die Kopie oben im Repo samt Gleichstandstest ist seit 2026-10-17 weg.
+(Task 093) und `reviews`, `guidelines`. Von der Platte liest keine mitgelieferte Ebene.
 Regeln und Zugriffswege:
 [`../../defaults/docs/handbook/verweisschema.md`](../../defaults/docs/handbook/verweisschema.md).
 
@@ -1355,56 +1321,24 @@ Installation und im Entwicklungsrepo — ein Verweis auf eine Ebene wäre an zwe
 Orte falsch. Wo die Instruktionen liegen, beantwortet der Aufruf. Aufgerufen wird das
 einmal je Host oder DevContainer installierte `k-playbook` unter seinem Namen.
 
-### Ein veralteter Anstoß wird ersetzt
+### Ein vorhandener Anstoß bleibt
 
-Der Marker allein war zu wenig. Ein Bestandsprojekt trug den Anstoß des abgelösten
-Wrapper-Modells (`k-playbook/bin/k-playbook context`); weil der Marker dastand, tat
-`applyRootInstructions()` nichts — und der damalige Git-Update-Weg erreichte die Datei
-nicht, denn sie liegt im Hauptverzeichnis und lag nicht im Clone. Nach dem Entfernen des Wrappers zeigte
-sie dauerhaft auf eine Datei, die es nicht mehr gibt. Dasselbe gilt seit dem Briefing für
-die Fassung mit `k-playbook context`, die das Binary bis dahin auslieferte.
-
-`replaceOutdatedInstructionsBlock()` ersetzt deshalb den Block, wenn er den Aufruf einer
-abgelösten Fassung trägt. Die Fassungen stehen in `legacyInstructionsBlocks`, die älteste
-zuerst, je Fassung der Aufruf (`/bin/k-playbook context` als Teilpfad, dann
-`k-playbook context`) und ihre Zeilen, so wie sie ausgeliefert wurden — eine eigene Kopie,
-nicht aus `instructionsBlock()` abgeleitet, denn eine abgelöste Fassung ändert sich nicht
-mehr. Das ist dieselbe enge Definition von „veraltet" wie bei der MCP-Registrierung, und
-aus demselben Grund: die neue Fassung enthält keines der Muster, der Lauf ist damit
-idempotent. Jede andere Fassung gehört dem Projekt und bleibt stehen.
-
-`instructionsBlockEnd()` grenzt den Block ab, zwei Wege in dieser Reihenfolge: die
-bekannte Gestalt einer abgelösten Fassung Zeile für Zeile (`knownInstructionsBlockEnd()`
-über `knownBlockEnd()`; die Aufrufzeile darf variieren), sonst die nächste Überschrift oder
-der nächste HTML-Kommentar, abzüglich der Leerzeilen davor — nie das Dateiende. Der Block
-trägt genau einen Marker und genau eine Überschrift; was ein Projekt davor oder dahinter
-geschrieben hat, bleibt dadurch stehen. Lässt sich keine Grenze bestimmen, wird nichts
-ersetzt: der Aufrufer bekommt einen Hinweis (`errAnstossEndeUnbestimmt`), der den neuen
-Aufruf nennt, und `RootInstructionsState.Hint` trägt ihn in die Karte. Eine vorhandene Datei
-zieht `refreshRootInstructions()` nach: Steht der Marker, wird ein veralteter Anstoß ersetzt;
-steht er nicht, wird der Anstoß angehängt.
-
-`RootInstructionsState` meldet den Bestand ohne zu schreiben: `HasOutdatedAnstoss` und
-`Hint`; `NeedsRefresh()` sagt, ob ein Lauf etwas nachzöge — oder es versuchte und am Hinweis
-scheiterte —, und ist gleich `HasOutdatedAnstoss`. Was ein Lauf wirklich täte, sagt
-`AnstossRefreshable`: der veraltete Anstoß, dessen Ende bestimmt ist. `upgrade --check`
-meldet nur daraus „würde … gebracht" und für den Rest allein den Hinweis. `AssistantSetup`
-sagt nach dem Lauf mit `RootRefreshed`, dass der Anstoß ersetzt wurde.
+Steht der Marker, gehört der Block dem Projekt, in welcher Fassung auch immer:
+`refreshRootInstructions()` hängt nur einen fehlenden Anstoß an und lässt einen
+vorhandenen stehen. `RootInstructionsState` meldet den Bestand ohne zu schreiben
+(`Present`, `HasMarker`).
 
 Drei Einstiege, wie bei MCP:
 
 | Weg | Einstieg | Tut |
 |---|---|---|
-| ausdrücklich | `ApplyRootInstructions()`, Einrichten und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, veralteten Block ersetzen, `opencode.json` registrieren |
+| ausdrücklich | `ApplyRootInstructions()`, Einrichten und `k-playbook upgrade` über `ApplyAssistantSetup()` | anlegen, anhängen, `opencode.json` registrieren |
 | ausdrücklich, im Terminal | `k-playbook upgrade` (`cmd/k-playbook/upgrade.go`), über `ApplyAssistantSetup()` | dasselbe, nach dem Programm-Update; `--check` meldet aus `CheckRootInstructions()`, was ein Lauf täte |
-| selbsttätig | `RepairRootInstructions()`, jeder Start | einen veralteten Block ersetzen; eine **ganz fehlende** Datei aus der Vorlage anlegen |
+| selbsttätig | `RepairRootInstructions()`, jeder Start | eine **ganz fehlende** Datei aus der Vorlage anlegen |
 
-Der Auffangweg kennt genau zwei Fälle, und `RootInstructionsRepair` sagt, welcher
-eingetreten ist (`Refreshed` oder `Created`; `Changed()` fasst beide zusammen), damit
-`runGUI()` jeden eigens meldet; eine Datei ohne Anstoßmarker fasst er nicht an. Das Ersetzen
-des veralteten Blocks ist eine Reparatur an Inhalt, den k-playbook selbst
-geschrieben hat, und läuft deshalb unabhängig davon, ob die Datei versioniert ist. Das
-Anlegen (`createRootInstructions()`) greift nur, wenn `AGENTS.md` ganz fehlt und die
+Der Auffangweg kennt genau einen Fall, und `RootInstructionsRepair` sagt, ob er
+eingetreten ist (`Created`, `Changed()`), damit `runGUI()` ihn eigens meldet; eine
+vorhandene Datei fasst er nicht an. Das Anlegen (`createRootInstructions()`) greift nur, wenn `AGENTS.md` ganz fehlt und die
 Fallmatrix aus `instructions_layout.go` nichts anderes vorsieht: kein Konflikt, keine
 Blockade, keine Umbenennung einer echten `CLAUDE.md`, kein zu entfernender Symlink. Dann
 gibt es nichts zu überschreiben und keine Entscheidung zu übergehen — es entsteht nur die
@@ -1453,8 +1387,7 @@ Task 143 in der Collection des Projekts unter `k-playbook/reviews/`:
 `resolveCatalog()` nimmt für beide Ebenen dieselben Quellen wie die Verweise
 (`NewProjectDefaultsSource`, `NewProjectLocalDocSource`).
 `path` eines Eintrags ist darum kein Plattenpfad, sondern immer der wirksame Verweis
-`k-playbook:/reviews/<name>`, gleich ob `dist`, `local` oder `override`. Ein
-liegengebliebenes `k-playbook/checks/` wird nicht mehr gelesen.
+`k-playbook:/reviews/<name>`, gleich ob `dist`, `local` oder `override`.
 Im Briefing fehlt `catalogs` darum ganz: `catalogs.reviews` steht unter `documents.reviews`,
 und `dropOrderedField()` lässt ein Objekt fallen, das dabei leer wird. Den Ort eines projekteigenen Rezepts in der
 Collection nennt das Feld `location` (`keph:/k-playbook/reviews/<name>`), nie `path`. Wer den Inhalt braucht,
@@ -1525,39 +1458,16 @@ anderes.
 
 ## Aktualisieren
 
-Aktualisiert wird nur noch das Programm, aus dem Release (nächster Abschnitt), und danach
-das Projekt. Einen Clone zieht nichts mehr nach (Task 156): `project/update.go` mit der
-Prüfung des Remote-Stands (`git ls-remote` gegen den Upstream des Clones), dem Pull
-(`git pull --ff-only`) und den Ergebnistypen beider ist entfallen, ebenso
-`project/permissions.go` mit dem Schreibschutz um den Pull
-und aus `publicremote.go` die Umstellung eines SSH-Remotes auf
-`https://github.com/kascada/k-playbook.git`. Geblieben sind `GitOutput()` (jetzt in
-`gitrun.go`), `RepairMCPReport()`/`MCPRepairReport` (jetzt in `mcp.go`) und in
-`publicremote.go` die drei Lesefunktionen für das Feld `github` (`upstreamRemote()`,
-`remoteRawURL()`, `projectRemoteURL()`).
-
-Was damit im Programm nicht mehr vorkommt: kein `git ls-remote` und kein `git pull` in
-einem Verzeichnis `k-playbook/`, kein `chmod` darauf — weder beim Start der Oberfläche
-(`protectProjectInstallation()` ist entfallen) noch nach dem Anlegen oder Zurücksetzen der
-Konfiguration —, keine Zeile dazu in `k-playbook upgrade`, `upgrade --check` und `--json`
-und kein Feld `playbookPresent` in `Environment`. Ein Projekt ohne `k-playbook/` ist
-vollständig. Liegt ein alter Clone noch da, bleibt er unberührt, auch mit dem Schreibschutz
-früherer Versionen; gelöscht wird er von /k-upgrade, Umstellung 3.8
-(`defaults/commands/k-upgrade.md`), die danach auch die Zeilen für `k-playbook/` aus den
-`.gitignore`-Dateien streicht. Sie verlangt ein Programm ab
-v0.16.39, erkannt an `neuestes Release` in der Zeile `Programm-Stand: nichts zu tun — …`:
-Ein Binary bis v0.16.38 braucht den Clone noch für sein eigenes Upgrade.
-
-Im Quell-Repo sind mit dem Pull auch die Make-Ziele `installer-update`,
-`installer-writable` und `installer-readonly` samt `INSTALLATION_DIR` entfallen.
+Aktualisiert wird das Programm, aus dem Release (nächster Abschnitt), und danach das
+Projekt. `GitOutput()` liegt in `gitrun.go`, `RepairMCPReport()`/`MCPRepairReport` in
+`mcp.go`, und `publicremote.go` trägt die drei Lesefunktionen für das Feld `github`
+(`upstreamRemote()`, `remoteRawURL()`, `projectRemoteURL()`).
 
 ### Version und Installation aus dem Release
 
 Es gibt genau zwei Versionsquellen: die eigene Version im Binary (`buildinfo.Version`) und
 den Tag des neuesten veröffentlichten Release auf GitHub. Jeder Vergleich und jede Installation des Programms
-geht von diesen beiden aus (Task 149). Der frühere Clone `<projekt>/k-playbook/` spielt
-dabei keine Rolle mehr: Kein Vergleich und keine Installation liest seine `VERSION`, seine
-`SHA256SUMS` oder ruft sein `bin/install` auf.
+geht von diesen beiden aus (Task 149).
 
 Die zweite Quelle kennt das Blattpaket `internal/release` — gelesen wird über HTTPS und
 anonym, weil das Repo öffentlich ist und kein Nutzer einen Schlüssel brauchen soll, und
@@ -1678,7 +1588,7 @@ Die Oberfläche hat dafür keinen eigenen Schritt mehr: `POST /api/update` samt
   also beim nächsten Lesezugriff nach einer Programmaktualisierung;
 - über den Knopf *Einrichten* der Assistenten-Karte: `setupMessage()` in
   `webui/assistant.go` ruft `ApplyAssistantSetup()` und formuliert den Antworttext
-  (`describeSetup()`) — Anstoß, veralteter Anstoß, eine erstmals
+  (`describeSetup()`) — Anstoß, eine erstmals
   angelegte `AGENTS.md`, Umbenennung und Konflikt;
 - im Terminal mit `k-playbook upgrade` (§„Acht Einstiege").
 
@@ -1694,11 +1604,8 @@ führt es aus; Asset-Namen, Plattformen und Prüfsumme bleiben damit Sache von K
 vorhandenes `kephalaion` lässt das Skript stehen; aktualisiert wird es über `k-playbook
 upgrade` (unten). Installiert wird nur das Binary, nicht Node, Dienst oder Token — im DevContainer kommt die
 config read-only vom Host, und der Node ist der des Hosts. Scheitert der Schritt, endet
-`bin/install` trotzdem mit 0: Binaries von vor Task 149 rufen das Skript aus dem Clone auf
-und messen den Erfolg ihres Programm-Updates an diesem Exit-Code; sie meldeten sonst ein
-gescheitertes Update, das es nicht gab. Das Skript `bin/install-kephalaion` bleibt aus
-demselben Grund vorerst im Repo — alte Binaries rufen es noch aus dem Clone auf —, das
-Programm selbst ruft es nicht mehr auf.
+`bin/install` trotzdem mit 0: k-playbook selbst ist installiert, und die letzte Zeile nennt
+`k-playbook upgrade` als Weg, Kephalaion nachzuholen.
 
 `k-playbook upgrade` hat für Kephalaion einen eigenen, ersten Schritt (Task 141), vor Programm
 und Projekt: k-playbook hängt von Kephalaion ab, nicht umgekehrt — neue k-playbook-Releases
@@ -1729,17 +1636,11 @@ Lauf auf. Bei `upgraded` und immer, wenn der Node neu gestartet wurde (`restarte
 `failed` mit `reason` `restart` auch ohne das Feld), setzt der Schritt `restartRequired` und
 die Ausgabe verlangt den Neustart der Sitzung — das trifft auch andere Sitzungen am selben
 Node. Im JSON stehen `auto`, `check`, `autoUnsupported`, `outcomeUnknown` und
-`restartRequired` unter `kephalaion`. `schemaVersion` ist seit Task 149 `2`:
-`program.status` trägt `latest` (dazu `latestError`) statt `clone`, `program.versionChanged`
-und `program.mcpRepaired` entfallen, `project` trägt `mcpRepairedPortable` und `mcpMessage`.
-Seit Task 156 ist sie `3`: `program.update`, `program.pulled`, `program.pullOutput` und
-`program.remoteSwitched` entfallen mit dem Pull.
+`restartRequired` unter `kephalaion`. `schemaVersion` ist `4`; die Fassungen davor stehen
+am Kommentar von `upgradeSchemaVersion` in `cmd/k-playbook/upgrade.go`.
 
 Der Schritt läuft im aufrufenden Prozess, vor dem Programmschritt; das neue Programm nach einem
-Binärwechsel führt nur `upgrade --project-only` aus und fasst Kephalaion nicht an. Einmal beim
-Übergang von einem Binary vor Task 141 arbeitet der alte Prozess noch in alter Reihenfolge
-(Programm, dann nur die Installation von Kephalaion): Dieser erste Lauf ruft kein `--auto`,
-Kephalaion folgt erst im zweiten `/k-upgrade`, den der Programmwechsel ohnehin verlangt.
+Binärwechsel führt nur `upgrade --project-only` aus und fasst Kephalaion nicht an.
 `healthKephalaion()` nennt die
 Installation als Abhilfe, solange `kephalaion` fehlt und die Anbindung nicht ok ist; bei ok
 schweigt es auch ohne Binary, denn der Node kann der eines anderen Rechners sein.
@@ -1809,8 +1710,7 @@ starten weiter ohne eigene Gruppe.
 aufrufbar, bestimmt es Tag und Prüfsumme wie das Paket `release` (neuestes Release über die
 Weiterleitung von `releases/latest` mit curl oder wget, `SHA256SUMS` des Tags über HTTPS)
 und installiert das Release-Binary direkt nach `~/.local/bin/k-playbook`, danach
-Kephalaion. Aus einem Checkout aufgerufen — `make install` im Quell-Repo oder, von einem
-Binary bis v0.16.38, `k-playbook/bin/install` im früheren Clone eines Projekts — verhält es
+Kephalaion. Aus einem Checkout aufgerufen — `make install` im Quell-Repo — verhält es
 sich gleich: Es liest weder `VERSION` noch `SHA256SUMS` neben sich und installiert das
 neueste Release. `git` braucht es nicht; den Cache des
 neuesten Release schreibt es nicht. Der ganze Ablauf steht in `main` und wird erst in der
@@ -1821,12 +1721,6 @@ Der normale Aufruf ist danach immer `k-playbook`; der GUI-**Start** installiert 
 aktualisiert kein Binary selbst. Aktualisiert wird über `k-playbook upgrade` und über den
 Update-Knopf der Oberfläche — beide über `program.Install()`, also ohne `bin/install`,
 und nie ungefragt.
-
-Hingenommen für Binaries von vor Task 149, die `bin/install` noch aus dem Clone aufrufen
-und danach die Datei gegen `SHA256SUMS` und `VERSION` **des Clones** prüfen: Steht der Clone
-hinter dem neuesten Tag (kein Pull vor „Programm aktualisieren“, oder das Fenster vor
-`make release-publish`), melden sie einen Fehlschlag, obwohl die Datei ersetzt ist; sobald
-der Clone den Tag trägt, stimmt es wieder.
 
 Der globale Aufruf ist überhaupt möglich, weil das Programm sein Projekt aus dem
 **Arbeitsverzeichnis** ableitet (`Detect()` über `os.Getwd()`) und nicht aus seinem
@@ -1864,34 +1758,9 @@ Binary dort lässt sich nicht mehr ausführen.
 **Die Grenze davon steht hier ausdrücklich:** Träger der Erkennung sind allein
 `bin/install` und die Installation über `release.Install()`. Wer `~/.local/bin/k-playbook` direkt aufruft, während dort ein
 plattformfremdes Binary liegt, bekommt weiterhin die Meldung der Shell
-(`cannot execute binary file`) — nach dem Wrapper-Ausstieg fängt das nichts mehr ab. Die
+(`cannot execute binary file`); das fängt nichts ab. Die
 make-Targets tragen die Erkennung ebenfalls nicht: `make dev-install` und `make gui`
 bauen vorher unbedingt für die eigene Plattform, dort kann nie ein fremdes Binary stehen.
-
-### Übergang aufräumen
-
-Der erste Start des neuen Binaries — und ebenso `bin/install` — entfernt die alte
-Spiegelung unter `~/.local/share/k-playbook/installation/` sowie die Binaries des früheren
-Standard-Caches unter `~/.cache/k-playbook/bin/` — dorthin, nach `bin/<version>/`, legte der
-Wrapper seine Downloads, und sonst nichts. Der Cache des neuesten Release
-(`latest-release.json`) daneben bleibt liegen. Ein direkter Eintrag
-`~/.local/bin/k-playbook` bleibt erhalten; nur ein Symlink auf die alte Spiegelung wird
-entfernt.
-
-Beim Start der Oberfläche entfernt `RemoveLegacyWrapper()` in
-`project/legacywrapper.go` zusätzlich die Wrapper-Datei des abgelösten Modells,
-`<projekt>/k-playbook/bin/k-playbook`. Das Quell-Repo kennt sie nicht mehr, und
-`.gitignore` deckt sie nicht ab — sie bliebe sonst als zusätzliche Datei in einem
-liegengebliebenen Clone liegen. Frühere Versionen haben `k-playbook/` den Schreibzugriff entzogen; deshalb gibt
-die Funktion vor dem Löschen das Verzeichnis des Wrappers frei, und nur dieses. Wieder
-gesperrt wird nichts (Task 156). Gemeldet wird nur, wenn
-wirklich etwas wegfällt; ein Fehler hält den Start nicht auf, und der nächste Start
-versucht es erneut.
-
-Die Tool-venvs unter `~/.local/share/k-playbook/security-tools/`
-(host-lokale Werkzeuge, getrennt von jedem Projekt-venv) bleiben ausdrücklich außerhalb dieser Bereinigung. Die
-Ebene `installation/` gab es genau dafür: ein venv bringt ein eigenes `bin/` mit, ohne
-diese Trennung kollidierten beide.
 
 ## Woher Binary und Dateien kommen
 
@@ -1901,38 +1770,23 @@ Zwei Dinge, die getrennt driften können — und deren Verwechslung teuer ist.
 Stellen: Commands, Skills und `scripts/` (Skripte, Tool-Matrizen, Scanner- und
 Severity-Katalog) seit 2026-10-25 aus `~/.local/share/k-playbook/` (unten), die Texte —
 Reviews, Instruktionen, Guidelines, Command-Texte, Handbuch — seit Task 131 vom Hub, aus
-`<hub>:k-playbook/defaults/`. Das Binary liest nie neben sich und nie aus dem Projekt:
-`PlaybookDir(projektDir)`, also `<projekt>/k-playbook/`, war bis dahin die Quelle und ist
-heute nur noch der Ort eines früheren Clones.
+`<hub>:k-playbook/defaults/`. Das Binary liest nie neben sich und nie mitgelieferte Dateien
+aus dem Projekt.
 
 Das ist Absicht: Das direkt installierte Binary unter `~/.local/bin` ist an kein Projekt
 gebunden. Es leitet den Projektinhalt ausschließlich aus dem Arbeitsverzeichnis und dem
 Anker ab.
 
-**Niemand verlangt den Clone mehr.** Das Feld von `Environment`, das meldete, ob
-`k-playbook/` vorliegt, gibt es seit Task 156
-nicht mehr: Der Pull in `k-playbook upgrade` (`upgrade.go`) und in
-`POST /api/update` (`webui/update.go`, die Route selbst ist danach entfernt) und der Schreibschutz beim
-Start der Oberfläche (`gui.go`) sind entfallen, und `cleanUpLegacyWrapper()` kommt ohne die
-Prüfung aus — `RemoveLegacyWrapper()` tut nichts, wenn die Wrapper-Datei nicht liegt.
-Die Konstanten für den Aufruf `make -C k-playbook install`, die nur noch die
-Meldung zum fehlenden Clone trug, sind mit ihr gefallen. `k-playbook scan` (`scanRun`, hinter der Pause aus
+**Keine Installation im Projekt.** `Environment` meldet keinen Ort einer Installation im
+Projekt, und kein Weg verlangt eine: `k-playbook scan` (`scanRun`, hinter der Pause aus
 Task 147), die MCP-Review-Werkzeuge (`resolveReviewEnvironment`) und die Seiten
 „Assistenten“ und „MCP“ (`assistantState`, `mcpState`, in der Seite `app.js` und `mcp.js`)
-verweigern ohne `k-playbook/` nicht mehr mit der Meldung zur fehlenden Installation (Task 154): Rezepte und
-Instruktionen kommen vom Hub, Skripte und Scan-Katalog aus `SharedDir()`. Mit den Sperren
-fiel `playbookDir` aus dem Review-Umschlag, aus der Antwort von `GET /api/config` und aus
-dem JSON der beiden Preflight-Skripte; die Skripte nennen ihr Verzeichnis in der Ausgabe
-`Skripte:`. Meldungen, die ein Nachziehen verlangen — `describePreflightError` bei
+nehmen Rezepte und Instruktionen vom Hub, Skripte und Scan-Katalog aus `SharedDir()`. Der
+Review-Umschlag, die Antwort von `GET /api/config` und das JSON der beiden
+Preflight-Skripte tragen kein `playbookDir`; die Skripte nennen ihr Verzeichnis in der
+Ausgabe `Skripte:`. Meldungen, die ein Nachziehen verlangen — `describePreflightError` bei
 „Unknown argument“, `CheckSchema` bei neuerer `schema_version`, `renderNewerConfig` —,
-nennen `k-playbook upgrade` statt `git pull` im Clone. Den Katalog `checks`, der als letzter
-noch aus `PlaybookDir` las, gibt es seit Task 155 nicht mehr. Mit Task 157 sind auch die
-letzten Felder gefallen, die den Ort nannten: `playbook` in der Kontextausgabe
-(`project.Context`, damit `k-playbook context`, `k_playbook_context` und der Abschnitt
-`context` des Briefings, Fassung `"7"`), `playbook` in `display` von `GET /api/context` und
-`playbookDir` in `Environment` (damit in den Antworten mit `environment`). `PlaybookDir()`
-und `PlaybookDirName` bleiben für den Code, der Altbestand erkennt: `links.go` (alte Links),
-`legacywrapper.go`, `reset.go` und `config.go` (`LegacyModels`, `suggestRepoRoot`).
+nennen `k-playbook upgrade`.
 
 Die Fassungen des Briefings (`BriefingSchemaVersion` in `project/briefing.go`) dazu: Fassung
 7 trug noch `context.local`, Fassung 8 nicht mehr. Die heutige Fassung ist `"9"` (Task 187):
@@ -1951,8 +1805,7 @@ Servers zu dem Binary, aus dem er stammt, wird gesondert behandelt.
 
 ### Mitgelieferte Dateien unter `~/.local/share/k-playbook/`
 
-Der Weg, auf dem der Clone `<projekt>/k-playbook/` weggefallen ist: Was die Assistenten als
-Datei auf der Platte brauchen, trägt das Binary selbst und entpackt es einmal je Rechner
+Was die Assistenten als Datei auf der Platte brauchen, trägt das Binary selbst und entpackt es einmal je Rechner
 nach `~/.local/share/k-playbook/` (`$K_PLAYBOOK_SHARE_DIR`, wenn gesetzt, sonst
 `$XDG_DATA_HOME/k-playbook/`; auf macOS derselbe Pfad). Heute sind das `commands/`, `skills/` und `scripts/`; letzteres liest das
 Binary selbst (`project.SharedDir()`: Tool-Matrizen, Preflight- und Installer-Skripte,
@@ -1999,9 +1852,7 @@ das Binary unter `~/.local/bin`; Commands, Skills und Skripte reisen im Binary m
 tragen danach denselben Stand. Die Texte — Reviews, Instruktionen, Guidelines,
 Command-Texte — kommen weiterhin vom Hub und damit aus dem zuletzt veröffentlichten
 Release, nicht aus dem Arbeitsbaum `defaults/`. Es gibt keinen Sync-Weg aus dem
-Arbeitsstand auf den Hub und keine Ausnahme davon in der Oberfläche. Bis Task 156 lag
-unter `~/dev/k-playbook/k-playbook/` ein eigener Clone auf dem zuletzt gepushten Commit,
-aus dem der Inhalt kam.
+Arbeitsstand auf den Hub und keine Ausnahme davon in der Oberfläche.
 
 **Der Hintergrunddienst erkennt auch einen dev-Build.** Verglichen wird nicht die
 `VERSION`, sondern die Datei dahinter, siehe „Lebenszyklus": Größe und Änderungszeit von
@@ -2013,34 +1864,6 @@ Hand ist dafür nicht mehr nötig.
 Was das nicht leistet: die Ablösung geschieht je Projekt und erst beim nächsten Aufruf
 dort. `make gui` im Arbeitsstand beendet weiterhin nur den Server dieses Projekts — die
 Server anderer Projekte laufen bis zu ihrem nächsten `k-playbook` mit altem Code weiter.
-
-## Altlasten des globalen Modells
-
-`RemoveGlobalLinks()` in `legacy/global.go` läuft bei jedem Programmstart, vor der
-Oberfläche. Sie räumt weg, was das abgelöste host-globale Modell hinterlassen hat:
-
-| Ort | Alte Form |
-|---|---|
-| `~/.claude/commands` | Verzeichnis-Symlink auf `<repo>/commands`, sonst Einzel-Symlinks darin |
-| `~/.claude/skills` | Einzel-Symlinks auf die Skill-Verzeichnisse des Repos |
-| `~/.config/opencode/command` | Einzel-Symlinks auf `<repo>/commands/*.md` |
-| `~/.config/opencode/opencode.jsonc`, `.json` | `skills.paths` auf die Basisinstallation |
-
-Bleiben diese Links liegen, sieht ein Assistent in **jedem** Projekt zusätzlich die
-Commands eines fremden Standes — genau das, was die projektlokale Installation auflösen
-soll. Deshalb der Aufräumschritt beim Start und nicht in der Oberfläche.
-
-Erkannt wird an einem Pfadsegment `k-playbook` im Symlink-Ziel, unabhängig davon, ob das
-Ziel noch existiert: der Repo-Pfad war frei wählbar, das Verzeichnis hieß aber immer so,
-und ein toter Link ist genauso eine Altlast wie ein lebender. Echte Dateien und Symlinks,
-die woandershin zeigen, bleiben unberührt; ein Verzeichnis fällt nur weg, wenn danach
-nichts mehr darin steht. Aus der OpenCode-Config wird ausschließlich der Top-Level-Key
-`skills` geschnitten, wenn sein Wert ein `k-playbook` nennt — der Rest der Datei bleibt
-Zeichen für Zeichen erhalten, Kommentare eingeschlossen. Deshalb ein eigener
-JSONC-Scanner statt Parsen und Neuschreiben.
-
-Gemeldet wird nur, wenn tatsächlich etwas wegfällt; auf einem sauberen Rechner ist der
-Schritt still. Ein Fehler dabei hält den Start nicht auf.
 
 ## Security-Tool-Preflight
 
@@ -2079,8 +1902,7 @@ dazu, dass die Auswahl aus den Manifesten erkannt und noch nicht gespeichert ist
 **Keine Rekursion.** Geprüft wird nur die oberste Ebene von `project.repo_root` und,
 falls verschieden, die oberste Ebene des Hauptverzeichnisses. Ein rekursiver Lauf träfe
 `node_modules/`, `vendor/` und Monorepo-Rauschen und liefe bei jedem Briefing
-mit; eine Ausschlussliste braucht es so nicht, denn auch ein liegengebliebener Clone
-`<projekt>/k-playbook/` ist ein Verzeichnis, kein Manifest.
+mit; eine Ausschlussliste braucht es so nicht.
 
 **Begrenzt auf die Tool-Matrix.** Das Ergebnis wird auf die Sprachen beschnitten, die
 `ReadToolLanguages()` aus `scripts/security-tools.tsv` liest — dieselbe Funktion, aus der
@@ -2329,8 +2151,7 @@ dazu in `internal/vscodeext`.
 **Die VSIX ist eingecheckt und per `go:embed` im Binary.** Nicht bei jedem Build mit vsce
 erzeugt: vsce schreibt die Bauzeit und die mtimes der Quelldateien in das Zip, und
 `SHA256SUMS` muss bitgleich nachbaubar bleiben — CI baut den Tag nach und prüft dagegen.
-Nicht je Projekt abgelegt, wie es der frühere Clone im Projekt getan hätte: Verschiedene
-Projekte auf einer Maschine trügen verschiedene Stände und würden abwechselnd ältere und
+Nicht je Projekt abgelegt: Verschiedene Projekte auf einer Maschine trügen verschiedene Stände und würden abwechselnd ältere und
 neuere Fassungen installieren. Nicht in Go
 zusammengebaut: das wäre ein Nachbau von vsce. Die Erweiterung hat deshalb eine eigene
 Version in `installer/vscode/package.json`, nicht die `VERSION` des Programms — die VSIX
@@ -2829,18 +2650,9 @@ Schritte ohne KI und ohne Rückfrage, damit ihn später ein Cron-Job aufrufen ka
 ## GitHub CLI
 
 `project/gh.go` trägt nur den Befund dieses Rechners. Eine Projektentscheidung über gh
-gibt es nicht mehr (Task 128): Ob gh im Spiel ist, entscheidet allein der Weg zu GitHub —
-mit Dienst der Zugangsdatei dessen gewählter Zugang, ohne Dienst `gh.ready`. Der frühere
-Block `tools.gh` mit `status` (`unknown`, `enabled`, `disabled`) wird nirgends gelesen;
-Kontext, Briefing und MCP lassen ihn auch mit unbekanntem Wert stehen. Entfernt wird er nur
-im Schreibweg des Einrichtens: `ApplyAssistantSetup()` ruft `RemoveLegacyGHBlock()`
-(`project/gh_legacy.go`), ohne Rückfrage und ohne Schritt in `/k-upgrade`, und meldet es in
-`AssistantSetup.ConfigBlocksRemoved`; `k-playbook upgrade` (auch `--check`) und
-`describeSetup` nennen es in einem Satz. Gebaut ist das auf denselben Zeilenhelfern wie
-`replaceNestedBlock()` (`isTopLevelYAMLLine`, `lineIndent`): Andere Blöcke unter `tools:` und
-ihre Kommentare bleiben, ein Kommentar auf oberster Ebene über `tools:` auch (in der alten
-Vorlage der auskommentierte Block `docs:`); bleibt unter `tools:` nichts, fällt auch `tools:`.
-Die Vorlage von `CreateConfig()` legt keinen Block `tools:` mehr an.
+gibt es nicht (Task 128): Ob gh im Spiel ist, entscheidet allein der Weg zu GitHub —
+mit Dienst der Zugangsdatei dessen gewählter Zugang, ohne Dienst `gh.ready`. Die Vorlage
+von `CreateConfig()` legt keinen Block `tools:` an.
 
 Der Host-Befund kommt aus `DetectGH()`: ein `exec.LookPath("gh")` und ein Blick in
 `hosts.yml` im gh-Konfigurationsverzeichnis, dazu `GH_TOKEN`/`GITHUB_TOKEN`, die die
@@ -3620,8 +3432,7 @@ Handler liest, wählt er über `openKPlaybookHandbook` bzw. `openProjectHandbook
 bekommt die API über `data-docs-api` am `body` (aus dem Bereich, `/api/docs` oder
 `/api/handbook`), `docs.js` ist für beide dasselbe.
 
-Nichts davon ist ins Binary eingebettet, und es gibt keinen Rückfall auf die Platte — auch
-nicht auf einen liegengebliebenen Clone im Projekt. Ist ein Handbuch nicht lesbar, antwortet die API
+Nichts davon ist ins Binary eingebettet, und es gibt keinen Rückfall auf die Platte. Ist ein Handbuch nicht lesbar, antwortet die API
 mit einer Meldung statt einer Liste, und das Feld `code` sagt, warum:
 
 - `kephalaion_unavailable` — Kephalaion ist nicht erreichbar. Die Meldung nennt den Ort und
@@ -4342,14 +4153,11 @@ Abhilfe hingehört; auf dem Host bleibt sie still. Daneben meldet sie eine ungü
 auf jedem Rechner.
 
 Die Quelle `anchor` (`project/health_anchor.go`, Task 106) meldet den Stand des Ankers
-`.k-playbook/K-PLAYBOOK.yaml` im Repository, als `warning` mit zwei Befunden: Der Anker liegt
-in einem Git-Worktree und ist dort weder versioniert (`ls-files --error-unmatch`) noch
-ignoriert (`check-ignore`) — ein Zustand, der auch ein frisches Projekt vor dem ersten Commit
-und einen absichtlich lokalen Anker trifft, deshalb nennt die Abhilfe beide Wege, `git add`
-und `.gitignore`. Und: Am früheren Ort, `K-PLAYBOOK.yaml` direkt im Hauptverzeichnis, steht
-noch eine Datei im Index, obwohl `Discover` sie beim ersten Aufruf des neuen Programms nach
-`.k-playbook/` gezogen hat (`migrateConfig`); nur dieser Befund spricht vom Umzug, Abhilfe
-`git rm --cached` und den Umzug committen. Die Quelle spricht nur bei positivem Befund: ohne
+`.k-playbook/K-PLAYBOOK.yaml` im Repository, als `warning`: Der Anker liegt in einem
+Git-Worktree und ist dort weder versioniert (`ls-files --error-unmatch`) noch ignoriert
+(`check-ignore`) — ein Zustand, der auch ein frisches Projekt vor dem ersten Commit und einen
+absichtlich lokalen Anker trifft, deshalb nennt die Abhilfe beide Wege, `git add` und
+`.gitignore`. Die Quelle spricht nur bei positivem Befund: ohne
 Git, außerhalb eines Worktrees, bei `project.vcs` ungleich `git`, bei ignoriertem Anker (das
 Quell-Repo) und bei jedem Git-Fehler bleibt sie still. Sie nutzt dafür die Kette von
 `mcpGitTracked` (siehe „Registrierung“ im Abschnitt zu den MCP-Einträgen, `mcpTargetTracked()`),
@@ -4592,40 +4400,21 @@ und könnte auf einen ganz anderen Stand zeigen als den, den `bin/install` geleg
 Absolut und nicht als bloßer Kommandoname, weil aus Dock oder Finder gestartete Clients
 die Shell-`PATH` nicht erben; `~/.local/bin` fehlt dort typischerweise. Lässt sich kein
 Binary auflösen, meldet jedes Ziel `MCPStateNoCommand` und es wird nichts geschrieben:
-eine Registrierung, die auf nichts zeigt, ist schlechter als keine. Das gilt auch für die
-portable Form.
-
-Eine Ausnahme hat die Form: Ersetzt ein selbsttätiger Weg einen veralteten Eintrag, wählt
-`mcpRepairCommand()` je Zieldatei — erfasst oder unbeantwortet der bloße Name
-`k-playbook`, nicht erfasst `MCPCommand()`. Einzelheiten unter „Zwei Schreibwege, eine
-Entscheidungsstelle".
+eine Registrierung, die auf nichts zeigt, ist schlechter als keine.
 
 #### Eine Menge akzeptierter Formen statt eines Sollwerts
 
-Geschrieben wird je Zieldatei genau eine Form nach fester Regel, geprüft wird gegen eine
-Menge. `reflect.DeepEqual`
-gegen `mcpEntry()` ist deshalb weg; an seiner Stelle stehen drei Prädikate in `mcp.go`:
+Geschrieben wird immer der absolute Pfad, geprüft wird gegen eine Menge. Statt
+`reflect.DeepEqual` gegen `mcpEntry()` stehen zwei Prädikate in `mcp.go`:
 
 - `acceptedMCPCommandForms()` — die Menge selbst, als Liste benannter Formen. Heute zwei:
   jeder absolute Pfad, dessen Dateiname `k-playbook` ist, **auch der eines fremden
   `$HOME`** (`isInstalledCommandForm`), und der bloße Kommandoname `k-playbook`
   (`isPortableCommandForm`) — die eincheckbare Form, die kein `$HOME` nennt. Eine
   weitere Form ist ein weiterer Listeneintrag; der Vergleich selbst bleibt unverändert.
-- `isOutdatedMCPCommand()` — „veraltet" im engen Sinn: der abgelöste Wrapper. Ein
-  **relativer** Eintrag genügt mit der Endung `bin/k-playbook`, ein **absoluter** muss
-  auf `k-playbook/bin/k-playbook` enden. Ohne diese Trennung fiele
-  `~/.local/bin/k-playbook` selbst darunter — es endet ebenfalls auf `bin/k-playbook` —
-  und die Auto-Korrektur schriebe endlos.
 - `mcpEntryCommand()` — liest Kommando und Argumente aus dem vorgefundenen Eintrag,
   ohne den Rest zu bewerten. Zusätzliche Schlüssel wie ein von Hand gesetztes `timeout`
-  bei OpenCode überleben damit; der frühere Strukturvergleich hätte sie weggeschrieben.
-
-`legacyWrapperCommand` und `legacyWrapperTail` in `mcp.go` sowie
-`legacyInstructionsCommand` in `instructions.go` sind bewusst **eigene** Konstanten und
-nicht aus einem Wrapper-Bezeichner abgeleitet. Die Datei `bin/k-playbook` gibt es im
-Quell-Repo nicht mehr; genau deshalb müssen die drei Konstanten sie überleben — sie sind
-das Einzige, was ein Bestandsprojekt noch von ihr weg migriert. Sie werden erst
-entfernt, wenn kein Projekt mehr aus dem Wrapper-Modell aktualisiert.
+  bei OpenCode überleben damit; ein Strukturvergleich hätte sie weggeschrieben.
 
 Der fremde `$HOME` ist eine Entscheidung mit Preis, und der steht in
 [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md): teilen sich Host und Container ein Repository bei
@@ -4636,11 +4425,7 @@ in derselben Datei wechselseitig für veraltet.
 Die portable Form hat ihren eigenen Preis, und auch der steht dort: der bloße Name
 hängt an der `PATH`, und aus Dock oder Finder gestartete Clients erben sie nicht.
 Einrichten, Ergänzen und Anlegen schreiben sie deshalb nie — `MCPCommand()` liefert
-weiter den absoluten Pfad. Schreibziel ist sie an genau einer Stelle: beim selbsttätigen
-Ersetzen eines veralteten Eintrags in einer erfassten Datei (`mcpRepairCommand()`, siehe
-unten). Der alte relative Wrapper-Eintrag nannte keine Umgebung; der Name ist seine treue
-Übersetzung, ein absoluter Pfad in einem Commit wäre es nicht. Sonst ist sie eine Form, die
-eine eingecheckte Registrierung tragen darf, ohne von der Auto-Korrektur überschrieben zu
+den absoluten Pfad. Sie ist eine Form, die eine eingecheckte Registrierung tragen darf, ohne von der Auto-Korrektur überschrieben zu
 werden. Der Ausweg für Dock und Finder ist der Handeintrag des absoluten Pfads; er ist
 akzeptiert und bleibt stehen. *Einrichten* hilft nicht, denn es überschreibt keine
 akzeptierte Form — außer bei OpenCode ohne Memory-Block: dann schreibt
@@ -4654,26 +4439,18 @@ hängen, obwohl es einen Projektpfad meint.
 | Weg | Einstieg | Modus (`MCPWriteScope`) | Schreibt bei | Geschriebene Form |
 |---|---|---|---|---|
 | ausdrücklich | `ApplyMCP()`, Klick auf *Einrichten* | `MCPWriteAll` | allem, was nicht zur Menge gehört | absoluter Pfad |
-| ohne Aufrufer | `RepairMCP()`; war „Aktualisieren“ in der Oberfläche (`POST /api/update`, entfernt) | `MCPWriteOutdatedOnly` | ausschließlich `MCPStateOutdated` | erfasst oder unbeantwortet `k-playbook`, sonst absoluter Pfad |
-| selbsttätig | `RepairMCP()`, jeder Start und der Projektschritt von `k-playbook upgrade` (`upgradeProject()`, auch unter `--project-only`) | `MCPWriteOutdatedAndUnversioned` | `MCPStateOutdated`; dazu `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | `MCPStateOutdated` wie im engen Modus; Ergänzen und Anlegen absoluter Pfad |
+| selbsttätig | `RepairMCP()`, jeder Start und der Projektschritt von `k-playbook upgrade` (`upgradeProject()`, auch unter `--project-only`) | `MCPWriteUnversioned` | `MCPStateMissingEntry` und `MCPStateMissingFile`, wenn der Weg zur Zieldatei **über keinen Symlink** führt und sie **nicht von git erfasst** ist — die fehlende Datei nur bei einer Spur des Assistenten | absoluter Pfad |
 
-Alle gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied, und er
-ist ein Parameter von `RepairMCP()`, weil die selbsttätigen Aufrufer verschieden
-weit gehen dürfen. An einem Pull hängt die Reparatur nicht (Task 149), und seit Task 156
-gibt es keinen mehr. Die Aufrufer gehen über `project.RepairMCPReport()`
-(Ergebnis `MCPRepairReport.Repaired`, die Dateien mit bloßem Namen zusätzlich in
-`MCPRepairReport.Portable`, ein Fehlschlag in `Message`). Der enge Modus zieht nur den
-Eintrag auf den abgelösten Wrapper nach und sonst nichts; seit `POST /api/update` entfernt
-ist, ruft ihn nichts mehr. Der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`) und der
-Projektschritt von `k-playbook upgrade` dürfen
-mehr — `upgrade` repariert immer im Umfang des Starts. `upgrade --check` meldet weiter nur veraltete Einträge (`MCPStateOutdated`) und
-sagt damit weniger, als ein Lauf täte; die Lücke ist hingenommen. Die Grenze ist gemessen,
-nicht geraten:
+Beide gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied. Die
+selbsttätigen Aufrufer — der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`)
+und der Projektschritt von `k-playbook upgrade` — gehen über `project.RepairMCPReport()`
+(Ergebnis `MCPRepairReport.Repaired`, ein Fehlschlag in `Message`). `upgrade --check`
+meldet keine MCP-Einträge und sagt damit weniger, als ein Lauf täte; die Lücke ist
+hingenommen. Die Grenze ist gemessen, nicht geraten:
 
-- **`MCPStateOutdated`** wird in beiden Modi ersetzt, unabhängig von der Versionierung —
-  eine Reparatur an Inhalt, den k-playbook selbst geschrieben hat.
-- **`MCPStateStale`**, `MCPStateUnreadable`, `MCPStateAmbiguousTarget` und
-  `MCPStateNoCommand` bleiben in beiden Modi liegen: ein Eintrag kann aus einem fremden
+- **Ein vorhandener Eintrag** bleibt im selbsttätigen Modus immer liegen:
+  `MCPStateStale`, `MCPStateUnreadable`, `MCPStateAmbiguousTarget` und
+  `MCPStateNoCommand`: ein Eintrag kann aus einem fremden
   `$HOME` stammen und dort gültig sein, und sonst gibt es nichts Eindeutiges zu
   schreiben.
 - **Nicht von git erfasst** misst `mcpTargetTracked()` im Hauptverzeichnis, denn dort
@@ -4712,9 +4489,7 @@ nicht geraten:
   die übergeht der Start nicht. Beim Auflösen kämen neue offene Fragen hinzu: ein Ziel
   außerhalb des Repos, eines in einem anderen Repo, ein toter Link. Die Prüfung sitzt im
   Startzweig von `mcpTargetNeedsWrite()`, nicht in `applyMCPTarget()`. Der Knopf schreibt
-  deshalb weiter durch den Link, der enge Modus bleibt unverändert, und
-  `MCPStateOutdated` wird auch hinter einem Link korrigiert; für dessen Form wird dort
-  das Linkziel gemessen (nächster Punkt). Offen bleiben harte Links:
+  deshalb weiter durch den Link. Offen bleiben harte Links:
   `os.Lstat` erkennt sie nicht, `ls-files` misst den nicht erfassten Linkpfad, und
   `os.WriteFile` schreibt in denselben Inode.
 - **Spur des Assistenten** (`assistantTrace()`): eine fehlende Datei entsteht nur, wenn
@@ -4724,43 +4499,20 @@ nicht geraten:
   `ApplyLinks()` legt sie in jedem Projekt an, schon auf dem Lesepfad. Ohne die
   Bedingung entstünden bei jedem Start zwei Dateien, die niemand braucht. Ein fehlender
   Eintrag in vorhandener Datei braucht keine Spur.
-- **Form beim Ersetzen** (`mcpRepairCommand()`): Erst wenn feststeht, dass geschrieben
-  wird und der vorgefundene Eintrag veraltet ist, legt `applyMCPTarget()` das Kommando
-  fest — in beiden selbsttätigen Modi, nie bei `MCPWriteAll`. Erfasst oder unbeantwortet
-  heißt `InstalledCommandName`, nicht erfasst `MCPCommand()`. Die git-Aufrufe laufen nur
-  in diesem Fall. Ohne Link auf dem Weg misst `mcpTargetTracked()` wie oben. Mit Link misst
-  `mcpRepairTargetTracked()` die Datei, die tatsächlich beschrieben wird: Die Kette aus
-  Config, `project.vcs` und `rev-parse` läuft unverändert (`mcpGitTracked()`), bei
-  `project.vcs` ≠ git oder ohne Repository bleibt es also bei „nicht erfasst". Danach wird
-  die Zieldatei per `filepath.EvalSymlinks` aufgelöst, `rev-parse --show-toplevel` im
-  Verzeichnis des Linkziels muss — ebenfalls aufgelöst — dieselbe Wurzel melden wie im
-  Hauptverzeichnis, und `ls-files --error-unmatch` läuft in dieser Wurzel mit dem Pfad
-  relativ dazu. Physisch gegen physisch, weil auch das Hauptverzeichnis über einen
-  verlinkten Pfad erreicht werden kann. Ein Ziel außerhalb dieses Repositorys, auch in
-  einem verschachtelten, und jedes gescheiterte Auflösen gelten als unbeantwortet. Ohne
-  diese Regel misst `ls-files` den Linkpfad (Exit 1) und schriebe den absoluten Pfad in
-  die erfasste Datei.
-
 Ergänzen und Anlegen schreiben dieselbe Form wie der Knopf — den absoluten Pfad aus
 `MCPCommand()`. Dass die Datei nicht erfasst ist, heißt: das Projekt hat sie nicht
 eingecheckt. Die Startmeldung sagt beim Eintragen deshalb dazu, dass die Datei einen
-rechnerbezogenen Pfad trägt und unversioniert bleiben sollte, und unterscheidet
-„eingetragen" von „korrigiert" anhand des Zustands vor dem Lauf. Welche Form geschrieben
-wurde, liefert `RepairMCP()` selbst zurück (`[]MCPWrite` mit `Path` und `Command`). Steht
-der bloße Name darin, sagen die Startmeldung und der Projektschritt von
-`k-playbook upgrade` (`upgradeProjectReport.messages()`) das und nennen den Preis: ein aus Dock oder Finder gestarteter Client braucht
-den absoluten Pfad, von Hand eingetragen. Die Meldung hängt an der geschriebenen Form,
-nicht am Tracking-Ergebnis. Fremde Einträge bleiben in jedem Fall unangetastet — gepatcht
-wird nur der eigene Schlüssel.
+rechnerbezogenen Pfad trägt und unversioniert bleiben sollte. Die geschriebenen Dateien
+liefert `RepairMCP()` selbst zurück (`[]MCPWrite` mit `Path` und `Command`). Fremde
+Einträge bleiben in jedem Fall unangetastet — gepatcht wird nur der eigene Schlüssel.
 
-Bereits migrierte und committete Projekte bleiben, wie sie sind: ein absoluter Pfad aus
-fremdem `$HOME` gilt als akzeptiert und wird nicht mehr ersetzt. Ebenso bleibt eine per
-Bind-Mount geteilte, aber nicht erfasste Datei beim absoluten Pfad der Umgebung, in der
-die Korrektur lief — „erfasst" heißt committet, nicht geteilt. Beides steht als Grenze in
+Ein absoluter Pfad aus fremdem `$HOME` gilt als akzeptiert und wird nicht ersetzt. Ebenso
+bleibt eine per Bind-Mount geteilte, aber nicht erfasste Datei beim absoluten Pfad der
+Umgebung, in der das Ergänzen lief — „erfasst" heißt committet, nicht geteilt. Beides steht als Grenze in
 [`defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md).
 
 Die Enge ist die Idempotenz-Zusage: der zweite Lauf schreibt nichts mehr — auch nicht in
-einer zweiten Umgebung, denn beide geschriebenen Formen sind akzeptiert —, und keine von
+einer zweiten Umgebung, denn ein absoluter Pfad ist akzeptiert —, und keine von
 git erfasste Datei wird durch das Ergänzen verändert. Ohne das machte jeder Start die
 getrackten MCP-Dateien eines Projekts dreckig, und ein Repo mit eingecheckter
 Registrierung käme nie an einem sauberen Arbeitsbaum vorbei.
@@ -5077,28 +4829,28 @@ Beide Werte hält jeder Prozess beim **Start** fest und liest sie nicht von der 
 sonst wäre ein Wechsel dort nie zu erkennen — bei der Kennung wiegt das doppelt: nach
 einem `mv` über die Datei zeigt `os.Executable()` auf einen gelöschten Inode, und ein
 Server, der erst auf Nachfrage nachsähe, meldete die Kennung des **neuen** Binaries statt
-seiner eigenen. Der Schlüssel in `/api/health` wird dagegen je Anfrage berechnet: nach
-dem Umschlüsseln muss schon die nächste Antwort den neuen tragen.
+seiner eigenen. Der Schlüssel in `/api/health` wird dagegen je Anfrage gelesen, und zwar
+aus der Registrierung (`registeredKey()`): nach dem Umschlüsseln trägt schon die nächste
+Antwort den neuen, nach einem gescheiterten Umschlüsseln weiter den alten, unter dem die
+Laufzeitdatei liegt. Scheitert es nach `POST /api/config`, steht das als Hinweis in dessen
+Antwort.
 
 ### Der Aufruf
 
-`runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `careForHost()` mit
-`cleanUpLegacy()` und der Migrationsbereinigung — und
-richtet dann das Projekt nach, soweit das ohne Schaden geht; und zwar bei **jedem** Aufruf, auch bei dem,
+`runGUI()` in `cmd/k-playbook/gui.go` pflegt zuerst den Wirt — `careForHost()` — und
+richtet dabei das Projekt nach, soweit das ohne Schaden geht; und zwar bei **jedem** Aufruf, auch bei dem,
 der nur ein Fenster öffnet; im Server liefen sie nur beim allerersten Start. Die
 selbsttätigen Wege auf das Projekt, in dieser Reihenfolge:
 
 | Weg | Schreibt | Nur wenn |
 |---|---|---|
-| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteOutdatedAndUnversioned` | den eigenen Eintrag in `.mcp.json`, `opencode.json` | veralteter Wrapper-Eintrag; fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
-| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | veralteter Anstoßblock; ganz fehlende Datei ohne Konflikt in der Fallmatrix |
+| `repairMCPRegistration()` → `RepairMCP()` mit `MCPWriteUnversioned` | den eigenen Eintrag in `.mcp.json`, `opencode.json` | fehlender Eintrag oder fehlende Datei nur, wenn die Datei nicht von git erfasst ist und der Weg dorthin über keinen Symlink führt, die fehlende Datei zusätzlich nur bei einer Spur des Assistenten |
+| `repairRootInstructions()` → `RepairRootInstructions()` | `AGENTS.md` | ganz fehlende Datei ohne Konflikt in der Fallmatrix |
 
 Gemeinsame Regel: kein selbsttätiger Lauf verändert eine **von git erfasste** Datei.
 Neue, nicht erfasste Dateien darf er anlegen — ob sie eingecheckt werden, entscheidet das
-Projekt. Ausgenommen sind allein Reparaturen an Inhalt, den k-playbook selbst geschrieben
-hat: die Korrektur des veralteten Wrapper-Eintrags (`MCPStateOutdated`), der Nachzug des
-veralteten Anstoßblocks in `AGENTS.md` und die
-Migration des `CLAUDE.md`-Symlinks zur Include-Datei auf dem Lesepfad. Eine bewusste, vom Nutzer entschiedene Ausnahme ist
+Projekt. Ausgenommen ist allein die Migration des `CLAUDE.md`-Symlinks zur Include-Datei
+auf dem Lesepfad. Eine bewusste, vom Nutzer entschiedene Ausnahme ist
 außerdem das Neuanlegen einer erfassten, lokal gelöschten `AGENTS.md` (§„Instruktionen").
 Jeder Weg ist idempotent — ein zweiter Lauf schreibt
 nichts —, hält den Start bei einem Fehler nicht auf und meldet nur, wenn wirklich etwas
@@ -5171,11 +4923,10 @@ und erst wenn das scheitert, den Weg über `k-playbook` im Terminal. Der Knopf
 nur noch MCP-Einträge und Einrichtung nach und prüfte das Programm, und die Seite rief sie
 nicht mehr auf. Der Knopf kennt die Programmaktualisierung (`POST /api/update/program`,
 `applyProgramHandler()` in `webui/restart.go`) und das erneute Prüfen
-(`GET /api/update?fresh=1`); veraltete MCP-Einträge korrigiert der Start, die Einrichtung
+(`GET /api/update?fresh=1`); fehlende MCP-Einträge ergänzt der Start, die Einrichtung
 zieht die Assistenten-Karte nach.
 
-Knopf und Neustart hängen am Tag (`checkProgram()`, also `program.CheckStatus()`); ein
-Verzeichnis `k-playbook/` liest und nennt der Handler nicht. Nur „älter" löst aus, nie
+Knopf und Neustart hängen am Tag (`checkProgram()`, also `program.CheckStatus()`). Nur „älter" löst aus, nie
 „ungleich": Ein Programm über dem neuesten Tag
 (`make dev-install VERSION=…`) gilt als aktuell, und bei einem Vergleich auf Ungleichheit
 stufte der Dienst sich selbst auf ein älteres Release herab. Ist der Tag unbekannt oder
@@ -5245,8 +4996,7 @@ Fehler — ein Startweg ist das nicht, Starten bleibt der argumentlose Aufruf.
 Ist das laufende Programm älter als der neueste Release-Tag, meldet `GET /api/update` das
 (`checkProgram()`), und die Oberfläche zeigt den Knopf „Programm aktualisieren (v0.9.3 →
 v0.9.4)" (`program.latest` in der Antwort, gelesen in `static/service.js`). Das ist der
-einzige Zustand, in dem der Knopf etwas tut außer erneut zu prüfen: Den Modus `"pull"` mit
-„Update verfügbar“ gibt es seit Task 156 nicht mehr, ein Clone wird nicht verglichen. Der
+einzige Zustand, in dem der Knopf etwas tut außer erneut zu prüfen. Der
 Vergleich braucht das Netz — den Tag liest `release.LatestTag()`; ist er
 unbekannt, meldet die Prüfung nichts und nennt den Grund in `program.latestError`.
 
@@ -5485,8 +5235,8 @@ Hinweis auf die Port-Weiterleitung.
 - Abgeschaltet wird über eine leere Datei, nicht über eine Liste in der Konfiguration.
   Ein Mechanismus statt zweier.
 - `git status --porcelain` und `git rev-list --count @{u}..HEAD` für den lokalen Zustand.
-- Kein Clone im Projekt und kein Pull (Task 156): Das Programm kommt aus dem Release, die
-  Inhalte kommen mit dem Programm und vom Hub.
+- Keine Installation im Projekt: Das Programm kommt aus dem Release, die Inhalte kommen mit
+  dem Programm und vom Hub.
 - Kein Projekt-Store. Es gibt keine Liste bekannter Projekte mehr — das Werkzeug arbeitet
   auf dem Projekt, in dem es liegt.
 - Die Oberfläche läuft als Hintergrunddienst je Projekt, wiedergefunden über eine

@@ -199,7 +199,7 @@ func TestDocsScopeSubkommando(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"Scope         " + root + " (project.repoRoot)\n", "Zusätzlich    src\n", "Immer außen   /k-playbook/, /.k-playbook/, keph-backup/, .git/\n",
+		"Scope         " + root + " (project.repoRoot)\n", "Zusätzlich    src\n", "Immer außen   /.k-playbook/, keph-backup/, .git/\n",
 		"Versteckt     ausgeschlossen (.*)\n", "Aus K-PLAYBOOK.yaml  ", "Ausschlüsse   venv/, env/, node_modules/", ".gitignore (1)",
 		"im Scope\tsrc/a.go\n", "ausgeschlossen\tx.tmp\tgitignore\t.gitignore: *.tmp\n", "ausgeschlossen\t.env\thidden\t.\n",
 		"ausgeschlossen\tkeph-backup/z.md\talways\tkeph-backup/\n",

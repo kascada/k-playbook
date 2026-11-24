@@ -237,10 +237,8 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 // Kein mitgelieferter Text nennt das Feld playbook der Kontextausgabe mehr
 // als Wurzel, Leseort oder Ausschluss (Task 157): weder context.playbook.dir
 // noch playbook.dir, weder unter defaults/ noch unter share/. Die Wurzel
-// ist project.dir; ein liegengebliebener Clone steht als
-// fester Pfad <project.dir>/k-playbook/ da, nicht als Feld. Nur die
-// Liste der Fassungen im Handbuch (mcp.md) nennt context.playbook noch, als
-// das, was Fassung 6 trug.
+// ist project.dir. Nur die Liste der Fassungen im Handbuch (mcp.md) nennt
+// context.playbook noch, als das, was Fassung 6 trug.
 func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
 	assertShippedTextsLack(t, []string{"playbook.dir", "playbookDir"})
 }
@@ -915,7 +913,7 @@ func assertDocsScopeModul(t *testing.T) {
 		"Der Scope gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` und `/k-docs-tools`",
 		"`/k-doc-inventory` liest seine Quellen nach seinem eigenen Vertrag", "`k_playbook_docs_scope`",
 		"`k-playbook docs scope [<pfad>] [--check <pfad>…] --json`", "`EXTRA_PATH`", "`SCAN_ROOT`", "**Stand.**", "**Preflight.**",
-		"Immer außen   /k-playbook/, /.k-playbook/, keph-backup/, .git/", "`NEW_EXCLUDES`", "**Ausschlüsse speichern.**",
+		"Immer außen   /.k-playbook/, keph-backup/, .git/", "`NEW_EXCLUDES`", "**Ausschlüsse speichern.**",
 		"`k_playbook_docs_exclude_add`", "„Neu laden“", "`rejected`", "`unsupported`", "`/k-upgrade`",
 	} {
 		if !strings.Contains(scopeText, squashSpace(needle)) {
@@ -1244,106 +1242,37 @@ func TestDefaultsOverlaySkillIstHuelleUndText(t *testing.T) {
 	}
 }
 
-// /k-upgrade 3.8 löscht seit Task 156 einen alten Clone k-playbook/ ganz und
-// ohne Rückfrage — nur ein echtes Verzeichnis mit eigenem .git-Verzeichnis,
-// nach dem Nennen dessen, was nicht vom Repo kam — und streicht danach die
-// Zeilen, die k-playbook/ ausnehmen, aus jeder .gitignore vom
-// Projektverzeichnis bis zur Repo-Wurzel, sobald das Verzeichnis weg ist. Die
-// Vorbedingung steht für sich: Die Zeile zum Programm-Stand muss „neuestes
-// Release“ nennen. 3.8 ist die einzige Umstellung und behält ihre Nummer;
-// Schritt 3, Schritt 4, Einleitung und Hülle nennen sie.
-func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
+// /k-upgrade kennt nur den heutigen Aufbau (Task 192): keine Umstellung unter
+// Schritt 3, kein Löschen eines Clones, keine .gitignore-Zeilen dazu — weder im
+// Text noch in der Hülle. Der Vergleich des Programms gilt dem neuesten
+// Release.
+func TestDefaultsKUpgradeOhneAltbestand(t *testing.T) {
 	file := readRepoDefault(t, "commands/k-upgrade.md")
-	start, end := strings.Index(file, "### 3.8 — "), strings.Index(file, "## Schritt 4 — ")
-	if start < 0 || end < start {
-		t.Fatal("Abschnitt 3.8 nicht vor Schritt 4 gefunden")
+	if count := strings.Count(file, "\n### 3."); count != 0 {
+		t.Errorf("erwartet keine Umstellung unter Schritt 3, gefunden %d", count)
 	}
-	if count := strings.Count(file, "\n### 3."); count != 1 {
-		t.Fatalf("erwartet genau eine Umstellung unter Schritt 3, gefunden %d", count)
-	}
-	section := squashSpace(file[start:end])
+	text := squashSpace(file)
 	for _, needle := range []string{
-		"**Anlass:** `<project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder eine `.gitignore` von `project.dir` bis `project.repoRoot` trägt eine der Zeilen",
-		"**Vorbedingung:** Schritt 2 hat die Zeile `Programm-Stand: nichts zu tun — …` ausgegeben, und sie nennt `neuestes Release`",
-		"So schreibt sie erst ein Programm ab v0.16.39",
-		"Fehlt die Zeile oder nennt sie stattdessen `Installation`, löschst und änderst du nichts",
-		"`k-playbook/ löschen wartet auf den Binärwechsel`",
-		"braucht den Clone für sein eigenes Upgrade",
-		`test -L "<project.dir>/k-playbook" && echo SYMLINK`,
-		`test -d "<project.dir>/k-playbook/.git" && ! test -L "<project.dir>/k-playbook/.git" && echo CLONE`,
-		"nur ein echtes Verzeichnis, kein Symlink, in dem direkt ein Verzeichnis `.git` liegt",
-		"`.git` ist eine Datei wie in einem Submodul oder Worktree",
-		"`k-playbook/ ist ein Symlink, nichts gelöscht`",
-		"`k-playbook/ ist kein Clone, nichts gelöscht: <grund>`",
-		"auch mit unverfolgten, geänderten oder ignorierten Dateien und mit eigenen Commits darin",
-		`git -C "<project.dir>/k-playbook" status --porcelain --ignored`,
-		`git -C "<project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes`,
-		"`k-playbook/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`",
-		"jede Zeile des ersten Befehls, auch wenn es viele sind, und die Zahl der Commits",
-		"Das ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage gibt es auch dann nicht.",
-		`chmod -R u+w -- "<project.dir>/k-playbook"`,
-		`rm -rf -- "<project.dir>/k-playbook"`,
-		"von `project.dir` aufwärts bis `project.repoRoot`, beide eingeschlossen",
-		"`k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, `**/k-playbook` und `**/k-playbook/`",
-		"`<projektpfad>/k-playbook/`, mit und ohne `/` vorn, mit und ohne `/` hinten",
-		"Kommentare und alle anderen Muster bleiben stehen",
-		"Existiert es nicht oder nicht mehr, gleich wer es gelöscht hat, fällt die Zeile.",
-		"bleibt auch die Zeile, und die Meldung sagt warum",
-		"noch ein anderes vorhandenes Verzeichnis trifft, etwa den Clone eines zweiten Projekts",
-		"ohne Vorlage und ohne Rückfrage, auch in einer versionierten `.gitignore`",
-		"Committet wird nicht",
-		"`k-playbook/ gelöscht`",
-		"andere Checkouts lassen `/k-upgrade` laufen, bevor sie mit `git add -A` committen",
-		"findet `k-playbook/` sonst als unverfolgtes Verzeichnis im Arbeitsbaum",
-	} {
-		if !strings.Contains(section, needle) {
-			t.Errorf("3.8 nennt %q nicht", needle)
-		}
-	}
-	// Kein Befehl der Vorlage darf den Pfad ungequotet einsetzen, und keiner
-	// nimmt context.playbook.dir: Das Feld fällt mit Task 157.
-	for _, bare := range []string{"test -L <project.dir>", "rm -rf -- <project.dir>", "chmod -R u+w -- <project.dir>", "git -C <project.dir>", "context.playbook.dir"} {
-		if strings.Contains(section, bare) {
-			t.Errorf("3.8 setzt den Pfad ungequotet ein oder nennt das alte Feld: %q", bare)
-		}
-	}
-	general := squashSpace(file[:start])
-	for _, needle := range []string{
-		"Ausgenommen ist ein Fall, und nur er: der Clone `k-playbook/`, den 3.8 löscht, samt der Zeilen, die 3.8 streicht, auch in einer versionierten `.gitignore`",
-		"das Löschen eines alten Clones `k-playbook/` samt der Zeilen, die `k-playbook/` in einer `.gitignore` ausnehmen",
 		"wenn das laufende älter ist als das neueste Release",
-		"sie behält ihre Nummer",
+		"Zurzeit gibt es keine Umstellung: Schritt 3 meldet `Umstellungen: alles erledigt.`",
 	} {
-		if !strings.Contains(general, needle) {
-			t.Errorf("Einleitung oder Schritt 3 nennt %q nicht", needle)
-		}
-	}
-	four := squashSpace(file[end:])
-	for _, needle := range []string{
-		"Für 3.8 die Zeilen aus Schritt 3",
-		"`k-playbook/ löschen wartet auf den Binärwechsel`",
-	} {
-		if !strings.Contains(four, needle) {
-			t.Errorf("Schritt 4 nennt %q nicht", needle)
+		if !strings.Contains(text, needle) {
+			t.Errorf("k-upgrade.md nennt %q nicht", needle)
 		}
 	}
 	hull, err := os.ReadFile(filepath.Join("..", "..", "..", "share", "commands", "k-upgrade.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	description := string(hull)
-	for _, needle := range []string{
-		"Zieht Kephalaion, Programm und Projekt nach",
-		"wenn es älter ist als das neueste Release",
-		"(3.8) — er löscht ohne Rückfrage einen alten Clone k-playbook/ ganz",
-		"streicht aus jeder .gitignore vom Projektverzeichnis bis zur Repo-Wurzel die Zeilen, die k-playbook/ ausnehmen, sobald das Verzeichnis weg ist",
-	} {
-		if !strings.Contains(description, needle) {
-			t.Errorf("die Hülle nennt %q nicht", needle)
+	for name, content := range map[string]string{"k-upgrade.md": file, "die Hülle": string(hull)} {
+		for _, gone := range []string{"3.8", "Clone", "k-playbook/", "Binärwechsel", "v0.16.39"} {
+			if strings.Contains(content, gone) {
+				t.Errorf("%s nennt noch %q", name, gone)
+			}
 		}
 	}
-	if strings.Contains(description, "älter ist als die Installation") {
-		t.Error("die Hülle vergleicht das Programm noch mit der Installation")
+	if !strings.Contains(string(hull), "wenn es älter ist als das neueste Release") {
+		t.Error("die Hülle vergleicht das Programm nicht mit dem neuesten Release")
 	}
 }
 

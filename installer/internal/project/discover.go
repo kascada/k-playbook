@@ -15,30 +15,15 @@ import (
 // Hauptverzeichnis des Projekts.
 //
 // Anker ist die Datei, nicht das Verzeichnis ProjectDirName: Die Link-Pflege
-// legt das Verzeichnis auch ohne Konfiguration an (für den Link share), und
-// ein liegengebliebener Clone <projekt>/k-playbook/ (Altbestand, siehe
-// PlaybookDirName) kann es aus einem älteren Stand des Quell-Repos tragen. Am
+// legt das Verzeichnis auch ohne Konfiguration an (für den Link share). Am
 // Verzeichnis allein fände Discover ein Projekt, wo keines ist.
 const ConfigFileName = "K-PLAYBOOK.yaml"
-
-// PlaybookDirName ist der Name des früheren Clones innerhalb des Projekts: Bis
-// Task 156 lag die Installation als Git-Clone unter <projekt>/k-playbook/.
-// Heute ist die Installation das Binary allein, und /k-upgrade (Umstellung
-// 3.8) löscht einen liegengebliebenen Clone. Den Namen braucht nur noch, wer
-// Altbestand erkennt: alte Links, der Wrapper, das Zurücksetzen der
-// Konfiguration, der Vorschlag beim ersten Start.
-const PlaybookDirName = "k-playbook"
 
 // ErrNotFound meldet, dass ab dem Startverzeichnis aufwärts kein Projekt liegt.
 var ErrNotFound = errors.New("kein k-playbook-Projekt gefunden")
 
 // Discover liefert das Hauptverzeichnis des Projekts, erkannt an
 // .k-playbook/K-PLAYBOOK.yaml darin.
-//
-// Liegt auf einer Ebene noch die K-PLAYBOOK.yaml am früheren Ort direkt im
-// Hauptverzeichnis, zieht Discover sie vorher um (migrateConfig). Das steht
-// hier, weil jeder Leser und Schreiber der Konfiguration erst über Discover
-// an sein Projektverzeichnis kommt: Umgezogen ist, bevor irgendwer liest.
 //
 // Gesucht wird ab startDir aufwärts, ein Kandidat je Ebene. Die Suche bricht
 // bewusst nicht am Git-Worktree-Root ab: Das Repository kann unterhalb des
@@ -56,9 +41,6 @@ func Discover(startDir string) (string, error) {
 	home := homeDir()
 
 	for {
-		if err := migrateConfig(dir); err != nil {
-			return "", err
-		}
 		if fileExists(ConfigPath(dir)) {
 			return dir, nil
 		}
@@ -75,71 +57,9 @@ func Discover(startDir string) (string, error) {
 	}
 }
 
-// PlaybookDir ist der Ort des früheren Clones innerhalb eines Projekts (siehe
-// PlaybookDirName). Ob dort noch etwas liegt, sagt der Pfad nicht.
-func PlaybookDir(projectDir string) string {
-	return filepath.Join(projectDir, PlaybookDirName)
-}
-
 // ConfigPath ist der Ort der K-PLAYBOOK.yaml eines Projekts.
 func ConfigPath(projectDir string) string {
 	return filepath.Join(projectDir, ProjectDirName, ConfigFileName)
-}
-
-// legacyConfigPath ist der frühere Ort der K-PLAYBOOK.yaml, direkt im
-// Hauptverzeichnis. Nur migrateConfig kennt ihn.
-func legacyConfigPath(projectDir string) string {
-	return filepath.Join(projectDir, ConfigFileName)
-}
-
-// migrateConfig zieht eine K-PLAYBOOK.yaml vom früheren Ort nach ConfigPath um.
-//
-// Liegt am neuen Ort schon eine, gilt sie, und die alte wird gelöscht. Sonst
-// wird die alte verschoben. Ist die alte ein Symlink, zieht die Datei um, auf
-// die er zeigt, und der Link wird entfernt: Ein verschobener relativer Link zeigte
-// ins Leere. Gelöscht wird bei vorhandenem neuem Ort nur der Link, nie sein
-// Ziel; das kann außerhalb des Projekts liegen.
-//
-// Ohne alte Datei, oder wenn sie keine lesbare Datei ist (ein Verzeichnis, ein
-// Link ins Leere), geschieht nichts.
-func migrateConfig(dir string) error {
-	legacy := legacyConfigPath(dir)
-	if !fileExists(legacy) {
-		return nil
-	}
-	target := ConfigPath(dir)
-
-	if fileExists(target) {
-		if err := os.Remove(legacy); err != nil {
-			return fmt.Errorf("alte %s neben %s nicht gelöscht: %w", legacy, target, err)
-		}
-		return nil
-	}
-
-	source := legacy
-	info, err := os.Lstat(legacy)
-	if err != nil {
-		return fmt.Errorf("%s nicht lesbar: %w", legacy, err)
-	}
-	isLink := info.Mode()&os.ModeSymlink != 0
-	if isLink {
-		if source, err = filepath.EvalSymlinks(legacy); err != nil {
-			return fmt.Errorf("Ziel von %s nicht auflösbar: %w", legacy, err)
-		}
-	}
-
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return fmt.Errorf("%s anlegen: %w", filepath.Dir(target), err)
-	}
-	if err := os.Rename(source, target); err != nil {
-		return fmt.Errorf("%s nicht nach %s verschoben: %w", source, target, err)
-	}
-	if isLink {
-		if err := os.Remove(legacy); err != nil {
-			return fmt.Errorf("Link %s nach dem Umzug nicht entfernt: %w", legacy, err)
-		}
-	}
-	return nil
 }
 
 // homeDir liefert das Home-Verzeichnis aufgelöst, damit der Vergleich in

@@ -581,7 +581,7 @@ func TestReviewWriteAIEntry(t *testing.T) {
 
 func TestReviewWriteAIEntryScanTriageDoneUndStatus(t *testing.T) {
 	root := newReviewProject(t)
-	runDir := mustCreateRun(t, root, []review.Entry{{Name: scanTriageEntry, Kind: review.KindAI, RecipeKey: scanTriageEntry, RecipePath: filepath.Join(root, project.PlaybookDirName, "commands", filepath.FromSlash(scanTriageModule)), RecipeOrigin: "dist", Title: "Review-Triage", ResultRequired: boolPtr(true), DefaultResult: scanTriageResult}})
+	runDir := mustCreateRun(t, root, []review.Entry{{Name: scanTriageEntry, Kind: review.KindAI, RecipeKey: scanTriageEntry, RecipePath: filepath.Join(root, "k-playbook", "commands", filepath.FromSlash(scanTriageModule)), RecipeOrigin: "dist", Title: "Review-Triage", ResultRequired: boolPtr(true), DefaultResult: scanTriageResult}})
 	mustWriteFile(t, filepath.Join(runDir, scanTriageResult), minimalTriage())
 	result, _, err := reviewWriteAIEntryTool(context.Background(), nil, reviewWriteAIEntryInput{
 		reviewBaseInput: reviewBaseInput{ProjectDir: root},
@@ -1697,7 +1697,7 @@ func scanTriageRunEntry(root string) review.Entry {
 		Name:           scanTriageEntry,
 		Kind:           review.KindAI,
 		RecipeKey:      scanTriageEntry,
-		RecipePath:     filepath.Join(root, project.PlaybookDirName, "commands", filepath.FromSlash(scanTriageModule)),
+		RecipePath:     filepath.Join(root, "k-playbook", "commands", filepath.FromSlash(scanTriageModule)),
 		RecipeOrigin:   "dist",
 		Title:          "Review-Triage",
 		ResultRequired: boolPtr(true),

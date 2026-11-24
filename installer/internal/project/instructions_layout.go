@@ -17,12 +17,11 @@ import (
 // projektabhängige Variable: eine umgedrehte Richtung müsste in Prüfung,
 // Oberfläche und Doku dauerhaft mitgedacht werden.
 //
-// Früher war CLAUDE.md ein Symlink auf AGENTS.md. Der hielt beide Dateien
-// zwangsläufig gleich, brach aber bei jedem Editor, der beim Speichern atomar
-// ersetzt — danach standen zwei echte Dateien nebeneinander, und die Prüfung
-// meldete „echte Datei statt Symlink". Die Include-Datei kennt diesen Fall
-// nicht. Ein noch stehender Symlink ist eine ältere Bauform und wird von
-// ApplyLinks verlustfrei ersetzt: der Inhalt steht ohnehin in AGENTS.md.
+// Ein Symlink CLAUDE.md -> AGENTS.md hielte beide Dateien zwangsläufig gleich,
+// bricht aber bei jedem Editor, der beim Speichern atomar ersetzt — danach
+// stünden zwei echte Dateien nebeneinander. Die Include-Datei kennt diesen
+// Fall nicht. Steht ein solcher Symlink im Projekt, ersetzt ApplyLinks ihn
+// verlustfrei: der Inhalt steht ohnehin in AGENTS.md.
 const ClaudeInstructionsFile = "CLAUDE.md"
 
 // ClaudeIncludeLine ist die Import-Zeile, mit der CLAUDE.md AGENTS.md lädt.
@@ -36,30 +35,6 @@ const ClaudeIncludeLine = "@" + RootInstructionsFile
 // Instructions (instructions/always/), nicht in der Datei.
 func claudeIncludeStub() string {
 	return ClaudeIncludeLine + "\n"
-}
-
-// legacyClaudeIncludeStubs sind die früheren Stubtexte mit Hinweis über der
-// Import-Zeile. applyIncludeFile ersetzt eine CLAUDE.md, die (getrimmt) genau
-// einem davon entspricht, durch den heutigen Stub; anderer Inhalt bleibt.
-func legacyClaudeIncludeStubs() []string {
-	const head = "Diese Datei ist nur der Include für Claude Code. Projektregeln gehören nach\n" +
-		RootInstructionsFile + " — was hier steht, erreicht OpenCode "
-	return []string{
-		head + "nicht.\n\n" + ClaudeIncludeLine + "\n",
-		head + "und Cursor nicht.\n\n" + ClaudeIncludeLine + "\n",
-	}
-}
-
-// isLegacyClaudeIncludeStub meldet, ob content (Whitespace getrimmt) genau
-// einer früheren Stubfassung entspricht.
-func isLegacyClaudeIncludeStub(content string) bool {
-	trimmed := strings.TrimSpace(content)
-	for _, legacy := range legacyClaudeIncludeStubs() {
-		if trimmed == strings.TrimSpace(legacy) {
-			return true
-		}
-	}
-	return false
 }
 
 // hasEffectiveInclude meldet, ob content die Import-Zeile so trägt, dass Claude
@@ -136,8 +111,8 @@ const (
 	// kindInclude: eine reguläre CLAUDE.md, die die Import-Zeile @AGENTS.md
 	// wirksam trägt — nicht in Backticks, nicht in einem Code-Block. Das
 	// Kriterium ist allein der Include, nicht ob daneben eigener Inhalt steht:
-	// die Toleranz erlaubt Projektinhalt neben dem Include, und der Stub trägt
-	// selbst eine Hinweiszeile. Nur CLAUDE.md kann diesen Zustand haben; ein
+	// die Toleranz erlaubt Projektinhalt neben dem Include. Der erzeugte Stub
+	// selbst ist nur die Import-Zeile. Nur CLAUDE.md kann diesen Zustand haben; ein
 	// AGENTS.md mit derselben Zeile importierte sich selbst und bleibt
 	// kindRegular.
 	kindInclude
@@ -407,14 +382,14 @@ func matchInstructions(projectDir string, claude pathState, agents pathState) in
 	case claude.kind == kindMissing && agents.kind == kindRegular:
 		return plainPlan(13)
 
-	// 14 — Migration: der Symlink aus einer älteren Fassung neben echter
-	// AGENTS.md. Hier ist nichts anzufassen; ApplyLinks ersetzt ihn
-	// verlustfrei durch die Include-Datei.
+	// 14 — CLAUDE.md ist ein Symlink auf eine echte AGENTS.md. Hier ist
+	// nichts anzufassen; ApplyLinks ersetzt ihn verlustfrei durch die
+	// Include-Datei.
 	case claude.kind == kindLinkToOther && agents.kind == kindRegular:
 		return plainPlan(14)
 
-	// 15 — der alte Symlink zeigt auf ein noch fehlendes AGENTS.md und wartet
-	// auf sein Ziel.
+	// 15 — der Symlink an CLAUDE.md zeigt auf ein noch fehlendes AGENTS.md und
+	// wartet auf sein Ziel.
 	case claude.kind == kindLinkToOther && agents.kind == kindMissing:
 		return plainPlan(15)
 

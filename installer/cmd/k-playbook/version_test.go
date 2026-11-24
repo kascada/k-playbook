@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -44,17 +43,10 @@ func TestVersionGibtNurDieVersionAus(t *testing.T) {
 // Startet `k-playbook` aus einem Programm, das älter ist als das neueste
 // Release, steht genau eine Zeile im Terminal, mit `k-playbook upgrade` als
 // Weg. Gleich, neuer und unbekannt bleiben still; ohne eigene Version wird der
-// Tag gar nicht abgerufen. Eine VERSION in einem alten Verzeichnis
-// k-playbook/ spielt keine Rolle.
+// Tag gar nicht abgerufen.
 func TestStartAusAelteremProgrammMeldetEineZeile(t *testing.T) {
 	root := t.TempDir()
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n")
-	if err := os.MkdirAll(filepath.Join(root, project.PlaybookDirName), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, project.PlaybookDirName, "VERSION"), []byte("v9.9.9\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	before, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
@@ -72,11 +64,6 @@ func TestStartAusAelteremProgrammMeldetEineZeile(t *testing.T) {
 	for _, want := range []string{"v0.9.3", "v0.9.4", "neueste Release", "Programm aktualisieren", project.UpgradeCommand} {
 		if !strings.Contains(line, want) {
 			t.Errorf("die Zeile nennt %q nicht: %q", want, line)
-		}
-	}
-	for _, gone := range []string{"v9.9.9", "make -C " + project.PlaybookDirName + " install"} {
-		if strings.Contains(line, gone) {
-			t.Errorf("die Zeile nennt noch %q: %q", gone, line)
 		}
 	}
 

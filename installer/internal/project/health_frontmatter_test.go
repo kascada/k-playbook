@@ -52,7 +52,10 @@ func TestHealthFrontmatterPruefteFragmenteAberNichtAbgeschaltetes(t *testing.T) 
 	}
 }
 
-// Alles, was das Binary ausliefert, hat ein lesbares Frontmatter.
+// Jede Markdown-Datei unter defaults/ — den Texten, die über Kephalaion
+// ausgeliefert werden — hat ein lesbares Frontmatter. Geprüft wird nur
+// defaults/; share/, das das Binary selbst mitbringt, deckt dieser Test nicht
+// ab.
 func TestFrontmatterDerAuslieferungIstGueltig(t *testing.T) {
 	defaults := filepath.Join("..", "..", "..", "defaults")
 	count := 0

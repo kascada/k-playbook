@@ -523,18 +523,13 @@ func mustJSON(t *testing.T, value any) []byte {
 	return data
 }
 
-// Das Briefing nennt keinen Clone k-playbook/ mehr (Task 157, Fassung 7), auch
-// wenn ein liegengebliebener im Projekt liegt, und seit Fassung 8 kein Feld
-// local (Task 159): die einzige Wurzel ist project.dir. Seit Fassung 9
-// (Task 187) fehlt der Abschnitt context ganz.
+// Das Briefing trägt kein Feld playbook (Fassung 7) und kein Feld local
+// (Fassung 8): die einzige Wurzel ist project.dir. Seit Fassung 9 (Task 187)
+// fehlt der Abschnitt context ganz.
 func TestBriefingNenntKeinPlaybook(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
-	if err := os.MkdirAll(filepath.Join(PlaybookDir(root), ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
 	briefing, err := BuildBriefing(t.Context(), root)
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
@@ -558,9 +553,6 @@ func TestBriefingNenntKeinPlaybook(t *testing.T) {
 		if _, ok := raw[absent]; ok {
 			t.Errorf("das Briefing trägt %s: %s", absent, raw[absent])
 		}
-	}
-	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(encoded), string(quoted)) {
-		t.Errorf("das Briefing nennt %s:\n%s", PlaybookDir(root), encoded)
 	}
 }
 

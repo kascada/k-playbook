@@ -208,6 +208,12 @@ func TestProjectHandbookOhneKephalaion(t *testing.T) {
 		!strings.Contains(err.Error(), "Abhilfe") {
 		t.Fatalf("List: %v", err)
 	}
+	// Die Abhilfe nennt den Ort, an dem der Schritt steht: die Statusseite
+	// mit der Karte zur Kephalaion-Collection, nicht die Seite Setup.
+	if !strings.Contains(err.Error(), "Statusseite") || !strings.Contains(err.Error(), "Kephalaion-Collection einrichten") ||
+		strings.Contains(err.Error(), "Setup") {
+		t.Errorf("Abhilfe nennt die Karte der Statusseite nicht: %v", err)
+	}
 	if _, _, err := handbook.Read("README.md"); handbookCodeOf(err) != DocCodeKephalaionUnavailable {
 		t.Errorf("Read: %v", err)
 	}

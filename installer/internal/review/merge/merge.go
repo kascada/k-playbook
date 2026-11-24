@@ -263,6 +263,18 @@ func Build(options Options) (Result, error) {
 		context.Present = true
 		context.Started = status.Started
 		context.Finished = status.Finished
+		if entry.Kind == review.KindAI {
+			// Die Zeiten eines AI-Eintrags heißen in seiner Datei startedAt
+			// und finishedAt (aiEntryTimes); started und finished gehen vor,
+			// wo sie stehen.
+			startedAt, finishedAt := aiEntryTimes(options.RunDir, entry.Name)
+			if context.Started == "" {
+				context.Started = startedAt
+			}
+			if context.Finished == "" {
+				context.Finished = finishedAt
+			}
+		}
 		context.Reason = status.Reason
 		context.Jobs = summarizeJobs(status.Jobs)
 		entries = append(entries, context)
@@ -362,6 +374,29 @@ func runContext(options Options, run review.Run) RunContext {
 // Nur AI-Einträge haben eine: review.EntryMode macht aus dem leeren Feld die
 // Vorgabe perspective, und die einem Tool-Eintrag zuzuschreiben behauptete eine
 // Betriebsart, die es dort nicht gibt.
+// aiEntryTimes liest die Zeiten eines AI-Eintrags unter den Namen, die
+// k_playbook_review_write_ai_entry schreibt: startedAt und finishedAt. Die
+// Datei eines AI-Eintrags trägt sie so — dieselbe Struktur ist Eingabe des
+// Werkzeugs und Statusausgabe —, review.EntryStatus kennt nur started und
+// finished. Ohne diesen zweiten Blick kamen die Zeiten der AI-Einträge im
+// Merge nie an. Umbenannt wird nichts; der Merge liest beide Namen. Eine
+// Datei, die sich hier nicht lesen lässt, liefert keine Zeiten: Den Fehler
+// meldet schon review.ReadEntryStatus.
+func aiEntryTimes(runDir string, name string) (string, string) {
+	data, err := os.ReadFile(review.EntryFile(runDir, name))
+	if err != nil {
+		return "", ""
+	}
+	var times struct {
+		StartedAt  string `json:"startedAt"`
+		FinishedAt string `json:"finishedAt"`
+	}
+	if err := json.Unmarshal(data, &times); err != nil {
+		return "", ""
+	}
+	return times.StartedAt, times.FinishedAt
+}
+
 func entryMode(entry review.Entry) review.Mode {
 	if entry.Kind != review.KindAI {
 		return ""

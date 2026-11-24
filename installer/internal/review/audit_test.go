@@ -225,7 +225,7 @@ func TestPathExcludedFromScope(t *testing.T) {
 		"commands/k-audit.md":               false,
 		"installer/.golangci.yml":           false,
 		".golangci.yml":                     false,
-		"k-playbook/reviews/review-tech.md": true,
+		"k-playbook/reviews/review-tech.md": false,
 		"installer/testdata/go.mod":         true,
 		"web/node_modules/x/index.js":       true,
 		"third/vendor/lib/a.go":             true,

@@ -106,8 +106,8 @@ func TestKonfigurierterHelmWertOhneZeileErzeugtHinweis(t *testing.T) {
 			"helm/prod.yaml", "helm-chart-generic.redis.standalone.tag", "helm/prod.yaml", "die Datei ist keine Quelle des Inventars"},
 		{"nicht gefunden", map[string]string{},
 			"helm/values.yaml", "a.tag", "helm/values.yaml", "die Datei liegt nicht auf der Platte"},
-		{"ausgeschlossen", map[string]string{"k-playbook/helm/values.yaml": redisValues},
-			"k-playbook/helm/values.yaml", "helm-chart-generic.redis.standalone.tag", "k-playbook/helm/values.yaml", "Ausschlussregel `k-playbook/**`"},
+		{"ausgeschlossen", map[string]string{"werkzeug/helm/values.yaml": redisValues},
+			"werkzeug/helm/values.yaml", "helm-chart-generic.redis.standalone.tag", "werkzeug/helm/values.yaml", "Ausschlussregel `werkzeug/**`"},
 		{"nicht auswertbar", map[string]string{"helm/values.yaml": "a:\n  b: [\n"},
 			"helm/values.yaml", "a.b", "helm/values.yaml", "die Datei ist nicht auswertbar"},
 		{"Muster ohne Treffer", map[string]string{},
@@ -122,6 +122,9 @@ func TestKonfigurierterHelmWertOhneZeileErzeugtHinweis(t *testing.T) {
 				files[name] = content
 			}
 			files[configKey] = helmValuesConfig("  - path: " + tc.path + "\n    key: " + tc.key + "\n    item: container/redis\n")
+			if strings.HasPrefix(tc.path, "werkzeug/") {
+				files[configKey] += "exclude:\n  - werkzeug/**\n"
+			}
 			result := collectFiles(t, files)
 
 			for _, entry := range result.Entries {

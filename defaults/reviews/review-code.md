@@ -207,8 +207,8 @@ Was im Audit bleibt:
 ## Ausschlüsse
 
 Diese Ausschlüsse begrenzen den Scope im Evidence-Lauf und im Report. Die zentralen
-Ausschlüsse der Modulsuche — `k-playbook/`, `vendor/`,
-`node_modules/`, `testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
+Ausschlüsse der Modulsuche — `vendor/`, `node_modules/`,
+`testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
 nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
 
 - Generierter oder gebündelter Code und abgelegte Kopien alter Stände (`_old/`,

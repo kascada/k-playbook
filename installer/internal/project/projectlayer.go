@@ -81,7 +81,7 @@ func (s *kephCollectionSource) indexProject() error {
 	if err != nil {
 		return docRefErrorf(DocCodeKephalaionUnavailable,
 			"die projekteigene Ebene hinter k-playbook: liegt in %s unter %s:/%s/ und ist ohne Kephalaion nicht erreichbar: %w — "+
-				"Abhilfe: Kephalaion einrichten über /k-gui (k-playbook gui, Abschnitt Kephalaion)",
+				"Abhilfe: Kephalaion einrichten auf der Statusseite der Oberfläche, Karte „Kephalaion-Collection einrichten“ (k-playbook ohne Argument oder /k-gui)",
 			address, DocSchemeKeph, s.root, err)
 	}
 	entries, err := store.List(s.ctx, kephalaion.ListRequest{Path: s.root, Recursive: true})

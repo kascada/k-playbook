@@ -93,8 +93,9 @@ type baseToolEntry struct {
 // DetectBaseTools liest die Matrix und prüft je Eintrag den PATH.
 //
 // Im Muster von DetectGH(): ein billiger Host-Befund ohne Unterprozess, der
-// deshalb in der Kontextausgabe stehen darf. Das Skript wird nicht aufgerufen —
-// weder mit --json noch sonstwie.
+// deshalb bei jedem Teilabruf environment des Briefings, in der
+// Umgebungsprüfung und im Kontext der Oberfläche erhoben werden darf. Das
+// Skript wird nicht aufgerufen — weder mit --json noch sonstwie.
 func DetectBaseTools(projectDir string) BaseTools {
 	state := BaseTools{
 		Matrix:         BaseToolMatrix(projectDir),

@@ -15,8 +15,8 @@
 //     wird nur diese Weiterleitung, ohne ihr zu folgen. Entwürfe und
 //     Vorabversionen zeigt die Adresse nicht, und die CI veröffentlicht ein
 //     Release erst mit allen Assets (.github/workflows/release.yml). Ein Tag
-//     ohne fertiges Release ist damit unsichtbar — anders als früher mit
-//     `git ls-remote`, das den Tag nannte, sobald er gepusht war.
+//     ohne fertiges Release ist damit unsichtbar; `git ls-remote` nennte ihn,
+//     sobald er gepusht ist.
 //   - Die Prüfsummen kommen aus der committeten SHA256SUMS des Tags, über
 //     raw.githubusercontent.com — nicht als Release-Asset: Die erwartete Summe
 //     kommt so über den Git-Stand, das Binary über das Release, und ein

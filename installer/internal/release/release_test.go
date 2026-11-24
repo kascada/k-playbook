@@ -85,7 +85,7 @@ func TestLatestTagLiestDieWeiterleitung(t *testing.T) {
 	}
 
 	// Ein absolutes Ziel, wie GitHub es schickt.
-	latest(t, http.StatusFound, server.URL+"/releases/tag/v0.16.38")
+	latest(t, http.StatusFound, server.URL+"/releases/tag/v0.17.3")
 	// latest ersetzt EnvSource durch einen neuen Server; dessen Adresse ist
 	// eine andere — das Ziel unter der alten gilt nicht als Release.
 	if _, err := LatestTag(context.Background()); err == nil {
@@ -94,11 +94,11 @@ func TestLatestTagLiestDieWeiterleitung(t *testing.T) {
 	var calls2 atomic.Int32
 	server2 := source(t, func(w http.ResponseWriter, r *http.Request) {
 		calls2.Add(1)
-		w.Header().Set("Location", "http://"+r.Host+"/releases/tag/v0.16.38")
+		w.Header().Set("Location", "http://"+r.Host+"/releases/tag/v0.17.3")
 		w.WriteHeader(http.StatusFound)
 	})
 	tag, err = LatestTag(context.Background())
-	if err != nil || tag != "v0.16.38" {
+	if err != nil || tag != "v0.17.3" {
 		t.Fatalf("absolutes Ziel unter %s: %q, %v", server2.URL, tag, err)
 	}
 }
@@ -472,8 +472,8 @@ func TestInstallErsetztSymlinkSelbst(t *testing.T) {
 	content := []byte("neu")
 	source(t, releaseHandler("v0.9.4", sumOf(content)+"  "+AssetName()+"\n", map[string][]byte{AssetName(): content}))
 	target := installTarget(t)
-	elsewhere := filepath.Join(t.TempDir(), "wrapper")
-	if err := os.WriteFile(elsewhere, []byte("wrapper"), 0o755); err != nil {
+	elsewhere := filepath.Join(t.TempDir(), "anderswo")
+	if err := os.WriteFile(elsewhere, []byte("anderswo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(elsewhere, target); err != nil {
@@ -488,7 +488,7 @@ func TestInstallErsetztSymlinkSelbst(t *testing.T) {
 		t.Fatalf("am Ziel liegt noch ein Link: %v, %v", info, err)
 	}
 	assertUntouched(t, target, "neu")
-	assertUntouched(t, elsewhere, "wrapper")
+	assertUntouched(t, elsewhere, "anderswo")
 }
 
 // Ein plattformfremdes Binary am Ziel — Host und DevContainer mit demselben

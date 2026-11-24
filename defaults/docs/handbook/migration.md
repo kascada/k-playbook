@@ -18,7 +18,7 @@ The migration to the project-local model is complete and incorporated into the d
 | Commands, the briefing once per session | [`commands.md`](./commands.md) |
 | Recipes, results, remediation policy | [`code-review.md`](./code-review.md), [`k-playbook-format.md`](./k-playbook-format.md#remediation) |
 | Removed: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
-| Tool: find anchors, linking, update, direct installation, legacy artifacts, web API | [`../installer/docs/architecture.md`](../../../installer/docs/architecture.md) |
+| Tool: find anchors, linking, update, direct installation, web API | [`../installer/docs/architecture.md`](../../../installer/docs/architecture.md) |
 | Command names and review handoff: `/k-audit`, `/k-review`, `/k-task-refine`, consistent `review-triage.md` | [`commands.md`](./commands.md), [`code-review.md`](./code-review.md), [`review-runs.md`](./review-runs.md) |
 
 ## Division Of Work: Development Repository Vs. Installation
@@ -28,8 +28,7 @@ skills, commands, reviews and rules, the installer, and the documentation are cr
 and made available through Git. Work happens against the repository state; what is
 installed is something else and may carry a different version: the binary under
 `~/.local/bin/k-playbook`, what it unpacks into `~/.local/share/k-playbook/`, and the texts
-the hub carries. Until task 156 the installation was a separate clone alongside it under
-`k-playbook/`.
+the hub carries.
 
 **The actual installation is different.** The reference project for testing and adapting is
 `/home/kleist/dev/Aiva/kascada/`. Every change is checked there against a real, evolved
@@ -112,9 +111,7 @@ findings at all -- it supplies `grype` and remains outside the merge.
   runner search for manifests under the target and start the job once per module. This lets
   `govulncheck`, `golangci-lint`, and `gosec` run even in projects whose `go.mod` is not at the
   root. `gosec` was initially set to `target` -- measurement showed it then checked nothing
-  (0 rather than 154 findings), and it has since also been set to `module`; its exclusions for
-  `k-playbook/` were removed without replacement because module search skips those directories
-  anyway.
+  (0 rather than 154 findings), and it has since also been set to `module`.
 
 **Measured; belongs in scan jobs.** Compared at `~/dev/Aiva/kascada` (351 files, 59,000 lines):
 
@@ -245,7 +242,7 @@ run of a family recipe. This is the deliberate consequence of the migration: `/k
 accepts exactly one result file and is not extended for multiple sources.
 
 **What the removal means for already configured projects.** In a target project that updated
-its installation -- at that time a clone -- it meant two things:
+its installation it meant two things:
 
 - With the update, the command disappears from the catalog, and the symlinks under
   `.claude/commands/` and `.opencode/commands/` are then orphaned.
@@ -310,14 +307,6 @@ addressed in this order:
    `/k-remediation` understands `review-triage.md` as the current format;
    historical `assessment.md`/`findings.md` remain legacy fallback. Only the concrete quality of
    task creation from bundles remains open in the end-to-end test.
-
-**Small cleanup item: installation sync -- overtaken.** At the time the installation was a
-write-protected clone in the project, and the last two merges needed it unlocked by hand so
-that `scripts/severity.tsv` (from Task 016) was available; the open question was a more
-convenient way to bring the development state into that clone. The question is gone with
-the clone (task 156): the scripts come with the binary and are unpacked into
-`~/.local/share/k-playbook/scripts/`, and `make dev-install` in the source repository brings
-a development state onto the machine.
 
 ## Open, Without A Specific Date
 

@@ -225,7 +225,10 @@ func (o *DocsOrders) Split(ctx context.Context, in DocsSplitInput) (DocsSplitRes
 	}
 
 	// Ein wartender roher Auftrag nimmt an nichts teil; nur ein voller Lauf
-	// (Auftrag über .) unter den rohen der Eingabe nimmt ihn auf.
+	// (Auftrag über .) unter den rohen der Eingabe nimmt ihn auf. Das Alter
+	// rechnet docsRawOrderAge wie in Orders: updated, sonst created. Ohne
+	// beide ist der Auftrag hier wie dort reif; gemeldet wird das allein von
+	// Orders unter problems.
 	var waiting []string
 	full := false
 	at := now()
@@ -237,14 +240,14 @@ func (o *DocsOrders) Split(ctx context.Context, in DocsSplitInput) (DocsSplitRes
 			if len(order.Pfade) == 1 && order.Pfade[0] == "." {
 				full = true
 			}
-			if age, ok := docsOrderAge(order.Updated, at); ok && age < DocsOrderWait {
+			if age, ok := docsRawOrderAge(order, at); ok && age < DocsOrderWait {
 				waiting = append(waiting, ref)
 			}
 		}
 	}
 	if len(waiting) > 0 && !full {
 		return DocsSplitResult{}, docRefErrorf(DocCodeInvalidInput,
-			"%s wartet noch (letzte Änderung jünger als %d Minuten) und geht in keinem vollen Lauf auf — nichts geschrieben",
+			"%s wartet noch (Wartezeit von %d Minuten nicht um) und geht in keinem vollen Lauf auf — nichts geschrieben",
 			strings.Join(waiting, ", "), int(DocsOrderWait/time.Minute))
 	}
 

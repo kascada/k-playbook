@@ -45,31 +45,6 @@ var githubEndpoints = []string{
 	"/api/github/runs/35002675449/failure",
 }
 
-// Ein alter Block tools.gh in K-PLAYBOOK.yaml entscheidet nichts mehr (Task
-// 128): Auch mit status: disabled oder unknown, oder einem unbekannten Wert,
-// fragt die Seite GitHub, sobald es einen Weg gibt — ohne Dienst ein bereites
-// gh. Der Runner muss also gerufen werden; vorher gab es dafür die Zustände
-// disabled und undecided, die keinen Prozess starteten.
-func TestGitHubAPIIgnoriertAltenGHBlock(t *testing.T) {
-	for _, value := range []string{"disabled", "unknown", "vielleicht"} {
-		t.Run(value, func(t *testing.T) {
-			runner := &countingRunner{}
-			enableGitHub(t, runner)
-			appendLegacyGHBlock(t, project.Detect().ProjectDir, value)
-
-			for _, path := range githubEndpoints {
-				result := getGitHubAPI(t, path)
-				if result.State == "disabled" || result.State == "undecided" {
-					t.Errorf("%s: alter Zustand %q", path, result.State)
-				}
-			}
-			if runner.calls == 0 {
-				t.Errorf("tools.gh.status: %s hat gh trotz bereitem gh abgehalten", value)
-			}
-		})
-	}
-}
-
 // Ohne Dienst und ohne bereites gh startet kein gh-Prozess: Der Zustand sagt,
 // was fehlt, und verweist auf die Zugangsdatei.
 func TestGitHubAPIOhneBereitesGHFragtNicht(t *testing.T) {
@@ -109,21 +84,6 @@ func (r *countingRunner) Run(_ context.Context, _ string, _ string, _ ...string)
 	r.calls++
 	r.mu.Unlock()
 	return nil, errors.New("Gezählt.")
-}
-
-// appendLegacyGHBlock hängt einen alten Block tools.gh an K-PLAYBOOK.yaml an,
-// wie ihn Fassungen vor Task 128 schrieben.
-func appendLegacyGHBlock(t *testing.T, projectDir string, value string) {
-	t.Helper()
-	path := project.ConfigPath(projectDir)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data = append(data, []byte("\ntools:\n  gh:\n    status: "+value+"\n")...)
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // Ohne K-PLAYBOOK.yaml gibt es kein Projekt, auf das sich die Ansicht beziehen

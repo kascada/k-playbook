@@ -43,8 +43,7 @@ func fixtureProject(t *testing.T, name string) (string, *kephtest.Store) {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 	// Die README-Vorlage von versions/ im Lieferumfang des Projekts — dort
-	// liest der abgeschirmte Store (defaultstest) ihn. Die Installation
-	// k-playbook/ gehört nie zum Inventar.
+	// liest der abgeschirmte Store (defaultstest) ihn.
 	putVersionsTemplate(t, root)
 
 	before, err := os.Getwd()

@@ -13,19 +13,24 @@ import (
 
 // Der Block docs: in K-PLAYBOOK.yaml hält fest, was die Docs-Erzeuger beim
 // Code-Scan auslassen, zusätzlich zu den festen Ausschlüssen ihres
-// Command-Texts. Ein Command liest die Liste aus context.docs.exclude und
-// schreibt sie über AddDocsExclude — nie die Datei selbst (Task 116).
+// Command-Texts. Ein Command liest die Liste aus environment.docs.exclude,
+// dem Teilabruf environment des Briefings (BuildBriefingEnvironment), und
+// schreibt sie über AddDocsExclude — nie die Datei selbst (Task 116). Das
+// Kommando context, das sie früher unter context.docs.exclude ausgab, ist
+// entfernt.
 
 // DocsExcludeProblem ist ein Eintrag, der nicht in die Liste kommt, samt Grund.
-// Dieselbe Form meldet das Lesen (context.docs.problems) und das Eintragen
+// Dieselbe Form meldet das Lesen (environment.docs.problems) und das Eintragen
 // (rejected).
 type DocsExcludeProblem struct {
 	Pattern string `json:"pattern"`
 	Reason  string `json:"reason"`
 }
 
-// ContextDocs ist der Abschnitt docs der Kontextausgabe. Beide Listen sind nie
-// null: ohne Block ist exclude leer, und es gibt nichts zu deuten.
+// ContextDocs ist der Abschnitt docs, wie ihn der Teilabruf environment des
+// Briefings liefert und der Kontext der Oberfläche trägt (Context.Docs). Beide
+// Listen sind nie null: ohne Block ist exclude leer, und es gibt nichts zu
+// deuten.
 type ContextDocs struct {
 	// Exclude sind die Muster aus docs.exclude, die die Prüfung bestanden haben,
 	// in der Reihenfolge der Datei und ohne Doppelte.

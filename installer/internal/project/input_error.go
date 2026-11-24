@@ -8,10 +8,12 @@ import "fmt"
 // Verzeichnis, eine vorhandene, aber unlesbare Datei — ist die Umgebung, und
 // Korrigieren hilft dort nicht.
 //
-// Die Unterscheidung muss aus project/ kommen: die Hüllen — MCP, Subkommando —
-// können sie nur treffen, wenn der Kern sie unterscheidbar zurückgibt.
-// Erkannt wird der Typ per errors.As, also auch durch Umhüllungen mit %w
-// hindurch.
+// Die Unterscheidung muss aus project/ kommen: Eine Hülle kann sie nur
+// treffen, wenn der Kern sie unterscheidbar zurückgibt. Erkennbar ist der Typ
+// per errors.As, also auch durch Umhüllungen mit %w hindurch — heute fragt
+// aber keine Fassade danach: InputErrorf nutzt nur das Handbuch (docs.go),
+// und MCP und Subkommandos unterscheiden Eingabefehler am Code eines
+// DocRefError (DocCodeInvalidInput, DocRefErrorCode).
 type InputError struct {
 	err error
 }

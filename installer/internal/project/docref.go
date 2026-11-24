@@ -297,7 +297,7 @@ type DocLayers struct {
 // projekteigene Ebene (siehe NewProjectLocalDocSource — teils in der
 // Collection des Projekts, teils auf der Platte), das
 // Projekt selbst ab seiner Wurzel und, auf Abruf, seine Collection
-// (OpenKephDocs). Vom früheren Clone k-playbook/ liest keine Ebene mehr.
+// (OpenKephDocs).
 func ProjectDocLayers(projectDir string) DocLayers {
 	return DocLayers{
 		Dist:    NewProjectDefaultsSource(projectDir),

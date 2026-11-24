@@ -14,7 +14,10 @@ import (
 // das MCP-Werkzeug, dessen Bezug sein projectDir ist.
 func TestKeyFromFolgtDemUebergebenenVerzeichnis(t *testing.T) {
 	projectDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(projectDir, project.ConfigFileName),
+	if err := os.MkdirAll(filepath.Dir(project.ConfigPath(projectDir)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(project.ConfigPath(projectDir),
 		[]byte("schema_version: 1\n"), 0o644); err != nil {
 		t.Fatalf("Anker schreiben: %v", err)
 	}

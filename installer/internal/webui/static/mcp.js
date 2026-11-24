@@ -23,7 +23,6 @@ const STATE_TEXTS = {
   "no-command": "kein installiertes k-playbook gefunden",
   "missing-file": "Datei nicht vorhanden",
   "missing-entry": "Eintrag fehlt",
-  outdated: "zeigt auf den abgelösten Wrapper",
   stale: "zeigt woandershin",
   unreadable: "kein lesbares JSON",
   "ambiguous-target": "zwei Konfigurationen",
@@ -35,8 +34,6 @@ const STATE_NOTES = {
     "Auf diesem Rechner ließ sich kein installiertes k-playbook auflösen. Solange das so ist, wird nichts geschrieben: ein Eintrag, der auf nichts zeigt, ist schlechter als keiner. Erst den Bootstrap ausführen.",
   "missing-file": "Die Datei entsteht beim Einrichten neu.",
   "missing-entry": "Die Datei bleibt erhalten, es kommt nur der eigene Eintrag hinzu.",
-  outdated:
-    "Der Eintrag stammt aus dem abgelösten Wrapper-Modell. Das ist der eine Fall, den k-playbook von sich aus richtigstellt — bei k-playbook upgrade und beim nächsten Start, ohne Klick auf Einrichten.",
   stale:
     "Der Schlüssel k-playbook gehört k-playbook. Ein abweichender Wert ist kein Konflikt, sondern ein falscher Stand — er wird beim Einrichten überschrieben, aber nicht von selbst.",
   unreadable:

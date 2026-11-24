@@ -12,7 +12,7 @@ import (
 )
 
 // Options beschreibt einen Erhebungslauf. Der Aufrufer — Subkommando, Command
-// oder später die Web-API — löst Pfade auf und reicht sie herein; die Fachlogik
+// oder die Web-API der Oberfläche — löst Pfade auf und reicht sie herein; die Fachlogik
 // sucht sich nichts selbst.
 type Options struct {
 	// ProjectDir ist die Projektwurzel, das Verzeichnis mit .k-playbook/K-PLAYBOOK.yaml.

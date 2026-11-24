@@ -34,9 +34,7 @@ type KephalaionResult struct {
 //
 // Sonst lädt es das install.sh aus dem neuesten Kephalaion-Release
 // (release.KephalaionInstallURL) und führt es aus, mit demselben Zeitlimit wie
-// die Installation des Programms. Das Skript bin/install-kephalaion des
-// Quell-Repos ruft dieses Programm nicht auf; es liegt dort nur noch für
-// Programme bis v0.16.38, die es aus ihrem früheren Clone im Projekt starten.
+// die Installation des Programms.
 // Asset-Namen, Plattformen und Prüfsumme bleiben Sache von Kephalaion. Erst
 // ganz laden, dann ausführen: Bricht der Download ab, läuft kein halbes
 // Skript, und ein Fehler beim Laden ist von einem Fehler der Installation zu

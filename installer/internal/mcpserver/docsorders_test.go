@@ -119,7 +119,7 @@ func TestDocsScopeTool(t *testing.T) {
 		len(scope.Checks) != 3 || scope.Checks[0].Excluded || scope.Checks[1].Reason != "further" || scope.Checks[2].Reason != "hidden" {
 		t.Fatalf("scope: %+v", scope)
 	}
-	if !strings.HasSuffix(scope.ScanRoot, filepath.Base(root)) || len(scope.Exclude.Always) != 4 {
+	if !strings.HasSuffix(scope.ScanRoot, filepath.Base(root)) || len(scope.Exclude.Always) != 3 {
 		t.Errorf("scope: %+v", scope.Exclude)
 	}
 	result, _, _ = docsScopeTool(ctx, nil, docsScopeInput{ProjectDir: root, Path: ".k-playbook"})

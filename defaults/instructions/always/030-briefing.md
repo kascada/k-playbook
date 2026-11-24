@@ -30,9 +30,7 @@ nennst du, bevor du mit der Arbeit beginnst, und bietest die Abhilfe aus `hint` 
 Warnung arbeitest du weiter. Nichts davon behebst du still — das tut der Nutzer oder beauftragt
 es ausdrücklich. Bei `Umgebung: keine Probleme` schweigst du; `k_playbook_health` prüft neu.
 
-Nicht selbst lesen: `K-PLAYBOOK.yaml` und die Katalogverzeichnisse unter `k-playbook/` — einem
-liegengebliebenen Clone aus dem früheren Modell, falls das Projekt noch einen hat. Was gilt,
-kommt mit dem Briefing.
+Nicht selbst lesen: `K-PLAYBOOK.yaml`. Was gilt, kommt mit dem Briefing.
 
 Ablegen: Jeder Ort, an dem etwas abgelegt wird, ist ein `keph:`-Verweis oder liegt unter
 `.k-playbook/` im `project.dir`. Was wohin gehört, steht in `k-playbook:/guidelines/betrieb.md`.

@@ -70,6 +70,70 @@ func TestAssistantHandlerHeiltBeimLesen(t *testing.T) {
 	}
 }
 
+// Geheilt wird nur unter der Bedingung des Briefings (Task 191): Bei einer
+// Fassung, die dieses Werkzeug nicht versteht, und bei einem unzulässigen
+// Wert in project.languages liest die Karte den Zustand, verlinkt aber
+// nichts — und sagt, warum.
+func TestAssistantHandlerHeiltNichtOhneAkzeptierteKonfiguration(t *testing.T) {
+	for _, test := range []struct {
+		name, config, reason string
+	}{
+		{"unbekannte Fassung", "schema_version: 99\n\nproject:\n  repo_root: .\n  vcs: git\n", "schema_version"},
+		{"ältere Fassung", "schema_version: 1\n\nproject:\n  repo_root: .\n  vcs: git\n", "schema_version"},
+		{"unzulässiges project.languages", "schema_version: " + project.SchemaVersion +
+			"\n\nproject:\n  repo_root: .\n  vcs: git\n  languages: [go, \"c sharp\"]\n", "project.languages"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := assistantProject(t)
+			writeFile(t, project.ConfigPath(root), test.config)
+			before := treeListing(t, root)
+
+			response := getAssistant(t)
+			if project.LinksOK(response.Entries) {
+				t.Errorf("die Verlinkung steht, obwohl nichts nachgezogen werden durfte: %+v", response.Entries)
+			}
+			if len(response.Entries) == 0 {
+				t.Error("der Zustand wird trotzdem gelesen")
+			}
+			if !strings.Contains(response.Message, "nicht nachgezogen") || !strings.Contains(response.Message, test.reason) {
+				t.Errorf("Message nennt den Grund nicht: %q", response.Message)
+			}
+			for _, name := range []string{".claude", ".opencode", "CLAUDE.md", "AGENTS.md"} {
+				if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+					t.Errorf("%s wurde angelegt (%v)", name, err)
+				}
+			}
+			if after := treeListing(t, root); strings.Join(before, "\n") != strings.Join(after, "\n") {
+				t.Errorf("der Abruf hat das Projekt verändert:\nvorher:  %v\nnachher: %v", before, after)
+			}
+
+			// Mit der akzeptierten Konfiguration zieht derselbe Abruf nach.
+			writeFile(t, project.ConfigPath(root),
+				"schema_version: "+project.SchemaVersion+"\n\nproject:\n  repo_root: .\n  vcs: git\n")
+			if response := getAssistant(t); !project.LinksOK(response.Entries) {
+				t.Errorf("mit akzeptierter Konfiguration muss die Verlinkung stehen: %+v", response.Entries)
+			}
+		})
+	}
+}
+
+// treeListing listet alle Einträge unter root, Links ohne ihnen zu folgen.
+func treeListing(t *testing.T, root string) []string {
+	t.Helper()
+	var entries []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		entries = append(entries, path+" "+entry.Type().String())
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return entries
+}
+
 // Ein umbenannter Command hinterlässt einen Link ins Leere und eine Lücke.
 // Beides soll der nächste Blick auf die Karte bereits behoben haben.
 func TestAssistantHandlerZiehtUmbenennungNach(t *testing.T) {
@@ -93,38 +157,12 @@ func TestAssistantHandlerZiehtUmbenennungNach(t *testing.T) {
 	}
 }
 
-// Die Karte nennt, was das Einrichten an AGENTS.md nachgezogen hat: den neuen
-// Aufruf beim ersetzten Anstoß. Der Hinweis auf einen Anstoß ohne Grenze kommt
-// als Fehler des Einrichtens in den Text und steht deshalb nicht noch einmal
-// hier.
-func TestDescribeSetupNenntNachzugAnAgents(t *testing.T) {
-	setup := project.AssistantSetup{RootRefreshed: true}
-	setup.Root.Hint = "das Ende des veralteten Anstoßblocks ließ sich nicht bestimmen"
-
-	text := describeSetup(setup)
-	if strings.Contains(text, setup.Root.Hint) {
-		t.Errorf("der Hinweis stünde doppelt im Text: %s", text)
-	}
-	if erwartet := "auf den aktuellen Aufruf gebracht (k-playbook briefing)"; !strings.Contains(text, erwartet) {
-		t.Errorf("%q fehlt in: %s", erwartet, text)
-	}
-	if strings.Contains(text, "k-playbook context") {
-		t.Errorf("der abgelöste Aufruf steht in der Meldung: %s", text)
-	}
-}
-
-// Ohne den Clone k-playbook/ zeigen die Seiten „Assistenten“ und „MCP“ ihren
-// Zustand, statt mit „Installationsverzeichnis … fehlt“ abzubrechen (Task 154).
-func TestAssistentUndMCPOhneClone(t *testing.T) {
-	root := assistantProject(t)
-	if err := os.RemoveAll(filepath.Join(root, project.PlaybookDirName)); err != nil {
-		t.Fatalf("%s entfernen: %v", project.PlaybookDirName, err)
-	}
+// Die Seiten „Assistenten“ und „MCP“ zeigen ihren Zustand ohne Installation
+// im Projekt, statt mit „Installationsverzeichnis … fehlt“ abzubrechen.
+func TestAssistentUndMCPOhneInstallation(t *testing.T) {
+	assistantProject(t)
 
 	assistant := getAssistant(t)
-	if _, err := os.Stat(filepath.Join(root, project.PlaybookDirName)); err == nil {
-		t.Fatalf("%s/ ist noch da", project.PlaybookDirName)
-	}
 	// Die Umgebung in der Antwort nennt keinen Ort einer Installation im
 	// Projekt mehr (Task 157).
 	if encoded, err := json.Marshal(assistant.Environment); err != nil {

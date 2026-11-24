@@ -16,7 +16,7 @@ import (
 // bin/install, make dev-install, k-playbook upgrade, ein Container mit eigener
 // Installation —, soll keine Rolle spielen. Im Normalfall ist es eine kleine
 // Datei lesen und vergleichen. Es schreibt nie nach stdout, das bei mcp den
-// JSON-RPC-Strom und bei context, briefing und read die Antwort trägt; ein
+// JSON-RPC-Strom und bei briefing und read die Antwort trägt; ein
 // Fehler ist ein Hinweis auf stderr und hält das Kommando nicht auf.
 //
 // In main und nicht in run, damit die Tests, die run direkt rufen, nicht in

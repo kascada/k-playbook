@@ -16,15 +16,13 @@ wget -qO- https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install 
 
 `bin/install` is self-contained: it determines the newest release of k-playbook, downloads the release binary for the platform, verifies it against the `SHA256SUMS` of that tag and installs it to `~/.local/bin/k-playbook`. Everything else comes with the binary: it unpacks commands, skills and scripts into `~/.local/share/k-playbook/`, and it reads the shipped texts — instructions, review recipes, guidelines, the texts of the commands and this handbook — from the public collection `k-playbook` on the project's Kephalaion hub.
 
-**No clone in the project.** In the former model a project carried a clone of the k-playbook repository under `k-playbook/`. That step is gone: the program does not read such a directory any more, a project without it is complete, and `/k-upgrade` deletes a clone that is still there (see [Update](#update)).
-
 **Go is not required.** `bin/install` downloads the release binary suitable for the platform and installs it to `~/.local/bin/k-playbook`. On macOS and in the DevContainer, the installer runs in its own environment and therefore installs the matching macOS or Linux binary.
 
 **`git` is not required.** The newest release is the newest published GitHub release, not the highest tag: `bin/install` reads the redirect of `https://github.com/kascada/k-playbook/releases/latest` to `…/releases/tag/<tag>` without following it — one request over HTTPS, anonymous, without the GitHub API. A release whose tag carries a suffix (`v1.2.3-rc1`) does not count; then the newest release is unknown and nothing is installed. `bin/install` needs `curl` or `wget` and `sha256sum` or `shasum`.
 
 **Installation requires network access.** The binaries are not in the repository but are release assets. `bin/install` downloads exactly the asset of the newest release and verifies it against the `SHA256SUMS` committed at its tag, fetched from the repository over HTTPS: the expected checksum comes through the Git state, the binary through the release, so a swapped asset is noticed. The release workflow publishes a release only once all assets are attached, so a tag whose assets are still being built is not visible yet. Should an asset be missing anyway, `bin/install` says that the release is not finished and replaces nothing.
 
-**Kephalaion is installed along with it.** k-playbook needs a Kephalaion node for every `keph:` document. If no `kephalaion` is on the `PATH`, `bin/install` then loads the `install.sh` of the latest Kephalaion release and runs it; that script downloads the binary and `SHA256SUMS`, verifies the checksum and installs to `~/.local/bin/kephalaion`. An existing `kephalaion` is left alone by the script, whatever its version; updating is the job of `k-playbook upgrade` (see [Update](#update)). Only the binary is installed. Setting up the node, the service and the token stays with Kephalaion (`kephalaion node init`, `kephalaion service install`); in a DevContainer, where the configuration comes read-only from the host and the node is the host's, that is exactly right. If the step fails, `bin/install` still ends with exit code 0, because k-playbook itself is installed, and names the command to catch up. `k-playbook upgrade` loads and runs the same `install.sh` in its Kephalaion step when `kephalaion` is missing, with or without a clone, and `k-playbook health` names the installation as the remedy while `kephalaion` is missing and the connection is not ok. The script `k-playbook/bin/install-kephalaion` stays in the clone for binaries from before this change, which still call it; the current program does not.
+**Kephalaion is installed along with it.** k-playbook needs a Kephalaion node for every `keph:` document. If no `kephalaion` is on the `PATH`, `bin/install` then loads the `install.sh` of the latest Kephalaion release and runs it; that script downloads the binary and `SHA256SUMS`, verifies the checksum and installs to `~/.local/bin/kephalaion`. An existing `kephalaion` is left alone by the script, whatever its version; updating is the job of `k-playbook upgrade` (see [Update](#update)). Only the binary is installed. Setting up the node, the service and the token stays with Kephalaion (`kephalaion node init`, `kephalaion service install`); in a DevContainer, where the configuration comes read-only from the host and the node is the host's, that is exactly right. If the step fails, `bin/install` still ends with exit code 0, because k-playbook itself is installed, and names the command to catch up. `k-playbook upgrade` loads and runs the same `install.sh` in its Kephalaion step when `kephalaion` is missing, and `k-playbook health` names the installation as the remedy while `kephalaion` is missing and the connection is not ok.
 
 **`~/.local/bin` must be in PATH**: this is a requirement, not an aside. k-playbook is called exclusively by its name; without the PATH entry, it would be installed but not discoverable by anyone. If it is missing, the bootstrap stops before downloading anything and prints the line for the shell profile:
 
@@ -104,7 +102,7 @@ project/
 └── opencode.json      OpenCode:     mcp -> k-playbook
 ```
 
-It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it, and when it replaces an obsolete wrapper entry in a tracked file, it writes the bare name itself. A client launched from the Dock or Finder then needs the absolute path, entered manually -- *Set up* does not replace an accepted form. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, the directory where `.k-playbook/K-PLAYBOOK.yaml` is located.
+It registers `k-playbook mcp`, resolved when written to the **absolute path** of the installed binary. Clients launched from the Dock or Finder do not inherit the shell PATH; a bare command name would be dead there. To commit the entry, enter the bare name `k-playbook` manually: automatic correction does not change it. A client launched from the Dock or Finder then needs the absolute path, entered manually -- *Set up* does not replace an accepted form. Both are described in [`mcp.md`](./mcp.md#why-the-entry-is-an-absolute-path). One condition always applies: the entry works only when the assistant is opened in the project root, the directory where `.k-playbook/K-PLAYBOOK.yaml` is located.
 
 Both files belong to the project. Exactly the `k-playbook` key is touched; foreign entries remain. Registration is complete only after restarting the assistant; Claude Code asks for approval once.
 
@@ -165,7 +163,7 @@ The interface compares this expected state with what is actually registered and 
 
 Skills appear only once under `.claude/skills`: OpenCode searches this directory too. `CLAUDE.md` is an include file with the import line `@AGENTS.md`, because Claude Code reads only `CLAUDE.md` while OpenCode prefers `AGENTS.md`. This leaves exactly one actual instruction file, and Claude Code loads it at startup through the import. Setup writes a short stub: above the import line, a note that project rules belong in `AGENTS.md`, then `@AGENTS.md` alone on a line.
 
-`AGENTS.md` also receives a brief **prompt**: a block that names `k-playbook briefing` (and the MCP tool `k_playbook_briefing`) as the one call at the start of a session. If the file is missing, it is created; if it exists, the block is appended and existing content is not touched. A `<!-- k-playbook:anstoss -->` marker prevents a second run from appending it again; a block that still names the superseded `k-playbook context` is replaced.
+`AGENTS.md` also receives a brief **prompt**: a block that names `k-playbook briefing` (and the MCP tool `k_playbook_briefing`) as the one call at the start of a session. If the file is missing, it is created; if it exists, the block is appended and existing content is not touched. A `<!-- k-playbook:anstoss -->` marker prevents a second run from appending it again.
 
 ### An existing CLAUDE.md
 
@@ -174,7 +172,7 @@ The direction is fixed: `CLAUDE.md` includes `AGENTS.md`, never the other way ar
 | Initial situation | What happens |
 |---|---|
 | `CLAUDE.md` contains the `@AGENTS.md` line, `AGENTS.md` is an actual file | the **expected state**, nothing to do. Content beside the import line belongs to the project and remains untouched |
-| `CLAUDE.md` is still a symlink to `AGENTS.md` | the older form: the symlink is **replaced without loss**; the content is already in `AGENTS.md`, including on the read path, see below |
+| `CLAUDE.md` is a symlink to `AGENTS.md` | the symlink is **replaced without loss** by the include file; the content is already in `AGENTS.md`, including on the read path, see below |
 | only an actual `CLAUDE.md` without an import line | it is **renamed** to `AGENTS.md`, the prompt is appended to the preserved content, and `CLAUDE.md` is created again as an include file |
 | only the include file, `AGENTS.md` missing | it remains; `AGENTS.md` is created from the template. Renaming it would create an `AGENTS.md` that imports itself |
 | `AGENTS.md` is a symlink to `CLAUDE.md` | the reversed direction is resolved: remove the symlink; rename an actual `CLAUDE.md`, leave an include file in place; then create the include file again or create `AGENTS.md` from the template |
@@ -190,17 +188,15 @@ During a conflict, nothing is moved, deleted, backed up, and no `AGENTS.md` is c
 
 The same process runs during **updates**. A project that has only an actual `CLAUDE.md` is therefore set up that way too, and a project without any `AGENTS.md` gets it for the first time.
 
-**Existing projects** migrate themselves. The first `k-playbook briefing`, or the assistants section of the interface, replaces the old symlink with the include file and reports this in `links.note`. Afterwards, `git status` shows a one-time modified `CLAUDE.md` with a changed mode (symlink -> regular file, `120000` -> `100644`); this change must be committed. It is the one place where a read-only path changes a versioned file in the project root, and it is named as such. No include to nowhere: as long as `AGENTS.md` is absent, an old symlink waits for its target and is replaced only when it exists. If the include file exists while `AGENTS.md` is missing, the detail text identifies the import to nowhere: Claude Code loads nothing from it until **Setup** creates `AGENTS.md`.
+**A symlink `CLAUDE.md`** is replaced with the include file by the next `k-playbook briefing` or by the assistants section of the interface, which reports this in `links.note`. Afterwards, `git status` shows a one-time modified `CLAUDE.md` with a changed mode (symlink -> regular file, `120000` -> `100644`); this change must be committed. It is the one place where a read-only path changes a versioned file in the project root, and it is named as such. No include to nowhere: as long as `AGENTS.md` is absent, such a symlink waits for its target and is replaced only when it exists. If the include file exists while `AGENTS.md` is missing, the detail text identifies the import to nowhere: Claude Code loads nothing from it until **Setup** creates `AGENTS.md`.
 
 **The cost of separation.** Without a symlink, there are two files that can diverge: content Claude Code writes to `CLAUDE.md` through `/memory` or `#` does not reach OpenCode, and the check does not report project content beside the include as a conflict. This is deliberate: reversing the direction would mean treating every piece of content beside the include as a conflict. As a counterweight, the stub above the import line says that project rules belong in `AGENTS.md`.
 
-**What Claude Code must support.** `@` imports in `CLAUDE.md` have existed since Claude Code **0.2.107** (CHANGELOG entry "CLAUDE.md files can now import other files"); an older version silently loads nothing from the stub. Import depth is limited: according to the documentation, Claude Code follows imports up to **four levels** deep ("Imported files can recursively import other files, with a maximum depth of four hops", code.claude.com, page "How Claude remembers your project", as of 2026-09-05). The stub consumes one level, so an `AGENTS.md` that itself imports with `@` has one level less than the former symlink.
+**What Claude Code must support.** `@` imports in `CLAUDE.md` have existed since Claude Code **0.2.107** (CHANGELOG entry "CLAUDE.md files can now import other files"); an older version silently loads nothing from the stub. Import depth is limited: according to the documentation, Claude Code follows imports up to **four levels** deep ("Imported files can recursively import other files, with a maximum depth of four hops", code.claude.com, page "How Claude remembers your project", as of 2026-09-05). The stub consumes one level, so an `AGENTS.md` that itself imports with `@` has one level less than it would have when read directly.
 
 Anything else an assistant should read is not in `AGENTS.md`: it comes with `k-playbook briefing`, the one call `AGENTS.md` names. The briefing carries the instructions that always apply, the shipped parts first and the project-owned parts from the project collection (`keph:/k-playbook/instructions/always/`) after them. What a project wants every session to know belongs into its collection.
 
 Linking is project-local. Nothing is written to `~/.config/opencode/` or `~/.claude/`. This allows one machine to have several projects with different k-playbook versions without them overwriting each other.
-
-**Legacy artifacts are removed.** On machines with an installation from the old model, host-global symlinks still exist under `~/.claude/commands`, `~/.claude/skills`, and `~/.config/opencode/command`, along with a `skills.paths` entry in the OpenCode user configuration. They apply to every project, so an assistant would additionally see commands from another version. `k-playbook` removes them on every start, but only items demonstrably belonging to k-playbook. If it removes something, it reports this in the terminal; otherwise it stays silent.
 
 After changing commands or skills, restart the respective assistant: both discover them at startup.
 
@@ -261,15 +257,7 @@ An assistant can receive the same information as a tool instead of retrieving it
 
 One call updates everything: `k-playbook upgrade` in the terminal, or `/k-upgrade` in an assistant session, whose hull runs the same call first. It brings Kephalaion up to date, then the program, then the project (`AGENTS.md`, `CLAUDE.md`, the linking and the MCP entries); the details are in [Updating the program](#updating-the-program). In the interface, the update button offers the program update when the running program is older than the newest release.
 
-**There is no clone to update any more.** Up to v0.16.38 a project carried a clone of the k-playbook repository under `k-playbook/`, and updating meant pulling it: the interface checked it with `git ls-remote` and pulled with `git pull --ff-only`, `make -C k-playbook installer-update` did the same by hand, and the clone was kept read-only in between. All of that is gone (task 156). The program neither reads nor pulls nor write-protects a `k-playbook/` directory, `k-playbook upgrade`, `k-playbook upgrade --check` and the interface do not mention it, and the Make targets `installer-update`, `installer-writable` and `installer-readonly` no longer exist. A project without `k-playbook/` is complete; nothing reports a missing installation.
-
-**`/k-upgrade` removes the old clone.** Conversion 3.8 deletes `k-playbook/` entirely and without asking, also with untracked, modified or ignored files and with commits of its own in it. It deletes only a real directory with a `.git` directory directly in it: a symlink, a directory without `.git`, and one whose `.git` is a file (submodule, worktree) stay and are reported in one line, and so does a clone in which `git status` fails. Before deleting, it names what did not come from the repository — every line of `git status --porcelain --ignored` and the number of commits that are on no remote — and repeats that in its report. A write protection left by earlier versions is lifted first.
-
-It then removes the lines that exclude `k-playbook/` from every `.gitignore` between the project directory and the repository root: `k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, the same with `**/` in front, and in a `.gitignore` above the project directory the forms with the path down to the project. Comments and all other patterns stay. A line goes only once the directory no longer exists, so that nothing of it slips into a commit; while the directory is still there the line stays, and the report says why. A line in a `.gitignore` above the project directory also stays while it still matches another existing directory below the repository root, such as the clone of a second project. A versioned `.gitignore` is changed without asking and then shows up in `git status`. Other checkouts should run `/k-upgrade` before they commit with `git add -A`: whoever pulls that commit and still has a clone finds `k-playbook/` as an untracked directory in the working tree.
-
-**3.8 waits for the binary change.** It runs only when `k-playbook upgrade` printed the line `Programm-Stand: nichts zu tun — …` and the line names `neuestes Release`, which a program from v0.16.39 on writes; otherwise it deletes and changes nothing and reports `k-playbook/ löschen wartet auf den Binärwechsel`. A binary of v0.16.38 or older still needs the clone for its own upgrade. If host and DevContainer share a project and one of them still runs such a binary after the clone is gone, its upgrade no longer gets anywhere; the remedy is the first installation, `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`.
-
-**What lies in the project root is caught up on the next call to `k-playbook`.** Startup is the general fallback path: it corrects a stale MCP registration and the prompt block in `AGENTS.md` itself and reports what it did. This is not an additional everyday step, but the same call with which a session starts anyway. `.k-playbook/K-PLAYBOOK.yaml` remains untouched by all of this.
+**What lies in the project root is caught up on the next call to `k-playbook`.** Startup is the general fallback path: it adds a missing MCP entry in a file not tracked by Git, creates a missing `AGENTS.md` from the template, and reports what it did. This is not an additional everyday step, but the same call with which a session starts anyway. `.k-playbook/K-PLAYBOOK.yaml` remains untouched by all of this.
 
 ### Updating the program
 
@@ -277,7 +265,7 @@ The program has exactly two version sources: its own version, stamped into the b
 
 - **`k-playbook version`** prints the program's own version, one line. **`k-playbook version --all`** adds the shipped VS Code extension and the newest release tag; without network that line says `unbekannt` with the reason, and the exit code stays 0. In a terminal, `version` points to `--all` on stderr.
 - **The health check warns** when the program is older than the newest release, with `k-playbook upgrade` as the remedy. It is the same check as in the briefing, `k-playbook health`, `k_playbook_health` and the status page. Without network, without a version of its own, or when the program is equally old or newer, it stays silent. The check reads the newest release from a cache, `latest-release.json` under `$XDG_CACHE_HOME/k-playbook/` or else `~/.cache/k-playbook/` (the same on Linux and macOS): a found release counts for six hours, a failure (no network, no answer in time) for thirty minutes, and only an older entry makes it ask GitHub. So it may lag behind a new release by a few hours. The note at interface startup and the status page when it loads read the same cache.
-- **`k-playbook upgrade`** in the terminal and **the update button** in the interface always ask GitHub right away — as do `k-playbook upgrade --check` and `k-playbook version --all` — and write the answer to the cache. They install the release binary of the newest release directly from GitHub, verified against the `SHA256SUMS` of its tag (fetched from the repository over HTTPS, not as a release asset), and replace `~/.local/bin/k-playbook` atomically. Neither needs, reads or mentions a `k-playbook/` directory in the project.
+- **`k-playbook upgrade`** in the terminal and **the update button** in the interface always ask GitHub right away — as do `k-playbook upgrade --check` and `k-playbook version --all` — and write the answer to the cache. They install the release binary of the newest release directly from GitHub, verified against the `SHA256SUMS` of its tag (fetched from the repository over HTTPS, not as a release asset), and replace `~/.local/bin/k-playbook` atomically.
 
 If the running binary is **older** than the newest release tag, the interface shows `Programm aktualisieren (vA → vB)`. On the click the service installs the release binary, hands over its runtime file to a new service started from that file, and the open page follows to the new address, where the header shows the new version. Nothing is downloaded on startup or during a check: only an explicit click or an explicit `k-playbook upgrade` installs. If the binary is equally old or newer — a build above the newest tag, as `make dev-install VERSION=…` produces — nothing is installed and the service continues. The comparison is semantic, and only "older" triggers it. If the newest release cannot be read — no network, no published release, no answer within three seconds — it is unknown: the health check stays silent, and `k-playbook upgrade` says so and still catches up the project.
 
@@ -285,9 +273,7 @@ The newest release is the newest published one, and the release workflow publish
 
 If the installation fails -- no network, checksum mismatch, release not finished -- the old service keeps running and the page names the error, the output, and the command to catch up by hand: `k-playbook upgrade`. If `k-playbook upgrade` itself fails to install, it names the first installation instead: `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`. The same holds if `k-playbook` in the `PATH` does not resolve to `~/.local/bin/k-playbook`: then there is no button and no installation, only a note with both paths. Installing anyway would put a new binary where the next call to `k-playbook` never looks; that call would start the old program again, and its startup would stop the newly started service. Remove the other file or move `~/.local/bin` to the front of the `PATH`, then run the first installation in the terminal. Afterwards, `k-playbook` starts the new version. After a program update in the terminal, an old service initially keeps running; it is detected and replaced only when the next call to `k-playbook` comes from a newly installed binary. The binary file itself is compared, not only its version, so a newly built binary with the same version also replaces the old service. If only commands, rules, or recipes are new, the service continues, `Reload` in the interface loads the version, and restarting the assistant is enough.
 
-**The MCP registration is repaired on every path.** Every start of the interface corrects a stale MCP entry. `k-playbook upgrade` repairs the MCP entries in its project step every time, in the same scope as the start of the interface: it replaces a stale entry and adds a missing one when the target file is not tracked by Git. `k-playbook upgrade --check` only reports stale entries.
-
-**Changing from the retired wrapper model.** A project still configured under the retired wrapper model has no installed program that could update itself, and since task 156 nothing pulls its clone any more. Run the first installation once per host and once per DevContainer: `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`. Until then, commands, the prompt block in `AGENTS.md`, and the MCP registration still point to `k-playbook/bin/k-playbook`, and no command works: the automatic correction paths run in the installed binary and therefore require it. It is the one remaining manual step; after it, the next call to `k-playbook` catches up registration and the prompt block itself and removes the wrapper file.
+**The MCP registration is caught up on every path.** Every start of the interface and the project step of `k-playbook upgrade` add a missing MCP entry, or create a missing file, when the target file is not tracked by Git. An existing entry stays, also one in no accepted form; *Set up* overwrites it. `k-playbook upgrade --check` does not report MCP entries.
 
 **Linking catches itself up.** Because commands and skills are linked individually, a newly shipped command does not arrive by itself. It is therefore caught up on the read path, not only at the press of a button: the assistants section synchronizes registration when displayed and reports what changed (`Linking synchronized: 3 added, 1 removed.`), and `k-playbook briefing` does the same, the call already made at the beginning of every assistant session. How the program reached its version is irrelevant: through the interface, `k-playbook upgrade`, or a build of one's own. What cannot resolve itself, an actual project file in the way or a conflict in `CLAUDE.md`, remains and continues to appear in the assistants section.
 
@@ -297,51 +283,43 @@ For the new commands to reach the assistant, restart it afterwards: Claude Code 
 
 When a run of `k-playbook upgrade` replaced the binary, its last line says to call `/k-upgrade` in an assistant session — a new one if a restart is due — for the conversions that need judgement, and `--check` ends with a preview line when a run would fetch something new; both are left out under `K_PLAYBOOK_VIA_COMMAND=1`, which the hull of `/k-upgrade` and its fallback call set.
 
-After an upgrade of Kephalaion, and whenever its node was restarted, the output asks for a restart of the assistant session, like after a program change, and `/k-upgrade` stops there; other sessions using the same node may have lost their connection to Kephalaion as well. **Once, on the transition** from a k-playbook binary that predates this step: the old binary still runs the old order (program first, Kephalaion only installed when missing), so the first run does not call `--auto`. Kephalaion follows in the second `/k-upgrade`, which the program change asks for anyway.
+After an upgrade of Kephalaion, and whenever its node was restarted, the output asks for a restart of the assistant session, like after a program change, and `/k-upgrade` stops there; other sessions using the same node may have lost their connection to Kephalaion as well.
 
 **READMEs of the project documentation.** Setup and update — the interface buttons and `k-playbook upgrade` — end by writing the `README.md` of every directory under `keph:/docs/` that has a template `k-playbook:/docs/<path>/README.md`, when it is missing or differs (task 137). These READMEs are the same in every project and come from the hub's delivery; one changed by hand is overwritten. Without a ready Kephalaion nothing is attempted, a slow hub holds the step up for at most 10 seconds, and a missing template is only a hint: none of it stops setup or update. `k-playbook docs readme` writes them on demand, `k-playbook docs readme --check` only reports.
 
 ### A project's own conversion script
 
-`/k-upgrade` runs one script that belongs to the project: if `scripts/k-upgrade-umbau.sh` exists in the project root, the session runs it with `bash scripts/k-upgrade-umbau.sh` from the project root, right after `k-playbook upgrade` and before conversion 3.8. It runs without asking, also when the binary changed and the command then stops for a restart. Its output is passed on unchanged. If it ends with an exit code other than 0, the session names the code and asks whether the conversion should run anyway. If the file is missing, nothing is said about it.
+`/k-upgrade` runs one script that belongs to the project: if `scripts/k-upgrade-umbau.sh` exists in the project root, the session runs it with `bash scripts/k-upgrade-umbau.sh` from the project root, right after `k-playbook upgrade` and before the conversions of step 3. It runs without asking, also when the binary changed and the command then stops for a restart. Its output is passed on unchanged. If it ends with an exit code other than 0, the session names the code and asks whether the conversions should run anyway. If the file is missing, nothing is said about it.
 
-The script belongs to the project and converts what concerns only this project. The conversion takes stock only after it has run.
+The script belongs to the project and converts what concerns only this project. The conversions take stock only after it has run.
 
 Only `/k-upgrade` runs the script. The update button in the interface and `k-playbook upgrade` in the terminal do not call it. k-playbook neither ships nor creates the file; the project writes it and keeps it under version control like any other script.
 
-### Existing projects: the linking is converted
+### A directory symlink in the linking
 
-Anyone updating a project from a version through 0.4 finds the assistant linking to convert after the update. One click handles it; nothing is deleted or overwritten:
+If a target of the linking such as `.claude/commands` is a symlink to a whole directory, only that one source would ever arrive. The assistants section reports it, and one click handles it; nothing is deleted or overwritten:
 
 | Where | What the interface reports | What to do |
 |---|---|---|
-| Assistant linking | `Directory symlink from an older version` | **Set up**: the symlink is replaced with individual links |
-
-This is the actual conversion: `.claude/commands -> ../k-playbook/commands`, a link into the clone of that time, becomes an actual directory with one link per command. Nothing in `k-playbook/` is touched by it.
+| Assistant linking | `Directory symlink, replaced with individual links` | **Set up**: the symlink is replaced with individual links |
 
 Individual links belong in the project's repository and are committed. A fresh checkout of the project then has commands registered immediately.
 
-### A configuration from a retired model
+### A configuration with an older schema_version
 
-Anyone carrying forward a project from one of the first versions will eventually encounter:
+A `.k-playbook/K-PLAYBOOK.yaml` with an older or missing `schema_version` is not read:
 
 ```text
-K-PLAYBOOK.yaml has schema_version 1 and describes a retired model ...
+K-PLAYBOOK.yaml hat schema_version 1, dieses Werkzeug erwartet 3 — bitte neu einrichten: ...
 ```
 
-This is not an error in the project, but the consequence of a deliberate separation: the program updates itself from the releases, while `.k-playbook/K-PLAYBOOK.yaml` sits in the project and is never overwritten because it belongs to the project. At some point the tool is three models ahead while the file is still at the first. It is not converted ([`k-playbook-format.md`](./k-playbook-format.md#schema_version) explains why), but it can be reset.
+It is not converted ([`k-playbook-format.md`](./k-playbook-format.md#schema_version) explains why); the project is set up again. Start the interface: the **Project configuration** section then appears again, names the found version and offers **Reset and create again**. It:
 
-Start the interface: the **Project configuration** section then appears again, names the found version and the model it describes, and offers **Reset and create again**. It:
-
-- places the old file alongside it as `K-PLAYBOOK.yaml.v1-alt`, rather than deleting it, because `remediation`, `tools`, and `project.repo_root` exist only there,
+- places the old file alongside it as `K-PLAYBOOK.yaml.v1-alt`, rather than deleting it, so that custom values stay readable,
 - writes a fresh `K-PLAYBOOK.yaml` with `schema_version: 3`, prefilled with the old `project.repo_root`,
 - never overwrites an existing backup, instead appending `-2`, `-3`.
 
-Then go through the remaining sections as for a new installation and retrieve custom values from the backup.
-
-**First save project-owned content.** Under model 1, tasks, checks, reviews, guidelines, docs, and the todo list were **inside** `k-playbook/`, precisely the directory that later held the clone of the tool and that `/k-upgrade` deletes as a clone (conversion 3.8). Merely renewing the configuration would leave a silent trap: everything would look healthy, and the content would be lost with the directory. If the interface finds project-owned content there, it writes nothing, names the paths under "Zuerst außerhalb von k-playbook/ sichern", and remains at "Outdated". Save the content to a place outside `k-playbook/`; the program names no target for it.
-
-The old file's `paths.` section identifies the paths. Once nothing project-owned lies in `k-playbook/` any more, the button becomes available.
+Then go through the remaining sections as for a new installation and retrieve custom values from the backup. Files from an earlier model are neither detected nor reported; they are removed by hand.
 
 ## One tool for all projects
 
@@ -352,11 +330,11 @@ cd /path/to/project
 k-playbook
 ```
 
-It is the same tool for every project. Which project it means derives from the directory in which it is called, not from the program's location. Nothing of the tool lies in the project: commands, skills and scripts come with the binary, the shipped texts from the hub. An entry point in the project itself no longer exists; k-playbook is called exclusively by its name, and commands do the same.
+It is the same tool for every project. Which project it means derives from the directory in which it is called, not from the program's location. Nothing of the tool lies in the project: commands, skills and scripts come with the binary, the shipped texts from the hub. There is no entry point in the project itself; k-playbook is called exclusively by its name, and commands do the same.
 
 `~/.local/bin/k-playbook` is an actual file, not a symlink or runtime resolution. Every work environment installs the version for its own platform: the macOS host a Darwin binary and the DevContainer a Linux binary. A DevContainer therefore bootstraps once for itself and again after a rebuild.
 
-**There is no longer dedicated DevContainer integration**: no bind mount to `/workspaces/k-playbook`, no symlink in the container, and no setup script in `.devcontainer/`. The container runs the same bootstrap as the host and gets its own binary; the project brings nothing of the tool with it.
+**There is no dedicated DevContainer integration**: nothing to mount and no setup script in `.devcontainer/`. The container runs the same bootstrap as the host and gets its own binary; the project brings nothing of the tool with it.
 
 **One release, one binary.** A release is a tag `vX.Y.Z`; its assets are the binaries, and the `SHA256SUMS` committed at that tag contains their checksums. `VERSION` at the root of the repository names the same release and is what a build stamps into the binary; the installed program reads no `VERSION` file in a project. If the running binary is older than the newest release tag, it is replaced by `k-playbook upgrade` or by the update button, and only on an explicit call or click; the program never downloads anything on startup or during a check. The download is verified against the `SHA256SUMS` of the tag before the file at `~/.local/bin/k-playbook` is replaced (see [Updating the program](#updating-the-program)).
 
@@ -598,12 +576,11 @@ All build targets use the same flags CI uses to build release assets, so every p
 
 Checklist for a project:
 
-- [ ] `.k-playbook/K-PLAYBOOK.yaml` is in the project root. A `K-PLAYBOOK.yaml` directly in the project root is the former place; the tool moves it on its first call ([`k-playbook-format.md`](./k-playbook-format.md#finding-the-anchor)).
+- [ ] `.k-playbook/K-PLAYBOOK.yaml` is in the project root ([`k-playbook-format.md`](./k-playbook-format.md#finding-the-anchor)).
 - [ ] `schema_version: 3` is set.
 - [ ] `project.repo_root` points to the project repository; `project.vcs` is `git` or `none`.
-- [ ] The project has no `k-playbook/` directory. Where a clone is left from the former model, `/k-upgrade` deletes it (conversion 3.8).
 - [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks through `.k-playbook/share/` or to `.k-playbook/commands/` and `.k-playbook/skills/`; the interface reports them as configured.
-- [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
+- [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink `CLAUDE.md` was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; `k-playbook version --all` names the newest release tag, and the program matches it or is newer.
 - [ ] `k-playbook briefing` completes, names the expected instructions and reviews, and reports `Umgebung: keine Probleme`.
 - [ ] With VS Code in the environment: `k-playbook vscode status` names the embedded
@@ -619,11 +596,9 @@ The final item checks all preceding items at once: the command stops if configur
 
 **Skills are not triggered.** Every skill directory must contain `SKILL.md`; without it, the directory does not count as a skill and is not linked. Then restart the assistant.
 
-**`schema_version` does not match.** If the number is below `3` or missing, configuration is older than the tool. The interface resets it; see [A configuration from a retired model](#a-configuration-from-a-retired-model). If it is higher, the reverse is true: the program is behind. Then `k-playbook upgrade` helps, not a reset, which would discard the newer file.
+**`schema_version` does not match.** If the number is below `3` or missing, configuration is older than the tool. The project is set up again; see [A configuration with an older schema_version](#a-configuration-with-an-older-schema_version). If it is higher, the reverse is true: the program is behind. Then `k-playbook upgrade` helps, not a reset, which would discard the newer file.
 
-**The tool finds no project.** Then `.k-playbook/K-PLAYBOOK.yaml` is missing above the invocation location. Starting at the working directory, the search goes upwards to `$HOME` or `/` and deliberately does not guess. The interface then proposes a location. One more cause: a program older than the move of the anchor into `.k-playbook/` (2026-11) does not find a project whose anchor has already moved. After the first call of the new program, every environment of the project -- a second machine, a DevContainer, a colleague's checkout -- needs the new program; `k-playbook upgrade` installs it.
-
-**An assistant sees foreign commands.** Typical after an installation from the old model: host-global symlinks apply to every project. Start the interface once; it removes them and reports what was removed.
+**The tool finds no project.** Then `.k-playbook/K-PLAYBOOK.yaml` is missing above the invocation location. Starting at the working directory, the search goes upwards to `$HOME` or `/` and deliberately does not guess. The interface then proposes a location. A `K-PLAYBOOK.yaml` directly in the project root is not an anchor.
 
 **`k-playbook: command not found`.** Either the bootstrap has not yet run in this environment, in which case run it: `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`. Or `~/.local/bin` is missing from PATH. The bootstrap checks PATH itself and stops in that case before downloading anything.
 

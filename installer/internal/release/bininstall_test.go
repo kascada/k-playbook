@@ -140,11 +140,10 @@ func releases(t *testing.T) *releasetest.Source {
 	return source
 }
 
-// Über stdin — der lokale Ersatz für curl | bash — und aus einem Clone
-// aufgerufen verhält sich bin/install gleich: Es installiert den neuesten Tag,
-// geprüft gegen dessen SHA256SUMS, mit Exit-Code 0. VERSION und SHA256SUMS
-// neben dem Skript im Clone liest es nicht; sie weichen hier vom neuesten Tag
-// ab.
+// Über stdin — der lokale Ersatz für curl | bash — installiert bin/install den
+// neuesten Tag, geprüft gegen dessen SHA256SUMS, mit Exit-Code 0. VERSION und
+// SHA256SUMS neben dem Skript liest es nicht; sie weichen hier vom neuesten
+// Tag ab. Den Cache unter ~/.cache/k-playbook/ fasst es nicht an.
 func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 	script := installScript(t)
 
@@ -154,18 +153,13 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 		if err := os.WriteFile(r.target, []byte("vorher\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		// Die Binaries des alten Wrappers gehen, der Cache des neuesten
-		// Release daneben bleibt.
 		cache := filepath.Join(r.home, ".cache", "k-playbook")
-		wrapperBinary := filepath.Join(cache, "bin", "v0.1.2", "k-playbook-linux-amd64")
 		latest := filepath.Join(cache, release.CacheFileName)
-		for _, path := range []string{wrapperBinary, latest} {
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(path, []byte("alt\n"), 0o644); err != nil {
-				t.Fatal(err)
-			}
+		if err := os.MkdirAll(filepath.Dir(latest), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(latest, []byte("alt\n"), 0o644); err != nil {
+			t.Fatal(err)
 		}
 
 		code, output := r.run(t, script)
@@ -174,9 +168,6 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 		}
 		if got := r.installed(t); got != "neu v0.10.0\n" {
 			t.Errorf("am Ziel liegt %q:\n%s", got, output)
-		}
-		if _, err := os.Stat(filepath.Join(cache, "bin")); !os.IsNotExist(err) {
-			t.Errorf("die Binaries des alten Wrappers blieben liegen: %v", err)
 		}
 		if content, err := os.ReadFile(latest); err != nil || string(content) != "alt\n" {
 			t.Errorf("der Cache des neuesten Release wurde gelöscht: %q, %v", content, err)
@@ -195,11 +186,11 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 		}
 	})
 
-	t.Run("aus dem Clone", func(t *testing.T) {
+	t.Run("neben VERSION und SHA256SUMS", func(t *testing.T) {
 		releases(t)
 		r := newInstallRun(t, true)
-		clone := filepath.Join(r.dir, "k-playbook")
-		if err := os.MkdirAll(filepath.Join(clone, "bin"), 0o755); err != nil {
+		checkout := filepath.Join(r.dir, "checkout")
+		if err := os.MkdirAll(filepath.Join(checkout, "bin"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		content, err := os.ReadFile(script)
@@ -207,25 +198,23 @@ func TestBinInstallInstalliertDenNeuestenTag(t *testing.T) {
 			t.Fatal(err)
 		}
 		for path, file := range map[string]string{
-			filepath.Join(clone, "bin", "install"): string(content),
-			// Der Clone steht hinter dem neuesten Tag, und seine Summe passt zu
+			filepath.Join(checkout, "bin", "install"): string(content),
+			// VERSION steht hinter dem neuesten Tag, und die Summe passt zu
 			// nichts: Gelesen wird beides nicht.
-			filepath.Join(clone, "VERSION"):    "v0.9.4\n",
-			filepath.Join(clone, "SHA256SUMS"): strings.Repeat("0", 64) + "  " + release.AssetName() + "\n",
+			filepath.Join(checkout, "VERSION"):    "v0.9.4\n",
+			filepath.Join(checkout, "SHA256SUMS"): strings.Repeat("0", 64) + "  " + release.AssetName() + "\n",
 		} {
 			if err := os.WriteFile(path, []byte(file), 0o755); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		// Aus dem Hauptverzeichnis, ohne Argument — so rufen Binaries von vor
-		// Task 149 es auf.
-		code, output := r.run(t, "", "k-playbook/bin/install")
+		code, output := r.run(t, "", "checkout/bin/install")
 		if code != 0 {
 			t.Fatalf("Exit-Code %d:\n%s", code, output)
 		}
 		if got := r.installed(t); got != "neu v0.10.0\n" {
-			t.Errorf("am Ziel liegt %q, erwartet der neueste Tag statt VERSION des Clones:\n%s", got, output)
+			t.Errorf("am Ziel liegt %q, erwartet der neueste Tag statt VERSION daneben:\n%s", got, output)
 		}
 	})
 }

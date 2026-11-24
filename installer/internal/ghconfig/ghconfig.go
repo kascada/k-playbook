@@ -5,7 +5,8 @@
 // in keiner Antwort auf.
 //
 // Das Paket steht bewusst unter project und githubaccess: project braucht den
-// Befund für die Kontextausgabe (DetectGH), githubaccess für die Verfügbarkeit
+// Befund für den Teilabruf environment des Briefings und den Kontext der
+// Oberfläche (DetectGH), githubaccess für die Verfügbarkeit
 // eines gh-Zugangs (defaults/docs/handbook/github-access.md, Abschnitt Availability). project
 // importiert githubaccess für die Umgebungsprüfung; läge das Lesen in project,
 // könnte githubaccess es nur über einen Importzyklus erreichen. Eine zweite

@@ -41,15 +41,15 @@ func TestDocsScopeGitignoreGrenze(t *testing.T) {
 	}
 }
 
-// alwaysExcludedAbs schließt .k-playbook/ und k-playbook/ unter project.dir
-// und unter project.repoRoot aus, keph-backup/ und .git/ auf jeder Ebene.
+// alwaysExcludedAbs schließt .k-playbook/ unter project.dir und unter
+// project.repoRoot aus, keph-backup/ und .git/ auf jeder Ebene.
 func TestDocsScopeImmerAusgeschlossen(t *testing.T) {
 	s := &docsScope{projectDir: "/r/proj"}
 	for abs, want := range map[string]bool{
 		"/r/proj/.k-playbook/x.md":   true,
-		"/r/proj/k-playbook/x.md":    true,
+		"/r/proj/k-playbook/x.md":    false,
 		"/r/.k-playbook/x.md":        true,
-		"/r/k-playbook":              true,
+		"/r/k-playbook":              false,
 		"/r/proj/a/keph-backup/x.md": true,
 		"/r/proj/a/.git/config":      true,
 		"/r/proj/a/k-playbook/x.md":  false,

@@ -3,7 +3,6 @@ package project
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -55,39 +54,6 @@ func TestApplyLinksVerlinktDurchShare(t *testing.T) {
 	}
 	if !shareIgnored(root) {
 		t.Error(".k-playbook/.gitignore nimmt share nicht aus")
-	}
-}
-
-// Die Links aus der Zeit vor Stufe 2 zeigen in den Clone. Sie gehören uns:
-// was noch im Katalog steht, wird umgesetzt, was nicht, verschwindet.
-func TestHealLinksSetztCloneLinksUm(t *testing.T) {
-	root := newProject(t)
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-test.md"), "alt\n")
-	writeFile(t, filepath.Join(root, PlaybookDirName, "commands", "k-weg.md"), "alt\n")
-	commands := filepath.Join(root, ".claude", "commands")
-	if err := os.MkdirAll(commands, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"k-test.md", "k-weg.md"} {
-		if err := os.Symlink(filepath.Join("..", "..", PlaybookDirName, "commands", name), filepath.Join(commands, name)); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	status := statusFor(t, CheckLinks(root), claudeCommands())
-	if !slices.Contains(status.Wrong, "k-test.md") || !slices.Contains(status.Stale, "k-weg.md") {
-		t.Fatalf("Wrong = %v, Stale = %v", status.Wrong, status.Stale)
-	}
-
-	repair := HealLinks(root)
-	if !repair.Applied || repair.Error != "" {
-		t.Fatalf("Heilung: %+v", repair)
-	}
-	if got := readlink(t, filepath.Join(commands, "k-test.md")); !strings.Contains(got, ".k-playbook") {
-		t.Errorf("k-test.md zeigt weiter auf %q", got)
-	}
-	if _, err := os.Lstat(filepath.Join(commands, "k-weg.md")); !os.IsNotExist(err) {
-		t.Errorf("k-weg.md ist noch da (%v)", err)
 	}
 }
 

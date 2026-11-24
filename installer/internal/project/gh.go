@@ -8,16 +8,14 @@ import (
 )
 
 // GHHost ist der Host, um den es geht — ghconfig.Host, hier unter dem Namen,
-// den die Oberfläche und die Kontextausgabe schon tragen. Bewusst nur einer:
+// den die Oberfläche schon trägt. Bewusst nur einer:
 // Enterprise-Instanzen hätten eigene Accounts je Host; das wäre ein anderes
 // Feature als das hier.
 const GHHost = ghconfig.Host
 
 // GH ist der Befund zur GitHub CLI auf diesem Rechner. Eine Projektentscheidung
 // darüber gibt es nicht mehr (Task 128): Ob gh genutzt wird, ergibt sich aus
-// der GitHub-Zugangsdatei, ohne Dienst daraus, ob gh bereit ist (Ready). Ein
-// alter Block tools.gh in K-PLAYBOOK.yaml wird nicht gelesen; das Einrichten
-// entfernt ihn (RemoveLegacyGHBlock).
+// der GitHub-Zugangsdatei, ohne Dienst daraus, ob gh bereit ist (Ready).
 type GH struct {
 	Host string `json:"host"`
 	// Installed und Path sind der Host-Befund.
@@ -43,8 +41,10 @@ type GH struct {
 // hinterlegt.
 //
 // Bewusst ohne Aufruf von `gh auth status`: der prüft den Token beim Server und
-// kostet einen Netzzugriff. Dieser Befund soll billig genug sein, um in der
-// Kontextausgabe zu stehen. Die gh-Konfiguration liest das Paket ghconfig,
+// kostet einen Netzzugriff. Dieser Befund soll billig genug sein, um bei
+// jedem Teilabruf environment des Briefings und in jedem Kontext der
+// Oberfläche (BuildContext) erhoben zu werden. Die gh-Konfiguration liest das
+// Paket ghconfig,
 // das auch githubaccess für die Verfügbarkeit eines gh-Zugangs nutzt — eine
 // Fassung der Logik für beide.
 func DetectGH() GH {

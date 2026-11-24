@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,17 +60,14 @@ func TestDescribeJobUebersprungen(t *testing.T) {
 	}
 }
 
-// Ohne den Clone <projekt>/k-playbook/ verweigert scan nicht mehr mit „die
-// Installation … fehlt“ (Task 154). Geprüft wird der Teil hinter der Pause:
+// scan verlangt keine Installation im Projekt. Geprüft wird der Teil hinter
+// der Pause:
 // runScan als Ganzes endet zurzeit immer an review.Paused und bestünde auch
 // mit der Sperre. Das Ergebnisverzeichnis kommt über die Naht
 // review.ResultsDirOverride, die nur Tests setzen.
-func TestScanRunOhneCloneVerlangtKeineInstallation(t *testing.T) {
+func TestScanRunVerlangtKeineInstallation(t *testing.T) {
 	root := t.TempDir()
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: git\n")
-	if _, err := os.Stat(filepath.Join(root, project.PlaybookDirName)); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("%s/ darf es im Testprojekt nicht geben: %v", project.PlaybookDirName, err)
-	}
 	t.Chdir(root)
 	review.ResultsDirOverride = filepath.Join(root, "ergebnisse")
 	t.Cleanup(func() { review.ResultsDirOverride = "" })

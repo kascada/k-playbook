@@ -1,7 +1,7 @@
 name: Release
 
 # Baut die vier Plattform-Binaries zu einem Tag und hängt sie als Assets an das
-# Release. Der Clone trägt sie nicht mehr; `bin/install` und das Programm
+# Release. `bin/install` und das Programm
 # selbst (`k-playbook upgrade`, Update-Knopf) laden genau das eine, das zur
 # Plattform der jeweiligen Umgebung passt — aus dem neuesten veröffentlichten
 # Release (der Weiterleitung von releases/latest), geprüft gegen das SHA256SUMS
@@ -181,12 +181,6 @@ jobs:
           Terminal oder „Programm aktualisieren“ in der Oberfläche. Die Umgebungsprüfung
           (Briefing, `k-playbook health`) warnt, wenn das Programm älter ist als das neueste
           Release, und `k-playbook version --all` nennt beide Versionen.
-
-          Ältere Programme (bis v0.16.38) aktualisieren sich noch über einen Clone
-          `k-playbook/` im Projekt. Liegt er noch, läuft ihr `k-playbook upgrade` weiter wie
-          bisher, über die Dateien, die dafür auf `main` liegen bleiben (`VERSION`,
-          `SHA256SUMS`, `bin/install`). Fehlt der Clone schon, hilft die Installation oben.
-          Den Clone löscht danach `/k-upgrade`.
           EOF
           )"
           gh release create "$TAG" dist/k-playbook-* \

@@ -18,11 +18,11 @@ import (
 // braucht keine Kephalaion-Anbindung.
 
 // docsScopeAlways sind die Verzeichnisse, die nie zum Scan gehören, so wie
-// die Ausgabe sie nennt: k-playbook/ und .k-playbook/ nur direkt unter dem
-// Projektverzeichnis (daher der Anker), keph-backup/ und .git/ auf jeder
-// Ebene. Gerechnet wird nicht mit diesen Mustern, sondern mit
-// alwaysExcludedAbs und alwaysExcludedRel.
-var docsScopeAlways = []string{"/k-playbook/", "/.k-playbook/", "keph-backup/", ".git/"}
+// die Ausgabe sie nennt: .k-playbook/ nur direkt unter dem Projektverzeichnis
+// (daher der Anker), keph-backup/ und .git/ auf jeder Ebene. Gerechnet wird
+// nicht mit diesen Mustern, sondern mit alwaysExcludedAbs und
+// alwaysExcludedRel.
+var docsScopeAlways = []string{"/.k-playbook/", "keph-backup/", ".git/"}
 
 // docsScopeFurther sind die weiteren Ausschlüsse ohne Rückfrage; sie gelten
 // auf jeder Ebene.
@@ -241,15 +241,13 @@ func (s *docsScope) extra(arg string) (DocsScopeExtra, error) {
 }
 
 // alwaysExcludedAbs prüft einen absoluten Pfad gegen die immer
-// ausgeschlossenen Verzeichnisse: <projectDir>/.k-playbook/ und
-// <projectDir>/k-playbook/, dazu keph-backup/ und .git/ auf jeder Ebene.
+// ausgeschlossenen Verzeichnisse: <projectDir>/.k-playbook/, dazu
+// keph-backup/ und .git/ auf jeder Ebene.
 func (s *docsScope) alwaysExcludedAbs(abs string, projectRoot string) bool {
-	for _, name := range []string{ProjectDirName, "k-playbook"} {
-		for _, base := range []string{s.projectDir, projectRoot} {
-			dir := filepath.Join(base, name)
-			if abs == dir || strings.HasPrefix(abs, dir+string(filepath.Separator)) {
-				return true
-			}
+	for _, base := range []string{s.projectDir, projectRoot} {
+		dir := filepath.Join(base, ProjectDirName)
+		if abs == dir || strings.HasPrefix(abs, dir+string(filepath.Separator)) {
+			return true
 		}
 	}
 	for _, part := range strings.Split(filepath.ToSlash(abs), "/") {
@@ -261,16 +259,13 @@ func (s *docsScope) alwaysExcludedAbs(abs string, projectRoot string) bool {
 }
 
 // alwaysExcludedRel ist alwaysExcludedAbs für das Einsammeln der .gitignore:
-// full ist der absolute Pfad, rel derselbe ab SCAN_ROOT. k-playbook/ und
-// .k-playbook/ treffen nur direkt unter dem Projektverzeichnis,
-// keph-backup/ und .git/ auf jeder Ebene unter SCAN_ROOT — ein solcher Name
-// über SCAN_ROOT schließt nichts aus.
+// full ist der absolute Pfad, rel derselbe ab SCAN_ROOT. .k-playbook/ trifft
+// nur direkt unter dem Projektverzeichnis, keph-backup/ und .git/ auf jeder
+// Ebene unter SCAN_ROOT — ein solcher Name über SCAN_ROOT schließt nichts aus.
 func (s *docsScope) alwaysExcludedRel(full string, rel string) bool {
-	for _, name := range []string{ProjectDirName, "k-playbook"} {
-		dir := filepath.Join(s.projectDir, name)
-		if full == dir || strings.HasPrefix(full, dir+string(filepath.Separator)) {
-			return true
-		}
+	dir := filepath.Join(s.projectDir, ProjectDirName)
+	if full == dir || strings.HasPrefix(full, dir+string(filepath.Separator)) {
+		return true
 	}
 	for _, part := range strings.Split(rel, "/") {
 		if part == "keph-backup" || part == ".git" {

@@ -29,8 +29,8 @@ working directory is the target project. There is no fallback to that directory.
 starts with `Pflicht.`. The reason is the answer a caller gets: a field marked required in the
 schema is rejected by the SDK's schema validation before the tool runs, with a bare text
 (`validating "arguments": validating root: required: missing properties: ["projectDir"]`) --
-no envelope, no code, nothing that says the call did nothing. That is how a write call of a former
-tool got lost once. The tools therefore check the parameter themselves: missing, empty, or only
+no envelope, no code, nothing that says the call did nothing. That is how a write call once
+got lost. The tools therefore check the parameter themselves: missing, empty, or only
 whitespace yields the family's envelope with `ok: false`, code `invalid_input`, and the same
 message in all families -- `projectDir fehlt — nichts ausgeführt. Wiederhole den Aufruf
 mit projectDir, dem Projektverzeichnis mit K-PLAYBOOK.yaml (absoluter Pfad).` A `projectDir`
@@ -120,9 +120,8 @@ touched. Comments alone are not such a case.
 The registration *Set up* writes is an absolute path and is therefore tied to an environment;
 it cannot be committed as-is. To share it, enter the [portable form](#the-portable-form-the-bare-command-name)
 manually -- the bare command name. What is there is not touched by automatic correction as
-long as it belongs to the set of accepted forms. k-playbook writes the bare name itself in
-one case only: when automatic correction replaces an obsolete entry in a file tracked by git
--- see [Existing Projects Synchronize Automatically](#existing-projects-synchronize-automatically).
+long as it belongs to the set of accepted forms. k-playbook never writes the bare name
+itself.
 
 ## Approval and Restart
 
@@ -137,9 +136,7 @@ cannot approve its own servers.
 ## Why the Entry Is an Absolute Path
 
 The value *Set up* registers is the **absolute path of the installed binary resolved when
-writing**, typically `~/.local/bin/k-playbook`, expanded. It is neither the bare command name
-nor the project-owned wrapper used previously. The one exception is automatic correction of
-an obsolete entry in a tracked file: it writes the bare name
+writing**, typically `~/.local/bin/k-playbook`, expanded. It is not the bare command name
 ([below](#the-portable-form-the-bare-command-name)).
 
 The reason is the case in which the entry is needed. A client started from the Dock or Finder
@@ -150,16 +147,14 @@ no inherited environment.
 
 ### A Set of Accepted Forms, Not a Target Value
 
-Each write puts exactly one form into a file, chosen by a fixed rule: the absolute path,
-except when automatic correction replaces an obsolete entry in a tracked file -- then the bare
-name. **Validation** checks against a set:
+Each write puts exactly one form into a file: the absolute path. **Validation** checks
+against a set:
 
 | Form | Counts as |
 |---|---|
 | any absolute path whose filename is `k-playbook` | current |
 | the same path from another `$HOME` | current |
 | the bare command name `k-playbook` -- the portable form | current |
-| `k-playbook/bin/k-playbook`, `bin/k-playbook`, and any path ending in either | obsolete |
 | anything else, including `./k-playbook` | incorrect state, reported |
 
 Comparing for equality with a single target value would declare every other valid spelling
@@ -167,9 +162,8 @@ incorrect and rewrite it on every run. Two cases make this concrete: a committed
 registration cannot contain an absolute home path, and the host and Dev Container have
 different HOMEs.
 
-"Obsolete" is therefore defined **narrowly**: the old wrapper path, and nothing else. Only
-it is overwritten automatically. An entry that neither fits the set nor is the old wrapper
-is reported and overwritten only when *Set up* is clicked explicitly.
+An entry that does not fit the set is reported and overwritten only when *Set up* is clicked
+explicitly; nothing overwrites it automatically.
 
 ### The Portable Form: the Bare Command Name
 
@@ -194,12 +188,8 @@ in PATH, or `bin/install` aborts. For the same reason, host and container do not
 ping-pong with this file: neither finds anything in it to correct.
 
 *Set up* never writes it, and neither does adding a missing entry or creating a missing file
--- all of them write the resolved absolute path. k-playbook writes it in exactly one case:
-when automatic correction replaces an obsolete wrapper entry in a file git tracks, or where
-that question cannot be answered ([details](#existing-projects-synchronize-automatically)).
-The old relative wrapper entry named no environment, so the bare name is its faithful
-translation. Otherwise the portable form is entered manually in the file and then remains
-there. Exactly the name is accepted -- `./k-playbook` and every path ending in the name are
+-- all of them write the resolved absolute path. The portable form is entered manually in the
+file and then remains there. Exactly the name is accepted -- `./k-playbook` and every path ending in the name are
 not.
 
 ### Three Explicit Boundaries
@@ -208,8 +198,6 @@ not.
 here rather than concealed: a client started from the Dock or Finder -- Cursor, VS Code,
 Claude Desktop -- does not inherit the login-shell PATH. It finds nothing under a bare name,
 and the server remains unavailable. This exact case is why *Set up* writes the absolute path.
-It applies to a bare name entered manually and to one written by automatic correction in a
-tracked file alike.
 
 Anyone sharing a committed registration shares a form that works from the terminal and in a
 Dev Container, but not from the Dock. *Set up* does not help here: the bare name belongs to
@@ -235,10 +223,9 @@ replace a foreign absolute path either; anyone working in this situation enters 
 form manually.
 
 The same applies to a file that host and Dev Container **share without git tracking it** --
-through a bind mount, for example. Automatic correction then writes the absolute path of the
+through a bind mount, for example. Adding a missing entry then writes the absolute path of the
 environment it runs in, and the other environment stays without MCP, because the foreign
-path counts as current. The bare name is written automatically only into tracked files:
-"tracked" means committed, not shared. This boundary is named, not solved.
+path counts as current. This boundary is named, not solved.
 
 **The server finds the project through its working directory.** The registered path says
 which binary starts -- not which project is intended. At runtime, the server resolves this by
@@ -249,30 +236,23 @@ in the code repository, which may lie in a subdirectory of the project root acco
 not find their project. The interface states the condition in the block and clearly points it
 out if it itself was not started in the project root.
 
-## Existing Projects Synchronize Automatically
+## Missing Entries Are Added Automatically
 
-A project whose registration still names the retired wrapper is corrected without manual
-work in two places:
+A missing registration is added without manual work in two places:
 
 - by **`k-playbook upgrade`**, in its project step, on every run -- and so by `/k-upgrade`,
   whose hull runs that call.
 - at **every start** of `k-playbook`. This is the fallback path for everything that bypasses
   the first, such as a program installed by hand.
 
-In the former model the first place was the clone update through the interface; with the
-clone in the project and its pull it is gone (task 156).
-
 Clicking *Set up* is not required for this; it remains the explicit write path alongside it.
 
-This correction is **narrow and idempotent**. Replacing the obsolete entry is a repair of
-content k-playbook wrote itself, so it runs regardless of whether the file is committed;
-only the form written depends on it (see below).
-No accepted form is touched, and an entry that is neither obsolete nor accepted (`stale`)
-is left alone -- it may come from a foreign `$HOME` and be valid there. Nothing is deleted.
+This path is **narrow and idempotent**. An existing entry is never touched: neither an
+accepted form nor one in an incorrect state (`stale`) -- it may come from a foreign `$HOME`
+and be valid there. Nothing is deleted.
 
-The two automatic paths go equally far. Besides replacing the obsolete entry, each also
-**adds a missing entry and creates a missing file -- but only when the target file is not
-tracked by git.** That is the condition that keeps the working tree of a checkout clean,
+The two automatic paths go equally far. Each **adds a missing entry and creates a missing
+file -- but only when the target file is not tracked by git.** That is the condition that keeps the working tree of a checkout clean,
 and it is measured, not guessed,
 in the project root: `.k-playbook/K-PLAYBOOK.yaml` unreadable counts as tracked (the question is
 unanswered, so nothing is written); `project.vcs` other than `git` means nothing is
@@ -290,7 +270,7 @@ a directory on the way. Writing would land in the link target while the measurem
 the link, and a link is a deliberate setup of the project, so it is skipped rather than
 resolved. Only the components below the project root count; a project that lives under a
 symlinked path is not affected. In both cases -- symlink and a repository git refuses to
-trust -- only *Set up* writes; an obsolete entry is still corrected. Hard links are not
+trust -- only *Set up* writes. Hard links are not
 detected and remain a known gap. A
 missing file is additionally created only if the assistant has left a **trace of its own**
 in the project: an entry in `.claude/` or `.opencode/` that is not one of the symlink
@@ -299,43 +279,15 @@ own under `.opencode/`. The directories alone are no trace; k-playbook creates t
 every project. Without that condition every start and every upgrade would create two files
 nobody needs.
 
-Which form is written depends on the case. **Adding** a missing entry and **creating** a
-missing file write what *Set up* writes: the absolute path. The start message says so -- the
+**Adding** a missing entry and **creating** a missing file write what *Set up* writes: the
+absolute path. The start message says so -- the
 file carries a machine-specific path and should stay unversioned. Whether the project
 commits it anyway is the project's decision; from then on the file is tracked and the
 automatic path adds nothing to it any more.
 
-**Replacing** an obsolete entry follows the same tracking measurement, per target file and in
-both automatic paths: a file git **tracks** -- or one for which the question stays
-unanswered, such as with an unreadable `K-PLAYBOOK.yaml` -- gets the bare name `k-playbook`;
-a file that is **not tracked** gets the absolute path. The old relative wrapper entry named no
-environment, and a committed replacement must not name one either. The absolute legacy path
-`…/k-playbook/bin/k-playbook` follows the same rule. A later start writes nothing, neither on
-the host nor in a second environment, because both forms are accepted. The measurement runs
-only when an obsolete entry is actually replaced.
-
-Behind a **symlink**, the question is answered for the file that is actually written: the
-link target. That rule applies only after the chain above has established that the project
-uses git and its root lies in a repository -- with `project.vcs` other than `git`, a file
-behind a link stays untracked and gets the absolute path. The link target is resolved and
-compared physically with the physical repository root, since the project root itself may be
-reached through a symlinked path. A target in the same repository is measured with
-`git ls-files`; a target that is not tracked there gets the absolute path. A target outside
-that repository -- in no repository or in a nested one -- or one that cannot be resolved
-leaves the question unanswered and gets the bare name.
-
-When the bare name was written, the start message and the report of `k-playbook upgrade`
-say so and name its cost: a client launched from the Dock or Finder needs the absolute path, entered
-manually.
-
-**Projects already migrated and committed stay as they are.** Earlier versions wrote the
-absolute path into tracked files as well. A path from a foreign `$HOME` counts as current and
-is not replaced again. Affected projects enter the bare name `k-playbook` manually in
-`.mcp.json` and `opencode.json`; automatic correction leaves it there.
-
 The prerequisite remains the one-time bootstrap per host or Dev Container --
 `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`:
-both correction paths run in the installed binary. Without an installed `k-playbook`, no path can be registered --
+both automatic paths run in the installed binary. Without an installed `k-playbook`, no path can be registered --
 then nothing is written and the interface says so.
 
 ## Tools
@@ -741,7 +693,7 @@ collection `<hub>:k-playbook` under `defaults/` through the node's replica (task
 of the project binding, the account Kephalaion chooses for it (`kephalaion node client`),
 collection `k-playbook`; without a ready binding, or with an
 empty `defaults/`, a `k-playbook:` reference is `kephalaion_unavailable`, also when a local file
-exists -- no fallback to the disk, and none to a leftover clone `k-playbook/`. For `commands/` that is the text of a command, while
+exists -- no fallback to the disk. For `commands/` that is the text of a command, while
 the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/commands/`) is only the hull the assistant registers (task 092,
 [verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
 `documents` in the briefing (`overlayDocDir`): for `reviews`, name,
@@ -788,7 +740,7 @@ Error codes, in the envelope's `error.code` like the other tool families:
 |---|---|
 | `invalid_input` | `projectDir` missing; `ref` is not a reference in the scheme -- no prefix, no `/` after it, an empty, hidden, `.` or `..` segment --; names a directory without the trailing `/`; or ends in `/` without naming an assembled directory (today only `k-playbook:/instructions/always/`): the file name is missing, decided without reading -- `k-playbook:/instructions/on-demand/`, `k-playbook:/instructions/`, `k-playbook:/reviews/`, `project:/docs/`, `keph:/user/~/tasks/`, an unknown directory, a file with a trailing `/`; an include line with more than one argument; `lines` not of the form `from-to`/`from-`, `section` not a heading line, both set, or either on a directory |
 | `section_not_found` | the heading of `section` does not occur outside code blocks and the frontmatter |
-| `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `reviews/`, `guidelines/`, `commands/`, `includes/`, `testdata/` and `docs/` (for example `checks/`, `skills/` or the former kind for rules, gone since task 135); the message names only the reader kinds |
+| `unsupported` | a valid `k-playbook:` reference outside `instructions/`, `reviews/`, `guidelines/`, `commands/`, `includes/`, `testdata/` and `docs/` (for example `checks/`, `skills/` or `rules/`, gone since task 135); the message names only the reader kinds |
 | `not_found` | neither layer has the file or the assembled directory, the project has no such file, or the node reports `none` for the name in the collection; there is no fallback to reading anywhere else |
 | `kephalaion_unavailable` | a `keph:` reference while the binding is not ready (`kephalaion.ok` not `true`), the node cannot be reached, or the session could not be opened; a `k-playbook:` reference whose shipped layer `<hub>:k-playbook/defaults/` cannot be read -- binding not ready, collection missing or unreadable, `defaults/VERSION` missing --, even when a local file exists; no fallback |
 | `kephalaion_error` | the node rejected `read` with a message (collection not readable, replica never synced, invalid name); the message is the node's |
@@ -1238,8 +1190,8 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   default: the distinct `anlaesse` joined), `entstanden` (default: the oldest `datum`) and
   `abgelehnt` (the user declined a `neu` or `entfaellt`); `raw` are the absorbed raw orders as
   `keph:/queue/docs/<file>` references. Everything is validated before anything is written
-  (`invalid_input`). A raw order that is still waiting (last change younger than the waiting
-  time) is rejected with `invalid_input` and nothing is written, unless the raw orders of the
+  (`invalid_input`). A raw order that is still waiting (waiting time not over, measured by
+  `updated`, or by `created` when `updated` is missing or unreadable) is rejected with `invalid_input` and nothing is written, unless the raw orders of the
   input include one with `pfade: .` (the full run takes all of them in); a waiting order not in
   `raw` is left untouched. Per document one split order named `code-<document without .md>` is
   created or, when one is open for that document, extended (united `pfade`, `aktion` set anew,
@@ -1338,7 +1290,8 @@ the text of the always-instructions and before "Auf Abruf", so that a session re
 it does anything: one line `Umgebung: keine Probleme` without a problem, otherwise `Umgebung:`
 and one line per entry `  [level] area: message — hint`. The subcommand `briefing` exits 0
 even with errors in `health` -- the briefing reports, it does not judge; the exit code belongs
-to `k-playbook health`.
+to `k-playbook health`. An unknown option is a usage error and ends `briefing` with exit code 2,
+like `health`; every other failure ends with 1.
 
 **Without Kephalaion** there is no briefing: its shipped texts and the project's own layer live in
 collections (tasks 131, 143), so it fails as a whole with `kephalaion_unavailable` (the
@@ -1381,7 +1334,7 @@ to report:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"9"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, the directory of the former clone in the project, `"7"` still had `context.local`, `"8"` still had the transitional section `context` and uncapped work lists) |
+| `schemaVersion` | the version of the briefing output, `"9"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, `"7"` still had `context.local`, `"8"` still had the transitional section `context` and uncapped work lists) |
 | `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` in its first line (see "Head of the plain text" below) |
 | `now` | the moment of the call in the machine's time zone: `date` (`YYYY-MM-DD`) and `timestamp` (RFC 3339) -- the date a session writes into logs and names instead of guessing it |
 | `project` | `dir` (the main directory, where `.k-playbook/K-PLAYBOOK.yaml` lies; always present), `repoRoot`, `vcs` and `languages`. `available` is `false` with `message` when the configuration is unreadable, of an unknown version or names an inadmissible language -- a state like `work.available`, not an error: `dir` stays, the other fields and `links` are absent, the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
@@ -1463,7 +1416,6 @@ is always present, `[]` without a problem. The sources in this version:
 | `share` | `K_PLAYBOOK_SHARE_DIR` is set but not an absolute path | `warning` | set it to an absolute path or remove it; until then the shipped commands and skills are missing |
 | `share` | k-playbook runs in a container (`/.dockerenv` or `/run/.containerenv`), `K_PLAYBOOK_SHARE_DIR` is not set, and the project directory lies on a bind mount from the host (in `/proc/self/mountinfo`: longest mount point containing the project, not `overlay`, root not `/` and not under `…/volumes/`) -- every call here points `.k-playbook/share` at the container's home and the host loses the shipped commands; on the host itself the source stays silent, and a project cloned into a container volume does not count (`installation.md`, "Host and DevContainer sharing the project") | `warning` | set `K_PLAYBOOK_SHARE_DIR` to `${localEnv:HOME}/.local/share/k-playbook` in `devcontainer.json`, with its own volume there and a `chown` in `postCreateCommand`; if nobody runs k-playbook in this project on the host, set it to the container's own directory |
 | `anchor` | `project.vcs` is `git`, the project directory lies in a Git worktree (`rev-parse --show-toplevel` answers), and the anchor `.k-playbook/K-PLAYBOOK.yaml` is neither tracked (`ls-files --error-unmatch`) nor ignored (`check-ignore`) -- a state, not a presumed move: it also fits a fresh project before its first commit and an anchor kept local on purpose | `warning` | `git add .k-playbook/K-PLAYBOOK.yaml` and commit, so every clone has the anchor; or put it into `.gitignore` if it is meant to stay local |
-| `anchor` | a `K-PLAYBOOK.yaml` at the former place, directly in the project directory, is still in the index -- `Discover` moved the file to `.k-playbook/` on the first call of the new program, the index does not know yet | `warning` | `git rm --cached K-PLAYBOOK.yaml` and commit the move together with `git add .k-playbook/K-PLAYBOOK.yaml` |
 
 The source `anchor` speaks only on a positive finding. Without git, outside a worktree, with
 `project.vcs` other than `git`, with an ignored anchor (the k-playbook source repository) and on
@@ -1821,8 +1773,8 @@ is tracked:
 Both use the **portable form** -- the bare command name `k-playbook`. The absolute path
 *Set up* writes is tied to a `$HOME` and cannot be used here; the ignored `.mcp.json` contains
 the bare name only so this machine has the same setting everywhere. Automatic correction
-touches neither: the portable form belongs to the set of accepted forms, and only the old
-wrapper path is replaced automatically.
+touches neither: it adds only missing entries, and the portable form belongs to the set of
+accepted forms.
 
 This keeps the working tree clean with every upgrade and every start. Clicking *Set up*
 here writes nothing either, as long as `opencode.json` carries the memory block: the bare

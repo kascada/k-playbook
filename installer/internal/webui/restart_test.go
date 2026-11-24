@@ -331,9 +331,6 @@ func TestInstallationScheitertDienstLaeuftWeiter(t *testing.T) {
 			t.Errorf("Meldung ohne %q: %s", want, response.Message)
 		}
 	}
-	if strings.Contains(response.Message, "make -C "+project.PlaybookDirName+" install") {
-		t.Errorf("die Meldung nennt noch den Bootstrap des Clones: %s", response.Message)
-	}
 	if got := program.ReadVersion(f.target); got != "v0.9.90" {
 		t.Errorf("am Ziel liegt %q, die Datei wurde ersetzt", got)
 	}
@@ -384,54 +381,5 @@ func TestGleichzeitigerStartInDerLueckeGewinnt(t *testing.T) {
 	}
 	if !f.state.registration.Released() {
 		t.Error("der alte Dienst gilt noch als registriert")
-	}
-}
-
-// Ein altes Verzeichnis k-playbook/ bleibt bei der Programmaktualisierung
-// unberührt (Task 156): kein Pull, und auch die Startpflege des neuen
-// Dienstes setzt keinen Schreibschutz mehr.
-func TestProgrammaktualisierungLaesstAltenCloneUnberuehrt(t *testing.T) {
-	asset := buildProgram(t, "v0.9.91")
-	target := isolateHome(t)
-	writeExecutable(t, target, versionScript("v0.9.90"))
-
-	projectDir := updateProject(t, "v0.9.91")
-	cloneFile := oldClone(t, projectDir)
-	serveRelease(t, "v0.9.91", asset)
-	chdir(t, projectDir)
-
-	key, err := guiproc.Key()
-	if err != nil {
-		t.Fatal(err)
-	}
-	registration, err := guiproc.Register(guiproc.Record{
-		Key: key, Addr: "127.0.0.1:1", PID: os.Getpid(), Version: "v0.9.90",
-		StartTime: guiproc.OwnStartTime().Unix(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = registration.Remove() })
-	t.Cleanup(func() { stopRegistered(t, registration.Path()) })
-
-	shutdown, wasStopped := shutdownProbe()
-	state := &serverState{version: "v0.9.90", registration: registration, shutdown: shutdown}
-	code, response := postUpdate(t, state, programHandler, "/api/update/program")
-	if code != http.StatusOK || !response.Restarted || response.Version != "v0.9.91" {
-		t.Fatalf("Status %d, Antwort %+v", code, response)
-	}
-	if strings.Contains(response.Message, "Pull") {
-		t.Errorf("die Meldung nennt noch einen Pull: %s", response.Message)
-	}
-	assertCloneUntouched(t, cloneFile)
-	record, ok, err := guiproc.Read(registration.Path())
-	if err != nil || !ok || record.Version != "v0.9.91" || record.URL() != response.URL {
-		t.Fatalf("Laufzeitdatei = %+v (%v, %v)", record, ok, err)
-	}
-	if got := program.ReadVersion(target); got != "v0.9.91" {
-		t.Errorf("am Ziel liegt %q", got)
-	}
-	if !wasStopped() {
-		t.Error("der alte Dienst beendet sich nicht")
 	}
 }

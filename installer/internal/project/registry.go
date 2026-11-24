@@ -12,8 +12,10 @@ type AssetKind string
 
 const (
 	// KindCommands sind einzelne Markdown-Dateien, aufrufbar als /<name>.
-	// Unterverzeichnisse bilden Namensräume: _shared/path-resolution.md wird
-	// als /_shared:path-resolution aufgerufen.
+	// Unterverzeichnisse bilden Namensräume. Ein Namensraum mit
+	// Unterstrich-Präfix (_shared/, _docs/ …) trägt Fragmente: Sie sind nur
+	// Include und werden nicht als Command registriert (IsFragmentName,
+	// ActiveRegistry).
 	KindCommands AssetKind = "commands"
 	// KindSkills sind Verzeichnisse mit einer SKILL.md darin.
 	KindSkills AssetKind = "skills"
@@ -55,9 +57,8 @@ func (e RegistryEntry) LinkSource() string {
 // registryDirs sind die beiden Quellverzeichnisse einer Sorte, in
 // Überlagerungsreihenfolge: erst mitgeliefert, dann projekteigen.
 //
-// Mitgeliefert ist seit Stufe 2 von Punkt 20 der Arbeitsliste
-// (docs/knowledge-aktuell.md) ~/.local/share/k-playbook/, das das Binary für den
-// ganzen Rechner entpackt, nicht mehr der Clone k-playbook/. Gelesen wird am
+// Mitgeliefert ist ~/.local/share/k-playbook/, das das Binary für den ganzen
+// Rechner entpackt. Gelesen wird am
 // echten Ort, damit der Katalog nicht davon abhängt, ob der Link
 // .k-playbook/share schon steht; verlinkt wird durch ihn hindurch.
 //
@@ -201,8 +202,8 @@ func collectCommands(dir string, prefix string, files map[string]string) {
 		}
 
 		path := filepath.Join(dir, name)
-		// Ein Symlink hier wäre ein Rest aus einer früheren Verlinkung und
-		// könnte im Kreis zeigen; Quellen sind immer echte Einträge.
+		// Ein Symlink hier gehört nicht zum Katalog und könnte im Kreis
+		// zeigen; Quellen sind immer echte Einträge.
 		info, err := os.Lstat(path)
 		if err != nil || info.Mode()&os.ModeSymlink != 0 {
 			continue

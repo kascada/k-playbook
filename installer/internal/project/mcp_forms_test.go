@@ -46,14 +46,12 @@ func TestInstalledCommandPathOhneInstallation(t *testing.T) {
 	}
 }
 
-// Der Vertrag in einer Tabelle: was als aktuell gilt, was im engen Sinn
-// veraltet ist und was beides nicht ist.
+// Der Vertrag in einer Tabelle: was als aktuell gilt und was nicht.
 func TestMengeDerAkzeptiertenEintragsformen(t *testing.T) {
 	tests := []struct {
 		name     string
 		command  string
 		accepted bool
-		outdated bool
 	}{
 		{
 			name:     "aufgelöster absoluter Pfad",
@@ -73,31 +71,10 @@ func TestMengeDerAkzeptiertenEintragsformen(t *testing.T) {
 			accepted: true,
 		},
 		{
-			name:     "alter Wrapper, relativ",
-			command:  "k-playbook/bin/k-playbook",
-			outdated: true,
-		},
-		{
-			name:     "alter Wrapper, mit ./ davor",
-			command:  "./k-playbook/bin/k-playbook",
-			outdated: true,
-		},
-		{
-			name:     "alter Wrapper ohne Installationsverzeichnis",
-			command:  "bin/k-playbook",
-			outdated: true,
-		},
-		{
-			name:     "alter Wrapper, absolut",
-			command:  "/home/wer/projekt/k-playbook/bin/k-playbook",
-			outdated: true,
-		},
-		{
-			// Die Falle: ~/.local/bin/k-playbook endet ebenfalls auf
-			// bin/k-playbook. Als veraltet zählte es endlos neu geschrieben.
-			name:     "installiertes Binary ist kein alter Wrapper",
-			command:  "/home/wer/.local/bin/k-playbook",
-			accepted: true,
+			// Nur ein absoluter Pfad oder der bloße Name gilt; ein relativer
+			// Pfad hinge am Arbeitsverzeichnis des Clients.
+			name:    "relativer Pfad",
+			command: "bin/k-playbook",
 		},
 		{
 			// Die portable Form: die eincheckbare Registrierung dieses
@@ -127,12 +104,6 @@ func TestMengeDerAkzeptiertenEintragsformen(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if got := isAcceptedMCPCommand(test.command); got != test.accepted {
 				t.Errorf("isAcceptedMCPCommand(%q) = %v, erwartet %v", test.command, got, test.accepted)
-			}
-			if got := isOutdatedMCPCommand(test.command); got != test.outdated {
-				t.Errorf("isOutdatedMCPCommand(%q) = %v, erwartet %v", test.command, got, test.outdated)
-			}
-			if test.accepted && test.outdated {
-				t.Fatal("akzeptiert und veraltet schließen einander aus")
 			}
 		})
 	}
@@ -177,98 +148,13 @@ func TestApplyMCPLaesstAkzeptierteFormUnveraendert(t *testing.T) {
 	}
 }
 
-// Der eng definierte Fall: der alte Wrapper wird als veraltet gemeldet.
-func TestCheckMCPMeldetDenAltenWrapperAlsVeraltet(t *testing.T) {
-	root := newMCPProject(t)
-	writeFile(t, filepath.Join(root, ".mcp.json"),
-		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
-
-	status := mcpStatusFor(t, CheckMCP(root), ".mcp.json")
-	if status.State != MCPStateOutdated {
-		t.Fatalf("State = %q, erwartet %q", status.State, MCPStateOutdated)
-	}
-}
-
-// Die Auto-Korrektur greift genau einmal und genau dort: der Wrapper-Eintrag
-// wird ersetzt, die akzeptierte Form daneben bleibt Byte für Byte stehen.
-//
-// Das Projekt hat keine K-PLAYBOOK.yaml: die Tracking-Frage ist unbeantwortet,
-// und seit Task 062 steht nach der Korrektur deshalb der bloße Name darin.
-func TestRepairMCPKorrigiertNurVeralteteEintraege(t *testing.T) {
-	installTestBinary(t)
-	root := t.TempDir()
-
-	veraltet := filepath.Join(root, ".mcp.json")
-	writeFile(t, veraltet,
-		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
-
-	portabel := `{"mcp":{"` + MCPServerKey + `":{"type":"local","command":["/Users/fremd/.local/bin/k-playbook","mcp"],"enabled":true}}}` + "\n"
-	writeFile(t, filepath.Join(root, "opencode.json"), portabel)
-
-	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
-	if err != nil {
-		t.Fatalf("RepairMCP: %v", err)
-	}
-	if len(repaired) != 1 || repaired[0].Path != ".mcp.json" {
-		t.Fatalf("korrigiert = %v, erwartet nur .mcp.json", repaired)
-	}
-	if repaired[0].Command != InstalledCommandName {
-		t.Errorf("geschriebenes Kommando = %q, erwartet %q", repaired[0].Command, InstalledCommandName)
-	}
-
-	entry := readJSON(t, veraltet)["mcpServers"].(map[string]any)[MCPServerKey].(map[string]any)
-	if entry["command"] != InstalledCommandName {
-		t.Errorf("command = %v, erwartet %q", entry["command"], InstalledCommandName)
-	}
-
-	// Die akzeptierte Form bleibt auch ohne instructions-Eintrag stehen: die
-	// Auto-Korrektur repariert, sie richtet nicht ein.
-	raw, err := os.ReadFile(filepath.Join(root, "opencode.json"))
-	if err != nil {
-		t.Fatalf("opencode.json lesen: %v", err)
-	}
-	if string(raw) != portabel {
-		t.Errorf("akzeptierte Form wurde von der Auto-Korrektur angefasst:\n%s", raw)
-	}
-}
-
-// Idempotenz: der zweite Lauf meldet nichts und fasst nichts an. Ohne das
-// machte jeder Start die getrackten MCP-Dateien eines Projekts dreckig.
-func TestRepairMCPIstIdempotent(t *testing.T) {
-	root := newMCPProject(t)
-	writeFile(t, filepath.Join(root, ".mcp.json"),
-		`{"mcpServers":{"`+MCPServerKey+`":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}`+"\n")
-
-	if _, err := RepairMCP(root, MCPWriteOutdatedOnly); err != nil {
-		t.Fatalf("erster Lauf: %v", err)
-	}
-	first, err := os.ReadFile(filepath.Join(root, ".mcp.json"))
-	if err != nil {
-		t.Fatalf(".mcp.json lesen: %v", err)
-	}
-
-	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
-	if err != nil {
-		t.Fatalf("zweiter Lauf: %v", err)
-	}
-	if len(repaired) != 0 {
-		t.Errorf("zweiter Lauf hat erneut korrigiert: %v", repaired)
-	}
-
-	second, err := os.ReadFile(filepath.Join(root, ".mcp.json"))
-	if err != nil {
-		t.Fatalf(".mcp.json lesen: %v", err)
-	}
-	if string(first) != string(second) {
-		t.Errorf("zweiter Lauf hat die Datei verändert:\n%s\n%s", first, second)
-	}
-}
-
-// Ein Projekt ohne MCP-Dateien bleibt eines: die Auto-Korrektur legt nichts an.
+// Ein Projekt ohne MCP-Dateien und ohne Spur eines Assistenten bleibt eines:
+// die Auto-Korrektur legt nichts an.
 func TestRepairMCPLegtNichtsAn(t *testing.T) {
 	root := newMCPProject(t)
+	writeVCSConfig(t, root, "none")
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -283,15 +169,16 @@ func TestRepairMCPLegtNichtsAn(t *testing.T) {
 }
 
 // Ohne installiertes k-playbook gibt es keinen Pfad, der sich eintragen ließe.
-// Dann korrigiert auch die Auto-Korrektur nichts.
+// Dann ergänzt auch die Auto-Korrektur nichts.
 func TestRepairMCPOhneInstalliertesBinary(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	root := t.TempDir()
+	writeVCSConfig(t, root, "none")
 
-	veraltet := `{"mcpServers":{"` + MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
+	veraltet := `{"mcpServers":{}}` + "\n"
 	writeFile(t, filepath.Join(root, ".mcp.json"), veraltet)
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}
@@ -308,10 +195,8 @@ func TestRepairMCPOhneInstalliertesBinary(t *testing.T) {
 	}
 }
 
-// Die portable Form in beiden Dateien: der Zustand dieses Quell-Repos ab
-// Etappe 3. Beide Umfänge der selbsttätigen Wege — der enge von
-// „Aktualisieren“ in der Oberfläche und der des Starts — müssen daran
-// vorbeigehen, sonst schriebe die eigene Automatik bei jedem Lauf einen
+// Die portable Form in beiden Dateien: der Zustand dieses Quell-Repos. Der
+// selbsttätige Weg des Starts und Einrichten müssen daran vorbeigehen, sonst schriebe die eigene Automatik bei jedem Lauf einen
 // absoluten Home-Pfad in getrackte Dateien und der Release-Preflight scheiterte
 // an ihr.
 func TestPortableFormBleibtVonSelbstUnangetastet(t *testing.T) {
@@ -335,7 +220,7 @@ func TestPortableFormBleibtVonSelbstUnangetastet(t *testing.T) {
 		}
 	}
 
-	repaired, err := RepairMCP(root, MCPWriteOutdatedOnly)
+	repaired, err := RepairMCP(root, MCPWriteUnversioned)
 	if err != nil {
 		t.Fatalf("RepairMCP: %v", err)
 	}

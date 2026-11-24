@@ -15,8 +15,7 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
 `k-playbook:/instructions/on-demand/doku-auftraege.md`; dieser Text wiederholt sie nicht.
 
 - Grundlage ist `CHANGED_PATHS` aus 5f, Schritt 6 — nur Namen, kein Diff. Code für `code` ist
-  Quelltext unter `project.repoRoot` außerhalb von `.k-playbook/`,
-  einem liegengebliebenen Clone `k-playbook/` (Altbestand), versteckten Pfaden und
+  Quelltext unter `project.repoRoot` außerhalb von `.k-playbook/`, versteckten Pfaden und
   `environment.docs.exclude` — das holt er an dieser Stelle über den Abruf `environment`
   (`k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`), es steht nicht
   im Briefing; ein geändertes Manifest oder Lockfile betrifft `tools`.

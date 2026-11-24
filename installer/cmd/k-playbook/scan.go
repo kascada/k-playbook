@@ -33,8 +33,7 @@ func runScan(args []string) error {
 // ein Test ihn erreicht, solange review.Paused sperrt.
 //
 // Scan-Katalog und Skripte kommen aus SharedDir(), der Lauf aus dem
-// Ergebnisverzeichnis (review.ResultsDir); den früheren Clone
-// <projekt>/k-playbook/ verlangt er seit Task 154 nicht mehr.
+// Ergebnisverzeichnis (review.ResultsDir).
 func scanRun(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("kein Lauf angegeben: k-playbook scan <lauf> [eintrag …]")

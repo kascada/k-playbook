@@ -39,10 +39,7 @@ project/
 | the shipped texts in `<hub>:k-playbook/defaults/` | k-playbook | the hub fetches the new release |
 
 Because the installation is the binary alone, nothing shipped lies in the
-project, and an update cannot touch anything the project owns. In the former
-model the installation was a clone under `<project>/k-playbook/`; the program
-neither reads nor pulls such a directory any more (task 156), and `/k-upgrade`
-3.8 deletes an old clone.
+project, and an update cannot touch anything the project owns.
 
 ```mermaid
 flowchart LR
@@ -64,7 +61,7 @@ flowchart LR
 
 ### Paths are derived, not stored in config
 
-There is no longer a `paths:` block. Every location is fixed: project-owned
+There is no `paths:` block. Every location is fixed: project-owned
 commands and skills are under `.k-playbook/`, next to `K-PLAYBOOK.yaml`, and
 project knowledge is under `keph:/docs/` in the project collection. Tasks are
 documents in the project collection as well, `keph:/user/<user>/tasks/`, not

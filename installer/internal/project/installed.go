@@ -59,8 +59,7 @@ var ErrNoInstalledCommand = errors.New("kein installiertes " + InstalledCommandN
 //     wenigstens ehrlich.
 //
 // Bewusst **nicht** gesucht wird über die PATH: ein PATH-Treffer wäre wieder
-// von der Umgebung des Aufrufers abhängig, und in einem Entwicklungsrepo kann
-// dort noch ein abgelöster Wrapper vor ~/.local/bin stehen.
+// von der Umgebung des Aufrufers abhängig.
 func InstalledCommandPath() (string, error) {
 	if candidate, err := InstallTargetPath(); err == nil {
 		if isExecutableFile(candidate) {

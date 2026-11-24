@@ -82,9 +82,9 @@ func ToolMatrix(projectDir string) string {
 	return filepath.Join(SharedDir(), filepath.FromSlash(ToolMatrixPath))
 }
 
-// ReadToolLanguages liest nur die Sprachliste aus der Tool-Matrix. Das braucht
-// die Oberfläche auch dann, wenn der eigentliche Preflight wegen eines aktiven
-// Projekt-venv abbricht.
+// ReadToolLanguages liest nur die Sprachliste aus der Tool-Matrix: die Menge
+// der wählbaren Sprachen für die Oberfläche und die Grenze der Erkennung in
+// DetectLanguages — ohne den Preflight zu starten.
 func ReadToolLanguages(projectDir string) ([]string, error) {
 	data, err := os.ReadFile(ToolMatrix(projectDir))
 	if err != nil {
@@ -165,8 +165,10 @@ func CheckTools(projectDir string, languages []string) (ToolPreflight, error) {
 		if ctx.Err() == context.DeadlineExceeded {
 			return ToolPreflight{}, fmt.Errorf("Preflight hat nicht innerhalb von %s geantwortet", toolPreflightTimeout)
 		}
-		// Das Skript bricht mit einer Meldung auf stderr ab, etwa bei einem
-		// aktiven Projekt-venv. Die gehört in die Fehlermeldung.
+		// Das Skript bricht mit einer Meldung auf stderr ab, etwa bei einer
+		// fehlenden Tool-Matrix. Die gehört in die Fehlermeldung. Ein aktives
+		// Projekt-venv gehört nicht dazu: Der lesende Aufruf mit --json darf es
+		// messen und meldet es als toolScope; nur --install bricht daran ab.
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
 			message, _, _ := strings.Cut(strings.TrimSpace(string(exitErr.Stderr)), "\n")

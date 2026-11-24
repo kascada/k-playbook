@@ -10,7 +10,8 @@
 // k-playbook: Es bleibt in Kephalaions eigener Datei
 // <tokensDir>/<hub>/<account>.token.
 //
-// Sicherheitsvertrag, für alle Aufrufer gleich (Kontextausgabe, Oberfläche):
+// Sicherheitsvertrag, für alle Aufrufer gleich (Briefing, Umgebungsprüfung,
+// Oberfläche):
 // Hub und Collection kommen aus der Projektdatei oder aus einer Anfrage. Der
 // Hub wird ein Argument der Auskunft und ein Header-Name, deshalb werden beide
 // nach der Namensregel von Kephalaion geprüft. Gelesen wird ein Token nur aus
@@ -22,7 +23,8 @@
 // keinem Log.
 //
 // Das Paket hängt nur von der Standardbibliothek ab, damit
-// project es für die Kontextausgabe einbinden kann.
+// project es für Briefing, Umgebungsprüfung und den Kontext der Oberfläche
+// einbinden kann.
 package kephalaion
 
 import (

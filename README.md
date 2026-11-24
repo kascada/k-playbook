@@ -115,9 +115,7 @@ What k-playbook ships is not in the project. Commands, skills and scripts are un
 the binary to `~/.local/share/k-playbook/`, once per machine; the shipped texts —
 instructions, review recipes, guidelines, the texts of the commands and the handbook — lie
 in the public collection `k-playbook` on the project's Kephalaion hub and are read as
-`k-playbook:/…` references. In the former model a project carried a clone of this
-repository under `k-playbook/` instead; a clone that is still there is no longer read, and
-`/k-upgrade` deletes it.
+`k-playbook:/…` references.
 
 Everything a project owns lies in its Kephalaion collection or under `.k-playbook/`.
 Tasks, todos, the project documentation and the source configuration of the version
@@ -129,10 +127,6 @@ The collection's hub and name stand in the block `kephalaion:` of
 token and the node's address come from Kephalaion itself (`kephalaion node client`).
 Project-owned commands and skills live in `.k-playbook/commands/` and
 `.k-playbook/skills/`.
-
-`/k-upgrade` has one conversion that needs a judgement (3.8): it deletes a leftover clone
-`k-playbook/` and then removes the `.gitignore` lines that kept `k-playbook/` out of Git,
-each only once its directory is gone.
 
 The reviews are paused: the location of review results is not decided yet. Until then
 `/k-review`, `/k-audit` and `/k-remediation` only say so, `k-playbook scan` and
@@ -169,8 +163,8 @@ Code loads it through the import.
 The direction is the same everywhere. If a project brings only a real `CLAUDE.md`, setup
 **renames** it to `AGENTS.md` and creates `CLAUDE.md` anew as an include; the content is
 preserved and not duplicated. A `CLAUDE.md` that already carries the line `@AGENTS.md` is
-set up — including one with its own house rules alongside. A symlink from an older
-version is replaced without loss on the first `k-playbook briefing`. What cannot be
+set up — including one with its own house rules alongside. A symlink `CLAUDE.md` is
+replaced with the include file without loss on the next `k-playbook briefing`. What cannot be
 resolved automatically — two real files without an import line, a deliberately set link
 to a different target, a git-ignored `AGENTS.md` — is reported as a **conflict** and left
 untouched. As long as it stands, Claude Code sees nothing of the playbook.
@@ -214,15 +208,14 @@ older `kephalaion` without `--auto` are only reported), then the release binary 
 running program is older than the newest release tag, then
 `AGENTS.md`, `CLAUDE.md`, linking, the missing fields of the `maintenance:` block in
 `K-PLAYBOOK.yaml` (with the backup switched off; existing values stay) and MCP entries (a
-stale entry is replaced, a missing one added when the file is not tracked by Git), and last
+missing one is added when the file is not tracked by Git; an existing entry stays), and last
 the `README.md` of the
 directories under `keph:/docs/` from their templates (only with a ready Kephalaion, reported
 as a hint) —
 and `/k-upgrade` in an assistant session relays its message; `k-playbook upgrade --check`
 only reports what a run would do. Kephalaion comes first because k-playbook depends on it and
 the later steps need its node. After a Kephalaion upgrade or node restart, as after a program
-change, the session has to be restarted. Once, when coming from a binary that predates this
-order, the first run does not update Kephalaion yet; the second `/k-upgrade` does.
+change, the session has to be restarted.
 
 The linking for the assistants catches up by itself afterwards — on the next
 `k-playbook briefing`, the call at the start of every session, or on the next look at the

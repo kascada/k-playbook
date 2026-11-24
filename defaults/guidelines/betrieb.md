@@ -11,9 +11,7 @@ verweist hierher, statt den Ort ein zweites Mal zu begründen.
 Texte kommen über `k-playbook:`-Verweise, Commands, Skills und Skripte liegen unter
 `~/.local/share/k-playbook/` und gehören dem Programm. Was dort abgelegt oder geändert
 wird, ist nach der nächsten Aktualisierung weg — ohne Fehlermeldung, ohne Spur. Alles, was
-das Projekt hervorbringt, liegt im Projekt selbst oder in seiner Collection. Liegt im
-Projekt noch ein Verzeichnis `k-playbook/`, ist das ein liegengebliebener Clone aus dem
-früheren Modell: Auch dorthin wird nie geschrieben, und `/k-upgrade` löscht ihn.
+das Projekt hervorbringt, liegt im Projekt selbst oder in seiner Collection.
 
 **Pfade werden nicht geraten.** Jeder Ort, an dem etwas abgelegt wird, ist ein
 `keph:`-Verweis oder liegt unter der Projektwurzel, dort unter `.k-playbook/`. Die

@@ -11,24 +11,27 @@ import (
 )
 
 // Die Quellen der Umgebungsprüfung (Task 098). Jede Funktion ist eine Quelle
-// für health.Check: Sie bewertet einen Befund, den die Kontextausgabe heute
-// schon trägt, und macht daraus Einträge mit Stufe, Bereich, Satz und
-// Abhilfe. Die Quellen stehen hier und nicht im Paket health, weil sie aus
+// für health.Check: Sie bewertet einen Befund, den das Briefing als Rohwert
+// schon trägt — die Anbindung unter kephalaion, Basis-Werkzeuge und
+// Quellenkonfiguration im Teilabruf environment —, und macht daraus Einträge
+// mit Stufe, Bereich, Satz und Abhilfe. Die Quellen stehen hier und nicht im
+// Paket health, weil sie aus
 // diesem Paket lesen (DetectBaseTools, LoadVersionSources,
 // kephalaionCheck) und das Briefing in diesem Paket den Report trägt — health
 // kann project darum nicht importieren. Eingehängt werden sie beim Laden des
 // Pakets; jedes Programm, das das Briefing, die CLI, den MCP-Server oder die
 // GUI baut, importiert project und hat sie damit.
 //
-// Die vierte Quelle, github, wertet kein Feld der Kontextausgabe aus, sondern
+// Die vierte Quelle, github, wertet keinen dieser Rohwerte aus, sondern
 // liest die persönliche GitHub-Zugangsdatei über das Paket githubaccess; sie
 // steht hier neben den anderen, weil hier alle Quellen eingehängt werden und
-// githubaccess project nicht kennt.
+// githubaccess project nicht kennt. Weitere Quellen stehen in den Dateien
+// health_*.go daneben.
 //
 // Repariert wird nichts — auch die Quelle github legt eine fehlende
 // Zugangsdatei nicht an; das tut nur `k-playbook github init` —, und kein
 // Eintrag nennt einen Token oder einen Wert aus einer Datei; Dienst- und
-// Schlüsselnamen dürfen vorkommen. Die Kontextausgabe bleibt unverändert;
+// Schlüsselnamen dürfen vorkommen. Die Rohwerte bleiben unverändert;
 // health ersetzt keine Felder, es bewertet sie.
 func init() {
 	health.Register(healthKephalaion)
@@ -99,12 +102,12 @@ func kephalaionHint(state kephalaion.State) string {
 	switch state {
 	case kephalaion.StateNotConfigured:
 		return "Den Block kephalaion: mit hub und collection in " + ConfigDisplayName +
-			" eintragen und committen oder in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion); " +
+			" eintragen und committen oder in der Oberfläche einrichten (k-playbook ohne Argument oder /k-gui; Statusseite, Karte „Kephalaion-Collection einrichten“); " +
 			"ohne ihn gibt es keine mitgelieferten Texte (k-playbook:, das Briefing), und keph:-Verweise, " +
 			"Workbench und die eigene Arbeit sind nicht erreichbar."
 	case kephalaion.StateInvalidEntry:
 		return "Den Block kephalaion: in " + ConfigDisplayName +
-			" prüfen oder die Anbindung in der Oberfläche neu einrichten (k-playbook gui, Abschnitt Kephalaion)."
+			" prüfen oder die Anbindung in der Oberfläche neu einrichten (k-playbook ohne Argument oder /k-gui; Statusseite, Karte „Kephalaion-Collection einrichten“)."
 	case kephalaion.StateNoKephalaion:
 		return "Kephalaion aktualisieren: kephalaion upgrade; k-playbook braucht kephalaion node client im Format 1."
 	case kephalaion.StateClientFailed:
@@ -118,9 +121,9 @@ func kephalaionHint(state kephalaion.State) string {
 	case kephalaion.StateHubUnknown, kephalaion.StateHubNeverSynced, kephalaion.StateReplicaUnreadable:
 		return "Den Hub am Node prüfen und abgleichen: kephalaion status, kephalaion node sync."
 	case kephalaion.StateCollectionUnreadable:
-		return "Leserecht auf die Collection beantragen oder in der Oberfläche eine lesbare Collection wählen (k-playbook gui, Abschnitt Kephalaion)."
+		return "Leserecht auf die Collection beantragen oder in der Oberfläche eine lesbare Collection wählen (k-playbook ohne Argument oder /k-gui; Statusseite, Karte „Kephalaion-Collection einrichten“)."
 	}
-	return "Die Anbindung in der Oberfläche prüfen (k-playbook gui, Abschnitt Kephalaion)."
+	return "Die Anbindung in der Oberfläche prüfen (k-playbook ohne Argument oder /k-gui; Statusseite, Karte „Kephalaion-Collection einrichten“)."
 }
 
 // healthBaseTools bewertet die Basis-Werkzeuge: je fehlendem eine Warnung mit
@@ -146,9 +149,9 @@ func healthBaseTools(_ context.Context, projectDir string) []health.Problem {
 //
 //   - Liegt es, ist aber nicht lesbar, von fremder Fassung oder trägt roots,
 //     ist das ein Fehler — der Erhebungslauf bräche daran ab. Der Satz nennt
-//     den Ort, nicht den Inhalt: Die Einzelheiten des Lesers stehen in der
-//     Kontextausgabe unter versionSources.error, die eine Zeile des Dokuments
-//     zitieren kann.
+//     den Ort, nicht den Inhalt: Die Einzelheiten des Lesers stehen im
+//     Teilabruf environment des Briefings unter versionSources.error, das
+//     eine Zeile des Dokuments zitieren kann.
 //   - Ist Kephalaion für das Projekt bereit, das Dokument aber nicht
 //     lesbar, ist das ebenfalls ein Fehler: Kein Leser fällt dann auf die
 //     Platte oder still auf die Standardquellen zurück.

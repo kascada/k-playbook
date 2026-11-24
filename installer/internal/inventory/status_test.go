@@ -43,27 +43,7 @@ func TestBodyOhneFrontmatterIstDieGanzeDatei(t *testing.T) {
 	}
 }
 
-// legacyHead ist der Kopf eines Inventars vor Task 120: type, tags, status
-// und die Zahlen im Block `inventory:`.
-const legacyHead = "---\n" +
-	"type: Version Inventory\n" +
-	"title: Versionsinventar\n" +
-	"description: Vollständige Übersicht der deklarierten Versionen dieses Projekts, nach Umgebung getrennt und mit Herkunft je Zeile.\n" +
-	"tags: [versions, inventory, dependencies]\n" +
-	"status: stable\n" +
-	"generated: { by: k-doc-inventory, at: 2026-10-25T10:00:00+02:00 }\n" +
-	"inventory:\n" +
-	"  sources-configured: 1\n" +
-	"  sources-read: 2\n" +
-	"  entries: 3\n" +
-	"  deviations: 4\n" +
-	"  rejected: 5\n" +
-	"  sources-excluded: 6\n" +
-	"  sources-unevaluable: 7\n" +
-	"---\n\n# Versionsinventar\n"
-
-// Der neue Kopf trägt die Zahlen unter generated.stats; der Stand kommt von
-// dort, und type, status und tags verlangt niemand mehr.
+// Der Kopf trägt die Zahlen unter generated.stats; der Stand kommt von dort.
 func TestStatusLiestDenNeuenKopf(t *testing.T) {
 	data := "---\n" +
 		"title: Versionsinventar\n" +
@@ -88,26 +68,6 @@ func TestStatusLiestDenNeuenKopf(t *testing.T) {
 		SourcesConfigured: 1, SourcesRead: 2, Entries: 3, Deviations: 4, Rejected: 5, SourcesExcluded: 6, SourcesUnevaluable: 7}
 	if status != want {
 		t.Errorf("Status = %+v, erwartet %+v", status, want)
-	}
-}
-
-// Ein Inventar im alten Kopf wird bis zum nächsten Lauf weiter gelesen: ohne
-// generated.stats gilt der Block inventory:.
-func TestStatusLiestDenAltenKopfBisZumNaechstenLauf(t *testing.T) {
-	status := StatusOf([]byte(legacyHead))
-	if status.Problem != "" {
-		t.Fatalf("Problem = %q", status.Problem)
-	}
-	if status.SourcesConfigured != 1 || status.SourcesRead != 2 || status.Entries != 3 || status.Deviations != 4 ||
-		status.Rejected != 5 || status.SourcesExcluded != 6 || status.SourcesUnevaluable != 7 ||
-		status.GeneratedAt != "2026-10-25T10:00:00+02:00" {
-		t.Errorf("Status = %+v", status)
-	}
-
-	// Fehlt im alten Kopf eine Zahl, nennt der Befund den alten Schlüssel.
-	broken := strings.Replace(legacyHead, "  entries: 3\n", "", 1)
-	if got := StatusOf([]byte(broken)).Problem; !strings.Contains(got, "inventory.entries") {
-		t.Errorf("Problem = %q", got)
 	}
 }
 

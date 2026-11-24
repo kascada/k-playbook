@@ -12,7 +12,7 @@
 //     gefundenen Werkzeugs.
 //   - Jede Datei wird durch die Vertrauensgrenze in trust.go geöffnet, und zwar
 //     ausschließlich über Boundary.ReadFile. Jeder Aufrufweg — Subkommando,
-//     Command, später die Web-API — geht damit durch dieselbe Prüfung.
+//     Command, die Web-API der Oberfläche — geht damit durch dieselbe Prüfung.
 //   - Nichts verschwindet still. Was abgelehnt, nicht gefunden oder nicht
 //     gelesen werden konnte, steht als Ablehnung oder Hinweis im Ergebnis.
 package inventory

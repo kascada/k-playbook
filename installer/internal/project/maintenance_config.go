@@ -774,7 +774,8 @@ func pathStrictlyBelow(parent, child string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// maintenanceDocsExclude ist der Eintrag für context.docs.exclude: das
+// maintenanceDocsExclude ist der Eintrag für docs.exclude, wie der Teilabruf
+// environment des Briefings und der Kontext der Oberfläche es tragen: das
 // geprüfte Ziel relativ zu project.repoRoot, verankert und als Verzeichnis,
 // etwa /sub/keph-backup/docs/. Den Eintrag gibt es nur, wenn das Ziel unterhalb
 // von project.repoRoot liegt, denn die Form ist an project.repoRoot gebunden.

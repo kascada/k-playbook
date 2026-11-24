@@ -127,7 +127,9 @@ Schlüsselnamen dürfen vorkommen). Repariert und geschrieben wird nichts —
 auch keine fehlende GitHub-Zugangsdatei; die legt k-playbook github init an.
 Die Bereiche heute:
 
-  kephalaion      eingetragen, aber nicht ok: error; nicht eingetragen: warning
+  kephalaion      jede nicht bereite Anbindung: error, auch eine nicht
+                  eingetragene; ein account: im Block kephalaion: von
+                  K-PLAYBOOK.yaml, den k-playbook nicht liest: warning
   baseTools       je fehlendem Basis-Werkzeug eine warning
   versionSources  keph:/k-playbook/inventory.md da, aber nicht lesbar, von
                   unbekannter Fassung oder mit roots: error; Kephalaion
@@ -137,7 +139,18 @@ Die Bereiche heute:
                   github.yaml sagt etwas Falsches: je Problem ein error mit
                   dem Pfad in der Datei vorn im Satz; je Dienst ohne
                   verfügbaren Zugang eine warning; eine fehlende Datei ist
-                  kein Eintrag
+                  kein Eintrag. Dazu die Berechtigungen der Clients für
+                  GitHub über run: fehlen sie trotz Dienst, stehen sie ohne
+                  Dienst noch da, lassen sie sich nicht eintragen oder
+                  widerspricht ihnen ein Eintrag, je eine warning
+  share           das Verzeichnis der mitgelieferten Dateien ist unbekannt,
+                  oder ein Container teilt den Projektordner mit dem Host,
+                  ohne dass K_PLAYBOOK_SHARE_DIR gesetzt ist: warning
+  anchor          .k-playbook/K-PLAYBOOK.yaml liegt in einem Git-Worktree
+                  und ist weder versioniert noch ignoriert: warning
+  frontmatter     je Command oder Skill, dessen Frontmatter kein gültiges
+                  YAML ist: error
+  program         das Programm ist älter als das neueste Release: warning
 
 Ohne --json der Klartext: ohne Problem die Zeile „Umgebung: keine Probleme“,
 sonst „Umgebung:“ und je Eintrag „[stufe] bereich: satz — abhilfe“ — derselbe

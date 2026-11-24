@@ -22,17 +22,13 @@ Everything else the project owns lies in its Kephalaion collection and is named 
 `keph:` reference.
 
 Because nothing shipped lies in the project, an update of the program cannot
-touch anything the project owns. In the former model the installation was a
-clone of the k-playbook repository under `<project>/k-playbook/`, beside the
-configuration. The program no longer reads such a directory, and `/k-upgrade`
-deletes one that is left (conversion 3.8).
+touch anything the project owns.
 
 The name of the project directory is irrelevant.
 
 ## No paths in configuration
 
-Earlier versions had a `paths:` block with nine keys. It no longer exists. All
-locations derive from the project root, the directory that holds
+The configuration names no paths. All locations derive from the project root, the directory that holds
 `.k-playbook/K-PLAYBOOK.yaml`:
 
 | What | Where |
@@ -66,13 +62,10 @@ locations derive from the project root, the directory that holds
 | version sources | `keph:/k-playbook/inventory.md` — in the project collection, settings in the frontmatter |
 
 A key whose value is always the same would only be a source of errors.
-Commands therefore no longer guess or read paths: they derive them.
+Commands therefore do not guess or read paths: they derive them.
 
-This also applies to project documentation. Previously, `paths.docs` was the
-only value allowed to point out of the k-playbook directory with `../`, so a
-project could continue using its existing docs. This special case is removed:
-the project documentation lives in `keph:/docs/`, and other documentation
-maintained by a project remains untouched.
+This also applies to project documentation: it lives in `keph:/docs/`, and other
+documentation maintained by a project remains untouched.
 
 The docs producers do not write to disk: `/k-docs-code` and the
 `ks-overlay-repo-analyse` skill go through `k-playbook docs checkout|publish code` into
@@ -116,21 +109,13 @@ The anchor is the **file** `.k-playbook/K-PLAYBOOK.yaml`, not the directory
 configuration (for the `share` link), so a `.k-playbook/` can exist where no
 project is. The k-playbook repository itself no longer versions anything under
 `.k-playbook/` — in its own checkout that directory belongs to a separate private
-development repository. A clone `<project>/k-playbook/` left over from the former
-model can still carry a `.k-playbook/`, from an older state of the repository or
-from the link maintenance. The conclusion stands: a search for the bare directory
-could find a project where there is none.
+development repository. A search for the bare directory could find a project where
+there is none.
 
-**Moving from the former place.** Until 2026-11 the anchor was `<project>/K-PLAYBOOK.yaml`,
-directly in the project root. The tool moves it before it checks a level: if
-`.k-playbook/K-PLAYBOOK.yaml` already exists, the file at the former place is
-deleted (a symlink: only the link); otherwise it is moved (a symlink: the file it
-points to). There is no phase in which both places are read. After the first call of
-the new program, an older program no longer finds the project: every environment
-of the project -- a second machine, a DevContainer, a colleague's checkout -- then
-needs the new program. The environment check (`k-playbook health`, area `anchor`)
-warns when the moved anchor is neither tracked nor ignored, or when the former
-place is still in the index.
+A `K-PLAYBOOK.yaml` directly in the project root is not an anchor: it is neither read
+nor moved nor reported, and the project counts as not set up. The environment check
+(`k-playbook health`, area `anchor`) warns when the anchor is neither tracked nor
+ignored.
 
 The upward search must **not** stop at the Git worktree root. The project
 repository can lie below the project root (`project.repo_root`) and is then its
@@ -247,7 +232,7 @@ source repository `defaults/docs/handbook/`) documents k-playbook itself, `keph:
 project. They are two different objects and nothing to merge.
 
 `guidelines/` is not a pair either (task 148): the kind exists shipped only, in
-`<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`).
+`<hub>:k-playbook/defaults/guidelines/` (since task 131).
 `k_playbook_doc_read` (`k-playbook:/guidelines/<name>.md`) and the briefing
 (`documents.guidelines`) resolve only that layer, so the origin is always `dist`.
 Project-owned guidelines live in `keph:/docs/guidelines/`; how a session is pointed to
@@ -256,8 +241,7 @@ by the same rule as `reviews/`.
 
 Nothing shipped may be changed. `~/.local/share/k-playbook/` belongs to the
 program and is replaced when the program is updated; the shipped texts on the
-hub are replaced by the next release. A clone `k-playbook/` left over from the
-former model is not written to either; `/k-upgrade` deletes it.
+hub are replaced by the next release.
 
 ## The briefing
 
@@ -411,19 +395,14 @@ session, `k-playbook briefing`, with the MCP tool `k_playbook_briefing` as its
 equivalent — exactly the `AGENTS.md` of the source repository. If the file does
 not exist, it is created from that template; if it exists, the block is appended
 without touching existing content. A marker, `<!-- k-playbook:anstoss -->`,
-prevents a second run from appending it again. A block that still carries a
-superseded call (`k-playbook context`, before that the wrapper
-`k-playbook/bin/k-playbook context`) is replaced by the current one. Replaced is
-only what can be bounded positively (the shipped shape line by line, else the next
-heading or HTML comment, never the end of the file); project text before and
-behind the block stays, and a block whose end cannot be determined stays with a
-hint. This runs at setup, at the start of the interface and with
-`k-playbook upgrade`.
+prevents a second run from appending it again. A block that carries the marker
+belongs to the project and stays as it is, whatever its wording. This runs at setup
+and with `k-playbook upgrade`; the start of the interface only creates a missing
+file.
 
 `k-playbook upgrade` is the one catch-up in the terminal, the subcommand behind
 `/k-upgrade`: first Kephalaion, then the program — the release binary of the
-newest release, only when the running program is older than it; a clone
-`k-playbook/` is neither pulled nor read (task 156) —, then the project: `AGENTS.md`, `CLAUDE.md` as the
+newest release, only when the running program is older than it —, then the project: `AGENTS.md`, `CLAUDE.md` as the
 include file, the linking of commands and skills, the MCP entries. After a
 binary change the newly installed program performs the project step; after
 that the calling program, when `opencode service status` reports a running
@@ -553,29 +532,23 @@ git:
 Required field. Current version: `3`.
 
 `3` describes the model documented here: an anchor `.k-playbook/K-PLAYBOOK.yaml`
-in the project root and no paths in configuration. Neither the move of the anchor
-from `<project>/K-PLAYBOOK.yaml` into `.k-playbook/` nor the end of the clone
-`k-playbook/` beside it (task 156) changed the number: the file and its fields
-stay the same.
-
-Older values belong to retired models and are no longer supported:
-
-| Value | Model |
-|---|---|
-| `1` | central base installation under `~/dev/k-playbook` |
-| `2` | anchor in the k-playbook directory, installation under `_dist/`, `paths.*` |
+in the project root and no paths in configuration. A smaller value is not read; the
+answer is "bitte neu einrichten".
 
 The tool stops for every other version rather than continuing. Silently
 continuing to read would be most dangerous: the values could be read but would
 mean something else. A number higher than `3` is reported as "installation
 older than configuration"; a missing `schema_version` is also an error.
 
-There is no `migrate` command: the models describe different directory layouts,
-and converting their fields into each other would mean maintaining a translation
-that grows with every model. Instead, the interface resets it: it saves the old
-file as `K-PLAYBOOK.yaml.v1-alt` and creates a fresh one. The process is
-described in
-[`installation.md`](./installation.md#a-configuration-from-a-retired-model).
+The scalars `schema_version`, `project.repo_root` and `project.vcs` may stand in one pair of
+enclosing quotes, double or single: `schema_version: "3"` is the same version as
+`schema_version: 3`. The reader understands no more YAML than that -- a value with a single
+quote, or with a comment behind it, is taken as it stands.
+
+There is no `migrate` command: the fields of an older version are not converted.
+Instead, the project is set up again; the interface saves the old file as
+`K-PLAYBOOK.yaml.v1-alt` and creates a fresh one. The process is described in
+[`installation.md`](./installation.md#a-configuration-with-an-older-schema_version).
 
 ### `project.repo_root`
 
@@ -638,19 +611,6 @@ Optional block for project-local tool decisions.
 Important: this contains project decisions, not host facts. Whether `gitleaks`
 or `trivy` is installed on this machine belongs in a preflight report, not in a
 versioned project configuration.
-
-#### `tools.gh` (removed)
-
-Until task 128 a block `tools.gh` with `status` (`unknown`, `enabled`,
-`disabled`) held the project's decision whether it uses the GitHub CLI. It is
-gone: whether gh is in play is decided by the way to GitHub alone — with a
-service of the personal GitHub access file, its selected access; without one,
-`environment.gh.ready` from the partial call of the briefing. An existing block is ignored, also with an
-unknown value, and nothing fails on it. Setting up the project (`k-playbook
-upgrade`, or setting up and updating in the interface) removes it together with
-its comments, without asking, and says so in its answer
-(`AssistantSetup.configBlocksRemoved`); other blocks under `tools:` stay, and an
-empty `tools:` goes as well.
 
 #### `tools.mcp`
 
@@ -900,10 +860,9 @@ file is versioned, so the addition wants to be committed.
 ## Writing rules
 
 - An existing `K-PLAYBOOK.yaml` is never overwritten. It belongs to the project and may contain values the tool does not know.
-- The only thing the tool does unasked is the move from the former place `<project>/K-PLAYBOOK.yaml` into `.k-playbook/` ("Finding the anchor"); the content stays byte for byte.
 - Write only after confirmation, step by step.
 - The tool owns `schema_version` and `project.*`.
-- The interface writes nothing under `tools:`; `tools.mcp` and `git` are only read. The one exception is removing the obsolete block `tools.gh` while setting up (section `tools.gh` (removed)); other blocks under `tools:` and their comments stay, and an empty `tools:` is removed. A new file has no `tools:` line.
+- The interface writes nothing under `tools:`; `tools.mcp` and `git` are only read. A new file has no `tools:` line.
 - The remediation policy is set during onboarding; later `/k-remediation` may change it after asking. Only the `remediation:` block is written.
 - `docs.exclude` is written only by `k-playbook docs exclude add` and `k_playbook_docs_exclude_add`, after the user confirmed; only lines for new entries are inserted into the `docs:` block, nothing in it is rendered again, and a form that cannot be extended safely is refused (`unsupported`). A missing block is appended; unindented comments before the next block belong to what follows and stay, such as the commented `docs:` example of a new file.
 - The `maintenance:` block is only added to: setup and `k-playbook upgrade` insert missing fields with their defaults (backup off) behind the last line of their parent, never overwrite a value and write nothing when the block cannot be placed unambiguously; a missing block is appended. `k-playbook maintain` never writes the file.
@@ -913,11 +872,11 @@ file is versioned, so the addition wants to be committed.
   `kephalaion:` block; the account, which differs per machine, comes from Kephalaion and is
   written nowhere. The interface writes only the lines `hub:` and `collection:` of that block,
   after a passed check.
-- Nothing shipped is written: neither `~/.local/share/k-playbook/` nor a leftover clone `k-playbook/`.
+- Nothing shipped is written, in particular nothing under `~/.local/share/k-playbook/`.
 
 ## Filename
 
 The canonical filename is `K-PLAYBOOK.yaml`, and it sits in `.k-playbook/`. Do not
 create `K-PLAYBOOK.yml`, so the tool and commands need to check only one name. A
-`K-PLAYBOOK.yaml` directly in the project root is the former place; the tool moves
-it ("Finding the anchor").
+`K-PLAYBOOK.yaml` directly in the project root is not an anchor ("Finding the
+anchor").

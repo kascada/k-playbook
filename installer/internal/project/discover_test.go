@@ -9,14 +9,10 @@ import (
 	"testing"
 )
 
-// newInstallation legt ein Projekt mit Anker und dem Verzeichnis k-playbook/
-// eines liegengebliebenen Clones an (Altbestand).
+// newInstallation legt ein Projekt mit Anker an.
 func newInstallation(t *testing.T, projectDir string) {
 	t.Helper()
 
-	if err := os.MkdirAll(PlaybookDir(projectDir), 0o755); err != nil {
-		t.Fatalf("k-playbook/ anlegen: %v", err)
-	}
 	writeFile(t, ConfigPath(projectDir), "schema_version: 2\n")
 }
 
@@ -63,21 +59,20 @@ func TestDiscoverFindetAnkerAusTieferUnterebene(t *testing.T) {
 }
 
 // Ein Verzeichnis unterhalb des Hauptverzeichnisses kann ein eigener
-// Git-Worktree sein — das Repository des Projekts (project.repo_root) oder ein
-// liegengebliebener Clone k-playbook/. Ein Abbruch am Worktree-Root würde den
-// Anker eine Ebene darüber verdecken.
+// Git-Worktree sein — das Repository des Projekts (project.repo_root). Ein
+// Abbruch am Worktree-Root würde den Anker eine Ebene darüber verdecken.
 func TestDiscoverLaeuftUeberGitWorktreeHinaus(t *testing.T) {
 	root := t.TempDir()
 	newInstallation(t, root)
 
-	playbook := PlaybookDir(root)
-	if err := os.MkdirAll(filepath.Join(playbook, ".git"), 0o755); err != nil {
-		t.Fatalf(".git in k-playbook/ anlegen: %v", err)
+	code := filepath.Join(root, "code")
+	if err := os.MkdirAll(filepath.Join(code, ".git"), 0o755); err != nil {
+		t.Fatalf(".git in code/ anlegen: %v", err)
 	}
 
-	found, err := Discover(playbook)
+	found, err := Discover(code)
 	if err != nil {
-		t.Fatalf("Discover aus k-playbook/ heraus: %v", err)
+		t.Fatalf("Discover aus code/ heraus: %v", err)
 	}
 	if want := resolved(t, root); found != want {
 		t.Errorf("Discover = %q, erwartet %q", found, want)
@@ -106,9 +101,8 @@ func TestDetectFromLiefertProjektverzeichnis(t *testing.T) {
 	}
 }
 
-// Ein Projekt braucht kein Verzeichnis k-playbook/: Die Config allein macht es
-// zum Projekt. Die Umgebung meldet weder, ob das Verzeichnis liegt, noch
-// seinen Pfad (Task 157) — auch dann nicht, wenn ein alter Clone daliegt.
+// Die Config allein macht ein Verzeichnis zum Projekt. Die Umgebung trägt
+// kein Feld zu einer Installation im Projekt (Task 157).
 func TestDetectFromOhnePlaybookVerzeichnis(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, ConfigPath(root), "schema_version: 2\n")
@@ -123,16 +117,13 @@ func TestDetectFromOhnePlaybookVerzeichnis(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Environment kodieren: %v", err)
 		}
-		for _, gone := range []string{"playbookPresent", "playbookDir", PlaybookDir(resolved(t, root))} {
+		for _, gone := range []string{"playbookPresent", "playbookDir"} {
 			if strings.Contains(string(encoded), gone) {
 				t.Errorf("Environment trägt noch %s: %s", gone, encoded)
 			}
 		}
 	}
 	assertNoPlaybookField(environment)
-
-	newInstallation(t, root)
-	assertNoPlaybookField(DetectFrom(root))
 }
 
 func TestDetectFromOhneInstallation(t *testing.T) {
@@ -158,146 +149,37 @@ func TestDiscoverIgnoriertGleichnamigesVerzeichnis(t *testing.T) {
 	}
 }
 
-// Ein liegengebliebener Clone k-playbook/ kann .k-playbook/ aus einem älteren
-// Stand des Quell-Repos tragen. Das Verzeichnis allein ist kein Anker, sonst
-// endete die Suche im Clone.
+// Ein Unterverzeichnis kann ein .k-playbook/ ohne Konfiguration tragen. Das
+// Verzeichnis allein ist kein Anker, sonst endete die Suche dort.
 func TestDiscoverUebergehtKPlaybookVerzeichnisOhneKonfiguration(t *testing.T) {
 	root := t.TempDir()
 	newInstallation(t, root)
 
-	playbook := PlaybookDir(root)
-	writeFile(t, filepath.Join(playbook, ProjectDirName, ".gitignore"), "/share\n")
+	unten := filepath.Join(root, "unten")
+	writeFile(t, filepath.Join(unten, ProjectDirName, ".gitignore"), "/share\n")
 
-	found, err := Discover(playbook)
+	found, err := Discover(unten)
 	if err != nil {
-		t.Fatalf("Discover aus k-playbook/ heraus: %v", err)
+		t.Fatalf("Discover aus unten/ heraus: %v", err)
 	}
 	if want := resolved(t, root); found != want {
 		t.Errorf("Discover = %q, erwartet %q", found, want)
 	}
 }
 
-func TestDiscoverZiehtAlteKonfigurationUm(t *testing.T) {
+// Ein K-PLAYBOOK.yaml direkt im Hauptverzeichnis ist kein Anker: das Projekt
+// gilt als nicht eingerichtet, und die Datei bleibt, wo sie ist.
+func TestDiscoverKenntKeinenAnkerImHauptverzeichnis(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, legacyConfigPath(root), "schema_version: 3\n# alt\n")
+	writeFile(t, filepath.Join(root, ConfigFileName), "schema_version: 3\n")
 
-	found, err := Discover(root)
-	if err != nil {
-		t.Fatalf("Discover: %v", err)
+	if _, err := Discover(root); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Fehler = %v, erwartet %v", err, ErrNotFound)
 	}
-	if want := resolved(t, root); found != want {
-		t.Errorf("Discover = %q, erwartet %q", found, want)
+	if !fileExists(filepath.Join(root, ConfigFileName)) {
+		t.Error("die Datei im Hauptverzeichnis wurde verschoben oder gelöscht")
 	}
-	if got := readFile(t, ConfigPath(root)); got != "schema_version: 3\n# alt\n" {
-		t.Errorf("Inhalt am neuen Ort = %q", got)
-	}
-	if _, err := os.Lstat(legacyConfigPath(root)); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("alte Datei liegt noch: %v", err)
-	}
-}
-
-// Auch aus einer Unterebene heraus wird umgezogen, bevor gelesen wird.
-func TestDiscoverZiehtAlteKonfigurationAusUnterebeneUm(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, legacyConfigPath(root), "schema_version: 3\n")
-	deep := filepath.Join(root, "src", "paket")
-	if err := os.MkdirAll(deep, 0o755); err != nil {
-		t.Fatalf("Unterverzeichnis anlegen: %v", err)
-	}
-
-	if _, err := Discover(deep); err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	if !fileExists(ConfigPath(root)) {
-		t.Error("Konfiguration liegt nicht am neuen Ort")
-	}
-}
-
-// Liegt am neuen Ort schon eine, gilt sie; die alte wird gelöscht.
-func TestDiscoverLoeschtAlteKonfigurationNebenNeuer(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, ConfigPath(root), "schema_version: 3\n# neu\n")
-	writeFile(t, legacyConfigPath(root), "schema_version: 3\n# alt\n")
-
-	if _, err := Discover(root); err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	if got := readFile(t, ConfigPath(root)); got != "schema_version: 3\n# neu\n" {
-		t.Errorf("Inhalt am neuen Ort = %q, erwartet die neue Datei", got)
-	}
-	if _, err := os.Lstat(legacyConfigPath(root)); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("alte Datei liegt noch: %v", err)
-	}
-}
-
-// Ist die alte Datei ein relativer Symlink in ein Unterverzeichnis, muss die
-// Datei dahinter umziehen; der verschobene Link zeigte ins Leere.
-func TestDiscoverZiehtZielEinesSymlinksUm(t *testing.T) {
-	root := t.TempDir()
-	real := filepath.Join(root, "ablage", ConfigFileName)
-	writeFile(t, real, "schema_version: 3\n# hinter dem Link\n")
-	if err := os.Symlink(filepath.Join("ablage", ConfigFileName), legacyConfigPath(root)); err != nil {
-		t.Fatalf("Symlink anlegen: %v", err)
-	}
-
-	if _, err := Discover(root); err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	info, err := os.Lstat(ConfigPath(root))
-	if err != nil {
-		t.Fatalf("neuer Ort: %v", err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		t.Error("am neuen Ort liegt ein Link, erwartet die Datei selbst")
-	}
-	if got := readFile(t, ConfigPath(root)); got != "schema_version: 3\n# hinter dem Link\n" {
-		t.Errorf("Inhalt am neuen Ort = %q", got)
-	}
-	for _, path := range []string{legacyConfigPath(root), real} {
-		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
-			t.Errorf("%s liegt noch: %v", path, err)
-		}
-	}
-}
-
-// Neben einer neuen Datei wird nur der Link gelöscht, nie sein Ziel.
-func TestDiscoverLoeschtNebenNeuerNurDenLink(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, ConfigPath(root), "schema_version: 3\n")
-	real := filepath.Join(root, "anderswo.yaml")
-	writeFile(t, real, "schema_version: 3\n# fremd\n")
-	if err := os.Symlink(real, legacyConfigPath(root)); err != nil {
-		t.Fatalf("Symlink anlegen: %v", err)
-	}
-
-	if _, err := Discover(root); err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	if _, err := os.Lstat(legacyConfigPath(root)); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("Link liegt noch: %v", err)
-	}
-	if !fileExists(real) {
-		t.Error("Ziel des Links wurde gelöscht")
-	}
-}
-
-// Scheitert der Umzug, meldet Discover das, statt „nicht gefunden“ zu sagen.
-func TestDiscoverMeldetGescheitertenUmzug(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("als root greifen Dateirechte nicht")
-	}
-	root := t.TempDir()
-	writeFile(t, legacyConfigPath(root), "schema_version: 3\n")
-	if err := os.Chmod(root, 0o555); err != nil {
-		t.Fatalf("chmod: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
-
-	_, err := Discover(root)
-	if err == nil || errors.Is(err, ErrNotFound) {
-		t.Fatalf("Fehler = %v, erwartet einen gescheiterten Umzug", err)
-	}
-	if !fileExists(legacyConfigPath(root)) {
-		t.Error("alte Datei ist weg, obwohl der Umzug scheiterte")
+	if fileExists(ConfigPath(root)) {
+		t.Error("unter .k-playbook/ ist eine Konfiguration entstanden")
 	}
 }

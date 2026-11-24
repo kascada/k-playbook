@@ -47,8 +47,7 @@ Aus dem Briefing brauchst du `kephalaion` — `ok`, `address`, `message` — und
 
 **Das Inventar.** Lies `keph:/docs/generated/versions/inventory.md` mit `k_playbook_doc_read`
 (ersatzweise `k-playbook read`). Aus dem Kopf nimmst du `generated.at` und die Zahl der
-Einträge, `generated.stats.entries` — ein Inventar im alten Kopf trägt sie noch unter
-`inventory.entries`.
+Einträge, `generated.stats.entries`.
 
 - `not_found` — das Inventar fehlt. Biete an, `k-playbook inventory` jetzt laufen zu lassen
   (der Lauf ist deterministisch; Näheres in `k-playbook:/commands/k-doc-inventory.md`), und

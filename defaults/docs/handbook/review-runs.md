@@ -322,8 +322,8 @@ Scope semantics for `mode: evidence`:
   `**` skips any number of segments, while `*` and `?` apply within a segment. A pattern
   also matches a file when it matches its directory: `installer` and `installer/**` both
   cover `installer/internal/review/run.go`.
-- Within the globs, the central exclusions of module search also apply: `k-playbook/`,
-  `vendor/`, `node_modules/`, `testdata/`, and dot directories. They are inherited and do
+- Within the globs, the central exclusions of module search also apply: `vendor/`,
+  `node_modules/`, `testdata/`, and dot directories. They are inherited and do
   not belong in the recipe again.
 - The path scope is binding and enforced when reporting. `scope-hint` remains free text
   for `/k-review` and may neither extend nor override it.
@@ -500,9 +500,8 @@ cannot itself be performed, due to a read error or missing permissions, is `fail
 whether a module exists is then unknown, and `skipped` would claim that there is nothing
 to do.
 
-The search skips `k-playbook/` -- legacy: a clone of the tool left over from the former
-model --, plus `vendor/`, `testdata/`, `node_modules/`, and everything with a leading dot:
-none of these contain a project module. This list is in code rather than the catalog:
+The search skips `vendor/`, `testdata/`, `node_modules/`, and everything with a leading
+dot: none of these contain a project module. This list is in code rather than the catalog:
 unlike a tool exclusion, it does not belong to an invocation.
 
 **The job records which module was checked**, including the one-module case where the job
@@ -586,15 +585,12 @@ anything.
 
 Counting occurs **once per reference point and kind for the entire run**, not per job: the
 same tree walk over the same target produces the same result for every job of the same
-kind. It skips directories that no job sees anyway: `k-playbook/`, **anchored at the
-reference point**, plus everything with a leading dot. The anchoring is not a detail:
-`installer/cmd/k-playbook/` is code in this project, and excluding by name alone would
-consume it too, the same error as in Task 004, where an unanchored pattern matched the
-entire project root. The list is in code
+kind. It skips directories that no job sees anyway: everything with a leading dot and
+`node_modules/`. The list is in code
 ([`installer/internal/review/candidates.go`](../../../installer/internal/review/candidates.go)),
 for the same reason as the module-search list, and it is not the same: module search asks
 where a project module resides, while counting asks what a tool could have seen. Therefore,
-`vendor/`, `node_modules/`, and `testdata/` are included in the count.
+`vendor/` and `testdata/` are included in the count.
 
 **The number is an upper bound, not a coverage measurement.** Tool-specific exclusions
 are in `args`, and every tool expresses them differently; counting does not know them.

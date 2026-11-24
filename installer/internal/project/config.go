@@ -5,14 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
 // SchemaVersion ist die Fassung, die dieses Werkzeug schreibt und versteht.
-//
-// Die 2 ist an das abgelöste Layout vergeben: Konfiguration im
-// k-playbook-Verzeichnis, `_dist/`, `paths.*`. Eine Datei mit dieser Nummer
-// beschreibt etwas anderes als das, was hier gelesen würde.
+// Eine Datei mit kleinerer Nummer beschreibt etwas anderes als das, was hier
+// gelesen würde; das Projekt ist dann neu einzurichten.
 const SchemaVersion = "3"
 
 // Config sind die Werte aus der K-PLAYBOOK.yaml, soweit sie derzeit gebraucht
@@ -47,7 +46,7 @@ const (
 	SchemaOK SchemaStatus = "ok"
 	// SchemaMissing: die Datei trägt gar keine schema_version.
 	SchemaMissing SchemaStatus = "missing"
-	// SchemaOutdated: die Fassung gehört zu einem abgelösten Modell.
+	// SchemaOutdated: die Fassung ist älter als die des Werkzeugs.
 	SchemaOutdated SchemaStatus = "outdated"
 	// SchemaNewer: die Fassung ist neuer als das Werkzeug.
 	SchemaNewer SchemaStatus = "newer"
@@ -66,20 +65,13 @@ func SchemaState(config Config) SchemaStatus {
 		return SchemaOK
 	case "":
 		return SchemaMissing
-	case "1", "2":
-		return SchemaOutdated
-	default:
-		return SchemaNewer
 	}
-}
-
-// LegacyModels beschreibt, wofür die abgelösten Fassungen standen. Wer eine
-// solche Datei vor sich hat, braucht vor allem die Auskunft, welches Modell
-// sie beschreibt — daran hängt, wo seine Inhalte liegen.
-var LegacyModels = map[string]string{
-	"1": "zentrale Basisinstallation unter ~/dev/k-playbook, paths.*, Projekteigenes im " +
-		PlaybookDirName + "-Verzeichnis",
-	"2": "Anker im " + PlaybookDirName + "-Verzeichnis, Installation unter _dist/, paths.*",
+	if found, err := strconv.Atoi(config.SchemaVersion); err == nil {
+		if own, _ := strconv.Atoi(SchemaVersion); found < own {
+			return SchemaOutdated
+		}
+	}
+	return SchemaNewer
 }
 
 // CheckSchema meldet, wenn die Konfiguration nicht zu diesem Werkzeug passt.
@@ -94,10 +86,8 @@ func CheckSchema(config Config) error {
 		return fmt.Errorf("%s hat keine schema_version; erwartet wird %s — %s",
 			ConfigFileName, SchemaVersion, resetHint)
 	case SchemaOutdated:
-		return fmt.Errorf("%s hat schema_version %s und beschreibt ein abgelöstes Modell (%s); "+
-			"dieses Werkzeug erwartet %s — %s",
-			ConfigFileName, config.SchemaVersion, LegacyModels[config.SchemaVersion],
-			SchemaVersion, resetHint)
+		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug erwartet %s — bitte neu einrichten: %s",
+			ConfigFileName, config.SchemaVersion, SchemaVersion, resetHint)
 	default:
 		return fmt.Errorf("%s hat schema_version %s, dieses Werkzeug versteht %s — vermutlich ist die Installation älter als die Konfiguration; hilft `k-playbook upgrade` nicht weiter, gehört die Datei zu einem anderen Projekt",
 			ConfigFileName, config.SchemaVersion, SchemaVersion)
@@ -107,7 +97,7 @@ func CheckSchema(config Config) error {
 // resetHint nennt den Ausweg. Ohne ihn endete die Meldung bei der Diagnose:
 // von Hand ist der Weg nicht zu erraten, und `CreateConfig` verweigert, solange
 // die alte Datei liegt.
-const resetHint = "`k-playbook gui` starten, der Block „Projektkonfiguration\" " +
+const resetHint = "die Oberfläche starten (`k-playbook` ohne Argument oder `/k-gui`), der Block „Projektkonfiguration\" " +
 	"sichert die alte Datei weg und legt sie neu an"
 
 // ReadConfig liest die Konfiguration eines Projekts.
@@ -118,6 +108,12 @@ const resetHint = "`k-playbook gui` starten, der Block „Projektkonfiguration\"
 // alle ebenfalls zeilenweise, und der
 // zeilenweise Zugriff lässt Kommentare, Reihenfolge und unbekannte Blöcke
 // unangetastet, wenn später zurückgeschrieben wird.
+//
+// Einem Skalar nimmt es ein Paar umschließender Anführungszeichen ab
+// (unquoteConfigScalar): `schema_version: "3"` ist dieselbe Fassung wie
+// `schema_version: 3` und wurde vorher als neuere abgelehnt. Mehr YAML
+// versteht es weiter nicht — keine Kommentare hinter dem Wert, keine
+// Escape-Folgen.
 func ReadConfig(projectDir string) (Config, error) {
 	data, err := os.ReadFile(ConfigPath(projectDir))
 	if err != nil {
@@ -137,7 +133,7 @@ func ReadConfig(projectDir string) (Config, error) {
 		}
 		indented := strings.HasPrefix(key, " ") || strings.HasPrefix(key, "\t")
 		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
+		value = unquoteConfigScalar(strings.TrimSpace(value))
 
 		if !indented {
 			section = key
@@ -159,6 +155,21 @@ func ReadConfig(projectDir string) (Config, error) {
 	config.Kephalaion = parseKephalaionBlock(string(data))
 	config.Maintenance = parseMaintenanceBlock(string(data))
 	return config, nil
+}
+
+// unquoteConfigScalar nimmt einem Wert genau ein Paar umschließender
+// Anführungszeichen ab, doppelte oder einfache. Ein Wert, der nur vorn oder
+// nur hinten eines trägt oder zwei verschiedene, bleibt, wie er ist: Das ist
+// kein gequoteter Skalar, und raten soll der Leser nicht.
+func unquoteConfigScalar(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+	first, last := value[0], value[len(value)-1]
+	if first == last && (first == '"' || first == '\'') {
+		return value[1 : len(value)-1]
+	}
+	return value
 }
 
 // RepoRootDir löst project.repo_root gegen das Hauptverzeichnis auf.
@@ -243,10 +254,6 @@ func addUnique(list []string, value string) []string {
 // suggestRepoRoot sucht das Projekt-Repository. Liegt es im Hauptverzeichnis
 // selbst, ist der Wert "."; sonst kommen die Unterverzeichnisse in Frage, etwa
 // wenn das Repo eine Ebene unter dem Hauptverzeichnis ausgecheckt ist.
-//
-// PlaybookDirName wird dabei übersprungen: Ein liegengebliebener Clone
-// <projekt>/k-playbook/ aus der Zeit vor Task 156 hat ein .git und wäre sonst
-// Repo-Kandidat.
 func suggestRepoRoot(projectDir string) (string, []string) {
 	if pathExists(filepath.Join(projectDir, ".git")) {
 		return ".", []string{"."}
@@ -260,7 +267,7 @@ func suggestRepoRoot(projectDir string) (string, []string) {
 	var candidates []string
 	for _, entry := range entries {
 		name := entry.Name()
-		if !entry.IsDir() || name == PlaybookDirName || strings.HasPrefix(name, ".") {
+		if !entry.IsDir() || strings.HasPrefix(name, ".") {
 			continue
 		}
 		if pathExists(filepath.Join(projectDir, name, ".git")) {
@@ -288,12 +295,6 @@ func CreateConfig(projectDir string, repoRoot string) error {
 		return fmt.Errorf("%s ist kein Verzeichnis", projectDir)
 	}
 
-	// Anlegen kommt ohne Discover aus. Ohne den Umzug entstünde neben einer
-	// Datei am früheren Ort eine neue, und der nächste Discover löschte die
-	// alte samt ihren Werten.
-	if err := migrateConfig(projectDir); err != nil {
-		return err
-	}
 	path := ConfigPath(projectDir)
 	if pathExists(path) {
 		return fmt.Errorf("%s existiert bereits", ConfigFileName)

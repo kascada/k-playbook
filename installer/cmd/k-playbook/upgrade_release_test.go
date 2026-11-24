@@ -80,10 +80,8 @@ func TestUpgradeVergleichtMitDemNeuestenTag(t *testing.T) {
 	}
 }
 
-// Die JSON-Antwort trägt latest statt clone, kein versionChanged und kein
-// mcpRepaired am Programmschritt mehr, seit Task 156 auch keine Felder zum
-// Pull; die Fassung ist gestiegen.
-func TestUpgradeJSONTraegtLatestStattClone(t *testing.T) {
+// Die JSON-Antwort trägt am Programmschritt latest und running.
+func TestUpgradeJSONTraegtLatest(t *testing.T) {
 	upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
@@ -93,14 +91,9 @@ func TestUpgradeJSONTraegtLatestStattClone(t *testing.T) {
 			t.Errorf("upgrade --check --json: %v", err)
 		}
 	})
-	for _, erwartet := range []string{`"schemaVersion": "3"`, `"latest": "v0.17.0"`, `"running": "v0.16.8"`, `"outdated": true`} {
+	for _, erwartet := range []string{`"schemaVersion": "4"`, `"latest": "v0.17.0"`, `"running": "v0.16.8"`, `"outdated": true`} {
 		if !strings.Contains(stdout, erwartet) {
 			t.Errorf("%q fehlt in:\n%s", erwartet, stdout)
-		}
-	}
-	for _, verboten := range []string{`"clone"`, `"versionChanged"`, `"update"`, `"pulled"`, `"pullOutput"`, `"remoteSwitched"`} {
-		if strings.Contains(stdout, verboten) {
-			t.Errorf("%s steht noch in:\n%s", verboten, stdout)
 		}
 	}
 }
@@ -159,13 +152,10 @@ func TestUpgradeTagUnbekannt(t *testing.T) {
 	}
 }
 
-// Ohne Verzeichnis k-playbook/ laufen Vergleich und Installation: --check
-// meldet den Stand, ein Lauf installiert. Ein fehlender Clone wird nicht mehr
-// gemeldet (Task 156).
-func TestUpgradeOhneCloneVergleichtUndInstalliert(t *testing.T) {
+// Vergleich und Installation: --check meldet den Stand, ein Lauf installiert.
+func TestUpgradeVergleichtUndInstalliert(t *testing.T) {
 	t.Setenv(viaCommandEnv, "")
 	root := upgradeProjectDir(t, "v0.17.0")
-	removeClone(t, root)
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.16.8")
 	target := filepath.Join(root, "k-playbook-neu")
@@ -187,21 +177,17 @@ func TestUpgradeOhneCloneVergleichtUndInstalliert(t *testing.T) {
 		"Das Programm hat gewechselt: die Sitzung neu starten",
 		kUpgradeHinweis,
 	)
-	for _, gone := range []string{"Installation fehlt", project.PlaybookDirName + "/ fehlt", "der Pull entfällt"} {
-		if strings.Contains(check, gone) || strings.Contains(stdout, gone) {
-			t.Errorf("der fehlende Clone wird noch gemeldet (%q):\n%s\n%s", gone, check, stdout)
-		}
-	}
 	if len(*tags) != 1 || (*tags)[0] != "v0.17.0" {
 		t.Errorf("installiert mit %v, erwartet einmal v0.17.0", *tags)
 	}
 }
 
-// staleMCP ist ein Eintrag auf den abgelösten Wrapper — MCPStateOutdated.
-const staleMCP = `{"mcpServers":{"` + project.MCPServerKey + `":{"command":"k-playbook/bin/k-playbook","args":["mcp"]}}}` + "\n"
+// staleMCP ist ein Eintrag in keiner akzeptierten Form — MCPStateStale.
+const staleMCP = `{"mcpServers":{"` + project.MCPServerKey + `":{"command":"/opt/anderswo/werkzeug","args":["mcp"]}}}` + "\n"
 
-// Der Projektschritt repariert einen veralteten MCP-Eintrag und meldet es.
-func TestUpgradeRepariertVeraltetenMCPEintrag(t *testing.T) {
+// Einen vorhandenen Eintrag in keiner akzeptierten Form lässt der
+// Projektschritt stehen; überschrieben wird er erst beim Einrichten.
+func TestUpgradeLaesstFremdenMCPEintragStehen(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
 	setOwnVersion(t, "v0.17.0")
@@ -209,19 +195,15 @@ func TestUpgradeRepariertVeraltetenMCPEintrag(t *testing.T) {
 
 	report := runUpgradeJSON(t)
 	messages := strings.Join(report.Messages, "\n")
-	assertOrder(t, messages,
-		"Programm-Stand: nichts zu tun",
-		"Projekt: MCP-Registrierung nachgezogen: .mcp.json",
-	)
-	if report.Program.Error != "" {
-		t.Errorf("program = %+v, erwartet keinen Fehler", report.Program)
+	if strings.Contains(messages, "MCP-Registrierung nachgezogen: .mcp.json") {
+		t.Errorf("der fremde Eintrag wurde überschrieben:\n%s", messages)
 	}
 	content, err := os.ReadFile(filepath.Join(root, ".mcp.json"))
-	if err != nil || strings.Contains(string(content), "k-playbook/bin/k-playbook") {
-		t.Errorf("der veraltete Eintrag steht noch: %v\n%s", err, content)
+	if err != nil || string(content) != staleMCP {
+		t.Errorf("der Eintrag hat sich verändert: %v\n%s", err, content)
 	}
-	if status := mcpState(t, root, ".mcp.json"); !status.OK() {
-		t.Errorf("nach dem Lauf nicht in Ordnung: %+v", status)
+	if status := mcpState(t, root, ".mcp.json"); status.State != project.MCPStateStale {
+		t.Errorf("Zustand = %+v, erwartet stale", status)
 	}
 }
 

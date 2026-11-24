@@ -138,8 +138,8 @@ func ProjectHandbookFrom(source DocSource, address string) Handbook {
 		Start:  ProjectHandbookStart,
 		unavailable: func(err error) string {
 			return fmt.Sprintf("Kephalaion ist nicht erreichbar: Das Handbuch des Projekts liegt in %s unter %s "+
-				"und lässt sich ohne Kephalaion nicht zeigen. %v — Abhilfe: Kephalaion einrichten auf der Seite "+
-				"Setup (Abschnitt Kephalaion).", address, ref, rootCause(err))
+				"und lässt sich ohne Kephalaion nicht zeigen. %v — Abhilfe: Kephalaion einrichten auf der Statusseite "+
+				"(Karte „Kephalaion-Collection einrichten“).", address, ref, rootCause(err))
 		},
 		missing: func() string {
 			return fmt.Sprintf("Das Projekt hat kein Handbuch: %s gibt es in %s nicht. Die Startseite %s schreibt "+

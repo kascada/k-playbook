@@ -137,7 +137,7 @@ type KephalaionBlockResult struct {
 
 // SetKephalaionBinding trägt hub und collection in den Block kephalaion: von
 // K-PLAYBOOK.yaml ein — die Fachlogik hinter dem Einrichtungsschritt der
-// Oberfläche und dem Umzug in k-playbook upgrade. Zeilenweise wie
+// Oberfläche. Zeilenweise wie
 // AddDocsExclude: Fehlt der Block, wird er samt Kommentar angehängt; steht er
 // da, werden nur die Zeilen hub: und collection: ersetzt (ein Kommentar
 // dahinter bleibt) oder, wenn eine fehlt, hinter der letzten eingerückten

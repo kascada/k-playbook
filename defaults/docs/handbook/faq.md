@@ -20,13 +20,11 @@ If it finds nothing, for example in a project that is not set up yet, it does no
 
 No. The installation is the binary alone, once per machine: once on the host and once in every DevContainer. The same `k-playbook` serves every project; which one it means follows from the directory in which it is called. A project needs only its anchor, `.k-playbook/K-PLAYBOOK.yaml`.
 
-All projects of a machine therefore run with the same program version, and the shipped texts come from the Kephalaion hub of the project, in the release that hub carries. In the former model every project carried its own clone and could stay at an older version; that no longer exists.
+All projects of a machine therefore run with the same program version, and the shipped texts come from the Kephalaion hub of the project, in the release that hub carries.
 
-## Is there still a `k-playbook/` directory in the project?
+## Does anything of the tool lie in the project?
 
-No. In the former model the installation was a clone of the k-playbook repository under `<project>/k-playbook/`. Today nothing of the tool lies in the project: commands, skills and scripts are unpacked by the binary into `~/.local/share/k-playbook/`, and the shipped texts come from the hub.
-
-A clone that is still there is not read any more. `/k-upgrade` deletes it (conversion 3.8) and then removes the line that kept it out of Git from `.gitignore`; see [`installation.md`](./installation.md#update).
+No. Commands, skills and scripts are unpacked by the binary into `~/.local/share/k-playbook/`, and the shipped texts come from the hub. The project carries only its anchor and what it owns itself.
 
 ## Where is `K-PLAYBOOK.yaml`?
 
@@ -38,7 +36,7 @@ project/
     └── K-PLAYBOOK.yaml    the anchor
 ```
 
-Until 2026-11 the anchor was `K-PLAYBOOK.yaml` directly in the project root. The tool moves such a file into `.k-playbook/` on its first call; an older program then no longer finds the project, so every environment of the project needs the new program.
+A `K-PLAYBOOK.yaml` directly in the project root is not an anchor: it is neither read nor moved, and the project counts as not set up (see [`k-playbook-format.md`](./k-playbook-format.md#finding-the-anchor)).
 
 ## Where are the paths for tasks, reviews, and results?
 
@@ -48,7 +46,7 @@ Review results belong to `<ergebnisort>`.
 `<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
 All five review tools of the MCP server are blocked, and `/k-review`, `/k-audit` and `/k-remediation` are temporarily unavailable.
 
-Earlier versions used a `paths:` block with nine keys. It has been removed: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
+`K-PLAYBOOK.yaml` has no `paths:` block: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 
 ## How do I change a shipped review recipe?
 
@@ -112,7 +110,7 @@ For commands, the path from `commands/` counts: a local `commands/_shared/x.md` 
 
 Because entries come from two sources. A directory symlink points to exactly one of them, so it would provide either only the shipped entries or only `.k-playbook/commands/`. The target is therefore an actual directory with one link for each command or skill, pointing to the version that applies under the overlay rule.
 
-Older installations still have one directory symlink there. It is detected and replaced with individual links at the next synchronization.
+If one of these targets is a directory symlink, it is detected and replaced with individual links at the next synchronization.
 
 An **actual file** that you placed there yourself is never replaced. It takes precedence, and the interface identifies it as project-owned.
 

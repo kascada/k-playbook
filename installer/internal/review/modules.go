@@ -28,10 +28,6 @@ const ManifestGoModule = "go.mod"
 // Werkzeug auf — sie sucht die Gegenstände, über die anschließend aufgefächert
 // wird. Es gibt keinen Aufruf, in dem sie stehen könnte.
 var moduleSearchExcluded = map[string]bool{
-	// Altbestand: ein liegengebliebener Clone des Werkzeugs aus der Zeit vor
-	// Task 156, mit eigenem Modul. Sein Code ist ausgeliefertes Material,
-	// nicht Code des Projekts.
-	"k-playbook": true,
 	// Eingebundene Fremdquellen. Ihr Manifest gehört dem, von dem sie stammen.
 	"vendor":       true,
 	"node_modules": true,
@@ -198,8 +194,8 @@ func skipModuleDir(name string) bool {
 //
 // Der Pfad benennt eine Datei, ist relativ zur Projektwurzel und mit /
 // getrennt. Geprüft werden seine Verzeichnissegmente, denn der Ausschluss gilt
-// über den Verzeichnisnamen und nicht über die Ebene: k-playbook/reviews/ ist
-// genauso ausgeschlossen wie installer/testdata/. Das letzte Segment ist der
+// über den Verzeichnisnamen und nicht über die Ebene: vendor/ ist genauso
+// ausgeschlossen wie installer/testdata/. Das letzte Segment ist der
 // Dateiname und entscheidet nicht mit — .golangci.yml ist eine Datei des
 // Projekts, kein Werkzeug-Cache.
 //

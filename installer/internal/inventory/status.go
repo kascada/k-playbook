@@ -39,8 +39,7 @@ type Status struct {
 	Deviations        int    `json:"deviations"`
 	Rejected          int    `json:"rejected"`
 	// SourcesExcluded ist die Zahl der Quellen, die eine Ausschlussregel
-	// übergangen hat — ein liegengebliebener Clone k-playbook/ (feste Regel)
-	// und, wenn konfiguriert, die Muster aus `exclude:`.
+	// übergangen hat — die Muster aus `exclude:`.
 	SourcesExcluded int `json:"sourcesExcluded"`
 	// SourcesUnevaluable ist die Zahl der Quellen im Zustand „nicht
 	// auswertbar": gelesen, aber als Ganzes nicht ausgewertet.
@@ -106,15 +105,8 @@ func fillStatus(status *Status, data []byte) {
 	status.GeneratedBy = root.Get("generated", "by").Str()
 	status.GeneratedAt = root.Get("generated", "at").Str()
 
-	// Die Zahlen stehen seit Task 120 unter generated.stats. Ein Bestand im
-	// alten Kopf trägt sie im Block `inventory:`; er wird bis zum nächsten Lauf
-	// weiter gelesen, der ihn im neuen Kopf schreibt.
+	// Die Zahlen stehen unter generated.stats.
 	statsPath, stats := "generated.stats", root.Get("generated", "stats")
-	if stats == nil {
-		if legacy := root.Get("inventory"); legacy != nil {
-			statsPath, stats = "inventory", legacy
-		}
-	}
 	targets := map[string]*int{
 		"sources-configured":  &status.SourcesConfigured,
 		"sources-read":        &status.SourcesRead,

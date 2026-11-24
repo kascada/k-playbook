@@ -38,6 +38,44 @@ func TestProgressEmitterDebounceUndFormat(t *testing.T) {
 	}
 }
 
+// Die Schlussmeldung geht immer hinaus, auch im Fenster der Entprellung
+// (Task 191): Vorher verschluckte Stop sie, wenn die letzte Zwischenmeldung
+// weniger als das Fenster zurücklag, und der Client blieb beim vorletzten
+// Stand stehen.
+func TestProgressEmitterSchlussmeldungOhneEntprellung(t *testing.T) {
+	current := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+	events := []*mcp.ProgressNotificationParams{}
+	emitter := newProgressEmitter(context.Background(), "token", 2, func(_ context.Context, params *mcp.ProgressNotificationParams) error {
+		events = append(events, params)
+		return nil
+	}, 0, time.Second, func() time.Time { return current })
+
+	emitter.Report("gitleaks", review.JobStatus{Job: "gitleaks", State: review.StateDone})
+	// Im Fenster: Diese Zwischenmeldung fällt der Entprellung zum Opfer.
+	current = current.Add(100 * time.Millisecond)
+	emitter.Report("grype", review.JobStatus{Job: "grype", State: review.StateDone})
+	if len(events) != 1 {
+		t.Fatalf("Events vor Stop = %d, erwartet 1", len(events))
+	}
+
+	// Noch im Fenster: Die Schlussmeldung kommt trotzdem, mit dem Endstand.
+	current = current.Add(100 * time.Millisecond)
+	emitter.Stop("scan complete")
+	if len(events) != 2 {
+		t.Fatalf("Events nach Stop = %d, erwartet 2 — die Schlussmeldung fehlt", len(events))
+	}
+	last := events[1]
+	if last.Progress != 2 || last.Total != 2 || last.Message != "scan complete (2/2 complete)" {
+		t.Errorf("Schlussmeldung = %+v", last)
+	}
+
+	// Ein zweites Stop meldet nichts mehr.
+	emitter.Stop("scan complete")
+	if len(events) != 2 {
+		t.Errorf("Events nach zweitem Stop = %d, erwartet 2", len(events))
+	}
+}
+
 func TestProgressEmitterHeartbeatUndStop(t *testing.T) {
 	events := make(chan *mcp.ProgressNotificationParams, 8)
 	emitter := newProgressEmitter(context.Background(), "token", 1, func(_ context.Context, params *mcp.ProgressNotificationParams) error {

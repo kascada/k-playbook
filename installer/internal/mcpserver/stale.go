@@ -16,7 +16,7 @@ import (
 const staleNotice = `Hinweis von k-playbook: Dieser MCP-Server läuft aus einem Binary, das ` +
 	`inzwischen ersetzt wurde. Die Antwort oben stammt damit aus dem alten Programmstand. ` +
 	`Die Inhalte darin — Reviews, Instruktionen — sind aktuell, sie werden ` +
-	`bei jedem Aufruf von der Platte gelesen; veraltet ist der Code der Werkzeuge, und ` +
+	`bei jedem Aufruf frisch gelesen; veraltet ist der Code der Werkzeuge, und ` +
 	`Werkzeuge, die seither dazugekommen sind, fehlen dieser Sitzung ganz. Bitte dem Nutzer ` +
 	`melden: den Assistenten neu starten, damit der MCP-Server aus dem neuen Binary kommt.`
 

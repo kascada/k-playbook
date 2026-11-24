@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -959,8 +958,8 @@ func TestDocRefUndKatalogeStimmenUeberein(t *testing.T) {
 
 // Die mitgelieferte Ebene eines Projekts liest jede Sorte aus der
 // öffentlichen Collection unter defaults/ (Task 131) — instructions,
-// commands, reviews, guidelines. Was in einem liegengebliebenen Clone
-// k-playbook/ liegt, liest sie nicht: weder eine Leitlinie noch eine Hülle.
+// commands, reviews, guidelines. Was auf der Platte im Projekt liegt, liest
+// sie nicht: weder eine Leitlinie noch eine Hülle.
 func TestProjectDocLayersLiestAllesAusDefaults(t *testing.T) {
 	root := t.TempDir()
 	writeDocTree(t, filepath.Join(root, "k-playbook"), map[string]string{
@@ -1004,15 +1003,12 @@ func TestProjectDocLayersLiestAllesAusDefaults(t *testing.T) {
 	expectDocError(t, layers, "k-playbook:/skills/overlay/SKILL.md", DocCodeUnsupported)
 }
 
-// Ohne Verzeichnis k-playbook/ im Projekt — dem Normalfall — bleibt die
-// mitgelieferte Ebene dieselbe: Sie hängt allein an der Collection.
+// Die mitgelieferte Ebene hängt allein an der Collection, nicht an einer
+// Installation im Projekt.
 func TestProjectDocLayersOhneInstallation(t *testing.T) {
 	root := t.TempDir()
 	store := defaultsStore(map[string]string{"commands/k-task-create.md": "# k-task-create\n\nText\n"})
 	stubDefaultsStore(t, func(string) (DefaultsStore, string, error) { return store, testDefaultsAddress, nil })
-	if _, err := os.Stat(PlaybookDir(root)); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("k-playbook/ darf es hier nicht geben: %v", err)
-	}
 	got := mustResolveDoc(t, ProjectDocLayers(root), "k-playbook:/commands/k-task-create.md")
 	if got.Content != "# k-task-create\n\nText\n" {
 		t.Errorf("Command-Text ohne Installation: %q", got.Content)

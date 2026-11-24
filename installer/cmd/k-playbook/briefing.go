@@ -16,6 +16,12 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
 
+// briefingExitUsage ist der Exit-Code von `k-playbook briefing` bei einer
+// unbekannten Option — derselbe wie bei `k-playbook health`
+// (healthExitUsage), damit ein Skript den Aufruffehler an beiden gleich
+// erkennt. Alles andere endet weiter mit 1.
+const briefingExitUsage = 2
+
 // runBriefing gibt das Briefing aus — dieselbe Fachlogik, die das MCP-Werkzeug
 // k_playbook_briefing als Hülle anbietet: welche Anweisungen, Reviews und
 // Leitlinien für dieses Projekt gelten und was in der Projekt-Collection
@@ -45,7 +51,7 @@ func runBriefing(args []string) error {
 			printBriefingUsage(os.Stdout)
 			return nil
 		default:
-			return fmt.Errorf("unbekannte Option %s — erwartet wird briefing [--part %s] [--json]", arg, project.BriefingPartEnvironment)
+			return exitError{code: briefingExitUsage, err: fmt.Errorf("unbekannte Option %s — erwartet wird briefing [--part %s] [--json]", arg, project.BriefingPartEnvironment)}
 		}
 	}
 	// Ein unbekannter Teil ist ein Fehler, kein volles Briefing: Wer einen
@@ -519,10 +525,10 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
     einzige Inhalt im Briefing, alles Weitere sind Verweise im Präfixschema
     (k-playbook:/docs/handbook/verweisschema.md), keine Pfade;
   - gleich danach die Umgebungsprüfung: Fehler und Warnungen über die
-    Umgebung des Projekts (Kephalaion-Anbindung, gh, Basis-Werkzeuge,
-    Quellenkonfiguration), je Eintrag Stufe, Bereich, Satz und Abhilfe —
-    dieselbe Liste wie k-playbook health; ohne Problem die eine Zeile
-    „Umgebung: keine Probleme“;
+    Umgebung des Projekts (Bereiche kephalaion, baseTools, versionSources,
+    github, share, anchor, frontmatter, program), je Eintrag Stufe,
+    Bereich, Satz und Abhilfe — dieselbe Liste wie k-playbook health; ohne
+    Problem die eine Zeile „Umgebung: keine Probleme“;
   - die Anweisungen auf Abruf, Reviews und Leitlinien — lokal und
     mitgeliefert schon gegeneinander aufgelöst, je Eintrag Verweis und Titel;
     die Herkunft (local, override, disabled) nur, wenn sie nicht dist ist,
@@ -547,7 +553,7 @@ Gibt aus, was eine Sitzung zu Beginn wissen muss:
 Gelesen wird ein Eintrag über k_playbook_doc_read bzw. k-playbook read mit
 dem Verweis. Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts. Der
 Aufruf zieht dabei die Assistenten-Verlinkung nach; was sich geändert hat,
-steht unter links.
+steht unter links. Eine unbekannte Option endet mit Exit-Code 2.
 
 Ohne --json steht der Klartext zum Lesen; er zeigt jedes Feld, das ein Text
 aus dem Briefing liest, und ist der Weg über die Shell. Mit --json kommt die

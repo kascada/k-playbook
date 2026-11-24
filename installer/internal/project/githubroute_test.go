@@ -192,6 +192,11 @@ func TestGitHubRouteKeinVerfuegbarerZugang(t *testing.T) {
 	if !strings.Contains(route.Message, "Die Token-Datei fehlt") || !strings.Contains(route.Message, "deaktiviert") {
 		t.Errorf("Meldung nennt den Grund nicht: %q", route.Message)
 	}
+	// Empfohlen wird github check ohne Dienst: Mit einem Dienst dahinter
+	// endet der Aufruf mit Exit 2.
+	if !strings.Contains(route.Message, "k-playbook github check nennt") || strings.Contains(route.Message, "github check k-playbook") {
+		t.Errorf("Meldung empfiehlt nicht github check ohne Dienst: %q", route.Message)
+	}
 	if want := "github run k-playbook: git: keiner, api: keiner"; route.Line != want {
 		t.Errorf("Zeile %q, erwartet %q", route.Line, want)
 	}

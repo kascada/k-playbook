@@ -12,8 +12,9 @@ import (
 // Ist noch nichts angelegt, trägt Suggestion die Vorbelegung des Formulars.
 type configResponse struct {
 	// Installed meldet, ob mit diesem Projekt gearbeitet werden kann. Eine
-	// Konfiguration aus einem abgelösten Modell zählt nicht dazu: sie ist da,
-	// aber unbrauchbar, und alles Weitere bliebe Anzeige ohne Grundlage.
+	// Konfiguration mit alter oder fehlender schema_version zählt nicht dazu:
+	// sie ist da, aber unbrauchbar, und alles Weitere bliebe Anzeige ohne
+	// Grundlage.
 	Installed  bool                `json:"installed"`
 	ProjectDir string              `json:"projectDir"`
 	ConfigPath string              `json:"configPath"`
@@ -25,12 +26,6 @@ type configResponse struct {
 	// steht das Zurücksetzen zur Wahl.
 	Schema        project.SchemaStatus `json:"schema"`
 	SchemaVersion string               `json:"schemaVersion"`
-	// LegacyModel beschreibt das abgelöste Modell, zu dem die Datei gehört.
-	LegacyModel string `json:"legacyModel,omitempty"`
-	// LegacyContent sind Projektinhalte im Verzeichnis des früheren Clones
-	// (<projekt>/k-playbook/). Solange welche daliegen, wird nicht
-	// zurückgesetzt.
-	LegacyContent []string `json:"legacyContent,omitempty"`
 	// BackupPath ist die weggesicherte alte Datei, nach dem Zurücksetzen.
 	BackupPath string `json:"backupPath,omitempty"`
 	Message    string `json:"message"`
@@ -53,7 +48,9 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 //
 // Danach schlüsselt der Server seine Laufzeitdatei um: mit der Konfiguration
 // kann sich das aufgelöste ProjectDir ändern, und die Datei muss unter dem
-// Schlüssel liegen, den der nächste Aufruf berechnet.
+// Schlüssel liegen, den der nächste Aufruf berechnet. Scheitert das, ist die
+// Konfiguration trotzdem angelegt; die Antwort trägt dann hinter der Meldung
+// den Hinweis (rekey), statt ihn nur ins Log zu schreiben.
 func (state *serverState) createConfigHandler(w http.ResponseWriter, r *http.Request) {
 	var request createConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -65,13 +62,16 @@ func (state *serverState) createConfigHandler(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusConflict, configState("Nicht angelegt: "+err.Error()))
 		return
 	}
-	state.rekey()
+	message := project.ConfigFileName + " angelegt."
+	if hint := state.rekey(); hint != "" {
+		message += " " + hint
+	}
 
-	writeJSON(w, http.StatusOK, configState(project.ConfigFileName+" angelegt."))
+	writeJSON(w, http.StatusOK, configState(message))
 }
 
-// resetConfigHandler sichert eine Konfiguration aus einem abgelösten Modell
-// weg und legt eine frische an.
+// resetConfigHandler sichert eine Konfiguration mit alter oder fehlender
+// schema_version weg und legt eine frische an — das Neueinrichten.
 //
 // Getrennt von createConfigHandler, obwohl beide dieselbe Datei schreiben: das
 // Anlegen darf nie über etwas Vorhandenes gehen, und diese Grenze soll nicht
@@ -142,10 +142,8 @@ func configState(message string) configResponse {
 		// Block bleibt stehen und führt zum Zurücksetzen, statt sich wie nach
 		// einer gelungenen Einrichtung auszublenden.
 		response.Installed = false
-		response.LegacyModel = project.LegacyModels[config.SchemaVersion]
-		response.LegacyContent = project.LegacyContent(environment.ProjectDir)
 		// Das Formular soll nicht bei "." anfangen, wenn der alte Wert woanders
-		// hinzeigt: die Lage des Repositorys ändert sich durch den Modellwechsel
+		// hinzeigt: die Lage des Repositorys ändert sich durch das Neueinrichten
 		// nicht.
 		suggestion := project.Suggestion{ProjectDir: environment.ProjectDir, RepoRoot: config.RepoRoot}
 		if suggestion.RepoRoot == "" {

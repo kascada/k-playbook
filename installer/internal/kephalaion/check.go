@@ -86,8 +86,8 @@ type Status struct {
 	// Notes sind die Sätze, mit denen Message hinter dem Satz des Zustands
 	// endet, ohne dass sie zu ihm gehören — ein offener Tausch des Tokens
 	// (rotate), ein Problem der config von Kephalaion —, je samt eigener
-	// Abhilfe. Die Kontextausgabe zeigt Message ganz; getrennt braucht sie
-	// nur SplitRemedy.
+	// Abhilfe. Briefing und Oberfläche zeigen Message ganz; getrennt braucht
+	// sie nur SplitRemedy, das die Umgebungsprüfung ruft.
 	Notes []string `json:"-"`
 	// Rights sind die Rechte auf die Collection, wie whoami sie nennt (read,
 	// write, supersede, vendor/<name>, dir <pfad>/); nur bei ok.
@@ -157,7 +157,7 @@ func Check(ctx context.Context, binding Binding, configFile string) Status {
 func NotConfiguredMessage(configFile string) string {
 	return "Keine Collection eingetragen: In " + configFile + " fehlt der Block kephalaion: mit hub und collection. " +
 		"Abhilfe: den Block dort eintragen (hub: <alias>, collection: <name>) und committen, " +
-		"oder in der Oberfläche einrichten (k-playbook gui, Abschnitt Kephalaion)."
+		"oder in der Oberfläche einrichten (k-playbook ohne Argument oder /k-gui; Statusseite, Karte „Kephalaion-Collection einrichten“)."
 }
 
 // CheckBinding prüft Hub und Collection gegen den Node, den die Auskunft

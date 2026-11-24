@@ -22,10 +22,12 @@ const scannerColumns = 10
 type SARIFMode string
 
 const (
-	// SARIFNative: das Werkzeug schreibt SARIF selbst. Nur diese Jobs laufen.
+	// SARIFNative: das Werkzeug schreibt SARIF selbst.
 	SARIFNative SARIFMode = "native"
-	// SARIFConvert: das Werkzeug liefert etwas anderes, das umgewandelt werden
-	// müsste. Der Konverter ist nicht gebaut, der Job wird übersprungen.
+	// SARIFConvert: das Werkzeug liefert etwas anderes, das ein Konverter in
+	// SARIF umwandelt. Der Job läuft, wenn es für sein Werkzeug einen gibt
+	// (sarifConverters in execute.go, heute trufflehog und pip-audit); ohne
+	// Konverter wird er mit Grund übersprungen.
 	SARIFConvert SARIFMode = "convert"
 	// SARIFNone: das Werkzeug erzeugt überhaupt kein SARIF.
 	SARIFNone SARIFMode = "none"

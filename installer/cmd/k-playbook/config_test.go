@@ -39,11 +39,13 @@ func TestRunConfigCreateLegtAnkerImAktuellenVerzeichnisAn(t *testing.T) {
 	}
 }
 
-// Eine Datei am früheren Ort direkt im Hauptverzeichnis zählt als vorhandener
-// Anker: Sie zieht um und bleibt unverändert.
+// Ein vorhandener Anker wird abgelehnt und bleibt unverändert.
 func TestRunConfigCreateLehntVorhandenenAnkerAb(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, project.ConfigFileName), []byte("eigenständig\n"), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(project.ConfigPath(root)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(project.ConfigPath(root), []byte("eigenständig\n"), 0o644); err != nil {
 		t.Fatalf("Konfiguration anlegen: %v", err)
 	}
 

@@ -488,7 +488,7 @@ der Projekt-Collection.
             Aufträge nach done/ — nur wenn jeder zerlegte steht, sonst bleiben sie
             offen (kept) — und schließt ein abgelehntes neu oder entfaellt gleich.
             Alles wird vorher geprüft (invalid_input); ein roher Auftrag, der noch
-            wartet (letzte Änderung jünger als die Wartezeit), wird abgelehnt und
+            wartet (Wartezeit nicht um), wird abgelehnt und
             nichts geschrieben, außer unter den rohen der Eingabe steht ein voller
             Lauf (pfade .), der alle aufnimmt. Ein failed endet nach der
             Ausgabe mit Exit 1. Ausgabe immer JSON: documents, raw, closedRaw.

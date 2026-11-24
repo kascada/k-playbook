@@ -9,10 +9,6 @@ set -euo pipefail
 #
 #   curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash
 #
-# Aus einem Clone aufgerufen (make -C k-playbook install, k-playbook/bin/install)
-# verhält es sich genauso: Es liest weder VERSION noch SHA256SUMS des Clones
-# und installiert den neuesten Tag, nicht den Stand des Clones.
-#
 # Tag und Prüfsumme bestimmt es wie das Programm selbst (installer/internal/
 # release): der Tag ist der des neuesten veröffentlichten Release, gelesen aus
 # der Weiterleitung von <repo>/releases/latest auf <repo>/releases/tag/<tag>,
@@ -70,8 +66,6 @@ fail() {
 usage() {
   cat <<EOF
 Verwendung: ${install_command}
-   aus einem Clone: make -C k-playbook install
-         ohne make: k-playbook/bin/install
 
 Bestimmt das neueste Release von k-playbook (die Weiterleitung von
 releases/latest auf GitHub), lädt das Release-Binary dieser Plattform, prüft es gegen die SHA256SUMS des
@@ -79,9 +73,8 @@ Tags und installiert es nach ~/.local/bin/k-playbook. Fehlt Kephalaion auf
 diesem Rechner, installiert es danach über das install.sh des neuesten
 Kephalaion-Releases.
 
-Aus einem Clone aufgerufen verhält es sich gleich: VERSION und SHA256SUMS des
-Clones liest es nicht. Gebraucht werden curl oder wget und sha256sum oder
-shasum.
+VERSION und SHA256SUMS neben dem Skript liest es nicht. Gebraucht werden curl
+oder wget und sha256sum oder shasum.
 EOF
 }
 
@@ -389,21 +382,13 @@ main() {
 Ersetzt wurde nichts."
   fi
 
-  # Ein alter Symlink muss selbst ersetzt werden, nicht sein bisheriges Ziel.
+  # Ein Symlink am Ziel muss selbst ersetzt werden, nicht sein bisheriges Ziel.
   if [[ -L "${target}" ]]; then
     rm -f "${target}"
   fi
   chmod 0755 "${temporary}"
   mv -f "${temporary}" "${target}"
   temporary=""
-
-  # Der alte Wrapper legte seine Spiegelung und Downloads außerhalb von bin/ ab:
-  # die Spiegelung unter ~/.local/share/k-playbook/installation, die Binaries
-  # unter ~/.cache/k-playbook/bin/<version>/. Security-Tool-venvs liegen
-  # ebenfalls unter ~/.local/share/k-playbook und der Cache des neuesten
-  # Release unter ~/.cache/k-playbook/latest-release.json; beide bleiben
-  # ausdrücklich außerhalb dieser Bereinigung.
-  rm -rf "${HOME}/.local/share/k-playbook/installation" "${HOME}/.cache/k-playbook/bin"
 
   printf 'Installiert: %s (%s, sha256 %s)\n' "${target}" "${version}" "${actual}"
 
@@ -430,9 +415,7 @@ Ersetzt wurde nichts."
 
   # Kephalaion gehört zu jedem Rechner, auf dem k-playbook läuft; fehlt es,
   # wird es hier nachgeholt. Scheitert das, endet dieser Lauf trotzdem mit 0:
-  # k-playbook selbst ist installiert, und Binaries von vor Task 149 messen
-  # den Erfolg ihres Programm-Updates an diesem Exit-Code. Ein Fehlschlag hier
-  # meldete dort ein gescheitertes Programm-Update, das es nicht gab.
+  # k-playbook selbst ist installiert, und der Lauf hat sein Ziel erreicht.
   # `k-playbook upgrade` holt Kephalaion in einem eigenen Schritt nach, und
   # k-playbook health nennt es, solange es fehlt.
   printf '\n'

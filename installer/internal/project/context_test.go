@@ -128,13 +128,10 @@ func TestBuildContextMeldetAbgeschaltet(t *testing.T) {
 	}
 }
 
-// Den Katalog checks gibt es nicht mehr (Task 155): Ein liegengebliebenes
-// Verzeichnis k-playbook/checks/ ergibt keinen Katalog, weder in der
+// Den Katalog checks gibt es nicht mehr (Task 155), weder in der
 // Kontextausgabe noch im JSON.
 func TestBuildContextOhneKatalogChecks(t *testing.T) {
 	root := newContextProject(t)
-
-	write(t, filepath.Join(PlaybookDir(root), "checks", "check_secrets.sh"), "#!/bin/sh\necho x\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -347,12 +344,9 @@ func TestBuildContextNenntKeineGuidelines(t *testing.T) {
 	}
 }
 
-// Das Feld instructions gibt es nicht mehr (Task 148): Eine k-playbook.md in
-// einem liegengebliebenen Clone k-playbook/ nennt die Kontextausgabe nicht,
-// auch wenn die Datei daliegt.
+// Das Feld instructions gibt es nicht mehr (Task 148).
 func TestBuildContextNenntKeineInstructions(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(PlaybookDir(root), "k-playbook.md"), "# mitgeliefert\n")
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -375,15 +369,10 @@ func TestBuildContextNenntKeineInstructions(t *testing.T) {
 }
 
 // Das Feld playbook gibt es nicht mehr (Task 157): Die Kontextausgabe nennt
-// keinen Ort einer Installation im Projekt, auch wenn ein liegengebliebener
-// Clone k-playbook/ daliegt. Auch das Feld local ist entfallen (Task 159):
-// Die einzige Wurzel ist project.dir.
+// keinen Ort einer Installation im Projekt. Auch das Feld local ist entfallen
+// (Task 159): Die einzige Wurzel ist project.dir.
 func TestBuildContextNenntKeinPlaybook(t *testing.T) {
 	root := newContextProject(t)
-	write(t, filepath.Join(PlaybookDir(root), "VERSION"), "v0.0.0\n")
-	if err := os.MkdirAll(filepath.Join(PlaybookDir(root), ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 
 	context, err := BuildContext(root)
 	if err != nil {
@@ -405,10 +394,6 @@ func TestBuildContextNenntKeinPlaybook(t *testing.T) {
 	}
 	if _, ok := fields["local"]; ok {
 		t.Errorf("die Kontextausgabe trägt local: %s", fields["local"])
-	}
-	// Der Pfad des Clones steht nirgends, auch nicht unter anderem Namen.
-	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(data), string(quoted)) {
-		t.Errorf("die Kontextausgabe nennt %s:\n%s", PlaybookDir(root), data)
 	}
 }
 

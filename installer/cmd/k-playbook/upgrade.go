@@ -30,10 +30,8 @@ import (
 // voraus, Projektschritt und /k-upgrade brauchen den Node, und ein Neustart
 // des Nodes ist so am Anfang erledigt und von Kephalaion selbst geprüft. Fehlt
 // kephalaion, lädt der Schritt das install.sh des neuesten Kephalaion-Releases
-// und führt es aus (program.InstallKephalaion); das Skript
-// bin/install-kephalaion ruft dieses Programm nicht mehr auf. Liegt es da, ruft
-// der Schritt `kephalaion upgrade --auto
-// --json` auf und meldet allein nach dessen Antwort; ob ein Upgrade gefahrlos
+// und führt es aus (program.InstallKephalaion). Liegt es da, ruft der Schritt
+// `kephalaion upgrade --auto --json` auf und meldet allein nach dessen Antwort; ob ein Upgrade gefahrlos
 // ist (Hub, globale Installation, dev build, zu alter Hub, DevContainer),
 // entscheidet Kephalaion. Kennt das Binary --auto nicht (Exit 2), meldet der
 // Schritt den Report von `upgrade --check --json`. Bei `upgraded` oder einem
@@ -48,15 +46,13 @@ import (
 // Build über dem neuesten Tag sich herab. Ohne eigene Version wird der Tag
 // nicht abgerufen; ist er unbekannt (ohne Netz, ohne veröffentlichtes Release,
 // Zeitüberschreitung), sagt die Meldung das, und das Projekt wird trotzdem
-// nachgezogen. Ein Verzeichnis k-playbook/ im Projekt fasst der Lauf nicht an
-// und nennt es nicht (Task 156): Das Löschen eines alten Clones ist Sache von
-// /k-upgrade.
+// nachgezogen.
 //
 // (2) das Projekt — ApplyAssistantSetup, also Einordnen von
 // CLAUDE.md/AGENTS.md, Anstoß ersetzen, Verlinkung; danach immer die
 // MCP-Einträge
 // (project.RepairMCPReport im Umfang des Starts,
-// MCPWriteOutdatedAndUnversioned), danach die Berechtigungen der Clients für
+// MCPWriteUnversioned), danach die Berechtigungen der Clients für
 // GitHub (project.ApplyGitHubPermissions, Task 190): in einem Projekt mit
 // Dienst die eigenen Einträge in .claude/settings.local.json und
 // .opencode/opencode.jsonc, ohne Dienst ihr Entfernen; Widersprüche des
@@ -75,18 +71,15 @@ import (
 // Schritt (2) nicht selbst aus: er hätte alte Vorlagen und alte Erkennung.
 // Er startet dafür das neu installierte Programm mit `upgrade --project-only`
 // (reexecProjectStep). Die Oberfläche braucht das nicht, weil sie neu startet;
-// upgrade hat keinen Neustart. Den Schalter `--repair-mcp` nimmt
-// `--project-only` weiter an, er entscheidet aber nichts mehr: Ein Binary von
-// vor Task 149 gab damit mit, dass sein Pull entfiel, und startet das neu
-// installierte Programm noch so.
+// upgrade hat keinen Neustart.
 //
 // `--check` schreibt nichts: es meldet den Kephalaion-Stand (nur
 // `upgrade --check --json`, nie --auto), den Programm-Stand gegenüber dem
 // neuesten Release-Tag
 // — der Tag ist auch hier bekannt — und baut die Projektprüfung aus den
-// Check-Funktionen — es meldet, was ein Lauf täte. Bei den MCP-Einträgen sagt
-// es weniger, als ein Lauf täte: gemeldet werden nur veraltete Einträge, nicht
-// die fehlenden, die ein Lauf in einer nicht von git erfassten Datei ergänzt.
+// Check-Funktionen — es meldet, was ein Lauf täte. Die MCP-Einträge nennt es
+// nicht: die fehlenden, die ein Lauf in einer nicht von git erfassten Datei
+// ergänzt, hängen an der Messung der Versionierung.
 //
 // Hinweis auf /k-upgrade: Hat ein Lauf das Binary ersetzt, sagt die letzte
 // Zeile, dass /k-upgrade in einer Sitzung die Umstellungen nachzieht, die eine
@@ -104,7 +97,8 @@ import (
 // program.versionChanged und program.mcpRepaired entfallen, project trägt
 // mcpRepairedPortable und mcpMessage. Fassung 3 (Task 156): program.update,
 // program.pulled, program.pullOutput und program.remoteSwitched entfallen.
-const upgradeSchemaVersion = "3"
+// Fassung 4 (Task 192): project.mcpRepairedPortable entfällt.
+const upgradeSchemaVersion = "4"
 
 // viaCommandEnv ist die Umgebungsvariable, die Hülle und Ersatzaufruf von
 // /k-upgrade auf 1 setzen.
@@ -134,11 +128,6 @@ type upgradeOptions struct {
 	// projectOnly: nur Schritt (2) — der Aufruf, mit dem ein alter Prozess das
 	// neu installierte Programm für das Projekt arbeiten lässt.
 	projectOnly bool
-	// repairMCP: der Schalter --repair-mcp, nur zusammen mit projectOnly. Er
-	// wird angenommen und entscheidet nichts mehr — Schritt (2) repariert die
-	// MCP-Einträge immer. Ein Binary von vor Task 149 startet das neu
-	// installierte Programm noch mit ihm.
-	repairMCP bool
 }
 
 // upgradeReport ist die Antwort, als JSON oder — Zeile für Zeile aus Messages
@@ -221,12 +210,10 @@ type upgradeProjectReport struct {
 	Links project.LinkChanges `json:"links"`
 	// LinksCreated: die Verlinkung stand vorher gar nicht und steht jetzt.
 	LinksCreated bool `json:"linksCreated,omitempty"`
-	// MCPRepaired nennt die MCP-Dateien, die dieser Schritt geschrieben hat;
-	// MCPRepairedPortable die davon, in denen jetzt der bloße Kommandoname
-	// steht. MCPMessage sagt, was an der Reparatur nicht gelang.
-	MCPRepaired         []string `json:"mcpRepaired,omitempty"`
-	MCPRepairedPortable []string `json:"mcpRepairedPortable,omitempty"`
-	MCPMessage          string   `json:"mcpMessage,omitempty"`
+	// MCPRepaired nennt die MCP-Dateien, die dieser Schritt geschrieben hat.
+	// MCPMessage sagt, was an der Reparatur nicht gelang.
+	MCPRepaired []string `json:"mcpRepaired,omitempty"`
+	MCPMessage  string   `json:"mcpMessage,omitempty"`
 	// GitHubPermissions sind die Meldungen zu den Berechtigungen der Clients
 	// für GitHub (Task 190): was geschrieben, entfernt oder aus git
 	// ausgenommen wurde, was unberührt bleibt, und jeder Widerspruch des
@@ -250,8 +237,6 @@ func runUpgrade(args []string) error {
 			options.asJSON = true
 		case "--project-only":
 			options.projectOnly = true
-		case "--repair-mcp":
-			options.repairMCP = true
 		case "-h", "--help", "help":
 			printUpgradeUsage(os.Stdout)
 			return nil
@@ -261,9 +246,6 @@ func runUpgrade(args []string) error {
 	}
 	if options.check && options.projectOnly {
 		return errors.New("--check und --project-only schließen sich aus")
-	}
-	if options.repairMCP && !options.projectOnly {
-		return errors.New("--repair-mcp gilt nur zusammen mit --project-only")
 	}
 
 	environment := project.Detect()
@@ -701,9 +683,8 @@ func describeKephalaionCheckFailed(check program.KephalaionCheck) []string {
 // Clients für GitHub.
 //
 // Die MCP-Reparatur läuft auch unter --project-only, immer im Umfang des
-// Starts (MCPWriteOutdatedAndUnversioned): Ein Lauf ersetzt einen veralteten
-// Eintrag und ergänzt auch einen fehlenden Eintrag bzw. eine fehlende Datei,
-// wenn die Zieldatei nicht von git erfasst ist.
+// Starts (MCPWriteUnversioned): Ein Lauf ergänzt einen fehlenden Eintrag bzw.
+// eine fehlende Datei, wenn die Zieldatei nicht von git erfasst ist.
 func upgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
 	before := project.CheckLinks(projectDir)
@@ -720,12 +701,12 @@ func upgradeProject(projectDir string) upgradeProjectReport {
 	// (PendingLinkChanges); da ist keine Registrierung verändert, da ist eine
 	// entstanden.
 	report.LinksCreated = !project.LinksOK(before) && pending.Empty() && project.LinksOK(setup.Links)
-	report.Changed = setup.RootCreated || setup.RootExtended || setup.RootRefreshed ||
+	report.Changed = setup.RootCreated || setup.RootExtended ||
 		setup.Instructions.Renamed || setup.Instructions.RemovedLink || !pending.Empty() || report.LinksCreated ||
-		len(setup.ConfigBlocksRemoved) > 0 || setup.Maintenance.Changed || setup.Readmes.Changed()
+		setup.Maintenance.Changed || setup.Readmes.Changed()
 
-	repair := project.RepairMCPReport(projectDir, project.MCPWriteOutdatedAndUnversioned)
-	report.MCPRepaired, report.MCPRepairedPortable, report.MCPMessage = repair.Repaired, repair.Portable, repair.Message
+	repair := project.RepairMCPReport(projectDir, project.MCPWriteUnversioned)
+	report.MCPRepaired, report.MCPMessage = repair.Repaired, repair.Message
 	if len(repair.Repaired) > 0 {
 		report.Changed = true
 	}
@@ -758,12 +739,6 @@ func (r upgradeProjectReport) messages() []string {
 		case setup.RootExtended:
 			lines = append(lines, "Projekt: der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
 		}
-		if setup.RootRefreshed {
-			lines = append(lines, "Projekt: der veraltete Anstoß in "+project.RootInstructionsFile+" wurde auf "+project.InstalledCommandName+" briefing gebracht.")
-		}
-		if len(setup.ConfigBlocksRemoved) > 0 {
-			lines = append(lines, "Projekt: "+project.DescribeConfigBlocksRemoved(setup.ConfigBlocksRemoved))
-		}
 		if note := project.DescribeMaintenanceBlock(setup.Maintenance, false); note != "" {
 			lines = append(lines, "Projekt: "+note)
 		}
@@ -776,10 +751,6 @@ func (r upgradeProjectReport) messages() []string {
 	}
 	if len(r.MCPRepaired) > 0 {
 		lines = append(lines, "Projekt: MCP-Registrierung nachgezogen: "+strings.Join(r.MCPRepaired, ", ")+". Der Assistent liest den Eintrag erst nach einem Neustart.")
-	}
-	if len(r.MCPRepairedPortable) > 0 {
-		lines = append(lines, "Projekt: in "+strings.Join(r.MCPRepairedPortable, ", ")+" steht der bloße Name "+project.InstalledCommandName+
-			", weil die Datei von git erfasst ist; ein aus Dock oder Finder gestarteter Client braucht dort den absoluten Pfad.")
 	}
 	if r.MCPMessage != "" {
 		lines = append(lines, "Projekt: "+r.MCPMessage)
@@ -819,18 +790,6 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	case !root.HasMarker:
 		report.Pending = append(report.Pending, "der Anstoß würde an "+project.RootInstructionsFile+" angehängt.")
 	}
-	// Gemeldet wird nur, was ein Lauf wirklich täte: ein Anstoß, dessen Ende
-	// sich nicht bestimmen ließ, steht zwar in HasOutdatedAnstoss, bleibt
-	// aber stehen — er kommt allein über den Hinweis.
-	if root.AnstossRefreshable {
-		report.Pending = append(report.Pending, "der veraltete Anstoß in "+project.RootInstructionsFile+" würde auf "+project.InstalledCommandName+" briefing gebracht.")
-	}
-	if root.Hint != "" {
-		report.Pending = append(report.Pending, "von Hand: "+root.Hint)
-	}
-	if project.LegacyGHBlockPresent(projectDir) {
-		report.Pending = append(report.Pending, "der abgelöste Block "+project.LegacyGHBlockName+" würde aus "+project.ConfigFileName+" entfernt.")
-	}
 	if maintenance, err := project.PlanMaintenanceBlock(projectDir); err != nil {
 		report.Pending = append(report.Pending, "der Block "+project.MaintenanceBlockName+" ist nicht prüfbar — "+err.Error())
 	} else if note := project.DescribeMaintenanceBlock(maintenance, true); note != "" {
@@ -850,11 +809,6 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 		report.Pending = append(report.Pending, "Verlinkung würde nachgezogen — "+describeLinkCounts(report.Links)+".")
 	case !project.LinksOK(statuses):
 		report.Pending = append(report.Pending, "Verlinkung würde eingerichtet.")
-	}
-	for _, status := range project.CheckMCP(projectDir) {
-		if status.State == project.MCPStateOutdated {
-			report.Pending = append(report.Pending, "veralteter MCP-Eintrag in "+status.Path+" würde korrigiert.")
-		}
 	}
 	permissions := project.CheckGitHubPermissions(projectDir)
 	for _, status := range permissions.Statuses {
@@ -879,8 +833,7 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 // reexecProjectStep lässt das neu installierte Programm Schritt (2) ausführen.
 // Im Klartextmodus schreibt es direkt nach out; im JSON-Modus kommt seine
 // Antwort zurück, so wie sie kam — ein neueres Programm darf mehr Felder
-// kennen als dieses. --repair-mcp reist nicht mehr mit: Das neue Programm ist
-// neuer als dieses und repariert die MCP-Einträge im Projektschritt immer.
+// kennen als dieses.
 func reexecProjectStep(target string, projectDir string, asJSON bool, out io.Writer) (any, []string, error) {
 	args := []string{"upgrade", "--project-only"}
 	if asJSON {
@@ -983,13 +936,12 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      Download oder Install, eine eigene Meldung, und Schritt 2 läuft mit dem
      laufenden Programm. Hat das Binary gewechselt, führt das neu
      installierte Programm Schritt 2 aus.
-  2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen, einen veralteten
-     Anstoß auf k-playbook briefing bringen), CLAUDE.md als Include-Datei,
+  2. Projekt: AGENTS.md (Anstoß anlegen oder anhängen), CLAUDE.md als
+     Include-Datei,
      die Verlinkung der Commands und Skills, in K-PLAYBOOK.yaml die fehlenden
      Felder des Blocks maintenance mit den Vorgaben (Doku-Sicherung aus,
-     vorhandene Werte bleiben), danach immer die MCP-Einträge:
-     ein veralteter wird ersetzt, ein fehlender ergänzt, wenn die Zieldatei
-     nicht von git erfasst ist. Projekt-Prosa in AGENTS.md bleibt
+     vorhandene Werte bleiben), danach immer die MCP-Einträge: ein
+     fehlender wird ergänzt, wenn die Zieldatei nicht von git erfasst ist. Projekt-Prosa in AGENTS.md bleibt
      unangetastet.
 
 Hat das Binary gewechselt und liegt opencode im PATH, fragt der Lauf

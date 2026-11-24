@@ -183,7 +183,7 @@ func ResolveGitHubRoute(ctx context.Context, dir string) *GitHubRoute {
 	switch {
 	case choice.Empty():
 		route.State = GitHubRouteNoAccess
-		route.Message = "Der Dienst " + service.Name + " hat keinen verfügbaren Zugang (" + githubaccess.NoAccessMessage(service, githubaccess.ChooseOptions{}) + "). Die Oberfläche liest GitHub deshalb nicht, auch nicht über das aktive gh-Konto. k-playbook github check " + service.Name + " nennt die Gründe je Zugang."
+		route.Message = "Der Dienst " + service.Name + " hat keinen verfügbaren Zugang (" + githubaccess.NoAccessMessage(service, githubaccess.ChooseOptions{}) + "). Die Oberfläche liest GitHub deshalb nicht, auch nicht über das aktive gh-Konto. k-playbook github check nennt die Gründe je Zugang."
 	case choice.API == nil:
 		route.State = GitHubRouteNoAPI
 		route.Message = "Der Dienst " + service.Name + " hat keinen api-Zugang (kein verfügbarer Zugang vom Typ token oder gh). Die Oberfläche startet deshalb kein gh — es liefe sonst still über das aktive gh-Konto. git fetch läuft über den git-Zugang des Dienstes."

@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/kascada/k-playbook/installer/internal/guiproc"
-	"github.com/kascada/k-playbook/installer/internal/legacy"
 	"github.com/kascada/k-playbook/installer/internal/program"
 	"github.com/kascada/k-playbook/installer/internal/project"
 	"github.com/kascada/k-playbook/installer/internal/version"
@@ -46,9 +45,6 @@ func runGUI() error {
 // den eine Programmaktualisierung neu startet (guiproc.HostCareEnv) — dort
 // gibt es keinen Aufruf, der sie sonst übernähme. Einen Browser öffnet sie nie.
 func careForHost() {
-	cleanUpLegacy()
-	cleanUpFormerHostInstall()
-	cleanUpLegacyWrapper()
 	repairMCPRegistration()
 	repairRootInstructions()
 }
@@ -88,44 +84,6 @@ func outdatedProgramNotice(running string, latest string) string {
 		running, latest, project.UpgradeCommand)
 }
 
-// cleanUpFormerHostInstall entfernt Daten des abgelösten Wrapper-Modells.
-// Die direkt installierte Datei ~/.local/bin/k-playbook bleibt erhalten.
-func cleanUpFormerHostInstall() {
-	removals, err := legacy.RemoveFormerHostInstall()
-	if len(removals) > 0 {
-		fmt.Printf("Alte Host-Installation entfernt (%d):\n", len(removals))
-		for _, removal := range removals {
-			fmt.Printf("  - %s\n", removal)
-		}
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: alte Host-Installation nicht vollständig entfernt: %v\n", err)
-	}
-}
-
-// cleanUpLegacyWrapper entfernt die Wrapper-Datei des abgelösten Modells aus
-// dem früheren Clone k-playbook/ des Projekts. Das Quell-Repo kennt sie nicht
-// mehr, und .gitignore deckt sie nicht ab — sie bleibt sonst als zusätzliche
-// Datei liegen. Liegt weder das Verzeichnis noch die Datei, ist nichts zu tun
-// (RemoveLegacyWrapper).
-//
-// Ein Fehler hält den Start nicht auf: er wird sichtbar gemeldet, und der
-// nächste Start versucht es erneut.
-func cleanUpLegacyWrapper() {
-	environment := project.Detect()
-	if !environment.Installed {
-		return
-	}
-
-	removed, err := project.RemoveLegacyWrapper(environment.ProjectDir)
-	if removed != "" {
-		fmt.Printf("Wrapper des abgelösten Modells entfernt: %s\n", removed)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Hinweis: Wrapper des abgelösten Modells nicht entfernt: %v\n", err)
-	}
-}
-
 // repairMCPRegistration zieht die MCP-Registrierung des Projekts nach — ein
 // selbsttätiger Weg neben „Aktualisieren“ in der Oberfläche und dem
 // Projektschritt von `k-playbook upgrade`, im selben Umfang wie dieser und
@@ -138,56 +96,23 @@ func cleanUpLegacyWrapper() {
 // `k-playbook upgrade` nachgezogen wurde. Ein Klick auf „Einrichten" ist dafür
 // nicht nötig.
 //
-// Zwei Fälle, zwei Meldungen, dazu ein Hinweis je geschriebener Form. Ein
-// Eintrag, der auf den abgelösten Wrapper zeigt, wird korrigiert — unabhängig
-// davon, ob die Datei versioniert ist, denn den Eintrag hat k-playbook selbst
-// geschrieben. Eine fehlende Datei oder ein fehlender Eintrag wird
-// eingetragen, aber nur, wenn die Datei nicht von git erfasst ist. Welcher Fall
-// vorlag, sagt der Zustand vor dem Lauf.
-//
-// Welche Form geschrieben wurde, sagt RepairMCP selbst. Steht danach der
-// absolute Pfad in einer ergänzten Datei, sagt die Meldung, dass sie einen
-// rechnerbezogenen Pfad trägt und unversioniert bleiben sollte. Steht der
-// bloße Name darin — eine Korrektur in einer erfassten Datei oder bei
-// unbeantworteter Tracking-Frage —, sagt sie das und nennt den Preis: ein aus
-// Dock oder Finder gestarteter Client findet den Namen nicht und braucht den
-// absoluten Pfad, von Hand eingetragen. Die Meldung hängt an der geschriebenen
-// Form, nicht am Tracking-Ergebnis. Ein Fehler hält den Start nicht auf.
+// Eine fehlende Datei oder ein fehlender Eintrag wird eingetragen, aber nur,
+// wenn die Datei nicht von git erfasst ist; ein vorhandener Eintrag bleibt
+// stehen. Die Meldung sagt, dass die ergänzte Datei einen rechnerbezogenen
+// Pfad trägt und unversioniert bleiben sollte. Ein Fehler hält den Start nicht
+// auf.
 func repairMCPRegistration() {
 	environment := project.Detect()
 	if !environment.Installed {
 		return
 	}
 
-	outdated := map[string]bool{}
-	for _, status := range project.CheckMCP(environment.ProjectDir) {
-		if status.State == project.MCPStateOutdated {
-			outdated[status.Path] = true
-		}
-	}
-
-	repaired, err := project.RepairMCP(environment.ProjectDir, project.MCPWriteOutdatedAndUnversioned)
-	added := 0
-	portable := 0
+	repaired, err := project.RepairMCP(environment.ProjectDir, project.MCPWriteUnversioned)
 	for _, write := range repaired {
-		if write.Portable() {
-			portable++
-		}
-		if outdated[write.Path] {
-			fmt.Printf("Veraltete MCP-Registrierung korrigiert: %s -> %s\n", write.Path, write.Command)
-			continue
-		}
-		if !write.Portable() {
-			added++
-		}
 		fmt.Printf("MCP-Registrierung eingetragen: %s\n", write.Path)
 	}
-	if added > 0 {
+	if len(repaired) > 0 {
 		fmt.Println("Die eingetragene Datei trägt den rechnerbezogenen Pfad des installierten k-playbook und sollte unversioniert bleiben.")
-	}
-	if portable > 0 {
-		fmt.Printf("Eingetragen ist der bloße Name %s: die Datei ist von git erfasst oder ihre Versionierung ließ sich nicht klären, und ein rechnerbezogener Pfad gehört nicht in einen Commit.\n", project.InstalledCommandName)
-		fmt.Println("Ein aus Dock oder Finder gestarteter Client findet den Namen nicht; dort den absoluten Pfad von Hand eintragen — er bleibt stehen.")
 	}
 	if len(repaired) > 0 {
 		fmt.Println("Der Assistent liest den neuen Eintrag erst nach einem Neustart.")
@@ -212,13 +137,10 @@ func repairGitHubPermissions(projectDir string) {
 }
 
 // repairRootInstructions zieht AGENTS.md nach — das Gegenstück zur
-// MCP-Korrektur für die zweite Datei, die im Hauptverzeichnis liegt und die
-// der Git-Update-Weg deshalb nicht erreicht.
+// MCP-Ergänzung für die zweite Datei, die im Hauptverzeichnis liegt.
 //
-// Zwei Meldungen für Inhalt, den k-playbook selbst geschrieben hat. Ein
-// veralteter Anstoßblock wird ersetzt: ein Bestandsprojekt behielte sonst
-// dauerhaft den abgelösten Aufruf. Eine ganz fehlende Datei entsteht aus der
-// Vorlage — und das wird eigens gesagt, denn es ist eine neue, versionierbare
+// Eine ganz fehlende Datei entsteht aus der Vorlage — und das wird eigens
+// gesagt, denn es ist eine neue, versionierbare
 // Datei im Hauptverzeichnis, kein stiller Nebeneffekt. Ein fremder Text wird
 // nie angefasst. Ein Fehler hält den Start nicht auf.
 func repairRootInstructions() {
@@ -228,9 +150,6 @@ func repairRootInstructions() {
 	}
 
 	repaired, err := project.RepairRootInstructions(environment.ProjectDir)
-	if repaired.Refreshed {
-		fmt.Printf("Veralteten Anstoß in %s auf %s briefing gebracht.\n", project.RootInstructionsFile, project.InstalledCommandName)
-	}
 	if repaired.Created {
 		fmt.Printf("%s aus der Vorlage angelegt — eine neue Datei im Hauptverzeichnis, die zum Projekt gehört und eingecheckt werden kann.\n", project.RootInstructionsFile)
 	}
