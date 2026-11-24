@@ -1,6 +1,6 @@
 ---
 title: Ziel auflösen
-description: Baustein für /k-task-run und /k-task-refine, eingebunden als include — der gemeinsame Teil beim Auflösen des Arguments zu Tasks: leer, keph:-Verweis mit Prüfung auf Fremdes, Nummer, mehrere Treffer, Treffer unter done/.
+description: "Baustein für /k-task-run und /k-task-refine, eingebunden als include — der gemeinsame Teil beim Auflösen des Arguments zu Tasks: leer, keph:-Verweis mit Prüfung auf Fremdes, Nummer, mehrere Treffer, Treffer unter done/."
 ---
 
 - **Leer:** die eigenen offenen Tasks aus `k_playbook_doc_list` (Sorte `tasks`, ohne `done`,

@@ -1,6 +1,6 @@
 ---
 title: PR-Handoff
-description: Modul für /k-task-run, vom Hauptkontext gelesen, wenn ein Task `PR required: true` trägt — Preflight, Push und Pull Request über gh, mit Dienst über k-playbook github run, PR-Text als Datei, und was ohne nutzbaren Weg ausgegeben wird.
+description: "Modul für /k-task-run, vom Hauptkontext gelesen, wenn ein Task `PR required: true` trägt — Preflight, Push und Pull Request über gh, mit Dienst über k-playbook github run, PR-Text als Datei, und was ohne nutzbaren Weg ausgegeben wird."
 ---
 
 # PR-Handoff

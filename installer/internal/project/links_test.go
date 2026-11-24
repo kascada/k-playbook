@@ -14,7 +14,7 @@ func newProject(t *testing.T) string {
 
 	root := t.TempDir()
 	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
-	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "geteilt.md"), "geteilt\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "gemeinsam", "geteilt.md"), "geteilt\n")
 	writeFile(t, filepath.Join(shipped(t), "skills", "beispiel", skillFileName), "# Beispiel\n")
 	return root
 }
@@ -94,7 +94,7 @@ func TestApplyLinksLegtEinzelLinksAn(t *testing.T) {
 	}
 
 	// Der Namensraum bleibt als Verzeichnis erhalten.
-	if _, err := os.Stat(filepath.Join(target, "_shared", "geteilt.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(target, "gemeinsam", "geteilt.md")); err != nil {
 		t.Errorf("Namensraum nicht erreichbar: %v", err)
 	}
 }
@@ -297,7 +297,7 @@ func TestApplyLinksErhaeltEigeneDatei(t *testing.T) {
 	}
 
 	// Der Rest des Katalogs wird trotzdem registriert.
-	if _, err := os.Stat(filepath.Join(target, "_shared", "geteilt.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(target, "gemeinsam", "geteilt.md")); err != nil {
 		t.Errorf("übriger Katalog nicht registriert: %v", err)
 	}
 }
@@ -687,7 +687,7 @@ func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 	if err := os.Remove(filepath.Join(shipped(t), "commands", "k-test.md")); err != nil {
 		t.Fatalf("Command entfernen: %v", err)
 	}
-	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "_shared", "geteilt.md"), "projekteigen\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", "gemeinsam", "geteilt.md"), "projekteigen\n")
 
 	changes := PendingLinkChanges(CheckLinks(root))
 	if len(changes.Added) != 1 || changes.Added[0] != "k-neu.md" {
@@ -696,8 +696,8 @@ func TestPendingLinkChangesZaehltOhneDopplung(t *testing.T) {
 	if len(changes.Removed) != 1 || changes.Removed[0] != "k-test.md" {
 		t.Errorf("Removed = %v, erwartet [k-test.md]", changes.Removed)
 	}
-	if len(changes.Repointed) != 1 || changes.Repointed[0] != "_shared/geteilt.md" {
-		t.Errorf("Repointed = %v, erwartet [_shared/geteilt.md]", changes.Repointed)
+	if len(changes.Repointed) != 1 || changes.Repointed[0] != "gemeinsam/geteilt.md" {
+		t.Errorf("Repointed = %v, erwartet [gemeinsam/geteilt.md]", changes.Repointed)
 	}
 
 	if _, err := ApplyLinks(root); err != nil {
@@ -870,5 +870,48 @@ func TestApplyLinksErsetztAlteStubs(t *testing.T) {
 	}
 	if got := readFile(t, filepath.Join(root, "CLAUDE.md")); got != fremd {
 		t.Errorf("fremder Inhalt wurde verändert: %q", got)
+	}
+}
+
+// Links aus der Zeit, als Fragmente noch registriert wurden, verschwinden beim
+// Nachziehen samt leerer Verzeichnisse; ein eigener echter Command bleibt.
+func TestApplyLinksRaeumtVerwaisteFragmentLinksAb(t *testing.T) {
+	root := newProject(t)
+	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "frag.md"), "frag\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_audit", "frag.md"), "frag\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_review-run", "frag.md"), "frag\n")
+
+	for _, assistant := range []string{".claude", ".opencode"} {
+		for _, ns := range []string{"_shared", "_audit", "_review-run"} {
+			dir := filepath.Join(root, assistant, "commands", ns)
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			source := filepath.Join(ShareLink(root), "commands", ns, "frag.md")
+			if err := os.Symlink(source, filepath.Join(dir, "frag.md")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		writeFile(t, filepath.Join(root, assistant, "commands", "eigen.md"), "echt\n")
+	}
+
+	statuses, err := ApplyLinks(root)
+	if err != nil {
+		t.Fatalf("ApplyLinks: %v", err)
+	}
+	if !LinksOK(statuses) {
+		t.Fatalf("nach ApplyLinks nicht eingerichtet: %+v", statuses)
+	}
+
+	for _, assistant := range []string{".claude", ".opencode"} {
+		for _, ns := range []string{"_shared", "_audit", "_review-run"} {
+			if _, err := os.Lstat(filepath.Join(root, assistant, "commands", ns)); !os.IsNotExist(err) {
+				t.Errorf("%s/commands/%s steht noch: %v", assistant, ns, err)
+			}
+		}
+		content, err := os.ReadFile(filepath.Join(root, assistant, "commands", "eigen.md"))
+		if err != nil || string(content) != "echt\n" {
+			t.Errorf("%s: eigener Command = %q, %v", assistant, content, err)
+		}
 	}
 }

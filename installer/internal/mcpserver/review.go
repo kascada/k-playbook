@@ -1427,8 +1427,9 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 }
 
 func scanTriageCandidate(env reviewEnvironment) (reviewCandidate, bool) {
-	for _, entry := range project.ActiveRegistry(env.Root, project.KindCommands) {
-		if entry.Name != scanTriageModule {
+	// Das Modul ist ein Fragment und fehlt deshalb in ActiveRegistry.
+	for _, entry := range project.ResolveRegistry(env.Root, project.KindCommands) {
+		if entry.Name != scanTriageModule || entry.Disabled {
 			continue
 		}
 		resultRequired := true

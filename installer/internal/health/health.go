@@ -46,6 +46,7 @@ const (
 	AreaGitHub         = "github"
 	AreaShare          = "share"
 	AreaAnchor         = "anchor"
+	AreaFrontmatter    = "frontmatter"
 	// AreaProgram: das Programm selbst — ob es älter ist als das neueste
 	// Release (project/health_release.go).
 	AreaProgram = "program"

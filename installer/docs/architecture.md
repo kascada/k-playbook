@@ -902,10 +902,20 @@ Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse wie `_shared/`
 damit bis auf die einzelne Datei überlagerbar: ein Projekt ersetzt `_shared/context.md`
 und behält den Rest des Namensraums aus der Installation.
 
-Der Preis der Rekursion: Jede Datei in einem solchen Verzeichnis wird auch **registriert**
-und erscheint beim Assistenten als `_shared:context`. Das Frontmatter ändert daran
-nichts — `collectCommands()` überspringt nur Dotfiles, Symlinks und `README.md`. Wer ein
-reines Include will, das nicht als Command auftaucht, muss den Ausschluss dort ergänzen.
+Fragmente sind Namensraum-Dateien, deren erster Pfadteil mit `_` beginnt (`_shared/`,
+`_docs/`, `_task/` ...). `collectCommands()` nimmt sie weiter auf, damit sie überlagerbar
+und als Include auflösbar bleiben, und `ResolveRegistry()` zeigt sie der Oberfläche mit
+Herkunft. `ActiveRegistry()` lässt sie bei Commands aus (`IsFragmentName`; Skills bleiben
+unberührt): sie werden weder verlinkt noch beim Assistenten registriert, und ein
+vorhandener Link darauf räumt das nächste Nachziehen ab. Wer ein Fragment selbst braucht,
+etwa `review.go` für `_audit/review-scan-triage.md`, löst über `ResolveRegistry()` auf
+und überspringt abgeschaltete Einträge selbst.
+
+Das Frontmatter jedes aufgelösten, nicht abgeschalteten Commands und Skills prüft die
+health-Quelle `frontmatter` (`project/health_frontmatter.go`) mit `gopkg.in/yaml.v3`;
+`yamllite` liest zu großzügig (es nimmt ein ": " im Wert an). Ein Kopf, den der strenge
+Parser ablehnt, ist ein Fehler mit Datei und Parserfehler, weil OpenCode 2 den Command
+sonst unsichtbar macht. Ein Test prüft dasselbe für alles unter `defaults/`.
 
 Skills werden als Ganzes überlagert, nicht Datei für Datei. `SKILL.md`, `PLAYBOOK.md`
 und `vorlagen/` müssen zueinander passen; ein halb ersetzter Skill wäre nicht sinnvoll

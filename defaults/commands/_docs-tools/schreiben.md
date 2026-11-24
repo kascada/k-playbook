@@ -1,6 +1,6 @@
 ---
 title: Steckbriefe recherchieren und schreiben
-description: Modul für /k-docs-tools und seine Sub-Agenten, vom Hauptkontext und vom Sub-Agenten selbst als Auftrag gelesen — je ausgewähltem Kandidaten recherchieren (Basis aus Repo und Inventar, Klasse A zusätzlich gezielt im Web, höchstens drei Abrufe) und den Steckbrief im Arbeitsverzeichnis schreiben: Dateiname, Kopf, Vorlage, sources mit dem Inventar, Pitfalls konkret, und die Regeln eines schreibenden Laufs.
+description: "Modul für /k-docs-tools und seine Sub-Agenten, vom Hauptkontext und vom Sub-Agenten selbst als Auftrag gelesen — je ausgewähltem Kandidaten recherchieren (Basis aus Repo und Inventar, Klasse A zusätzlich gezielt im Web, höchstens drei Abrufe) und den Steckbrief im Arbeitsverzeichnis schreiben: Dateiname, Kopf, Vorlage, sources mit dem Inventar, Pitfalls konkret, und die Regeln eines schreibenden Laufs."
 ---
 
 Du recherchierst und schreibst Steckbriefe zu Libraries und Tools des Projekts, einen je

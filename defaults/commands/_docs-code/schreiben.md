@@ -1,6 +1,6 @@
 ---
 title: Ein Code-Dokument schreiben
-description: Modul für /k-docs-code und seine Sub-Agenten, vom Hauptkontext und vom Sub-Agenten selbst als Auftrag gelesen — ein Dokument unter keph:/docs/generated/code/ im Arbeitsverzeichnis schreiben: nur was der Code jetzt zeigt, Prüfung vor dem Einfügen, Kopf und Vorlage, Stellen als pfad:zeile, Englisch, Dateinamen, und die Regeln eines schreibenden Laufs.
+description: "Modul für /k-docs-code und seine Sub-Agenten, vom Hauptkontext und vom Sub-Agenten selbst als Auftrag gelesen — ein Dokument unter keph:/docs/generated/code/ im Arbeitsverzeichnis schreiben: nur was der Code jetzt zeigt, Prüfung vor dem Einfügen, Kopf und Vorlage, Stellen als pfad:zeile, Englisch, Dateinamen, und die Regeln eines schreibenden Laufs."
 ---
 
 Du schreibst ein Dokument der Code-Doku des Projekts in das Arbeitsverzeichnis `WORK_DIR`,

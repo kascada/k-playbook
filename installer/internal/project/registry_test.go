@@ -2,6 +2,7 @@ package project
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -71,18 +72,51 @@ func TestResolveRegistryErhaeltAuditNamensraumUndOverlaySchaltetAb(t *testing.T)
 	name := "_audit/review-scan-triage.md"
 	writeFile(t, filepath.Join(shipped(t), "commands", filepath.FromSlash(name)), "# Modul\n")
 
-	active := ActiveRegistry(root, KindCommands)
-	if len(active) != 1 || active[0].Name != name {
-		t.Fatalf("aktive Commands = %+v, erwartet %s", active, name)
+	// Das Fragment ist aufgelöst, aber nicht registriert.
+	if entry := entryFor(t, ResolveRegistry(root, KindCommands), name); entry.Disabled || entry.Origin != "dist" {
+		t.Fatalf("Fragment = %+v, erwartet aufgelöst aus dist", entry)
+	}
+	if active := ActiveRegistry(root, KindCommands); len(active) != 0 {
+		t.Fatalf("aktive Commands = %+v, erwartet keine", active)
 	}
 
-	writeFile(t, filepath.Join(root, ProjectDirName, "commands", filepath.FromSlash(name)), "# abgeschaltet\n")
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", filepath.FromSlash(name)), "Eigenes Modul\n")
 	entry := entryFor(t, ResolveRegistry(root, KindCommands), name)
+	if entry.Disabled || entry.Origin != "override" {
+		t.Fatalf("Überlagerung = %+v, erwartet override", entry)
+	}
+
+	writeFile(t, filepath.Join(root, ProjectDirName, "commands", filepath.FromSlash(name)), "")
+	entry = entryFor(t, ResolveRegistry(root, KindCommands), name)
 	if !entry.Disabled || entry.Origin != "override" {
 		t.Fatalf("Overlay = %+v, erwartet abgeschalteten Override", entry)
 	}
 	if got := len(ActiveRegistry(root, KindCommands)); got != 0 {
 		t.Fatalf("%d aktive Commands, erwartet 0", got)
+	}
+}
+
+// Fragmente unter _*-Namensräumen sind kein Command; gewöhnliche Namensräume
+// und Skills bleiben unberührt.
+func TestActiveRegistryLaesstFragmenteAusNurBeiCommands(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-a.md"), "# a\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "_shared", "frag.md"), "# frag\n")
+	writeFile(t, filepath.Join(shipped(t), "commands", "ns", "b.md"), "# b\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "_intern", skillFileName), "# skill\n")
+
+	var names []string
+	for _, e := range ActiveRegistry(root, KindCommands) {
+		names = append(names, e.Name)
+	}
+	if strings.Join(names, ",") != "k-a.md,ns/b.md" {
+		t.Errorf("aktive Commands = %v, erwartet k-a.md und ns/b.md", names)
+	}
+	if got := len(ResolveRegistry(root, KindCommands)); got != 3 {
+		t.Errorf("%d aufgelöste Commands, erwartet 3", got)
+	}
+	if got := len(ActiveRegistry(root, KindSkills)); got != 1 {
+		t.Errorf("%d aktive Skills, erwartet 1 (Skills bleiben unberührt)", got)
 	}
 }
 

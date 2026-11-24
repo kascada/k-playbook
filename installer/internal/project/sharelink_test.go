@@ -38,11 +38,11 @@ func TestApplyLinksVerlinktDurchShare(t *testing.T) {
 		t.Errorf("share zeigt auf %q, erwartet %q", got, shipped(t))
 	}
 	cases := map[string]string{
-		filepath.Join(".claude", "commands", "k-test.md"):             "../../.k-playbook/share/commands/k-test.md",
-		filepath.Join(".claude", "commands", "_shared", "geteilt.md"): "../../../.k-playbook/share/commands/_shared/geteilt.md",
-		filepath.Join(".opencode", "commands", "k-test.md"):           "../../.k-playbook/share/commands/k-test.md",
-		filepath.Join(".claude", "skills", "beispiel"):                "../../.k-playbook/share/skills/beispiel",
-		filepath.Join(".claude", "commands", "k-eigen.md"):            "../../.k-playbook/commands/k-eigen.md",
+		filepath.Join(".claude", "commands", "k-test.md"):               "../../.k-playbook/share/commands/k-test.md",
+		filepath.Join(".claude", "commands", "gemeinsam", "geteilt.md"): "../../../.k-playbook/share/commands/gemeinsam/geteilt.md",
+		filepath.Join(".opencode", "commands", "k-test.md"):             "../../.k-playbook/share/commands/k-test.md",
+		filepath.Join(".claude", "skills", "beispiel"):                  "../../.k-playbook/share/skills/beispiel",
+		filepath.Join(".claude", "commands", "k-eigen.md"):              "../../.k-playbook/commands/k-eigen.md",
 	}
 	for rel, want := range cases {
 		if got := readlink(t, filepath.Join(root, rel)); got != filepath.FromSlash(want) {

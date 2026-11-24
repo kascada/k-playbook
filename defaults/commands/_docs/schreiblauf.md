@@ -1,6 +1,6 @@
 ---
 title: Regeln eines schreibenden Docs-Laufs
-description: Modul für /k-docs-code und /k-docs-tools und ihre Sub-Agenten — was gilt, wenn ein Lauf erzeugte Dokumente selbst schreibt (nicht das Programm, wie beim Inventar): GENERATED_AT einmal je Lauf, Unklarheiten sammeln und vor publish vorlegen, keine Befunde, was nicht in die Doku gehört, und was ein Sub-Agent darf.
+description: "Modul für /k-docs-code und /k-docs-tools und ihre Sub-Agenten — was gilt, wenn ein Lauf erzeugte Dokumente selbst schreibt (nicht das Programm, wie beim Inventar): GENERATED_AT einmal je Lauf, Unklarheiten sammeln und vor publish vorlegen, keine Befunde, was nicht in die Doku gehört, und was ein Sub-Agent darf."
 ---
 
 Diese Regeln gelten für jeden Lauf, der erzeugte Dokumente selbst schreibt, und für jeden

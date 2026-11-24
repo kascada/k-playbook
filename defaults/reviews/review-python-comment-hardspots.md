@@ -3,7 +3,7 @@ name: review-python-comment-hardspots
 title: Python - Nicht-rekonstruierbare Entscheidungen kommentieren
 language: python
 interval-weeks: 16
-scope-hint: Python-Quellen; Ausschluss: virtuelle Umgebungen, tests/fixtures
+scope-hint: "Python-Quellen; Ausschluss: virtuelle Umgebungen, tests/fixtures"
 audit:
   enabled: true
   mode: evidence

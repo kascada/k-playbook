@@ -144,16 +144,32 @@ func ResolveRegistry(projectDir string, kind AssetKind) []RegistryEntry {
 }
 
 // ActiveRegistry sind die Einträge, die tatsächlich registriert gehören.
+//
+// Fragmente fehlen hier: Commands unter einem Namensraum mit Unterstrich-Präfix
+// (_shared/, _docs/ ...) sind nur Include, kein Command, den ein Mensch
+// aufruft. ResolveRegistry führt sie weiter, damit sie überlagerbar und als
+// Include auflösbar bleiben.
 func ActiveRegistry(projectDir string, kind AssetKind) []RegistryEntry {
 	entries := ResolveRegistry(projectDir, kind)
 
 	active := make([]RegistryEntry, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.Disabled {
-			active = append(active, entry)
+		if entry.Disabled {
+			continue
 		}
+		if kind == KindCommands && IsFragmentName(entry.Name) {
+			continue
+		}
+		active = append(active, entry)
 	}
 	return active
+}
+
+// IsFragmentName meldet, ob ein Command-Name unter einem Namensraum mit
+// Unterstrich-Präfix liegt und damit nur Include ist.
+func IsFragmentName(name string) bool {
+	first, _, nested := strings.Cut(name, "/")
+	return nested && strings.HasPrefix(first, "_")
 }
 
 // registrySources liest ein Quellverzeichnis und liefert Name -> Pfad.
