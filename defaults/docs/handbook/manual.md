@@ -260,7 +260,10 @@ no fallback to the disk.
 directory into `.k-playbook/work/docs/code/`, the session writes the documents there, and
 `k-playbook docs publish code` reconciles -- a document changed in Kephalaion since the
 checkout is reported as a conflict, not overwritten, and the hand-maintained `hints` in each
-document's frontmatter change only after the user confirms. Each writer changes only its own
+document's frontmatter change only after the user confirms. `k-playbook docs publish code
+--check` writes nothing and shows beforehand what publish would do, every rejection and the
+foreseeable conflicts; the checkout records the source state (branch, commit, changed
+files), and checkout, the check and publish report when the code has moved since (task 195). Each writer changes only its own
 documents (`generated.by`); the directory's `README.md` is written by `publish`.
 
 `/k-docs` is the guided entry point: it checks inventory, consistency, and

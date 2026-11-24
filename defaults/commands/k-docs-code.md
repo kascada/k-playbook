@@ -103,9 +103,12 @@ Rufe `k_playbook_docs_checkout` mit `projectDir` = `project.dir` und
   (`.k-playbook/work/docs/code`).
 - `state: existing` — ein Arbeitsverzeichnis liegt schon da, etwa von einem
   abgebrochenen Lauf. Nichts wurde geholt oder überschrieben. Nenne `existing.since`,
-  `existing.ageMinutes` und `existing.files` und frage: **weitermachen** (mit dem, was dort
-  liegt) oder **verwerfen** (`k_playbook_docs_checkout` mit `discard: true`, holt neu)?
-  Ohne Antwort geht es nicht weiter.
+  `existing.ageMinutes`, `existing.files` und `existing.stand` (bei `changed` die Dateien
+  aus `files`, dazu `incomplete` mit Grund; ohne Vergleich `message`) und frage:
+  **weitermachen** (mit dem, was dort liegt) oder **verwerfen** (`k_playbook_docs_checkout`
+  mit `discard: true`, holt neu)? Ohne Antwort geht es nicht weiter. Die Dateien aus
+  `existing.stand.files` behältst du für den Rest des Laufs, wie das Modul zu `publish` es
+  für `stand` sagt.
 - `kephalaion_unavailable` — nichts geschrieben; der Command endet wie in der Ablage oben.
 
 Die Doku wird ab hier nur in `WORK_DIR` geschrieben. Daneben schreibt der Lauf nur die
@@ -246,7 +249,8 @@ Inhalt.
 ## Schritt 6 — publish und Aufträge schließen
 
 Lies `k-playbook:/commands/_docs/publish.md` und rufe `publish` mit `erzeuger: code` auf; wann,
-ist frei: nach jedem Auftrag oder nach mehreren. `allow_hints: true` nur, wenn der Nutzer in
+ist frei: nach jedem Auftrag oder nach mehreren. Vor dem ersten `publish` des Laufs und nach
+einer Wiederaufnahme läuft zuerst der Prüfmodus, wie das Modul es sagt. `allow_hints: true` nur, wenn der Nutzer in
 Schritt 4 geänderte, neue oder mit einem Dokument entfallende `hints` bestätigt hat.
 
 **Abschluss eines Auftrags.** Nach jedem `publish` schließt du Aufträge einzeln, je einen
@@ -276,6 +280,7 @@ ergänzt hat. Kompakte Zusammenfassung:
   Schritt 5.
 - Der beschriebene Stand aus Schritt 1 (Branch bzw. `<ref>` und Commit).
 - Offene Dateien mit Grund, falls `publish` nicht aufgeräumt hat.
+- Eine Abweichung des Codes seit dem checkout (`stand`), wie im Modul zu `publish`.
 - Die Doku-Aufträge, je mit Verweis:
   - rohe, die zerlegt wurden und nach `done/` gewandert sind — getrennt die, aus denen kein
     Dokument folgte, mit Grund; liegt ihr Pfad außerhalb des Scans, ist der Nachzug offen;
@@ -298,7 +303,8 @@ ergänzt hat. Kompakte Zusammenfassung:
   Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - `$ARGUMENTS` ist nicht leer → kein Lauf; die Meldung aus Schritt 1.
 - Kein offener Auftrag mit `erzeuger: code`, oder nur wartende → kein Lauf; „Nichts zu tun“.
-- `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen.
+- `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen, mit
+  `existing.stand`.
 - Ein Werkzeug ist unbekannt (`k_playbook_docs_checkout`, `_scope`, `_orders`,
   `_orders_split`, `k-playbook docs` meldet `unbekanntes Kommando`) oder `k_playbook_doc_done`
   meldet `invalid_input` für die Sorte `docs` → die Installation ist älter als dieser

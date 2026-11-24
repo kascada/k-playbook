@@ -108,6 +108,41 @@ func TestDocsWorkToolsAblauf(t *testing.T) {
 	}
 }
 
+// publish mit check (Task 195): nichts geschrieben, Ablehnungen unter
+// problems statt als Fehler, je Dokument der Vorgang, stand in der Antwort;
+// checkout bei existing trägt existing.stand.
+func TestDocsWorkToolsPruefmodus(t *testing.T) {
+	root, store := newDocsWorkProject(t)
+	store.Put("docs/generated/code/01-a.md", "---\ntitle: A\ndescription: D\n---\n")
+	ctx := context.Background()
+	docsCheckoutTool(ctx, nil, docsCheckoutInput{ProjectDir: root, Producer: "code"})
+	result, _, _ := docsCheckoutTool(ctx, nil, docsCheckoutInput{ProjectDir: root, Producer: "code"})
+	checkout := decodeDocsWork[docsCheckoutEnvelope](t, result)
+	if result.IsError || checkout.Existing == nil || checkout.Existing.Stand == nil {
+		t.Fatalf("checkout vorhanden: %+v", checkout)
+	}
+
+	work := project.DocsWorkDir(root, "code")
+	if err := os.WriteFile(filepath.Join(work, "01-a.md"), []byte("---\ntitle: A neu\ndescription: D\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "notiz.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls := len(store.Calls)
+	result, _, _ = docsPublishTool(ctx, nil, docsPublishInput{ProjectDir: root, Producer: "code", Check: true})
+	publish := decodeDocsWork[docsPublishEnvelope](t, result)
+	if result.IsError || !publish.OK || publish.DocsPublishResult == nil || !publish.Check || len(publish.Problems) != 1 ||
+		publish.Docs[0].Status != project.DocsWritten || publish.Readme.Status != project.DocsReadmeMissing || publish.Stand == nil {
+		t.Fatalf("Prüfmodus: %+v", publish)
+	}
+	for _, call := range store.Calls[calls:] {
+		if !strings.HasPrefix(call, "list ") && !strings.HasPrefix(call, "read ") {
+			t.Errorf("geschrieben: %s", call)
+		}
+	}
+}
+
 // Fehlercodes wie bei den doc-Werkzeugen: projectDir, unbekannter Erzeuger,
 // ohne Kephalaion, ohne checkout.
 func TestDocsWorkToolsFehler(t *testing.T) {

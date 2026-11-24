@@ -140,6 +140,54 @@ func TestDocsSubkommandoAblauf(t *testing.T) {
 	}
 }
 
+// publish --check (Task 195): schreibt nichts, nennt je Dokument den
+// geplanten Vorgang oder conflict, Ablehnungen und hints gesammelt, die README
+// wie docs readme --check und den Stand; Exit 0. --json trägt check, problems
+// und stand.
+func TestDocsSubkommandoPublishCheck(t *testing.T) {
+	root := todoProjectRoot(t)
+	store := useCLIDocsWork(t)
+	store.Put("docs/generated/code/01-a.md", "---\ntitle: A\ndescription: D\n---\n")
+	store.Put("docs/generated/code/02-b.md", "---\ntitle: B\ndescription: D\n---\n")
+	if _, _, err := runDocsCaptured(t, "checkout", "code"); err != nil {
+		t.Fatal(err)
+	}
+	work := project.DocsWorkDir(root, "code")
+	if err := os.WriteFile(filepath.Join(work, "01-a.md"), []byte("---\ntitle: A neu\ndescription: D\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "02-b.md"), []byte("---\ntitle: B neu\ndescription: D\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "notiz.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store.Put("docs/generated/code/02-b.md", "---\ntitle: B fremd\ndescription: D\n---\n")
+	calls := len(store.Calls)
+
+	stdout, _, err := runDocsCaptured(t, "publish", "code", "--check")
+	if err != nil || !strings.Contains(stdout, "written\tkeph:/docs/generated/code/01-a.md") ||
+		!strings.Contains(stdout, "conflict\tkeph:/docs/generated/code/02-b.md") ||
+		!strings.Contains(stdout, "missing\tkeph:/docs/generated/code/README.md") ||
+		!strings.Contains(stdout, "Abgelehnt: notiz.txt: ") || !strings.Contains(stdout, "Stand: ") ||
+		!strings.Contains(stdout, "Geprüft, nichts geschrieben.") {
+		t.Fatalf("--check: %q %v", stdout, err)
+	}
+	for _, call := range store.Calls[calls:] {
+		if !strings.HasPrefix(call, "list ") && !strings.HasPrefix(call, "read ") {
+			t.Errorf("geschrieben: %s", call)
+		}
+	}
+	stdout, _, err = runDocsCaptured(t, "publish", "code", "--check", "--json")
+	var check project.DocsPublishResult
+	if err != nil || json.Unmarshal([]byte(stdout), &check) != nil || !check.Check || len(check.Problems) != 1 || check.Stand == nil {
+		t.Fatalf("--check --json: %q %v", stdout, err)
+	}
+	if _, err := os.Stat(filepath.Join(work, "notiz.txt")); err != nil {
+		t.Errorf("Arbeitsverzeichnis verändert: %v", err)
+	}
+}
+
 // Der Erzeuger libs (Task 120) geht denselben Weg wie code: checkout holt
 // docs/generated/libs/, publish legt neue Steckbriefe an, schreibt die README
 // des Verzeichnisses aus der Erzeugertabelle und räumt auf; code bleibt
@@ -196,6 +244,7 @@ func TestDocsSubkommandoFehler(t *testing.T) {
 		{"checkout", "code", "libs"},
 		{"checkout", "code", "--allow-hints"},
 		{"publish", "code", "--discard"},
+		{"checkout", "code", "--check"},
 		{"pull", "code"},
 	} {
 		if _, _, err := runDocsCaptured(t, args...); err == nil {

@@ -313,8 +313,8 @@ then nothing is written and the interface says so.
 | `k_playbook_doc_replace` | replace a text `old` that occurs exactly once by `new`, in a document of those kinds or under `docs/manual/`; optional `since_revision` |
 | `k_playbook_doc_set_field` | set (`value`) or remove (`unset`) one frontmatter field of a document of those kinds (not `docs/manual/`); other fields and the body stay byte for byte; optional `since_revision` |
 | `k_playbook_doc_grep` | find lines by a pattern (RE2) in one file (`ref`) or in all documents of a kind (`kind`, `user`, `done`); `count_only` returns per document only the count and the revision |
-| `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew. `erzeuger` is one of the producer table, today `code` (`/k-docs-code`, skill `ks-overlay-repo-analyse`) and `libs` (`/k-docs-tools`, task 120); the input schema lists them as `enum` |
-| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from its template `k-playbook:/docs/generated/<erzeuger>/README.md`, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty |
+| `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it, including the source state (branch, commit, checksums of changed files); reports an existing working directory instead of overwriting it, with `existing.stand` comparing the source state, `discard` fetches anew. `erzeuger` is one of the producer table, today `code` (`/k-docs-code`, skill `ks-overlay-repo-analyse`) and `libs` (`/k-docs-tools`, task 120); the input schema lists them as `enum` |
+| `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from its template `k-playbook:/docs/generated/<erzeuger>/README.md`, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty; `stand` compares the source state with the checkout; `check: true` writes nothing and reports the plan, all rejections, changed `hints` and foreseeable conflicts (task 195) |
 | `k_playbook_docs_readme` | write the `README.md` of the directories under `keph:/docs/` from their templates `k-playbook:/docs/<pfad>/README.md` -- each one that is missing or differs (create, otherwise write with its revision); without `pfad` all templates, with `pfad` one; `check: true` writes nothing and reports `missing`, `differs` or `unchanged`; like `k-playbook docs readme` (task 137) |
 | `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `environment.docs.exclude` (the partial call of the briefing); creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
 | `k_playbook_docs_scope` | compute the scope of the docs producers that scan the code (`/k-docs-code`, `/k-docs-tools`) by rules that stand only in the program, not in the command texts (tasks 179 and 180; `k-playbook:/commands/_docs/scope.md` calls it), locally and without Kephalaion: `scanRoot` (`project.repoRoot`), `stand` (branch, commit, whether `git status --porcelain` is empty), the effective exclusions by origin under `exclude` and, with `pfad` (exactly one extra path, `EXTRA_PATH`), `extra`; `check` reports per path whether it is excluded and why; like `k-playbook docs scope` |
@@ -1018,7 +1018,8 @@ task 137; the directory's `README.md` comes from its template); an unknown one i
 `invalid_input`, and the schema lists the valid ones as `enum` of `erzeuger`.
 
 **Inputs.** Both take `projectDir` (required by contract) and `erzeuger`;
-`k_playbook_docs_checkout` also `discard`, `k_playbook_docs_publish` also `allow_hints`.
+`k_playbook_docs_checkout` also `discard`, `k_playbook_docs_publish` also `allow_hints` and
+`check`.
 
 **Checkout.** Lists `docs/generated/<erzeuger>/` recursively and reads every `.md` except a
 `README.md` into `<projectDir>/.k-playbook/work/docs/<erzeuger>/` under the same relative
@@ -1026,10 +1027,18 @@ path. Beside the directory, not inside it, it writes the checkout record
 `<erzeuger>.checkout.json`: collection, time, and per document path, revision, SHA-256 of
 the content and `hints` -- publish measures "changed" and "hints unchanged" against this
 record, not against the current state in Kephalaion. An empty directory gets a record too.
+The record also holds the source state as `stand` (task 195): `git`, `branch`, the full
+`commit` and `dirty` -- per changed or untracked file from
+`git status --porcelain --untracked-files=all` in `project.repoRoot` its path (from the repo
+root) and the SHA-256 of its content, empty for a deleted file; at most 500 entries,
+`dirtyTruncated` counts the rest. It is taken after checkout's own writes (the line in
+`.k-playbook/.gitignore`), so the first comparison does not report them. Every checkout that
+fetches records a new state, also the one with `discard`; comparisons are always against the
+last checkout.
 `/work` is added to `.k-playbook/.gitignore`, as `/share` is. If the working directory or the
 record already exists, nothing is fetched or overwritten: the answer is `state: existing` with
-`existing` (`since`, `ageMinutes`, `files`, `record`), and the user decides whether to continue
-or to discard. `discard: true` reads everything first and only then replaces what lies there;
+`existing` (`since`, `ageMinutes`, `files`, `record`, `stand`), and the user decides whether to
+continue or to discard. `discard: true` reads everything first and only then replaces what lies there;
 if reading fails, it stays.
 
 **Publish.** First everything is checked, and a rejection writes nothing: only `.md` files
@@ -1054,12 +1063,40 @@ are published and the working directory is cleaned up anyway; nothing is written
 README, not even an empty one, and the CLI ends with exit 1 after the output. Without a
 checkout the answer is `not_checked_out`.
 
+**Source state.** `existing.stand` of checkout and `stand` of publish and of the check mode
+compare the current source state with the one in the record: `compared` (false when there is
+nothing to compare -- a record without `stand`, no git at checkout or now; `message` says
+which), `changed` (branch or commit differ, or the set or a checksum of the changed files),
+`files` (the paths affected: changed between both commits per `git diff --name-only`, plus
+files whose checksum differs, that appeared or disappeared), `recorded` and `current`
+(`branch`, `commit`), and `incomplete` when the comparison could not check everything:
+`dirty_truncated` (more than 500 changed files at checkout or now; only paths up to the last
+one with a checksum count) or `commit_unknown` (the recorded commit no longer resolves; the
+files between the commits are missing). Neither is an error, and `changed: false` with
+`incomplete` only means that nothing differs in what was checked. A deviation is reported,
+never prevented: publish writes anyway. What the record captures is the working tree; a
+session that describes another state (`git show <ref>:<pfad>`) handles that itself.
+
+**Check mode.** `check: true` (CLI `--check`) runs the same checks and the same plan as publish
+but writes nothing -- not to Kephalaion, not to the working directory, not to the record --
+and cleans up nothing. It lists the directory's revisions once (`list`, the node's replica)
+and marks `conflict` where publish would get one: `created` but the document exists
+(`name_taken`); `written` or `deleted` but the revision differs from the record
+(`stale_revision`) or the document is missing (`not_found`). A document unchanged locally
+stays `unchanged` even if it is newer in Kephalaion, since publish does not write it. The
+forecast does not rule a conflict out: `list` reads the replica, publish writes through the
+hub, so handling `conflict` after publish stays. The answer carries `check: true`, per document
+the planned status or `conflict`, `problems` (all rejections as a list instead of
+`invalid_input`), `hintsChanged` regardless of `allow_hints`, `readme` in the vocabulary of
+`k_playbook_docs_readme` with `check` (`missing`, `differs`, `unchanged`, `failed`) and
+`stand`; `open` is empty, `cleaned` false. The CLI ends with exit 0.
+
 **Answers**, in the usual envelope `{ok, tool, projectDir, …, error}`:
 
 | Tool | Fields on success |
 |---|---|
-| `k_playbook_docs_checkout` | `producer`, `ref` (`keph:/docs/generated/<erzeuger>/`), `dir`, `record`, `state` (`checked_out` or `existing`), `discarded`, `docs` (each `path`, `ref`, `revision`), `existing` |
-| `k_playbook_docs_publish` | `producer`, `ref`, `dir`, `docs` and `readme`, each `path`, `ref`, `status` (`created`, `written`, `deleted`, `unchanged`, `conflict`, `failed`), `revision`, `base` (the checkout revision), with `conflict` and `failed` also `code` and `message`; `hintsChanged`, `open` (the files left open) and `cleaned` |
+| `k_playbook_docs_checkout` | `producer`, `ref` (`keph:/docs/generated/<erzeuger>/`), `dir`, `record`, `state` (`checked_out` or `existing`), `discarded`, `docs` (each `path`, `ref`, `revision`), `existing` (with `stand`) |
+| `k_playbook_docs_publish` | `producer`, `ref`, `dir`, `docs` and `readme`, each `path`, `ref`, `status` (`created`, `written`, `deleted`, `unchanged`, `conflict`, `failed`), `revision`, `base` (the checkout revision), with `conflict` and `failed` also `code` and `message`; `hintsChanged`, `open` (the files left open), `cleaned` and `stand`; in check mode also `check` and `problems` |
 
 A publish with open files is not a tool error (`ok: true`); the CLI ends with exit 1 after the
 output. Error codes in `error.code`: `invalid_input`, `project_not_found`, `hints_changed`,
@@ -1067,10 +1104,11 @@ output. Error codes in `error.code`: `invalid_input`, `project_not_found`, `hint
 `failed` with `outcome_unknown` may have arrived: do not publish again blindly, look it up.
 
 **CLI.** `k-playbook docs checkout <erzeuger> [--discard] [--json]` and
-`k-playbook docs publish <erzeuger> [--allow-hints] [--json]`. Without `--json` checkout prints
-one line per document (path and revision) or the note about the existing working directory;
-publish prints status, reference and revision per document, tab-separated, then the README
-and the outcome.
+`k-playbook docs publish <erzeuger> [--allow-hints] [--check] [--json]`. Without `--json`
+checkout prints one line per document (path and revision) or the note about the existing
+working directory with a line on the source state; publish prints status, reference and
+revision per document, tab-separated, then the README, the source state and the outcome; with
+`--check` also the rejections and changed `hints`, closing with "Geprüft, nichts geschrieben."
 
 **READMEs from templates.** Every directory under `keph:/docs/` that has a template
 `k-playbook:/docs/<pfad>/README.md` (`defaults/docs/` in the source repo, shipped to the hub;

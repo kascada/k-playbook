@@ -59,9 +59,9 @@ func runDocs(args []string) error {
 
 	usage := map[string]string{
 		"checkout": "docs checkout <" + strings.Join(project.DocsProducerNames(), "|") + "> [--discard] [--json]",
-		"publish":  "docs publish <" + strings.Join(project.DocsProducerNames(), "|") + "> [--allow-hints] [--json]",
+		"publish":  "docs publish <" + strings.Join(project.DocsProducerNames(), "|") + "> [--allow-hints] [--check] [--json]",
 	}[sub]
-	var asJSON, discard, allowHints, help bool
+	var asJSON, discard, allowHints, check, help bool
 	var positional []string
 	for _, arg := range rest {
 		switch {
@@ -73,6 +73,8 @@ func runDocs(args []string) error {
 			discard = true
 		case arg == "--allow-hints" && sub == "publish":
 			allowHints = true
+		case arg == "--check" && sub == "publish":
+			check = true
 		case strings.HasPrefix(arg, "-"):
 			return fmt.Errorf("unbekannte Option %s — erwartet wird %s", arg, usage)
 		default:
@@ -112,7 +114,7 @@ func runDocs(args []string) error {
 		return nil
 	}
 
-	result, err := work.Publish(ctx, positional[0], project.DocsPublishOptions{AllowHints: allowHints})
+	result, err := work.Publish(ctx, positional[0], project.DocsPublishOptions{AllowHints: allowHints, Check: check})
 	if asJSON && (err == nil || result.Producer != "") {
 		if printErr := printDocsJSON(result); printErr != nil {
 			return printErr
@@ -122,6 +124,10 @@ func runDocs(args []string) error {
 	}
 	if err != nil {
 		return docError(err)
+	}
+	if result.Check {
+		// Der Prüfmodus schreibt nichts; was er findet, steht in der Ausgabe.
+		return nil
 	}
 	if !result.Cleaned {
 		open := result.Open
@@ -329,6 +335,7 @@ func printDocsCheckout(out io.Writer, result project.DocsCheckoutResult) {
 		fmt.Fprintf(out, "Arbeitsverzeichnis liegt schon da: %s\n", project.DisplayPath(result.Dir))
 		fmt.Fprintf(out, "  seit %s (vor %d Minuten), %d Dateien, Merkdatei %s\n",
 			existing.Since, existing.AgeMinutes, existing.Files, map[bool]string{true: "vorhanden", false: "fehlt"}[existing.Record])
+		printDocsStand(out, existing.Stand)
 		fmt.Fprintf(out, "Nichts geholt, nichts überschrieben. Weitermachen oder verwerfen: k-playbook docs checkout %s --discard\n", result.Producer)
 		return
 	}
@@ -356,9 +363,21 @@ func printDocsPublish(out io.Writer, result project.DocsPublishResult) {
 		line(item)
 	}
 	line(result.Readme)
+	if result.Check {
+		for _, problem := range result.Problems {
+			fmt.Fprintf(out, "Abgelehnt: %s\n", strings.ReplaceAll(problem, "\n", " "))
+		}
+		if len(result.HintsChanged) > 0 {
+			fmt.Fprintf(out, "hints geändert (bräuchte --allow-hints): %s\n", strings.Join(result.HintsChanged, ", "))
+		}
+		printDocsStand(out, result.Stand)
+		fmt.Fprintln(out, "Geprüft, nichts geschrieben.")
+		return
+	}
 	if len(result.HintsChanged) > 0 {
 		fmt.Fprintf(out, "hints geändert (allow_hints): %s\n", strings.Join(result.HintsChanged, ", "))
 	}
+	printDocsStand(out, result.Stand)
 	if result.Cleaned {
 		fmt.Fprintf(out, "Veröffentlicht nach %s; Arbeitsverzeichnis und Merkdatei entfernt.\n", result.Ref)
 		return
@@ -367,12 +386,52 @@ func printDocsPublish(out io.Writer, result project.DocsPublishResult) {
 		strings.Join(result.Open, ", "), project.DisplayPath(result.Dir))
 }
 
+// docsStandMaxFiles begrenzt die Dateien, die die Zeile zum Stand nennt;
+// --json trägt alle.
+const docsStandMaxFiles = 20
+
+// printDocsStand schreibt den Vergleich des Quellcodes mit dem beim checkout
+// in einer Zeile: kein Vergleich mit Grund, unverändert oder abweichend mit
+// den betroffenen Dateien, dazu, was der Vergleich nicht prüfen konnte.
+func printDocsStand(out io.Writer, stand *project.DocsStandCheck) {
+	if stand == nil {
+		return
+	}
+	if !stand.Compared {
+		fmt.Fprintf(out, "Stand: %s\n", stand.Message)
+		return
+	}
+	point := func(p *project.DocsStandPoint) string {
+		commit := p.Commit
+		if len(commit) > 12 {
+			commit = commit[:12]
+		}
+		return p.Branch + "@" + commit
+	}
+	text := "Stand: unverändert seit dem checkout (" + point(stand.Current) + ")"
+	if stand.Changed {
+		text = "Stand: abweichend seit dem checkout — " + point(stand.Recorded) + " → " + point(stand.Current)
+		if files := stand.Files; len(files) > 0 {
+			more := ""
+			if len(files) > docsStandMaxFiles {
+				more = fmt.Sprintf(" … und %d weitere", len(files)-docsStandMaxFiles)
+				files = files[:docsStandMaxFiles]
+			}
+			text += "; Dateien: " + strings.Join(files, ", ") + more
+		}
+	}
+	if len(stand.Incomplete) > 0 {
+		text += " — unvollständig geprüft: " + strings.Join(stand.Incomplete, ", ")
+	}
+	fmt.Fprintln(out, text)
+}
+
 func printDocsUsage(out io.Writer) {
 	fmt.Fprintf(out, `k-playbook docs — erzeugte Doku auschecken und veröffentlichen, Scope und Doku-Aufträge
 
 Aufruf:
   k-playbook docs checkout <erzeuger> [--discard] [--json]
-  k-playbook docs publish <erzeuger> [--allow-hints] [--json]
+  k-playbook docs publish <erzeuger> [--allow-hints] [--check] [--json]
   k-playbook docs readme [<pfad>] [--check] [--json]
   k-playbook docs exclude add <muster>… [--json]
   k-playbook docs scope [<pfad>] [--check <pfad>…] [--json]
@@ -389,8 +448,18 @@ der Projekt-Collection.
             daneben die Merkdatei <erzeuger>.checkout.json (Revision,
             Inhalts-Hash und hints je Dokument). /work kommt in .k-playbook/.gitignore. Liegt
             Arbeitsverzeichnis oder Merkdatei schon da, wird nichts geholt und
-            nichts überschrieben: die Ausgabe nennt Alter und Anzahl Dateien.
+            nichts überschrieben: die Ausgabe nennt Alter und Anzahl Dateien
+            und vergleicht den Quellcode mit dem Stand beim checkout (unten).
             --discard verwirft beides und holt neu.
+            Die Merkdatei hält den Stand des Quellcodes in project.repoRoot
+            fest: Branch, Commit und je geänderter oder unverfolgter Datei aus
+            git status den Pfad und die Prüfsumme ihres Inhalts, höchstens
+            500. checkout bei vorhandenem Arbeitsverzeichnis, publish und
+            publish --check vergleichen damit (--json: stand bzw.
+            existing.stand mit compared, changed, files, recorded, current,
+            incomplete — dirty_truncated oder commit_unknown — und message).
+            Eine Abweichung wird gemeldet, nicht verhindert; ohne git oder
+            bei einer Merkdatei ohne Stand gibt es keinen Vergleich.
   publish   Gleicht das Arbeitsverzeichnis an der Merkdatei ab: neu → anlegen,
             geändert → schreiben mit der Revision beim checkout, gelöscht →
             löschen mit dieser Revision, unverändert → nichts. Vorher wird
@@ -408,6 +477,16 @@ der Projekt-Collection.
             fehlgeschlagen ist; ein zweites publish schreibt dann nur noch
             den Rest. Fehlt nur die Vorlage der README (template_missing),
             wird trotzdem aufgeräumt; der Aufruf endet mit Exit 1.
+            --check ist der Prüfmodus: schreibt nichts — weder nach
+            Kephalaion noch ins Arbeitsverzeichnis noch in die Merkdatei —
+            und nennt je Dokument den geplanten Vorgang oder conflict, wo
+            publish absehbar einen bekäme (die Revision in Kephalaion weicht
+            ab, das Dokument fehlt oder ist schon angelegt; eine Vorhersage,
+            kein Ausschluss), alle Ablehnungen und geänderten hints gesammelt,
+            die README wie docs readme --check und den Stand. Ein lokal
+            unverändertes Dokument bleibt unchanged, auch wenn es in
+            Kephalaion neuer ist. Endet mit Exit 0; --json trägt check,
+            problems und hintsChanged.
 
   readme    Schreibt die README.md unter keph:/docs/ aus den Vorlagen
             k-playbook:/docs/<pfad>/README.md, die mit dem Hub ausgeliefert

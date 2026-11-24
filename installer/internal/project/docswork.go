@@ -228,11 +228,13 @@ var OpenDocsWork = func(projectDir string) (*DocsWork, error) {
 
 // docsRecord ist die Merkdatei: der Stand beim checkout, an dem publish
 // „geändert“ und „hints unverändert“ misst — nicht am aktuellen Stand in
-// Kephalaion.
+// Kephalaion. Stand ist der Quellcode beim checkout (docsstand.go); er
+// fehlt in Merkdateien älterer Checkouts, die trotzdem gültig bleiben.
 type docsRecord struct {
 	Producer   string           `json:"producer"`
 	Collection string           `json:"collection"`
 	CheckedOut string           `json:"checkedOut"`
+	Stand      *docsStand       `json:"stand,omitempty"`
 	Docs       []docsRecordItem `json:"docs"`
 }
 
@@ -484,12 +486,14 @@ type DocsCheckoutDoc struct {
 
 // DocsExisting beschreibt ein Arbeitsverzeichnis, das beim checkout schon
 // da ist: seit wann (aus der Merkdatei, ersatzweise der Änderungszeit), wie
-// alt in Minuten und wie viele Dateien darin liegen.
+// alt in Minuten und wie viele Dateien darin liegen. Stand vergleicht den
+// Quellcode mit dem, den die Merkdatei festhält.
 type DocsExisting struct {
-	Since      string `json:"since"`
-	AgeMinutes int    `json:"ageMinutes"`
-	Files      int    `json:"files"`
-	Record     bool   `json:"record"`
+	Since      string          `json:"since"`
+	AgeMinutes int             `json:"ageMinutes"`
+	Files      int             `json:"files"`
+	Record     bool            `json:"record"`
+	Stand      *DocsStandCheck `json:"stand,omitempty"`
 }
 
 // DocsCheckoutResult ist die Antwort von checkout. State ist checked_out
@@ -526,11 +530,12 @@ func (w *DocsWork) Checkout(ctx context.Context, name string, opts DocsCheckoutO
 	dir, recordFile := DocsWorkDir(w.projectDir, producer.Name), DocsRecordFile(w.projectDir, producer.Name)
 	result := DocsCheckoutResult{Producer: producer.Name, Ref: producer.Ref(), Dir: dir, Record: recordFile, Docs: []DocsCheckoutDoc{}}
 
-	existing, err := w.existing(dir, recordFile)
+	existing, recorded, err := w.existing(dir, recordFile)
 	if err != nil {
 		return DocsCheckoutResult{}, err
 	}
 	if existing != nil && !opts.Discard {
+		existing.Stand = compareDocsStand(ctx, docsRepoRoot(w.projectDir), recorded)
 		result.State, result.Existing = DocsStateExisting, existing
 		return result, nil
 	}
@@ -576,7 +581,10 @@ func (w *DocsWork) Checkout(ctx context.Context, name string, opts DocsCheckoutO
 		return DocsCheckoutResult{}, err
 	}
 
-	record := docsRecord{Producer: producer.Name, Collection: w.address, CheckedOut: w.now().UTC().Format(time.RFC3339)}
+	// Der Stand wird nach den eigenen Schreibvorgängen erhoben (die Zeile in
+	// .k-playbook/.gitignore), damit der erste Vergleich sie nicht meldet.
+	stand := readDocsStand(ctx, docsRepoRoot(w.projectDir))
+	record := docsRecord{Producer: producer.Name, Collection: w.address, CheckedOut: w.now().UTC().Format(time.RFC3339), Stand: &stand}
 	fail := func(err error) (DocsCheckoutResult, error) {
 		_ = removeDocsWork(dir, recordFile)
 		return DocsCheckoutResult{}, err
@@ -603,17 +611,20 @@ func (w *DocsWork) Checkout(ctx context.Context, name string, opts DocsCheckoutO
 }
 
 // existing beschreibt ein vorhandenes Arbeitsverzeichnis oder eine
-// vorhandene Merkdatei; nil, wenn beides fehlt.
-func (w *DocsWork) existing(dir, recordFile string) (*DocsExisting, error) {
+// vorhandene Merkdatei; nil, wenn beides fehlt. Dazu der Stand aus der
+// Merkdatei, nil ohne lesbare Merkdatei oder ohne Stand darin.
+func (w *DocsWork) existing(dir, recordFile string) (*DocsExisting, *docsStand, error) {
 	dirInfo, dirErr := os.Stat(dir)
 	recordInfo, recordErr := os.Stat(recordFile)
 	if os.IsNotExist(dirErr) && os.IsNotExist(recordErr) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	existing := &DocsExisting{Record: recordErr == nil}
 	var since time.Time
+	var recorded *docsStand
 	if record, ok, err := readDocsRecord(recordFile); err == nil && ok {
 		since, _ = time.Parse(time.RFC3339, record.CheckedOut)
+		recorded = record.Stand
 	}
 	if since.IsZero() {
 		switch {
@@ -635,7 +646,7 @@ func (w *DocsWork) existing(dir, recordFile string) (*DocsExisting, error) {
 			return nil
 		})
 	}
-	return existing, nil
+	return existing, recorded, nil
 }
 
 // removeDocsWork entfernt Arbeitsverzeichnis und Merkdatei.
@@ -673,9 +684,12 @@ func removeEmptyDocsWorkParents(dir string) {
 // DocsPublishOptions sind die Schalter von publish. AllowHints erlaubt,
 // hints zu ändern, ein Dokument mit hints zu löschen oder neu anzulegen —
 // nur nach Bestätigung durch den Nutzer; die Antwort nennt jedes solche
-// Dokument.
+// Dokument. Check ist der Prüfmodus (Task 195): nichts schreiben — weder
+// nach Kephalaion noch ins Arbeitsverzeichnis noch in die Merkdatei —, nur
+// melden, was publish täte.
 type DocsPublishOptions struct {
 	AllowHints bool
+	Check      bool
 }
 
 // Die Zustände eines Dokuments in der Antwort von publish.
@@ -709,15 +723,26 @@ type DocsPublishItem struct {
 // Dokument, dessen hints mit AllowHints geändert, gelöscht oder neu
 // angelegt wurden; Open die Dateien, die in Konflikt oder fehlgeschlagen
 // sind. Cleaned sagt, ob Arbeitsverzeichnis und Merkdatei entfernt wurden.
+//
+// Im Prüfmodus (Check) ist je Dokument der geplante Vorgang eingetragen oder
+// conflict, wo publish absehbar einen bekäme; Problems sind die Ablehnungen,
+// die publish als invalid_input meldete, HintsChanged ist gefüllt, gleich ob
+// AllowHints gesetzt ist; die README trägt das Vokabular von docs readme
+// --check (missing, differs, unchanged, failed). Open bleibt leer, Cleaned
+// falsch. Stand vergleicht den Quellcode mit dem beim letzten checkout —
+// gemeldet, nicht verhindert: publish schreibt trotz Abweichung.
 type DocsPublishResult struct {
 	Producer     string            `json:"producer"`
 	Ref          string            `json:"ref"`
 	Dir          string            `json:"dir"`
+	Check        bool              `json:"check,omitempty"`
 	Docs         []DocsPublishItem `json:"docs"`
 	Readme       DocsPublishItem   `json:"readme"`
+	Problems     []string          `json:"problems,omitempty"`
 	HintsChanged []string          `json:"hintsChanged,omitempty"`
 	Open         []string          `json:"open,omitempty"`
 	Cleaned      bool              `json:"cleaned"`
+	Stand        *DocsStandCheck   `json:"stand,omitempty"`
 }
 
 // docsPlanned ist ein Vorgang, den publish ausführen wird.
@@ -739,7 +764,8 @@ type docsPlanned struct {
 // ihrer Vorlage, wenn sie fehlt oder abweicht. Arbeitsverzeichnis und Merkdatei
 // werden nur entfernt, wenn nichts in Konflikt oder fehlgeschlagen ist;
 // sonst trägt die Merkdatei danach den Stand des Veröffentlichten, und ein
-// zweites publish schreibt nur noch den Rest.
+// zweites publish schreibt nur noch den Rest. Mit Check rechnet publish nur
+// den Plan und meldet ihn (checkPublish), ohne etwas zu schreiben.
 func (w *DocsWork) Publish(ctx context.Context, name string, opts DocsPublishOptions) (DocsPublishResult, error) {
 	producer, err := DocsProducerByName(name)
 	if err != nil {
@@ -765,13 +791,23 @@ func (w *DocsWork) Publish(ctx context.Context, name string, opts DocsPublishOpt
 			recordFile, record.Producer, record.Collection, producer.Name, w.address)
 	}
 
-	plan, hintsChanged, err := w.planPublish(producer, dir, record, opts)
+	plan, err := planPublish(dir, record)
 	if err != nil {
 		return DocsPublishResult{}, err
 	}
+	stand := compareDocsStand(ctx, docsRepoRoot(w.projectDir), record.Stand)
+	if opts.Check {
+		result, err := w.checkPublish(ctx, producer, dir, plan)
+		result.Stand = stand
+		return result, err
+	}
+	if err := plan.refusal(dir, opts.AllowHints); err != nil {
+		return DocsPublishResult{}, err
+	}
 
-	result := DocsPublishResult{Producer: producer.Name, Ref: producer.Ref(), Dir: dir, Docs: []DocsPublishItem{}, HintsChanged: hintsChanged}
-	for _, step := range plan {
+	result := DocsPublishResult{Producer: producer.Name, Ref: producer.Ref(), Dir: dir, Docs: []DocsPublishItem{}, HintsChanged: plan.hintsChanged,
+		Stand: stand}
+	for _, step := range plan.steps {
 		item := w.publishStep(ctx, producer, step)
 		switch item.Status {
 		case DocsCreated, DocsWritten:
@@ -807,10 +843,37 @@ func (w *DocsWork) Publish(ctx context.Context, name string, opts DocsPublishOpt
 	return result, nil
 }
 
+// docsPlan ist, was publish vorhat: die Vorgänge sortiert nach Pfad, die
+// Ablehnungen im Arbeitsverzeichnis und die Dokumente, deren hints sich
+// ändern (beides sortiert). Gerechnet wird ohne zu schreiben; publish und
+// der Prüfmodus teilen den Plan.
+type docsPlan struct {
+	steps        []docsPlanned
+	problems     []string
+	hintsChanged []string
+}
+
+// refusal ist die Ablehnung, mit der publish ohne Prüfmodus endet, bevor es
+// etwas schreibt: zuerst die Ablehnungen als invalid_input, dann geänderte
+// hints ohne allowHints als hints_changed; nil, wenn publish schreiben darf.
+func (p docsPlan) refusal(dir string, allowHints bool) error {
+	if len(p.problems) > 0 {
+		return docRefErrorf(DocCodeInvalidInput, "nichts veröffentlicht, %d Ablehnung(en) im Arbeitsverzeichnis %s:\n- %s",
+			len(p.problems), dir, strings.Join(p.problems, "\n- "))
+	}
+	if len(p.hintsChanged) > 0 && !allowHints {
+		return docRefErrorf(DocCodeHintsChanged,
+			"nichts veröffentlicht: hints geändert, oder ein Dokument mit hints wird gelöscht oder neu angelegt — %s. "+
+				"hints ändern sich nur nach Bestätigung durch den Nutzer; dann mit allow_hints (--allow-hints) veröffentlichen",
+			strings.Join(p.hintsChanged, ", "))
+	}
+	return nil
+}
+
 // planPublish prüft das Arbeitsverzeichnis und legt fest, was mit jedem
-// Dokument geschieht, sortiert nach Pfad. Ablehnungen kommen gesammelt als
-// invalid_input, Änderungen an hints ohne AllowHints als hints_changed.
-func (w *DocsWork) planPublish(producer DocsProducer, dir string, record docsRecord, opts DocsPublishOptions) ([]docsPlanned, []string, error) {
+// Dokument geschieht. Ein Fehler ist nur ein Lesefehler im
+// Arbeitsverzeichnis; Ablehnungen und geänderte hints stehen im Plan.
+func planPublish(dir string, record docsRecord) (docsPlan, error) {
 	var problems []string
 	files := map[string][]byte{}
 	walkErr := filepath.WalkDir(dir, func(file string, entry os.DirEntry, err error) error {
@@ -857,7 +920,7 @@ func (w *DocsWork) planPublish(producer DocsProducer, dir string, record docsRec
 		return nil
 	})
 	if walkErr != nil {
-		return nil, nil, fmt.Errorf("Arbeitsverzeichnis %s lesen: %w", dir, walkErr)
+		return docsPlan{}, fmt.Errorf("Arbeitsverzeichnis %s lesen: %w", dir, walkErr)
 	}
 
 	var plan []docsPlanned
@@ -898,18 +961,69 @@ func (w *DocsWork) planPublish(producer DocsProducer, dir string, record docsRec
 	slices.SortFunc(plan, func(a, b docsPlanned) int { return strings.Compare(a.rel, b.rel) })
 	slices.Sort(problems)
 	slices.Sort(hintsChanged)
+	return docsPlan{steps: plan, problems: problems, hintsChanged: hintsChanged}, nil
+}
 
-	if len(problems) > 0 {
-		return nil, nil, docRefErrorf(DocCodeInvalidInput, "nichts veröffentlicht, %d Ablehnung(en) im Arbeitsverzeichnis %s:\n- %s",
-			len(problems), dir, strings.Join(problems, "\n- "))
+// docsConflictForecast sind die Meldungen des Prüfmodus zu einem absehbaren
+// Konflikt, je Code, den publish dafür bekäme.
+var docsConflictForecast = map[string]string{
+	DocCodeStaleRevision: "seit dem checkout in Kephalaion geändert; publish bekäme einen Konflikt",
+	DocCodeNameTaken:     "inzwischen in Kephalaion angelegt; publish bekäme einen Konflikt",
+	DocCodeNotFound:      "inzwischen in Kephalaion gelöscht; publish bekäme einen Konflikt",
+}
+
+// checkPublish ist der Prüfmodus: Er liest einmal die Revisionen des
+// Verzeichnisses (List, die Replica des Nodes) und trägt je Vorgang ein, ob
+// publish absehbar einen Konflikt bekäme — created, aber das Dokument gibt es
+// schon; written oder deleted, aber die Revision weicht von der beim checkout
+// ab oder das Dokument fehlt. Ein unverändertes Dokument bleibt unchanged,
+// auch wenn es in Kephalaion neuer ist: publish schreibt es nicht. Die
+// Vorhersage schließt einen Konflikt nicht aus, publish schreibt über den
+// Hub. Die README prüft DocsReadmes mit Check. Geschrieben wird nichts.
+func (w *DocsWork) checkPublish(ctx context.Context, producer DocsProducer, dir string, plan docsPlan) (DocsPublishResult, error) {
+	entries, err := w.store.List(ctx, kephalaion.ListRequest{Path: producer.dir(), Recursive: true})
+	if err != nil {
+		return DocsPublishResult{}, kephError(err)
 	}
-	if len(hintsChanged) > 0 && !opts.AllowHints {
-		return nil, nil, docRefErrorf(DocCodeHintsChanged,
-			"nichts veröffentlicht: hints geändert, oder ein Dokument mit hints wird gelöscht oder neu angelegt — %s. "+
-				"hints ändern sich nur nach Bestätigung durch den Nutzer; dann mit allow_hints (--allow-hints) veröffentlichen",
-			strings.Join(hintsChanged, ", "))
+	current := map[string]int64{}
+	for _, entry := range entries {
+		if entry.Kind == "" || entry.Kind == kephalaion.ReadKindDocument {
+			current[entry.Name] = entry.Revision
+		}
 	}
-	return plan, hintsChanged, nil
+	result := DocsPublishResult{Producer: producer.Name, Ref: producer.Ref(), Dir: dir, Check: true, Docs: []DocsPublishItem{},
+		Problems: plan.problems, HintsChanged: plan.hintsChanged}
+	for _, step := range plan.steps {
+		name := producer.docName(step.rel)
+		item := DocsPublishItem{Path: step.rel, Ref: "keph:/" + name, Status: step.action, Base: step.base}
+		revision, exists := current[name]
+		conflict := ""
+		switch step.action {
+		case DocsUnchanged:
+			item.Revision = step.base
+		case DocsCreated:
+			if exists {
+				conflict, item.Revision = DocCodeNameTaken, revision
+			}
+		case DocsWritten, DocsDeleted:
+			switch {
+			case !exists:
+				conflict = DocCodeNotFound
+			case revision != step.base:
+				conflict, item.Revision = DocCodeStaleRevision, revision
+			default:
+				item.Revision = step.base
+			}
+		}
+		if conflict != "" {
+			item.Status, item.Code, item.Message = DocsConflict, conflict, docsConflictForecast[conflict]
+		}
+		result.Docs = append(result.Docs, item)
+	}
+	readme := NewDocsReadmes(w.store, w.templates).One(ctx, producer.templateDir(), DocsReadmeOptions{Check: true})
+	result.Readme = DocsPublishItem{Path: docsReadmeName, Ref: readme.Ref, Status: readme.Status, Revision: readme.Revision,
+		Base: readme.Base, Code: readme.Code, Message: readme.Message}
+	return result, nil
 }
 
 // publishStep führt einen Vorgang aus und macht aus dem Ergebnis einen

@@ -95,9 +95,12 @@ Rufe `k_playbook_docs_checkout` mit `projectDir` = `project.dir` und
   (`.k-playbook/work/docs/libs`).
 - `state: existing` — ein Arbeitsverzeichnis liegt schon da, etwa von einem
   abgebrochenen Lauf. Nichts wurde geholt oder überschrieben. Nenne `existing.since`,
-  `existing.ageMinutes` und `existing.files` und frage: **weitermachen** (mit dem, was dort
-  liegt) oder **verwerfen** (`k_playbook_docs_checkout` mit `discard: true`, holt neu)?
-  Ohne Antwort geht es nicht weiter.
+  `existing.ageMinutes`, `existing.files` und `existing.stand` (bei `changed` die Dateien
+  aus `files`, dazu `incomplete` mit Grund; ohne Vergleich `message`) und frage:
+  **weitermachen** (mit dem, was dort liegt) oder **verwerfen** (`k_playbook_docs_checkout`
+  mit `discard: true`, holt neu)? Ohne Antwort geht es nicht weiter. Die Dateien aus
+  `existing.stand.files` behältst du für den Rest des Laufs, wie das Modul zu `publish` es
+  für `stand` sagt.
 - `kephalaion_unavailable` — nichts geschrieben; der Command endet wie in der Ablage oben.
 
 Geschrieben wird ab hier nur in `WORK_DIR`. Einzige Ausnahme ist der bestätigte Eintrag
@@ -145,7 +148,9 @@ jeder geschriebenen Datei kurz melden: Dateiname und Zeilenzahl, nicht der Inhal
 
 ## Schritt 6 — publish
 
-Lies `k-playbook:/commands/_docs/publish.md` und rufe `publish` mit `erzeuger: libs` auf.
+Lies `k-playbook:/commands/_docs/publish.md` und rufe `publish` mit `erzeuger: libs` auf;
+vor dem ersten `publish` des Laufs und nach einer Wiederaufnahme zuerst den Prüfmodus, wie
+das Modul es sagt.
 Ist `open` leer und `cleaned` wahr, schließt du genau die Aufträge aus `ORDERS` ab, je einen
 mit `k_playbook_doc_done`; Aufträge, die nach dem Preflight angelegt wurden, stehen nicht in
 `ORDERS` und bleiben offen. Bricht der Lauf ab, meldet `publish` einen Konflikt, eine
@@ -165,6 +170,7 @@ ergänzt hat. Kompakte Zusammenfassung:
 - Der Stand des Inventars (`generated.at`) und der beschriebene Stand des Codes aus
   Schritt 1 (Branch bzw. `<ref>` und Commit).
 - Offene Dateien mit Grund, falls `publish` nicht aufgeräumt hat.
+- Eine Abweichung des Codes seit dem checkout (`stand`), wie im Modul zu `publish`.
 - Die Doku-Aufträge: abgeschlossen mit Verweis, offen geblieben mit Grund, oder keine.
 - Ausdrücklich: geschrieben wurde nur nach `keph:/docs/generated/libs/`, ins
   Arbeitsverzeichnis `WORK_DISPLAY_PATH` und — beim Abschließen der Aufträge — nach
@@ -187,7 +193,8 @@ ergänzt hat. Kompakte Zusammenfassung:
 - `$ARGUMENTS` fehlt auf der Platte, liegt außerhalb von `project.dir` oder in
   einem der immer ausgeschlossenen Verzeichnisse (`invalid_input` von `k_playbook_docs_scope`)
   → abbrechen, den Pfad nennen.
-- `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen.
+- `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen, mit
+  `existing.stand`.
 - Ein Werkzeug ist unbekannt (`k_playbook_docs_checkout`, `_scope`, `_orders`), `k-playbook
   docs` meldet `unbekanntes Kommando` oder `unbekannter Erzeuger "libs"` → die Installation
   ist älter als dieser Command: melden, `/k-upgrade` nennen, nichts von Hand rechnen oder

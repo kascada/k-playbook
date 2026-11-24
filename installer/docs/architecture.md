@@ -294,8 +294,9 @@ Dokument die Zahl und bei `keph:` die Revision. Die MCP-Werkzeuge `k_playbook_do
 `_replace`, `_set_field` und `_grep` sind die Hüllen darum (`mcpserver/docedit.go`). Vertrag:
 [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Changing and Searching Documents“.
 
-`docs checkout|publish <erzeuger> [--discard|--allow-hints] [--json]` holt erzeugte Doku mit
+`docs checkout|publish <erzeuger> [--discard|--allow-hints|--check] [--json]` holt erzeugte Doku mit
 mehreren Dokumenten in ein Arbeitsverzeichnis und gleicht sie zurück ab (Task 109);
+`publish --check` ist der Prüfmodus, der nichts schreibt (Task 195);
 `docs readme [<pfad>] [--check] [--json]` schreibt die `README.md` unter `keph:/docs/` aus
 ihren Vorlagen (Task 137); `docs exclude add <muster>… [--json]` trägt dauerhafte Ausschlüsse
 für den Code-Scan in `docs.exclude` von `K-PLAYBOOK.yaml` ein (Task 116). Einzelheiten unter
@@ -540,7 +541,10 @@ installer/
 │   │                            (Task 166)
 │   ├── docswork.go              Erzeugertabelle DocsProducers, DocsWork: checkout und
 │   │                            publish von docs/generated/<erzeuger>/ über
-│   │                            .k-playbook/work/docs/<erzeuger>/ und die Merkdatei
+│   │                            .k-playbook/work/docs/<erzeuger>/ und die Merkdatei;
+│   │                            Prüfmodus von publish (checkPublish, Task 195)
+│   ├── docsstand.go             Stand des Quellcodes in der Merkdatei und sein Vergleich
+│   │                            (readDocsStand, compareDocsStand, Task 195)
 │   ├── docsreadme.go            DocsReadmes: die README.md unter keph:/docs/ aus den
 │   │                            Vorlagen k-playbook:/docs/<pfad>/README.md (Task 137),
 │   │                            ListDocsTemplates, der README-Schritt des Einrichtens
@@ -2529,7 +2533,21 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   SHA-256 des Inhalts und `hints`. Rechnerlokal: `checkout` ergänzt `/work` in
   `.k-playbook/.gitignore` (`ensureProjectIgnored`, dieselbe Pflege wie `/share` in
   `sharelink.go`). Liegt beides schon da, wird nichts überschrieben; die Antwort nennt Alter
-  und Anzahl Dateien, `--discard` liest erst vollständig und ersetzt dann.
+  und Anzahl Dateien und unter `existing.stand` den Vergleich des Quellcodes, `--discard`
+  liest erst vollständig und ersetzt dann.
+- **Stand des Quellcodes** (Task 195, `docsstand.go`). Die Merkdatei trägt `stand`: `git`,
+  `branch`, `commit` (voll) und `dirty` — je Datei aus
+  `git status --porcelain --untracked-files=all` in `project.repoRoot` Pfad und SHA-256 des
+  Inhalts, leer bei einer gelöschten, höchstens 500, `dirtyTruncated` zählt den Rest.
+  Erhoben nach den eigenen Schreibvorgängen des checkout (`ensureProjectIgnored`), damit der
+  erste Vergleich sie nicht meldet; jeder checkout, der holt, hält einen neuen Stand fest,
+  verglichen wird immer mit dem letzten. `checkout` bei `existing`, `publish` und sein
+  Prüfmodus vergleichen (`DocsStandCheck`): `changed`, wenn Branch oder Commit abweichen oder
+  sich Menge oder Prüfsumme der geänderten Dateien unterscheidet; `files` aus
+  `git diff --name-only` zwischen den Commits und den abweichenden Dateien; `incomplete` mit
+  `dirty_truncated` oder `commit_unknown`, wenn nicht alles prüfbar war. Gemeldet, nie
+  verhindert; ohne git oder bei einer Merkdatei ohne `stand` kein Vergleich (`compared:
+  false`) und kein Fehler.
 - **Abgleich.** `publish` misst an der Merkdatei, nicht am aktuellen Stand in Kephalaion:
   neu → `create`, geändert → `write` mit der Revision beim checkout, gelöscht → `delete` mit
   dieser Revision. `stale_revision`, `name_taken` und `not_found` werden `conflict` und nicht
@@ -2537,6 +2555,15 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   der Namensregel von Kephalaion, keine `README.md`, Frontmatter mit `title` und
   `description`, `hints` unverändert — ein Dokument mit `hints` neu anlegen oder löschen
   zählt als Änderung — außer mit `--allow-hints`.
+- **Prüfmodus** (Task 195). `publish --check` (MCP `check: true`) rechnet denselben Plan
+  (`planPublish` liefert Vorgänge, Ablehnungen und geänderte `hints` getrennt; `refusal` macht
+  daraus für `publish` die bisherigen Fehler in der bisherigen Reihenfolge) und schreibt
+  nichts — weder Kephalaion noch Arbeitsverzeichnis noch Merkdatei, kein Aufräumen.
+  `checkPublish` liest einmal `list` des Verzeichnisses und meldet `conflict`, wo `publish`
+  einen bekäme (`created` und vorhanden; `written`/`deleted` mit anderer Revision oder
+  fehlend); lokal Unverändertes bleibt `unchanged`. Eine Vorhersage aus der Replica, kein
+  Ausschluss. Ablehnungen stehen unter `problems`, `hintsChanged` ist immer gefüllt, die
+  README kommt aus `DocsReadmes` mit `Check`.
 - **Aufräumen.** Arbeitsverzeichnis und Merkdatei verschwinden nur, wenn nichts in Konflikt
   oder fehlgeschlagen ist; sonst trägt die Merkdatei danach den Stand des Veröffentlichten,
   und ein zweites `publish` schreibt nur den Rest. Fehlt allein die Vorlage der README

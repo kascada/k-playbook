@@ -45,6 +45,7 @@ type docsPublishInput struct {
 	ProjectDir string `json:"projectDir,omitempty" jsonschema:"Pflicht. Verzeichnis, ab dem aufwärts nach K-PLAYBOOK.yaml gesucht wird. Relative Pfade werden relativ zum Arbeitsverzeichnis des MCP-Servers aufgelöst."`
 	Producer   string `json:"erzeuger" jsonschema:"Pflicht. Der Erzeuger, wie beim checkout."`
 	AllowHints bool   `json:"allow_hints,omitempty" jsonschema:"hints ändern, ein Dokument mit hints löschen oder neu anlegen — nur nach Bestätigung durch den Nutzer. Die Antwort nennt jedes solche Dokument unter hintsChanged."`
+	Check      bool   `json:"check,omitempty" jsonschema:"Prüfmodus: nichts schreiben — weder nach Kephalaion noch ins Arbeitsverzeichnis noch in die Merkdatei —, nur melden, was publish täte: je Dokument den Vorgang oder conflict, problems, hintsChanged, readme wie bei k_playbook_docs_readme mit check, stand."`
 }
 
 type docsReadmeInput struct {
@@ -116,11 +117,16 @@ func addDocsWorkTools(server *mcp.Server) {
 			"Arbeitsverzeichnis: alle .md unter keph:/docs/generated/<erzeuger>/ außer README.md und index.md (auf jeder " +
 			"Ebene; die index.md schreibt Kephalaion selbst), rekursiv, nach " +
 			"<projectDir>/.k-playbook/work/docs/<erzeuger>/ mit gleichem relativem Pfad; daneben die Merkdatei " +
-			"<erzeuger>.checkout.json (Revision, Inhalts-Hash, hints je Dokument), an der publish misst. Dort bearbeitest " +
+			"<erzeuger>.checkout.json (Revision, Inhalts-Hash, hints je Dokument, dazu der Stand des Quellcodes in " +
+			"project.repoRoot: Branch, Commit, Prüfsummen der geänderten Dateien aus git status, höchstens 500), an der publish misst. Dort bearbeitest " +
 			"du mit den Datei-Werkzeugen und veröffentlichst mit k_playbook_docs_publish. Antwort: state checked_out " +
 			"mit dir, record und docs (path, ref, revision) — oder state existing: Arbeitsverzeichnis oder Merkdatei " +
-			"liegen schon da (existing: since, ageMinutes, files, record), nichts geholt, nichts überschrieben; dann " +
-			"den Nutzer fragen: weitermachen oder verwerfen (discard: true holt neu). kephalaion_unavailable: nichts " +
+			"liegen schon da (existing: since, ageMinutes, files, record, stand), nichts geholt, nichts überschrieben; dann " +
+			"den Nutzer fragen: weitermachen oder verwerfen (discard: true holt neu), und existing.stand nennen. stand " +
+			"vergleicht den Quellcode mit dem beim checkout: compared (false: kein Stand festgehalten oder kein git, " +
+			"message sagt warum), changed, files (betroffene Pfade ab der Wurzel des Repos), recorded und current (branch, " +
+			"commit), incomplete (dirty_truncated: mehr als 500 geänderte Dateien; commit_unknown: festgehaltener Commit " +
+			"nicht auflösbar) — gemeldet, nie verhindert. kephalaion_unavailable: nichts " +
 			"geschrieben, kein Rückfall auf die Platte; ein unbekannter Erzeuger ist invalid_input. Hülle über " +
 			"`k-playbook docs checkout`.",
 	}, docsCheckoutTool)
@@ -140,10 +146,16 @@ func addDocsWorkTools(server *mcp.Server) {
 			"Vorlage k-playbook:/docs/generated/<erzeuger>/README.md, wenn sie fehlt oder abweicht; fehlt die Vorlage auf " +
 			"dem Hub, ist readme failed mit template_missing, nichts davon geschrieben, aufgeräumt wird trotzdem. Antwort: docs und readme je mit path, ref, status (created, written, deleted, unchanged, " +
 			"conflict, failed), revision, base (Revision beim checkout), bei conflict und failed code und message; " +
-			"hintsChanged, open (offene Dateien) und cleaned. Arbeitsverzeichnis und Merkdatei werden nur entfernt, wenn " +
+			"hintsChanged, open (offene Dateien), cleaned und stand (wie existing.stand bei k_playbook_docs_checkout; " +
+			"publish schreibt trotz Abweichung). Arbeitsverzeichnis und Merkdatei werden nur entfernt, wenn " +
 			"nichts offen ist; ein zweites publish schreibt dann nur den Rest. failed mit outcome_unknown: kann " +
 			"angekommen sein — nicht noch einmal veröffentlichen, sondern nachsehen. not_checked_out: kein checkout. " +
-			"kephalaion_unavailable: nichts geschrieben. Hülle über `k-playbook docs publish`.",
+			"kephalaion_unavailable: nichts geschrieben. check: true ist der Prüfmodus: schreibt nichts, liest einmal die " +
+			"Revisionen des Verzeichnisses (list) und antwortet mit check: true, je Dokument dem geplanten Vorgang (created, " +
+			"written, deleted, unchanged) oder conflict mit code, wo publish absehbar einen bekäme — eine Vorhersage aus der " +
+			"Replica, kein Ausschluss; ein lokal unverändertes Dokument bleibt unchanged, auch wenn es in Kephalaion neuer " +
+			"ist —, problems (alle Ablehnungen als Liste statt invalid_input), hintsChanged (gleich ob allow_hints), readme " +
+			"mit missing, differs, unchanged oder failed, stand; open leer, cleaned false. Hülle über `k-playbook docs publish`.",
 	}, docsPublishTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: docsToolReadme,
@@ -266,7 +278,7 @@ func docsPublishTool(ctx context.Context, _ *mcp.CallToolRequest, input docsPubl
 	if err != nil {
 		return fail(projectDir, docErrorCode(err), err), nil, nil
 	}
-	result, err := work.Publish(ctx, input.Producer, project.DocsPublishOptions{AllowHints: input.AllowHints})
+	result, err := work.Publish(ctx, input.Producer, project.DocsPublishOptions{AllowHints: input.AllowHints, Check: input.Check})
 	if err != nil {
 		return fail(projectDir, docErrorCode(err), err), nil, nil
 	}

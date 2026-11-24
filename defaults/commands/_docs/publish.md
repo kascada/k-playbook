@@ -1,16 +1,37 @@
 ---
 title: publish und seine Antworten
-description: Modul für /k-docs-code und /k-docs-tools, vom Hauptkontext gelesen, wenn die Dokumente geschrieben sind — k_playbook_docs_publish aufrufen, die Antwort je Dokument melden (created, written, deleted, unchanged, conflict, failed) und mit den Ablehnungen und Fehlern umgehen (invalid_input, hints_changed, conflict, kephalaion_unavailable, outcome_unknown).
+description: Modul für /k-docs-code und /k-docs-tools, vom Hauptkontext gelesen, wenn die Dokumente geschrieben sind — vorher der Prüfmodus (check), dann k_playbook_docs_publish aufrufen, die Antwort je Dokument melden (created, written, deleted, unchanged, conflict, failed), mit den Ablehnungen und Fehlern umgehen (invalid_input, hints_changed, conflict, kephalaion_unavailable, outcome_unknown) und mit einer Abweichung des Codes seit dem checkout (stand).
 ---
 
-Rufe `k_playbook_docs_publish` mit `projectDir` = `project.dir` und `erzeuger` = dem
+**Prüfmodus zuerst.** Vor dem ersten `publish` eines Laufs und nach jeder Wiederaufnahme
+(weitermachen nach `existing`) rufst du `k_playbook_docs_publish` mit `check: true` auf
+(ersatzweise `k-playbook docs publish <erzeuger> --check --json`). Er schreibt nichts und
+nennt je Dokument den geplanten Vorgang oder `conflict`. Bevor etwas veröffentlicht ist:
+
+- `problems` — die Ablehnungen, die `publish` als `invalid_input` meldete: beheben, erneut
+  prüfen.
+- `hintsChanged` — wie `hints_changed` unten vorlegen.
+- `conflict` — wie unten vorlegen. Die Vorhersage schließt einen Konflikt beim `publish`
+  nicht aus.
+- `readme` — `missing`, `differs` oder `unchanged`; `publish` schreibt sie selbst.
+
+**Stand.** Prüfmodus und `publish` vergleichen den Code mit dem beim letzten checkout
+(`stand`). Bei `stand.changed` hältst du `stand.files` gegen die Dokumente, die du in diesem
+Lauf geschrieben hast: Hast du eine genannte Datei für eines davon gelesen, legst du die
+Abweichung dem Nutzer vor dem nächsten `publish` vor — weiter, oder die betroffenen
+Dokumente neu schreiben. Sonst nennt der Bericht sie in einer Zeile. Die genannten Dateien
+behältst du für den Rest des Laufs, auch nach einem erneuten checkout, und hältst sie gegen
+jedes Dokument, das du danach schreibst. `stand.incomplete` nennt der Bericht mit seinem
+Grund, `compared: false` mit `stand.message`. Eine Abweichung verhindert `publish` nicht.
+
+Dann rufe `k_playbook_docs_publish` mit `projectDir` = `project.dir` und `erzeuger` = dem
 Erzeuger des Commands auf (`code` bzw. `libs`; ersatzweise `k-playbook docs publish
 <erzeuger> --json`). `allow_hints: true` nur, wenn der Nutzer geänderte, neue oder mit einem
 Dokument entfallende `hints` bestätigt hat.
 
 Melde die Antwort je Dokument: `created`, `written`, `deleted`, `unchanged`, `conflict`
-oder `failed`, mit Revision; dazu `hintsChanged`, `readme` und ob aufgeräumt wurde
-(`cleaned`). `open` nennt die Dokumente, die noch offen sind.
+oder `failed`, mit Revision; dazu `hintsChanged`, `readme`, `stand` wie oben und ob
+aufgeräumt wurde (`cleaned`). `open` nennt die Dokumente, die noch offen sind.
 
 - `invalid_input` — eine Ablehnung im Arbeitsverzeichnis (fehlendes Frontmatter, falscher
   Name, `README.md`, andere Datei als `.md`). Nichts wurde geschrieben. Die Stellen
