@@ -59,7 +59,7 @@ pfade:
   - <pfad relativ zu project.repoRoot>
 anlass: "<warum, in einem Satz>"
 sitzung: <session aus dem Briefing>
-entstanden: <context.now.date>
+entstanden: <now.date>
 ---
 ```
 
@@ -112,7 +112,7 @@ entstanden: <ältestes Datum der aufgegangenen Aufträge>
 - `sitzung` ist die Kennung deiner Sitzung, das Feld `session` des Briefings (im Klartext die
   Zeile `Sitzung:`). Hast du das Briefing neu geladen, nimm die neue Kennung. Ein zerlegter
   Auftrag trägt die Sitzung des Verarbeiters.
-- `entstanden` ist `context.now.date`. Gehen mehrere Aufträge in einem auf, bleibt das älteste
+- `entstanden` ist `now.date`. Gehen mehrere Aufträge in einem auf, bleibt das älteste
   Datum. `/k-docs` nennt den ältesten offenen Auftrag danach.
 
 **Rumpf.** Der Rumpf eines rohen Auftrags darf leer bleiben; mehr als ein kurzer Absatz gehört
@@ -138,7 +138,8 @@ Queue wandern nach `done/`.
   schreibt `dokument` und `aktion`. Den Ablauf trägt `k-playbook:/commands/k-docs-code.md`.
 
 `code` ist einzureihen, wenn sich Code des Projekts geändert hat, den `/k-docs-code` erfasst:
-Quelltext unter `project.repoRoot` außerhalb von `context.docs.exclude`. `tools` ist
+Quelltext unter `project.repoRoot` außerhalb von `environment.docs.exclude` (aus dem Abruf
+`environment`: `k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`; im Briefing steht es nicht). `tools` ist
 einzureihen, wenn sich die Bibliotheken oder Werkzeuge des Projekts geändert haben: eine neue
 oder entfernte Abhängigkeit, ein Versionssprung, ein anderes Werkzeug im Build.
 

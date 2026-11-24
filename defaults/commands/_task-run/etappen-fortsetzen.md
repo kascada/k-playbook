@@ -25,5 +25,5 @@ Bei `(b)` vor der Delegation mit `k_playbook_doc_append` und `since_revision: RE
 Zeile anhängen:
 
 ```text
-<!-- k-task-run: fortschritt zurückgesetzt <context.now.date> -->
+<!-- k-task-run: fortschritt zurückgesetzt <now.date> -->
 ```

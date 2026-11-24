@@ -54,8 +54,8 @@ gestützt Code ändert, prüft den Verweis, bevor er etwas schreibt oder Code ä
 
 ### Kopf
 
-Frontmatter mit `title`: der Titel ohne „Task <n> —“. Das Briefing (`work.tasks`) und
-`k_playbook_doc_list` zeigen ihn. `title` und andere Werte in freiem Text (etwa `description`,
+Frontmatter mit `title`: der Titel ohne „Task <n> —“. Das Briefing (`work.tasks`, höchstens
+10 Einträge) und `k_playbook_doc_list` zeigen ihn. `title` und andere Werte in freiem Text (etwa `description`,
 `thema`, `anlass`) stehen in doppelten Anführungszeichen, ein `"` im Wert wird `\"`; so liest
 jeder YAML-Leser genau diesen Text, auch bei „: “ oder „ #“. Unquotiert macht „: “ das
 Frontmatter unlesbar, und „ #“ beginnt einen Kommentar, der den Rest des Titels abschneidet;
@@ -168,7 +168,9 @@ ohne Fortschrittsverfolgung.
 
 ### Lebenslauf
 
-1. **Offen** — angelegt in `keph:/user/~/tasks/`. Das Briefing nennt ihn unter `work.tasks`.
+1. **Offen** — angelegt in `keph:/user/~/tasks/`. Das Briefing nennt ihn unter `work.tasks`,
+   solange er zu den 10 offenen Tasks mit den kleinsten Nummern gehört; `work.total.tasks`
+   nennt die Zahl aller, `k_playbook_doc_list` (Sorte `tasks`) liefert sie.
 2. **Geprüft** — `/k-task-refine` hat ein `## Review-Log (<datum>)` angehängt. Geprüft heißt
    allein, dass eine Zeile mit `## Review-Log` am Anfang im Dokument steht; ob der Task danach
    geändert wurde, spielt keine Rolle. Ein Task ohne diesen Block wurde nie gegengelesen;
@@ -193,7 +195,7 @@ und `k_playbook_doc_reopen` nennt die Revision nach dem Verschieben.
 `/k-task-run`, andere Commands und die spätere Oberfläche erkennen den Zustand eines Tasks an
 festen Zeilen, je eine eigene Zeile am Zeilenanfang. `<datei>` ist der Dateiname des
 Dokuments, der letzte Pfadteil des Verweises, etwa `014-setup-tts.md`; `<datum>` ist
-`context.now.date`.
+`now.date`.
 
 | Zeile | Schreibt | Bedeutung |
 |---|---|---|
@@ -237,7 +239,7 @@ keine Zeile, die später geändert wird.
   <!-- k-task-run: etappe <n> erledigt <datum> --> <beleg>
   ```
 
-  `<n>` ist die Nummer aus `### Etappe <n> — …`, `<datum>` `context.now.date`, `<beleg>` ein
+  `<n>` ist die Nummer aus `### Etappe <n> — …`, `<datum>` `now.date`, `<beleg>` ein
   kurzer Satz oder Halbsatz auf derselben Zeile (Dateien, Tests, Messung), ohne Zeilenumbruch.
   Nur so überlebt der Stand einen harten Abbruch: Bricht die Sitzung mitten in Etappe 4 ab,
   stehen die Zeilen für 1 bis 3 schon im Dokument.
@@ -360,7 +362,7 @@ Abschnitte liest, sieht Diff und Review nie — dafür sind sie gebaut.
 
 ### Ohne Kephalaion
 
-Steht `context.kephalaion.ok` nicht auf `true`, oder antwortet eine Operation mit
+Steht `kephalaion.ok` nicht auf `true`, oder antwortet eine Operation mit
 `kephalaion_unavailable`, gibt es keinen Task: nichts auf die Platte, kein Rückfall auf ein
-Verzeichnis. Der Command endet mit der Meldung aus `context.kephalaion.message` und nennt die
+Verzeichnis. Der Command endet mit der Meldung aus `kephalaion.message` und nennt die
 Setup-Seite (`/k-gui`), auf der die Projekt-Collection eingerichtet wird.

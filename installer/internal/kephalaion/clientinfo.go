@@ -128,7 +128,7 @@ func clientCall(hubs []string) string {
 func missingBinaryMessage() string {
 	return "Kephalaion ist auf diesem Rechner nicht installiert: kein " + BinaryName +
 		" im PATH, unter ~/.local/bin oder unter /usr/local/bin. Abhilfe: installieren mit " +
-		InstallCommand + "; danach die Anbindung prüfen (k-playbook context)."
+		InstallCommand + "; danach die Anbindung prüfen (k-playbook health)."
 }
 
 // tooOldMessage ist der Satz, wenn das Binary die Auskunft im Format 1 nicht
@@ -191,7 +191,7 @@ func QueryClient(ctx context.Context, hubs ...string) (ClientInfo, error) {
 				ClientTimeout, call)}
 		case runCtx.Err() != nil:
 			return ClientInfo{}, &ClientError{State: StateClientFailed,
-				Message: "Die Auskunft kephalaion node client wurde abgebrochen, bevor sie stand. Abhilfe: erneut prüfen (k-playbook context)."}
+				Message: "Die Auskunft kephalaion node client wurde abgebrochen, bevor sie stand. Abhilfe: erneut prüfen (k-playbook health)."}
 		}
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {

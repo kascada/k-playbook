@@ -157,8 +157,8 @@ the briefing, the one call at its start:
 k-playbook briefing
 ```
 
-`k-playbook context` still prints the resolved working state as JSON; the briefing carries
-what is left of it in its section `context` until that output has been taken apart.
+What only single commands need — the finding for `gh`, the base tools, the remediation
+policy — is not part of it and comes with `k-playbook briefing --part environment`.
 
 Linking is set up for Claude Code and OpenCode. Skills exist only once, under
 `.claude/skills`, because OpenCode searches that directory as well. `CLAUDE.md` is a small

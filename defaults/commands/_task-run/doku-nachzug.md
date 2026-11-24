@@ -15,13 +15,14 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
 `k-playbook:/instructions/on-demand/doku-auftraege.md`; dieser Text wiederholt sie nicht.
 
 - Grundlage ist `CHANGED_PATHS` aus 5f, Schritt 6 — nur Namen, kein Diff. Code für `code` ist
-  Quelltext unter `context.project.repoRoot` außerhalb von `.k-playbook/`,
+  Quelltext unter `project.repoRoot` außerhalb von `.k-playbook/`,
   einem liegengebliebenen Clone `k-playbook/` (Altbestand), versteckten Pfaden und
-  `context.docs.exclude`; ein geändertes Manifest oder
-  Lockfile betrifft `tools`.
+  `environment.docs.exclude` — das holt er an dieser Stelle über den Abruf `environment`
+  (`k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`), es steht nicht
+  im Briefing; ein geändertes Manifest oder Lockfile betrifft `tools`.
 - Je betroffenem Erzeuger ruft er `k_playbook_docs_order_add` auf (ersatzweise `k-playbook
   docs order add <code|tools> --pfad <pfad>… --anlass "<satz>" --sitzung <session> --json`):
-  `projectDir` = `context.project.dir`, `erzeuger` `code` bzw. `tools`, `pfade` aus
+  `projectDir` = `project.dir`, `erzeuger` `code` bzw. `tools`, `pfade` aus
   `CHANGED_PATHS`, so fein wie möglich, `anlass` ein Satz mit den Tasknummern, `sitzung` = die
   `session` seines Briefings. „Kein Doppel“ und „Wann nicht eingereiht wird“ rechnet das
   Programm nach `doku-auftraege.md`; die Antwort sagt `status`: `created` oder `extended`

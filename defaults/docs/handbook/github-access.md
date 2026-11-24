@@ -210,7 +210,7 @@ What "in place" means per type:
 
 | `type` | available when |
 |---|---|
-| `gh` | `gh` is installed and `login` is one of the accounts in gh's configuration for github.com — read from gh's files the way `context.gh` already does, not asked of the server. |
+| `gh` | `gh` is installed and `login` is one of the accounts in gh's configuration for github.com — read from gh's files the way `environment.gh` already does, not asked of the server. |
 | `token` | `file` is a regular file, mode `0600` (no group or world bits), and contains exactly one non-empty line. k-playbook reads the file only to judge that; the content never leaves the process and never appears in any output, log or error. |
 | `ssh` with `key` | `key` is a regular file whose mode has no group or world bits — SSH refuses such a key anyway ("UNPROTECTED PRIVATE KEY FILE"). |
 | `ssh` with `host` | `ssh -G <host>` resolves the alias and its `hostname` is `github.com`. An unknown alias resolves to itself and therefore fails this rule; `host: github.com` passes it. |
@@ -751,10 +751,13 @@ problems of *Reading the file*; `k-playbook github check` names the reason per a
 
 ## In the briefing
 
-The briefing (`k_playbook_briefing`, `k-playbook briefing`) and `k-playbook context` carry the
-field `context.github` (task 119), so that a session does not have to guess which service
-reaches GitHub for the repository it works in. Same source, same choice as `show`: `Path`,
-`Load` (which never writes), `Judge` with `selected`. There is no rule of its own.
+The briefing (`k_playbook_briefing`, `k-playbook briefing`) names the services for the
+repository a session works in (task 119), so that it does not have to guess which service
+reaches GitHub: `github.projectServices` in the JSON, the line `GitHub:` in the plain text. The
+full object is `environment.github` in the partial call of the briefing (`k-playbook briefing
+--part environment`, `k_playbook_briefing` with `part: "environment"`; task 187). Same source,
+same choice as `show`: `Path`, `Load` (which never writes), `Judge` with `selected`. There is no
+rule of its own.
 
 ```json
 "github": {
@@ -792,10 +795,10 @@ reaches GitHub for the repository it works in. Same source, same choice as `show
   — usually one.
 - `services`: the same object as `show --json`, with `state`, `reason` and `selected`.
 
-No network, no token value; the field writes nothing. The cost beyond `context.gh` is `Judge` (gh's
+No network, no token value; the field writes nothing. The cost beyond `environment.gh` is `Judge` (gh's
 configuration, file checks, `ssh -G` per `host`, 3 s limit each), three local `git` calls (four when the
-upstream remote carries no URL and `origin` is read as well) and at most one more `ssh -G` for a remote alias the file does not name. That is why `ContextForDir`
-fills the field and `BuildContext` does not: the interface and the review selection over MCP do
+upstream remote carries no URL and `origin` is read as well) and at most one more `ssh -G` for a remote alias the file does not name. That is why the briefing and its partial call
+fill the field and `BuildContext` does not: the interface and the review selection over MCP do
 not pay for it.
 
 In the plain text of `k-playbook briefing` the field is one line right after `Projektdoku:`,
@@ -805,10 +808,9 @@ otherwise `GitHub: kein Dienst für acme-labs/foo (Dienste: …)`,
 `GitHub: kein GitHub-Remote erkannt (Dienste: …)`
 or, with several matching services, all of them; without a file
 `GitHub: keine Zugangsdatei`, and with an `error` in the file
-`GitHub: die Zugangsdatei hat Fehler — k-playbook github check nennt sie`. The rest behind the
-separator shows `github`
-without `services`. The field is the state when the briefing was loaded; `k-playbook github
-show` gives the current one.
+`GitHub: die Zugangsdatei hat Fehler — k-playbook github check nennt sie`. Of the field the
+briefing itself carries only `github.projectServices`. The line is the state when the briefing
+was loaded; the partial call and `k-playbook github show` give the current one.
 
 The instruction "GitHub über run" (`defaults/instructions/always/400-github-ueber-run.md`)
 evaluates this line: it takes the service for the repository of the working directory from it,
@@ -820,9 +822,9 @@ Commands and reviews that reach GitHub — the PR step of `/k-task-run` and the 
 (`projectServices` for the working directory's repository, `show` for any other), with a
 service `run` (`--write` for writing), a service without an `api`
 channel calls no `gh` — `run` only removes `GH_TOKEN`/`GITHUB_TOKEN`, and `gh` then falls back to
-its active login (measured 2026-11-07) —, and without a service `context.gh` as before, with the
-access file and help setting it up as the remedy when that fails. `context.gh.ready` and
-`context.gh.account` therefore count only without a service.
+its active login (measured 2026-11-07) —, and without a service `environment.gh` as before, with the
+access file and help setting it up as the remedy when that fails. `environment.gh.ready` and
+`environment.gh.account` therefore count only without a service.
 
 ## In the interface
 
@@ -891,7 +893,7 @@ Not part of the contract yet; each will be specified here before it is built.
   `check`, `show` and `test` name per service the access `run` would choose, with and without
   `--write`; `test` adds whether it works (`selectedOk`). Requested from OMNI on 2026-11-02.
 - **Reverse lookup**: from a repository's remote to the service that names it — for the
-  briefing answered by `context.github.projectServices` (task 119, *In the briefing*); a verb
+  briefing answered by `github.projectServices` (task 119, *In the briefing*); a verb
   of its own is not specified.
 - **Named operations** with project rules, as CLI and MCP — the way AI sessions will reach
   GitHub. Until then sessions with a shell use `run` after the instruction "GitHub über run",

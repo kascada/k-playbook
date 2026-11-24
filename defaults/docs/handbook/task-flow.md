@@ -14,7 +14,7 @@ Tasks can arise directly from the conversation or be created by `/k-remediation`
 
 ## Where a task lives
 
-A task is a document in the project's Kephalaion collection under `keph:/user/<user>/tasks/`; a completed task is moved to `done/` below it. There is no task on disk any more: without a usable Kephalaion binding (`context.kephalaion.ok` not `true`) the task commands stop and say so, instead of falling back to a directory. The shipped always-instruction `300-arbeiten-in-tasks.md` says when work becomes a task; everything about the form of a task -- location, name and number, header, structure, life cycle, marker lines, progress lines, the write path -- stands once, in `k-playbook:/instructions/on-demand/tasks.md`. The four commands and `/k-remediation` refer to it and do not repeat it.
+A task is a document in the project's Kephalaion collection under `keph:/user/<user>/tasks/`; a completed task is moved to `done/` below it. There is no task on disk any more: without a usable Kephalaion binding (`kephalaion.ok` not `true`) the task commands stop and say so, instead of falling back to a directory. The shipped always-instruction `300-arbeiten-in-tasks.md` says when work becomes a task; everything about the form of a task -- location, name and number, header, structure, life cycle, marker lines, progress lines, the write path -- stands once, in `k-playbook:/instructions/on-demand/tasks.md`. The four commands and `/k-remediation` refer to it and do not repeat it.
 
 In short:
 
@@ -167,7 +167,7 @@ the next `since_revision`.
 
 ### Diff and review
 
-With `context.project.vcs: git` and `git` available, every task gets a diff and a code review:
+With `project.vcs: git` and `git` available (`environment.baseTools.missing` does not name it), every task gets a diff and a code review:
 
 - **Snapshot per task.** Before its first delegation, the main context records a snapshot of
   the working tree in the execution root, including uncommitted and untracked changes of

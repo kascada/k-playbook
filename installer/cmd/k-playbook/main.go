@@ -372,16 +372,19 @@ Unterkommandos:
             Aufruffehlern. Dasselbe wie das MCP-Werkzeug
             k_playbook_findings_check.
   briefing  Gibt aus, was für dieses Projekt gilt und was ansteht:
-            k-playbook briefing [--json]. Vorweg der Text der immer
-            geltenden Anweisungen k-playbook:/instructions/always/, dann
+            k-playbook briefing [--json]. Vorweg Datum, Projekt und
+            Kephalaion-Anbindung (now, project, kephalaion), dann der Text
+            der immer geltenden Anweisungen
+            k-playbook:/instructions/always/, die Umgebungsprüfung, dann
             Anweisungen auf Abruf, Reviews und Leitlinien — lokal und
-            mitgeliefert aufgelöst, je Eintrag Verweis, Titel, Beschreibung,
-            Herkunft —, dazu aus der Projekt-Collection die eigenen offenen
-            Tasks und Arbeitsstände und die Zahl offener Befunde, und der
-            Einstieg der Projektdoku. Verweise, keine Pfade. Dahinter, klar
-            abgetrennt, der Rest von k-playbook context — die Umgebungs-
-            angaben, die das Briefing noch nicht selbst abdeckt; zieht dabei
-            wie context die Assistenten-Verlinkung nach. Dasselbe wie das
+            mitgeliefert aufgelöst, je Eintrag Verweis und Titel —, dazu aus
+            der Projekt-Collection die eigenen offenen Tasks und
+            Arbeitsstände (je höchstens 10) und die Zahl offener Befunde,
+            der Einstieg der Projektdoku und der GitHub-Dienst dieses Repos.
+            Verweise, keine Pfade. Zieht dabei die Assistenten-Verlinkung
+            nach. Mit --part environment kommen statt des Briefings nur die
+            Umgebungsangaben, die einzelne Commands brauchen (gh, github,
+            baseTools, versionSources, docs, remediation). Dasselbe wie das
             MCP-Werkzeug k_playbook_briefing.
   health    Nennt Fehler und Warnungen über die Umgebung des Projekts:
             k-playbook health [--json]. Je Eintrag Stufe (error, warning),

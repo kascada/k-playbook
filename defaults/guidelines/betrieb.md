@@ -17,9 +17,8 @@ früheren Modell: Auch dorthin wird nie geschrieben, und `/k-upgrade` löscht ih
 
 **Pfade werden nicht geraten.** Jeder Ort, an dem etwas abgelegt wird, ist ein
 `keph:`-Verweis oder liegt unter der Projektwurzel, dort unter `.k-playbook/`. Die
-Projektwurzel ist `project.dir` aus der Ausgabe von `k-playbook context` — im Briefing
-dasselbe Feld unter `context` —, nie ein Wert aus einer Konfiguration und nie das Ergebnis
-einer Suche. Ein fest verdrahteter Pfad geht in dem Moment kaputt, in dem ein Projekt
+Projektwurzel ist `project.dir` aus dem Briefing, nie ein Wert aus einer Konfiguration und nie
+das Ergebnis einer Suche. Ein fest verdrahteter Pfad geht in dem Moment kaputt, in dem ein Projekt
 anders heißt oder tiefer liegt. Für Text, den ein Mensch liest, bleibt die kurze
 Schreibweise `.k-playbook/...` richtig; zum Schreiben wird der aufgelöste Pfad benutzt.
 

@@ -14,6 +14,9 @@ import (
 type fakeDoc struct {
 	by    string
 	title string
+	// updated ist der Zeitpunkt der letzten Änderung, den list meldet; leer
+	// der feste Zeitpunkt aller übrigen Dokumente.
+	updated string
 	// frontmatterError lässt list das Dokument wie der Node melden, wenn
 	// sich das Frontmatter nicht lesen ließ: frontmatter_error statt
 	// frontmatter.
@@ -126,9 +129,13 @@ func (s *fakeDocStore) List(_ context.Context, req kephalaion.ListRequest) ([]ke
 		if !req.Recursive && strings.Contains(strings.TrimPrefix(name, req.Path+"/"), "/") {
 			continue
 		}
+		updated := "2026-10-14T11:00:00.000Z"
+		if doc.updated != "" {
+			updated = doc.updated
+		}
 		entry := kephalaion.Entry{Kind: "document", Name: name,
 			Created: &kephalaion.Stamp{At: "2026-10-14T10:00:00.000Z", By: doc.by},
-			Updated: &kephalaion.Stamp{At: "2026-10-14T11:00:00.000Z", By: doc.by}}
+			Updated: &kephalaion.Stamp{At: updated, By: doc.by}}
 		if req.Frontmatter {
 			switch {
 			case doc.frontmatterError != "":

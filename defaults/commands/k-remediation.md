@@ -44,7 +44,8 @@ schreiben sie, und dieser Command legt keine an. Was in einem bereits eingericht
 Zielprojekt an Summaries liegt, bleibt aber lesbar und abarbeitbar. Alle Summary-Stellen
 unten sind so zu verstehen — Legacy-Eingabe, nie Ausgabe.
 
-Der Block `context.remediation` des Briefings legt fest, wie gearbeitet wird:
+Der Block `environment.remediation` legt fest, wie gearbeitet wird. Er steht nicht im
+Briefing: Hol ihn hier über den Abruf `environment` — `k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`.
 
 - `mode` - `task-branch-pr`, `task-first` oder `direct-allowed`.
 - `target` - tatsächlicher Code-/Git-Root, z. B. `./app` bei Wrapper-Repos.
@@ -84,11 +85,12 @@ Der Ort der Ergebnisse:
 - `KNOWN_DECISIONS` = `<ergebnisort>/known-decisions.md`
 - `LOG_FILE` = `<RESULTS_DIR>/log.md`
 
-Aus dem Briefing:
+Aus dem Briefing und dem Abruf `environment`:
 
 - `REMEDIATION_MODE`, `REMEDIATION_TARGET_DIR`, `REMEDIATION_TARGET_DISPLAY`,
   `REMEDIATION_GROUPING`, `REMEDIATION_QUICK_WINS`, `REMEDIATION_BRANCH_PREFIX`,
-  `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus `context.remediation`.
+  `REMEDIATION_PR_REQUIRED`, `REMEDIATION_DIRECT_FIXES` aus `environment.remediation` (Abruf
+  `environment`, oben).
 - `REMEDIATION_TARGET_REF` = der Ziel-Root als Verweis: `project:/<target>/`, ohne führendes
   `./`; für `target: .` die Projektwurzel `project:/`. So steht er in erzeugten Tasks
   (Ziel-Root, `Target repo`).
@@ -98,9 +100,9 @@ Aus dem Briefing:
 
 Command-specific policy:
 
-- Tasks brauchen die Collection. Steht `context.kephalaion.ok` nicht auf `true`, bricht der
+- Tasks brauchen die Collection. Steht `kephalaion.ok` nicht auf `true`, bricht der
   Command erst dort ab, wo er die Collection braucht — vor dem Abgleich gegen bestehende
-  Tasks (Schritt 5) und vor dem Anlegen eines Tasks (6c) —, mit `context.kephalaion.message`
+  Tasks (Schritt 5) und vor dem Anlegen eines Tasks (6c) —, mit `kephalaion.message`
   (Abschnitt „Ohne Kephalaion“ in `k-playbook:/instructions/on-demand/tasks.md`): kein Task
   auf der Platte, kein Abgleich, kein Ersatzverzeichnis. Im Modus `direct-allowed` laufen
   Sofort-Fixes (S) und Akzeptieren (A) ohne Collection weiter; der Command sagt dann einmal,
@@ -113,7 +115,7 @@ Command-specific policy:
   bestätigt.
 - Wenn `target` gesetzt ist, muss der Pfad existieren. Code-Verifikation und
   Branch-/Git-Hinweise beziehen sich auf diesen Target-Root, nicht zwingend auf
-  `context.project.repoRoot`.
+  `project.repoRoot`.
 - Wenn `mode: task-branch-pr` gilt und `target` ein Git-Repo ist, prüfe vor der
   Task-Erzeugung den aktuellen Branch und Dirty-State des Target-Repos. Bei Dirty-State keine
   Branch-/Task-Policy raten: User informieren und bestätigen lassen, ob Tasks trotzdem erzeugt
@@ -492,7 +494,7 @@ Nummer, Kopf und Aufbau stehen dort und werden hier nicht wiederholt:
    `.md`.
 3. Inhalt nach dem Abschnitt „Aufbau“ von `k-playbook:/instructions/on-demand/tasks.md`
    (Frontmatter mit `title`, Intent, Referenzen, Tools, Ziel, Kontext, Zu bauen) mit
-   Kephalaion `write` schreiben, `collection` = `context.kephalaion.address`, `name` = Pfad
+   Kephalaion `write` schreiben, `collection` = `kephalaion.address`, `name` = Pfad
    des Verweises ohne führenden `/`. Kontext = Befundtext + die Quelle als Verweis
    `QUELLE_REF`. Ziel = die saubere Lösung (kein Quick-and-Dirty). Jeder
    Verweis im Task hat die Form aus `k-playbook:/instructions/on-demand/tasks.md`,
@@ -674,7 +676,7 @@ Jeder Remediation-Lauf hinterlässt zusätzlich eine Zeile in `LOG_FILE` — auc
    |---|---|---|---|
    | 2026-07-12 | remediation | dependabot-alerts/2026-07-12/review-triage.md | 4 Bündel / 2 Tasks / 1 behoben / 1 akzeptiert |
 
-- `Datum`: `context.now.date`.
+- `Datum`: `now.date`.
 - `Review`: `remediation`.
 - `Scope`: die abgearbeitete Ergebnisdatei, projektrelativ.
 - `Output`: die Zahlen aus der Abschlusszusammenfassung in einem Satz.
@@ -712,4 +714,4 @@ ausdrücklich kein Folge-Command an.
 - **Ergebnisdatei nicht gefunden / nicht plausibel**: verfügbare `<date>/review-triage.md` und `<family>/<date>/review-triage.md` in `<RESULTS_DIR>` auflisten; als Legacy zusätzlich vorhandene `summary-*.md` und `assessment.md` — letztere nur, wenn kein `review-triage.md` im selben Ordner existiert. Bei Formatabweichung: abbrechen statt raten.
 - **Kein k-playbook-Projekt**: das Briefing schlägt fehl; abbrechen und `/k-gui` empfehlen.
 - **`RESULTS_DIR` fehlt im Dateisystem**: fragen, ob genau dieses Verzeichnis angelegt werden soll, oder `/k-gui` nennen.
-- **Kephalaion nicht bereit** (`context.kephalaion.ok` nicht `true`, `kephalaion_unavailable`): vor dem Abgleich und vor dem Anlegen eines Tasks abbrechen mit `context.kephalaion.message` (Schritt 1); ohne Collection gibt es keine Tasks und keinen Abgleich, und auf die Platte wird nicht ausgewichen.
+- **Kephalaion nicht bereit** (`kephalaion.ok` nicht `true`, `kephalaion_unavailable`): vor dem Abgleich und vor dem Anlegen eines Tasks abbrechen mit `kephalaion.message` (Schritt 1); ohne Collection gibt es keine Tasks und keinen Abgleich, und auf die Platte wird nicht ausgewichen.

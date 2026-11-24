@@ -24,7 +24,7 @@ will.
   Kephalaion selbst fest (`created.by`); dafür gibt es weder ein Feld noch ein
   User-Verzeichnis.
 - **Name mit Datum vorn**, nur ASCII: `results/<YYYY-MM-DD>-<kurzname>.md`, das Datum aus
-  `context.now.date`. Gehören mehrere Dateien zusammen, liegen sie in einem Verzeichnis
+  `now.date`. Gehören mehrere Dateien zusammen, liegen sie in einem Verzeichnis
   `results/<YYYY-MM-DD>-<kurzname>/`. Eine Ebene davor für die Art ist erlaubt, etwa
   `results/review/<YYYY-MM-DD>-<kurzname>.md`, aber keine Pflicht.
 - **Nur `.md`.** Alles andere — JSON, Rohausgaben von Scannern, Logs, Bilder — kommt nicht

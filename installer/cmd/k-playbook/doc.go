@@ -504,7 +504,7 @@ gehört allen —, set nicht:
           Muster, das mit - beginnt, steht nach --.
 
 Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts; gebraucht wird
-eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok), für
+eine bereite Kephalaion-Anbindung (k-playbook briefing, kephalaion.ok), für
 create, done, reopen, append, replace und set ein Node ab v0.3.1. Dasselbe
 wie die MCP-Werkzeuge k_playbook_doc_create, _list, _done, _reopen, _append,
 _replace, _set_field und _grep.

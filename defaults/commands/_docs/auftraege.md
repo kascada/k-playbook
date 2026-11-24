@@ -11,7 +11,7 @@ seines `erzeuger` ab: `/k-docs-code` die mit `erzeuger: code`, `/k-docs-tools` d
 steuern die Aufträge den Lauf, bei `tools` begründen sie ihn.
 
 **Lesen und bewerten lässt sie das Programm.** Rufe `k_playbook_docs_orders` mit `projectDir`
-= `context.project.dir` und `erzeuger` = `code` bzw. `tools` auf (ersatzweise
+= `project.dir` und `erzeuger` = `code` bzw. `tools` auf (ersatzweise
 `k-playbook docs orders <code|tools> --json`). Die Wartezeit, das Zusammenlegen abhängiger
 Aufträge und die Wahl des Laufs rechnet das Programm; sie stehen nirgends sonst und werden
 nicht nachgerechnet. Die Antwort trägt:

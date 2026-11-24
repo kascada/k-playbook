@@ -162,7 +162,7 @@ func addDocsWorkTools(server *mcp.Server) {
 		Name: docsToolExcludeAdd,
 		Description: "Trägt Muster dauerhaft in den Block docs.exclude von .k-playbook/K-PLAYBOOK.yaml ein — was die " +
 			"Docs-Erzeuger beim Code-Scan zusätzlich zu ihren festen Ausschlüssen auslassen; gelesen wird die Liste aus " +
-			"context.docs.exclude. Fehlt der Block, wird er angelegt; außerhalb des Blocks bleibt die Datei unverändert. " +
+			"environment.docs.exclude (k_playbook_briefing mit part environment). Fehlt der Block, wird er angelegt; außerhalb des Blocks bleibt die Datei unverändert. " +
 			"Muster gelten wie in einer .gitignore, relativ zu project.repo_root. Ein absolutes Muster, eines, das mit " +
 			".. aus project.repo_root führt, oder eines mit Zeilenumbruch oder anderem Steuerzeichen wird nicht " +
 			"eingetragen, sondern unter rejected mit reason gemeldet; eines, " +

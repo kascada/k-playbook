@@ -25,11 +25,11 @@ Nichts sonst. Kein Commit, kein Push, nichts in einem fremden Repo.
 
 include: _shared/erster-schritt.md
 
-Aus dem Briefing brauchst du `context.kephalaion` (`ok`, `address`, `message`, `user`),
-`context.project.dir`, `context.now` (`date`, `timestamp`), die Sitzung (`session`, im
-Klartext die Zeile `Sitzung:`) und die GitHub-Zeile (`context.github.projectServices`).
-Steht `context.kephalaion.ok` nicht auf `true`, endet der Command hier mit
-`context.kephalaion.message`: Ohne Kephalaion gibt es keine Befunde und kein Protokoll.
+Aus dem Briefing brauchst du `kephalaion` (`ok`, `address`, `message`, `user`),
+`project.dir`, `now` (`date`, `timestamp`), die Sitzung (`session`, im
+Klartext die Zeile `Sitzung:`) und die GitHub-Zeile (`github.projectServices`).
+Steht `kephalaion.ok` nicht auf `true`, endet der Command hier mit
+`kephalaion.message`: Ohne Kephalaion gibt es keine Befunde und kein Protokoll.
 
 **Obergrenze.** Ist `$ARGUMENTS` eine ganze Zahl ab 1, ist sie die Obergrenze `LIMIT`; leer
 heißt 25. Alles andere: melden und enden. Gezählt wird jeder Befund, den Schritt 4 ganz
@@ -59,7 +59,7 @@ Task bzw. einen Doku-Auftrag geht.
 
 ## Schritt 2 — Vorprüfung
 
-Rufe `k_playbook_findings_check` mit `projectDir` = `context.project.dir`, ersatzweise
+Rufe `k_playbook_findings_check` mit `projectDir` = `project.dir`, ersatzweise
 `k-playbook findings check --json` in der Shell. Das Programm gleicht die Replica ab, prüft
 die Rechte `read`, `write` und `supersede`, jeden Eintrag unter `queue/findings/` und liest
 jeden Befund. Ist das Werkzeug unbekannt oder meldet die Shell `unbekanntes Kommando:
@@ -112,8 +112,8 @@ trägst du in deine Fassung der Listen nach. Neu geholt wird nur, wenn ein Schre
 `foreign_change` meldet: Dann hat jemand anderes daran geschrieben.
 
 **Protokoll anlegen.** `k_playbook_doc_create` mit `kind: einordnung` und `name` =
-`<context.now.date>-<sitzung>`. Den Inhalt schreibst du gleich danach mit Kephalaion `write`
-(`collection` = `context.kephalaion.address`, `name` = der Pfad aus `ref` ohne `keph:/`):
+`<now.date>-<sitzung>`. Den Inhalt schreibst du gleich danach mit Kephalaion `write`
+(`collection` = `kephalaion.address`, `name` = der Pfad aus `ref` ohne `keph:/`):
 
 ```markdown
 ---
@@ -155,12 +155,12 @@ bleibt der Rest für den nächsten Lauf. Ohne `thema` steht ein Befund für sich
 
 ### 4.1 Lesen
 
-Lies den Befund ganz mit Kephalaion `read` (`collection` = `context.kephalaion.address`,
+Lies den Befund ganz mit Kephalaion `read` (`collection` = `kephalaion.address`,
 `name` = sein voller Name) und merke dir die Revision aus dieser Antwort — sie ist die
 `base_revision` für Löschen und Verschieben.
 
 - Leer, oder in den letzten sechs Stunden geändert (`updated` gegen
-  `context.now.timestamp`): Zeile `- <voller Name> | übersprungen (leer)` bzw.
+  `now.timestamp`): Zeile `- <voller Name> | übersprungen (leer)` bzw.
   `übersprungen (jünger als 6 h)`, weiter mit dem nächsten. `k_playbook_doc_create` legt
   einen Befund zuerst leer an, der Inhalt kommt im zweiten Aufruf, und eine Sitzung kann ihn
   noch nachtragen; die Wartezeit verhindert, dass gelesen wird, woran noch geschrieben wird.
@@ -271,7 +271,7 @@ Für jedes Ziel unter `keph:/docs/manual/`:
   Reviewprotokolle, der Stand laufender Vorhaben.
 - Bestehende Handdoku änderst du mit `k_playbook_doc_replace` bzw. `k_playbook_doc_append`,
   neue legst du mit Kephalaion `create` an.
-- Am heutigen Stand belegt: Pfad und Zeile auf `STAND`, Prüfdatum (`context.now.date`),
+- Am heutigen Stand belegt: Pfad und Zeile auf `STAND`, Prüfdatum (`now.date`),
   Befehl zum Nachprüfen.
 - Bewertungen tragen eine Bedingung „gilt nicht mehr, wenn …“ und den Befehl, sie zu prüfen.
 - Beim Einarbeiten prüfst du die Nachbaraussagen im selben Abschnitt mit; Falsches

@@ -105,7 +105,7 @@
 # Platzhalter:
 #   {out}      Zieldatei unter raw/, absolut. Pflicht bei output file, verboten bei
 #              output stdout.
-#   {target}   project.repo_root aus der context-Ausgabe, absolut: die Projektwurzel.
+#   {target}   project.repoRoot aus dem Briefing, absolut: die Projektwurzel.
 #              Nicht das Verzeichnis, in dem jemand gerade steht — sonst hinge das
 #              Ergebnis daran, wo der Lauf gestartet wurde. Bei workdir target ist es
 #              zugleich das Arbeitsverzeichnis, bei workdir module fallen beide

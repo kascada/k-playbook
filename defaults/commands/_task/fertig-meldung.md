@@ -6,7 +6,7 @@ description: Modul für /k-task-run und /k-task-refine, eingebunden als include 
 `/k-task-run` und `/k-task-refine` laufen lange, und wer sie startet, schaut danach oft
 nicht mehr auf den Bildschirm. Der Command meldet sich deshalb auf dem Rechner des Nutzers,
 wenn er fertig ist oder etwas von ihm braucht — mit dem Werkzeug
-`k_playbook_notify` des MCP-Servers `k-playbook`, `projectDir` ist `context.project.dir`.
+`k_playbook_notify` des MCP-Servers `k-playbook`, `projectDir` ist `project.dir`.
 
 ### Wann
 
@@ -20,7 +20,7 @@ wenn er fertig ist oder etwas von ihm braucht — mit dem Werkzeug
 
 | Feld | Inhalt |
 |---|---|
-| `title` | `<projekt>: <task> – <was>` — `<projekt>` ist der letzte Pfadteil von `context.project.dir`; `<task>` der Dateistamm des Task-Dokuments (der letzte Pfadteil seines Verweises ohne `.md`), bei mehreren `<n> Tasks`; `<was>` ist `fertig`, `Rückfrage: <worum es geht, drei Worte>` oder `abgebrochen` |
+| `title` | `<projekt>: <task> – <was>` — `<projekt>` ist der letzte Pfadteil von `project.dir`; `<task>` der Dateistamm des Task-Dokuments (der letzte Pfadteil seines Verweises ohne `.md`), bei mehreren `<n> Tasks`; `<was>` ist `fertig`, `Rückfrage: <worum es geht, drei Worte>` oder `abgebrochen` |
 | `body` | was passiert ist, ein bis zwei Sätze: Status, Review-Zahlen, der offene Punkt oder die Frage — höchstens 200 Zeichen, der Rest wird abgeschnitten |
 | `sound` | `true` |
 

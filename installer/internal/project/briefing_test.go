@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/kascada/k-playbook/installer/internal/githubaccess/accesstest"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -61,9 +63,9 @@ func mkdirAll(t *testing.T, dir string) {
 // stubBriefingDocs ersetzt den Zugang zur Collection für die Dauer des Tests.
 func stubBriefingDocs(t *testing.T, open func(string) (*UserDocs, error)) {
 	t.Helper()
-	original := openBriefingDocs
-	openBriefingDocs = open
-	t.Cleanup(func() { openBriefingDocs = original })
+	original := OpenBriefingDocs
+	OpenBriefingDocs = open
+	t.Cleanup(func() { OpenBriefingDocs = original })
 }
 
 func unavailableDocs(string) (*UserDocs, error) {
@@ -332,23 +334,107 @@ func TestBriefingEigeneArbeit(t *testing.T) {
 	if work.OpenFindings != 3 {
 		t.Errorf("openFindings %d, erwartet 3", work.OpenFindings)
 	}
+	// Unter dem Deckel nennt total dieselbe Zahl wie die Liste.
+	if work.Total != (BriefingWorkTotal{Tasks: 3, Workbench: 2}) {
+		t.Errorf("total %+v", work.Total)
+	}
 }
 
-// Nichts doppelt, nichts vergessen (Task 086, umgewidmet in Task 091): Die
-// obersten Felder von Briefing und Kontextausgabe bleiben disjunkt —
-// Umgebungsangaben stehen im Briefing nur im Übergangsabschnitt context, nicht
-// zusätzlich in den eigenen Abschnitten. schemaVersion ist oben die einzige
-// erlaubte Überschneidung, denn sie beschreibt die jeweilige Ausgabe selbst.
-// Im Abschnitt context fehlen genau die Felder, die das Briefing selbst
-// liefert; jedes übrige Feld der Kontextausgabe steht da — verglichen gegen
-// BuildContext, nicht gegen eine von Hand gepflegte Liste. `k-playbook
-// context` selbst bleibt unverändert; das sichern die Tests der Kontextausgabe.
-func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
+// Die Arbeitsliste ist gedeckelt (Task 187): Von 40 offenen Tasks und 40
+// aktiven Arbeitsständen stehen je BriefingWorkLimit im Briefing — die Tasks
+// nach Nummer, die Arbeitsstände nach letzter Änderung, die neueste zuerst —,
+// total nennt je Liste alle 40. Erledigte und fremde zählen nicht mit.
+func TestBriefingArbeitslisteMitDeckel(t *testing.T) {
+	root := newBriefingProject(t)
+	names := []string{"user/kamran/tasks/done/001-alt.md", "user/hp/tasks/002-fremd.md", "user/kamran/workbench/done/001-fertig.md"}
+	for i := 1; i <= 40; i++ {
+		// Vierstellige Nummern neben dreistelligen: geordnet wird nach der
+		// Zahl, nicht nach dem Namen (1000 stünde sonst vor 101).
+		number := 100 + i
+		if i > 35 {
+			number = 1000 + i
+		}
+		names = append(names, fmt.Sprintf("user/kamran/tasks/%03d-task.md", number), fmt.Sprintf("user/kamran/workbench/%03d-thema.md", i))
+	}
+	store := newFakeDocStore("kamran", names...)
+	for i := 1; i <= 40; i++ {
+		// Je höher die Nummer, desto älter die Änderung — außer Thema 007,
+		// das zuletzt geändert wurde.
+		store.docs[fmt.Sprintf("user/kamran/workbench/%03d-thema.md", i)].updated = fmt.Sprintf("2026-11-%02dT10:00:00.000Z", 1+(40-i)/2)
+	}
+	store.docs["user/kamran/workbench/007-thema.md"].updated = "2026-11-24T09:00:00.000Z"
+	stubBriefingDocs(t, func(string) (*UserDocs, error) { return newTestUserDocs(t, store, DocKinds), nil })
+
+	briefing, err := BuildBriefing(context.Background(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	work := briefing.Work
+	if !work.Available || work.Total != (BriefingWorkTotal{Tasks: 40, Workbench: 40}) {
+		t.Fatalf("work: available %v, total %+v", work.Available, work.Total)
+	}
+	if len(work.Tasks) != BriefingWorkLimit || len(work.Workbench) != BriefingWorkLimit {
+		t.Fatalf("Listen: %d Tasks, %d Arbeitsstände, erwartet je %d", len(work.Tasks), len(work.Workbench), BriefingWorkLimit)
+	}
+	for i, doc := range work.Tasks {
+		if want := fmt.Sprintf("keph:/user/kamran/tasks/%03d-task.md", 101+i); doc.Ref != want {
+			t.Errorf("Task %d: %s, erwartet %s", i, doc.Ref, want)
+		}
+	}
+	// Zuerst das zuletzt geänderte Thema, dann die mit dem jüngsten Datum;
+	// bei gleichem Zeitpunkt bleibt die Reihenfolge nach Namen.
+	wantWorkbench := []string{"007", "001", "002", "003", "004", "005", "006", "008", "009", "010"}
+	for i, doc := range work.Workbench {
+		if want := "keph:/user/kamran/workbench/" + wantWorkbench[i] + "-thema.md"; doc.Ref != want {
+			t.Errorf("Arbeitsstand %d: %s, erwartet %s", i, doc.Ref, want)
+		}
+	}
+
+	// Im JSON steht total neben den Listen.
+	encoded, err := json.Marshal(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"total":{"tasks":40,"workbench":40}`) {
+		t.Errorf("total im JSON: %s", encoded)
+	}
+}
+
+// Die Reihenfolge der Tasks folgt der Nummer: vierstellig hinter dreistellig,
+// gleiche Nummer nach Namen, ohne Nummer am Ende.
+func TestSortBriefingDocsByNumber(t *testing.T) {
+	docs := []BriefingDoc{
+		{Ref: "keph:/user/k/tasks/1000-z.md"}, {Ref: "keph:/user/k/tasks/notiz.md"}, {Ref: "keph:/user/k/tasks/101-b.md"},
+		{Ref: "keph:/user/k/tasks/099-c.md"}, {Ref: "keph:/user/k/tasks/101-a.md"},
+	}
+	sortBriefingDocsByNumber(docs)
+	want := []string{"099-c.md", "101-a.md", "101-b.md", "1000-z.md", "notiz.md"}
+	for i, doc := range docs {
+		if got := path.Base(doc.Ref); got != want[i] {
+			t.Errorf("Platz %d: %s, erwartet %s", i, got, want[i])
+		}
+	}
+}
+
+// Die eigenen Abschnitte (Task 187, Fassung 9): Was jede Sitzung braucht,
+// steht im Briefing unter now, project, kephalaion und github — mit denselben
+// Werten wie in der Kontextausgabe, aber nur mit den Feldern, die ein Text
+// liest. Den Übergangsabschnitt context gibt es nicht mehr, und was der
+// Teilabruf environment liefert, steht nicht im Briefing. `k-playbook context`
+// selbst bleibt unverändert; das sichern die Tests der Kontextausgabe.
+func TestBriefingTraegtEigeneAbschnitte(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
-	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
+	accesstest.Empty(t)
+	stubKephalaionCheck(t, kephalaion.Status{Configured: true, Hub: "vm", Collection: "projekt", Account: "kamran-wsl",
+		Address: "vm:projekt", State: kephalaion.StateOK, OK: true, Message: "Angemeldet als kamran-wsl (User kamran).",
+		Rights: []string{"read", "write"}, User: "kamran", Node: "wsl", NodeVersion: "v0.4.2"})
+	fixed := time.Date(2026, 11, 24, 10, 55, 30, 0, time.Local)
+	previous := now
+	now = func() time.Time { return fixed }
+	t.Cleanup(func() { now = previous })
 
-	context, err := BuildContext(root)
+	built, err := BuildContext(root)
 	if err != nil {
 		t.Fatalf("BuildContext: %v", err)
 	}
@@ -357,88 +443,55 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
 
-	// Oben disjunkt — auch gegen die Felder, die erst ContextForDir füllt.
-	full := context
-	full.Kephalaion = &kephalaion.Status{}
-	full.Links = &ContextLinks{}
-	full.GitHub = &ContextGitHub{}
-	contextKeys := topLevelKeys(t, full)
-	for key := range topLevelKeys(t, briefing) {
-		if key == "schemaVersion" {
-			continue
-		}
-		if contextKeys[key] {
-			t.Errorf("Feld %q steht im Briefing und in der Kontextausgabe", key)
-		}
+	if briefing.Now != (ContextNow{Date: "2026-11-24", Timestamp: fixed.Format(time.RFC3339)}) {
+		t.Errorf("now: %+v", briefing.Now)
+	}
+	wantProject := BriefingProject{Available: true, Dir: root, RepoRoot: built.Project.RepoRoot, VCS: built.Project.VCS,
+		Languages: built.Project.Languages}
+	if !reflect.DeepEqual(briefing.Project, wantProject) || len(briefing.Project.Languages) == 0 {
+		t.Errorf("project:\n%+v\nerwartet\n%+v", briefing.Project, wantProject)
+	}
+	wantKephalaion := BriefingKephalaion{OK: true, Message: "Angemeldet als kamran-wsl (User kamran).", Address: "vm:projekt", User: "kamran"}
+	if briefing.Kephalaion != wantKephalaion {
+		t.Errorf("kephalaion: %+v", briefing.Kephalaion)
+	}
+	if briefing.GitHub.ProjectServices == nil || len(briefing.GitHub.ProjectServices) != 0 || briefing.GitHub.Access == nil {
+		t.Errorf("github: %+v", briefing.GitHub)
 	}
 
-	// Der Rest: vollständig gegen BuildContext, ohne die abgedeckten Felder.
-	rest := briefing.Context
-	if !rest.Available || rest.Message != "" {
-		t.Fatalf("context: available %v, message %q", rest.Available, rest.Message)
+	// Im JSON genau diese obersten Felder — links fehlt, solange die
+	// Selbstheilung nichts meldet, und kommt sonst dazu.
+	encoded, err := json.Marshal(briefing)
+	if err != nil {
+		t.Fatal(err)
 	}
-	covered := map[string]bool{}
-	for _, path := range briefingCoveredContextFields {
-		covered[path] = true
+	keys := topLevelKeys(t, briefing)
+	delete(keys, "links")
+	want := map[string]bool{"schemaVersion": true, "session": true, "now": true, "project": true, "kephalaion": true,
+		"documents": true, "work": true, "projectDocs": true, "github": true, "health": true}
+	if !reflect.DeepEqual(keys, want) {
+		t.Errorf("oberste Felder %v, erwartet %v", keys, want)
 	}
-	// catalogs fällt ganz weg, wenn jeder Katalog darin abgedeckt ist: Seit
-	// Task 155 gibt es nur noch reviews, und das steht unter documents.
-	catalogsLeft := false
-	for name := range context.Catalogs {
-		if !covered["catalogs."+name] {
-			catalogsLeft = true
+	var raws map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &raws); err != nil {
+		t.Fatal(err)
+	}
+	for name, wantJSON := range map[string]string{
+		"now":        `{"date":"2026-11-24","timestamp":` + string(mustJSON(t, fixed.Format(time.RFC3339))) + `}`,
+		"kephalaion": `{"ok":true,"message":"Angemeldet als kamran-wsl (User kamran).","address":"vm:projekt","user":"kamran"}`,
+		"github":     `{"projectServices":[]}`,
+	} {
+		if string(raws[name]) != wantJSON {
+			t.Errorf("%s im JSON:\n%s\nerwartet\n%s", name, raws[name], wantJSON)
 		}
 	}
-	for key := range topLevelKeys(t, context) {
-		_, present := rest.Field(key)
-		expected := !covered[key]
-		if key == "catalogs" {
-			expected = catalogsLeft
-		}
-		if expected != present {
-			t.Errorf("Kontextfeld %q: im Rest %v, erwartet %v", key, present, expected)
-		}
+	// project trägt den Ort der Konfiguration nicht mehr.
+	var projectFields map[string]json.RawMessage
+	if err := json.Unmarshal(raws["project"], &projectFields); err != nil {
+		t.Fatal(err)
 	}
-	for name, entries := range context.Catalogs {
-		var catalogs map[string]json.RawMessage
-		if raw, ok := rest.Field("catalogs"); ok {
-			if err := json.Unmarshal(raw, &catalogs); err != nil {
-				t.Fatalf("context.catalogs: %v", err)
-			}
-		}
-		_, present := catalogs[name]
-		if covered["catalogs."+name] == present {
-			t.Errorf("catalogs.%s: im Rest %v, abgedeckt %v", name, present, covered["catalogs."+name])
-		}
-		if present {
-			want, _ := json.Marshal(entries)
-			if string(catalogs[name]) != string(want) {
-				t.Errorf("catalogs.%s abweichend:\n%s\n%s", name, catalogs[name], want)
-			}
-		}
-	}
-	// Was ContextForDir über BuildContext hinaus füllt, ist auch da.
-	if raw, ok := rest.Field("kephalaion"); !ok || !strings.Contains(string(raw), "Keine Collection eingetragen") {
-		t.Errorf("context.kephalaion: %s", raw)
-	}
-	if raw, ok := rest.Field("github"); !ok || !strings.Contains(string(raw), `"projectServices":[]`) {
-		t.Errorf("context.github: %s", raw)
-	}
-	// Ein übriges Feld steht unverändert da, wie `k-playbook context` es ausgibt.
-	want, _ := json.Marshal(context.Project)
-	if got, _ := rest.Field("project"); string(got) != string(want) {
-		t.Errorf("context.project:\n%s\nerwartet\n%s", got, want)
-	}
-
-	// Das abgedeckte Feld catalogs.reviews: ausgelassen hier, geliefert dort.
-	// guidelines gibt es in der Kontextausgabe nicht mehr (Task 148), die
-	// Leitlinien stehen nur unter documents.guidelines.
-	if _, ok := rest.Field("guidelines"); ok || len(briefing.Documents.Guidelines) == 0 {
-		t.Errorf("guidelines: im Rest %v, documents.guidelines %d", ok, len(briefing.Documents.Guidelines))
-	}
-	raw, _ := rest.Field("catalogs")
-	if strings.Contains(string(raw), "review-code.md") || len(briefing.Documents.Reviews) == 0 {
-		t.Errorf("catalogs.reviews im Rest: %s", raw)
+	if got := topLevelKeys(t, projectFields); !reflect.DeepEqual(got, map[string]bool{"available": true, "dir": true, "repoRoot": true, "vcs": true, "languages": true}) {
+		t.Errorf("Felder von project: %v", got)
 	}
 
 	// Die Dokumentlisten nennen Verweise, keine Pfade der Platte.
@@ -450,36 +503,30 @@ func TestBriefingTraegtKeinFeldDerKontextausgabe(t *testing.T) {
 		t.Errorf("Briefing nennt den Projektpfad: %s", data)
 	}
 
-	// JSON: available und die Felder stehen unmittelbar unter context, in der
-	// Reihenfolge der Kontextausgabe, und lesen sich zurück.
-	encoded, err := json.Marshal(briefing)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var raws map[string]json.RawMessage
-	if err := json.Unmarshal(encoded, &raws); err != nil {
-		t.Fatal(err)
-	}
-	section := string(raws["context"])
-	if !strings.HasPrefix(section, `{"available":true,"schemaVersion":`) || !strings.Contains(section, `"project":{"dir":`) {
-		t.Errorf("context im JSON: %s", section)
-	}
+	// Der Rückweg: Das JSON liest sich in dieselben Abschnitte zurück.
 	var decoded Briefing
 	if err := json.Unmarshal(encoded, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(decoded.Context, briefing.Context) {
-		t.Errorf("Rückweg:\n%+v\nerwartet\n%+v", decoded.Context, briefing.Context)
+	if !reflect.DeepEqual(decoded.Project, briefing.Project) || decoded.Kephalaion != briefing.Kephalaion || decoded.Now != briefing.Now {
+		t.Errorf("Rückweg: %+v %+v %+v", decoded.Project, decoded.Kephalaion, decoded.Now)
 	}
 }
 
-// Lässt sich die Kontextausgabe nicht bauen, ist das ein Zustand im Abschnitt
-// context — wie bei work —, kein Fehler: das übrige Briefing bleibt.
-// Der Abschnitt context trägt kein Feld playbook mehr (Task 157, Fassung 7),
-// auch wenn ein liegengebliebener Clone k-playbook/ im Projekt liegt — weder
-// als Feld noch im JSON des Briefings. Seit Fassung 8 fehlt auch das Feld
-// local (Task 159): die einzige Wurzel ist project.
-func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// Das Briefing nennt keinen Clone k-playbook/ mehr (Task 157, Fassung 7), auch
+// wenn ein liegengebliebener im Projekt liegt, und seit Fassung 8 kein Feld
+// local (Task 159): die einzige Wurzel ist project.dir. Seit Fassung 9
+// (Task 187) fehlt der Abschnitt context ganz.
+func TestBriefingNenntKeinPlaybook(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
 	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
@@ -491,20 +538,11 @@ func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "8" {
-		t.Errorf("schemaVersion %q, erwartet 8", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "9" {
+		t.Errorf("schemaVersion %q, erwartet 9", briefing.SchemaVersion)
 	}
-	if !briefing.Context.Available {
-		t.Fatalf("context: %+v", briefing.Context)
-	}
-	if value, ok := briefing.Context.Field("playbook"); ok {
-		t.Errorf("context trägt playbook: %s", value)
-	}
-	if _, ok := briefing.Context.Field("project"); !ok {
-		t.Errorf("context trägt project nicht")
-	}
-	if value, ok := briefing.Context.Field("local"); ok {
-		t.Errorf("context trägt local: %s", value)
+	if !briefing.Project.Available || briefing.Project.Dir != root {
+		t.Fatalf("project: %+v", briefing.Project)
 	}
 
 	encoded, err := json.Marshal(briefing)
@@ -515,13 +553,9 @@ func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	if err := json.Unmarshal(encoded, &raw); err != nil {
 		t.Fatal(err)
 	}
-	var section map[string]json.RawMessage
-	if err := json.Unmarshal(raw["context"], &section); err != nil {
-		t.Fatalf("context im JSON: %v\n%s", err, raw["context"])
-	}
-	for _, absent := range []string{"playbook", "local"} {
-		if _, ok := section[absent]; ok {
-			t.Errorf("context im JSON trägt %s: %s", absent, raw["context"])
+	for _, absent := range []string{"context", "playbook", "local"} {
+		if _, ok := raw[absent]; ok {
+			t.Errorf("das Briefing trägt %s: %s", absent, raw[absent])
 		}
 	}
 	if quoted, _ := json.Marshal(PlaybookDir(root)); strings.Contains(string(encoded), string(quoted)) {
@@ -529,7 +563,12 @@ func TestBriefingKontextNenntKeinPlaybook(t *testing.T) {
 	}
 }
 
-func TestBriefingKontextNichtBaubar(t *testing.T) {
+// Lässt sich die Konfiguration nicht lesen, ist das ein Zustand an der Stelle
+// des Abschnitts project — wie bei work —, kein Fehler: available false mit
+// der Meldung, dir bleibt, das übrige Briefing bleibt. Eingerichtet wird dann
+// nichts: Ein Werkzeug, das die Fassung nicht versteht, schreibt die
+// Verlinkung nicht um. Der Teilabruf environment meldet denselben Zustand.
+func TestBriefingProjektNichtLesbar(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
 	write(t, ConfigPath(root), "schema_version: 99\n")
@@ -538,9 +577,21 @@ func TestBriefingKontextNichtBaubar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	section := briefing.Context
-	if section.Available || !strings.Contains(section.Message, "schema_version 99") || len(section.Fields) != 0 {
-		t.Errorf("context: %+v", section)
+	section := briefing.Project
+	if section.Available || !strings.Contains(section.Message, "schema_version 99") || section.Dir != root ||
+		section.RepoRoot != "" || section.VCS != "" || len(section.Languages) != 0 {
+		t.Errorf("project: %+v", section)
+	}
+	if briefing.Links != nil {
+		t.Errorf("links trotz unlesbarer Konfiguration: %+v", briefing.Links)
+	}
+	for _, name := range []string{".claude", ".opencode", ClaudeInstructionsFile} {
+		if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Errorf("%s eingerichtet trotz unlesbarer Konfiguration (%v)", name, err)
+		}
+	}
+	if briefing.Now.Date == "" || briefing.Kephalaion.Message == "" {
+		t.Errorf("now %+v, kephalaion %+v", briefing.Now, briefing.Kephalaion)
 	}
 	if len(briefing.Documents.Reviews) == 0 || len(briefing.Documents.Always.Parts) == 0 {
 		t.Errorf("Dokumente fehlen: %+v", briefing.Documents)
@@ -549,8 +600,156 @@ func TestBriefingKontextNichtBaubar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(string(encoded), `{"available":false,"message":"`) || strings.Count(string(encoded), ":") != 2 {
-		t.Errorf("context im JSON: %s", encoded)
+	if !strings.HasPrefix(string(encoded), `{"available":false,"message":"`) || !strings.HasSuffix(string(encoded), `,"dir":`+string(mustJSON(t, root))+`}`) {
+		t.Errorf("project im JSON: %s", encoded)
+	}
+
+	environment := BuildBriefingEnvironment(root, root)
+	if environment.Available || !strings.Contains(environment.Message, "schema_version 99") || environment.GH != nil ||
+		environment.Remediation != nil {
+		t.Errorf("environment: %+v", environment)
+	}
+	if encoded, _ := json.Marshal(environment); !strings.HasPrefix(string(encoded), `{"available":false,"message":"`) || strings.Count(string(encoded), `":`) != 2 {
+		t.Errorf("environment im JSON: %s", encoded)
+	}
+}
+
+// Das Briefing steht am Anfang jeder Sitzung und zieht deshalb selbst die
+// Assistenten-Verlinkung nach (Task 187) — bis dahin kam die Heilung nur
+// nebenbei über ContextForDir mit. Was sich geändert hat, steht unter links;
+// beim zweiten Briefing gibt es nichts mehr zu melden, und das Feld fehlt.
+func TestBriefingZiehtVerlinkungNach(t *testing.T) {
+	root := newBriefingProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
+	writeFile(t, filepath.Join(shipped(t), "skills", "beispiel", skillFileName), "# Beispiel\n")
+
+	briefing, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if briefing.Links == nil {
+		t.Fatal("die Selbstheilung muss im Briefing stehen")
+	}
+	if briefing.Links.Note == "" {
+		t.Error("ohne Klartext weiß ein Assistent nicht, was das für seine Sitzung heißt")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "commands", "k-test.md")); err != nil {
+		t.Errorf("der Command ist nicht registriert: %v", err)
+	}
+	if !LinksOK(CheckLinks(root)) {
+		t.Errorf("nach dem Briefing steht die Verlinkung nicht: %+v", CheckLinks(root))
+	}
+	encoded, err := json.Marshal(briefing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"links":{`) || !strings.Contains(string(encoded), `"note":"`) {
+		t.Errorf("links im JSON: %s", encoded)
+	}
+
+	again, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if again.Links != nil {
+		t.Errorf("links = %+v, erwartet nichts zu melden", again.Links)
+	}
+	if encoded, _ := json.Marshal(again); strings.Contains(string(encoded), `"links"`) {
+		t.Errorf("das zweite Briefing trägt links: %s", encoded)
+	}
+
+	// Der Teilabruf environment heilt nicht: Er schreibt nichts.
+	commands := filepath.Join(shipped(t), "commands")
+	if err := os.Rename(filepath.Join(commands, "k-test.md"), filepath.Join(commands, "k-neu.md")); err != nil {
+		t.Fatal(err)
+	}
+	if environment := BuildBriefingEnvironment(root, root); !environment.Available {
+		t.Fatalf("environment: %+v", environment)
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".claude", "commands", "k-neu.md")); !os.IsNotExist(err) {
+		t.Errorf("der Teilabruf hat die Verlinkung nachgezogen (%v)", err)
+	}
+}
+
+// Versteht das Werkzeug die Konfiguration nicht, schreibt auch das Briefing
+// nicht: Es meldet den Zustand unter project und lässt die Verlinkung stehen.
+func TestBriefingHeiltNichtBeiUnbekannterFassung(t *testing.T) {
+	root := newBriefingProject(t)
+	stubBriefingDocs(t, unavailableDocs)
+	writeFile(t, filepath.Join(shipped(t), "commands", "k-test.md"), "test\n")
+	write(t, ConfigPath(root), "schema_version: 99\n\nproject:\n  repo_root: .\n  vcs: git\n")
+
+	briefing, err := BuildBriefing(t.Context(), root)
+	if err != nil {
+		t.Fatalf("BuildBriefing: %v", err)
+	}
+	if briefing.Project.Available || briefing.Links != nil {
+		t.Errorf("project %+v, links %+v", briefing.Project, briefing.Links)
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
+		t.Error("bei unlesbarer Konfiguration darf nichts verlinkt worden sein")
+	}
+}
+
+// Der Teilabruf environment (Task 187) liefert die Umgebungsangaben, die das
+// Briefing nicht mehr trägt, unter denselben Namen und mit denselben Werten
+// wie die Kontextausgabe — ohne die Felder, die kein Text liest: von gh
+// bleiben ready und account, baseTools verliert matrix; schemaVersion, mcp,
+// git, catalogs, now, project, kephalaion und links gehören nicht dazu. Er
+// trägt weder session noch documents noch work.
+func TestBriefingEnvironment(t *testing.T) {
+	root := newBriefingProject(t)
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+	accesstest.Empty(t)
+	stubKephalaionCheck(t, kephalaion.Status{State: kephalaion.StateNotConfigured, Message: "Keine Collection eingetragen."})
+
+	full, err := ContextForDir(root)
+	if err != nil {
+		t.Fatalf("ContextForDir: %v", err)
+	}
+	environment := BuildBriefingEnvironment(root, root)
+	if !environment.Available || environment.Message != "" {
+		t.Fatalf("environment: %+v", environment)
+	}
+	encoded, err := json.Marshal(environment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"available": true, "gh": true, "github": true, "baseTools": true, "versionSources": true, "docs": true, "remediation": true}
+	if keys := topLevelKeys(t, environment); !reflect.DeepEqual(keys, want) {
+		t.Errorf("Felder %v, erwartet %v", keys, want)
+	}
+
+	if *environment.GH != (BriefingGH{Ready: full.GH.Ready, Account: full.GH.Account}) {
+		t.Errorf("gh: %+v, Kontextausgabe %+v", environment.GH, full.GH)
+	}
+	if got := topLevelKeys(t, environment.GH); !reflect.DeepEqual(got, map[string]bool{"ready": true, "account": true}) {
+		t.Errorf("Felder von gh: %v", got)
+	}
+	tools := environment.BaseTools
+	if tools.Present != full.BaseTools.Present || tools.OK != full.BaseTools.OK || tools.Error != full.BaseTools.Error ||
+		tools.InstallCommand != full.BaseTools.InstallCommand || !reflect.DeepEqual(tools.Missing, full.BaseTools.Missing) {
+		t.Errorf("baseTools: %+v, Kontextausgabe %+v", tools, full.BaseTools)
+	}
+	if strings.Contains(string(encoded), `"matrix"`) {
+		t.Errorf("baseTools trägt matrix: %s", encoded)
+	}
+	// Die übrigen Unterfelder unverändert, wie `k-playbook context` sie ausgibt.
+	for name, pair := range map[string][2]any{
+		"github":         {environment.GitHub, full.GitHub},
+		"versionSources": {environment.VersionSources, full.VersionSources},
+		"docs":           {environment.Docs, full.Docs},
+		"remediation":    {environment.Remediation, full.Remediation},
+	} {
+		got, want := mustJSON(t, pair[0]), mustJSON(t, pair[1])
+		if string(got) != string(want) {
+			t.Errorf("%s:\n%s\nerwartet (Kontextausgabe)\n%s", name, got, want)
+		}
+	}
+	if environment.VersionSources.State != VersionSourcesUnavailable || environment.VersionSources.Ref != "keph:/k-playbook/inventory.md" {
+		t.Errorf("versionSources: %+v", environment.VersionSources)
 	}
 }
 
@@ -686,8 +885,8 @@ func briefingRefs(entries []BriefingEntry) []string {
 
 // Das Briefing trägt die Umgebungsprüfung als Abschnitt health (Task 098):
 // derselbe Report wie health.Check — ohne Problem leer mit ok, sonst die
-// Einträge sortiert; ein Fehler macht ok falsch. health ist kein Feld der
-// Kontextausgabe und bewertet nur, was dort steht.
+// Einträge sortiert; ein Fehler macht ok falsch. health bewertet und nennt
+// Abhilfen; die Rohwerte dazu liefert der Teilabruf environment.
 func TestBriefingTraegtHealth(t *testing.T) {
 	root := newBriefingProject(t)
 	stubBriefingDocs(t, unavailableDocs)
@@ -700,8 +899,8 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
-	if briefing.SchemaVersion != "8" {
-		t.Errorf("schemaVersion %q, erwartet 8", briefing.SchemaVersion)
+	if briefing.SchemaVersion != "9" {
+		t.Errorf("schemaVersion %q, erwartet 9", briefing.SchemaVersion)
 	}
 	if !briefing.Health.OK || len(briefing.Health.Problems) != 0 {
 		t.Errorf("health ohne Probleme: %+v", briefing.Health)
@@ -735,9 +934,10 @@ func TestBriefingTraegtHealth(t *testing.T) {
 	if direct := health.Check(t.Context(), root); !reflect.DeepEqual(direct, report) {
 		t.Errorf("health.Check:\n%+v\nBriefing:\n%+v", direct, report)
 	}
-	// Die Felder, die health bewertet, stehen weiter unverändert im Rest.
-	if raw, ok := briefing.Context.Field("versionSources"); !ok || !strings.Contains(string(raw), `"state":"unavailable"`) ||
-		!strings.Contains(string(raw), `"ref":"keph:/k-playbook/inventory.md"`) || !strings.Contains(string(raw), `"error":`) {
-		t.Errorf("context.versionSources: %s", raw)
+	// Die Felder, die health bewertet, liefert der Teilabruf environment als
+	// Rohwerte.
+	sources := BuildBriefingEnvironment(root, root).VersionSources
+	if sources == nil || sources.State != VersionSourcesUnavailable || sources.Ref != "keph:/k-playbook/inventory.md" || sources.Error == "" {
+		t.Errorf("environment.versionSources: %+v", sources)
 	}
 }

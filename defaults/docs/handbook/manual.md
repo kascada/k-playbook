@@ -95,19 +95,20 @@ could never reach the second.
 No command calculates what ultimately applies itself:
 
 ```bash
-k-playbook context
+k-playbook briefing
 ```
 
-The command outputs the resolved working state as JSON: directories,
-remediation policy, and the
-catalogs, already merged, including each entry's origin and marked
-disabled entries. Guidelines are not part of it (task 148): they come shipped only,
-and the briefing names them under `documents.guidelines`.
+The command outputs what a session has to know at its start: the date, the project's
+directories, the instructions, reviews and guidelines that apply -- already merged,
+including each entry's origin and marked disabled entries --, and the own open work.
+Guidelines come shipped only (task 148); the briefing names them under
+`documents.guidelines`. What only single commands need -- remediation policy, base tools,
+`gh` -- comes with `k-playbook briefing --part environment`.
 
 The same information is also available to an assistant as a tool:
-`k-playbook mcp` starts an MCP server whose only tool returns the working state.
+`k-playbook mcp` starts an MCP server with the tool `k_playbook_briefing`.
 It is meant to be invoked by the assistant, not by hand; on the command line,
-`context` remains the way to use it. Which MCP servers the project has
+`k-playbook briefing` is the way to use it. Which MCP servers the project has
 registered with each assistant -- this one and any other -- shows the interface
 under *Setup → MCP-Server*, with a detail page per server that measures what
 it offers on request; see [`mcp.md`](./mcp.md).

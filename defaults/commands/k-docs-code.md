@@ -34,8 +34,8 @@ Dieser Command ist ein Schreiber des Erzeugers `code`: sein Verzeichnis ist
 `keph:/docs/generated/code/`. Den zweiten Schreiber dort erkennst du an
 `generated.by: ks-overlay-repo-analyse`.
 
-Aus dem Briefing brauchst du `context.kephalaion` — `ok`, `address`, `message` —, dazu
-`session` und `context.now`. Ohne `ok: true` endet der Command hier (siehe die Ablage oben).
+Aus dem Briefing brauchst du `kephalaion` — `ok`, `address`, `message` —, dazu
+`session` und `now`. Ohne `ok: true` endet der Command hier (siehe die Ablage oben).
 
 **Kein Argument.** `/k-docs-code` nimmt kein Argument. Ist `$ARGUMENTS` nicht leer, endet der
 Command hier mit dieser Meldung — bevor etwas gesucht, geholt oder geschrieben wird:
@@ -47,7 +47,7 @@ Voller Lauf: /k-docs code reiht ihn ein, danach /k-docs-code.
 ```
 
 **Aufträge.** Lies `k-playbook:/commands/_docs/auftraege.md` mit `k_playbook_doc_read`
-(`projectDir` = `context.project.dir`) und rufe `k_playbook_docs_orders` mit `erzeuger: code`
+(`projectDir` = `project.dir`) und rufe `k_playbook_docs_orders` mit `erzeuger: code`
 auf. Du merkst dir `RAW_ORDERS` (`rawOrders`), `SPLIT_ORDERS` (`splitOrders`) und `WAITING`
 (`waiting`); meldet `problems` unlesbare Aufträge, nennst du sie im Preflight. Ein Auftrag
 ist **zerlegt**, wenn er `dokument` trägt, sonst **roh**; offene zerlegte heißen, ein früherer Lauf ist unterbrochen, und dieser setzt dort wieder an.
@@ -78,7 +78,7 @@ ergänzen (`NEW_EXCLUDES`, wie im Modul zum Scope).
 ```text
 /k-docs-code — Preflight
 ─────────────────────────────────────
-Collection    <context.kephalaion.address>
+Collection    <kephalaion.address>
 Ziel          keph:/docs/generated/code/
 <die Scope-Zeilen aus dem Modul zum Scope>
 Lauf          voll (Auftrag über .) | Teil-Lauf | Wiederaufnahme (nur zerlegte Aufträge)
@@ -94,11 +94,11 @@ Bei „nein“ abbrechen; nichts wurde geholt oder geschrieben, kein Auftrag ang
 
 ## Schritt 2 — checkout
 
-Rufe `k_playbook_docs_checkout` mit `projectDir` = `context.project.dir` und
+Rufe `k_playbook_docs_checkout` mit `projectDir` = `project.dir` und
 `erzeuger: code` (ersatzweise `k-playbook docs checkout code --json`).
 
 - `state: checked_out` — das Arbeitsverzeichnis ist geholt. `WORK_DIR` ist `dir` aus der
-  Antwort, `WORK_DISPLAY_PATH` derselbe Pfad ab `context.project.dir`
+  Antwort, `WORK_DISPLAY_PATH` derselbe Pfad ab `project.dir`
   (`.k-playbook/work/docs/code`).
 - `state: existing` — ein Arbeitsverzeichnis liegt schon da, etwa von einem
   abgebrochenen Lauf. Nichts wurde geholt oder überschrieben. Nenne `existing.since`,
@@ -292,8 +292,8 @@ ergänzt hat. Kompakte Zusammenfassung:
 
 ## Fehlerfälle
 
-- `context.kephalaion.ok` ist nicht `true` oder ein Werkzeug meldet
-  `kephalaion_unavailable` → kein Lauf; `context.kephalaion.message` nennen und auf die
+- `kephalaion.ok` ist nicht `true` oder ein Werkzeug meldet
+  `kephalaion_unavailable` → kein Lauf; `kephalaion.message` nennen und auf die
   Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - `$ARGUMENTS` ist nicht leer → kein Lauf; die Meldung aus Schritt 1.
 - Kein offener Auftrag mit `erzeuger: code`, oder nur wartende → kein Lauf; „Nichts zu tun“.

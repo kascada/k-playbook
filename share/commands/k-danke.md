@@ -9,7 +9,7 @@ allowed-tools: [Read, Bash, Glob, Grep, mcp__k-playbook__k_playbook_doc_read, mc
 ## Erster Schritt
 
 Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
-`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+`projectDir` = Arbeitsverzeichnis, ersatzweise in der Shell `k-playbook briefing`. Ist k-playbook
 nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
 immer geltenden Anweisungen (`documents.always.content`).
 
@@ -34,8 +34,8 @@ Command.
 - **Verbindlich ist `k-playbook:/instructions/on-demand/befunde.md`.** Lies sie mit
   `k_playbook_doc_read`, bevor du einen Befund liest oder schreibst. Sie enthält Ablage, Kopf,
   Rumpf und das Widerlegen; dieser Command wiederholt sie nicht.
-- `COLLECTION = context.kephalaion.address` aus dem Briefing.
-- Steht `context.kephalaion.ok` nicht auf `true`, sind die Befunde weder zu lesen noch zu schreiben.
+- `COLLECTION = kephalaion.address` aus dem Briefing.
+- Steht `kephalaion.ok` nicht auf `true`, sind die Befunde weder zu lesen noch zu schreiben.
   Sag das ausdrücklich, führe nur Schritt 6 aus und gib in Schritt 7 die Befunde, die
   festzuhalten wären, vollständig im Text wieder.
 

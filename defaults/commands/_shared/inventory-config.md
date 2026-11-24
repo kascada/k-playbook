@@ -1,6 +1,6 @@
 ---
 title: Die Quellenkonfiguration des Versionsinventars schreiben
-description: Wie ein Command die Quellenkonfiguration keph:/k-playbook/inventory.md in der Collection des Projekts anlegt oder ergänzt — das Gerüst eines neuen Dokuments (Frontmatter mit schema_version 3, sources, exclude, helm_values; Rumpf, der sie erklärt), die Schreibweise der Listen, der Weg read → Diff → create oder write mit base_revision samt stale_revision, name_taken und outcome_unknown, und die Prüfung danach über das Briefing in der Shell (k-playbook briefing --json).
+description: Wie ein Command die Quellenkonfiguration keph:/k-playbook/inventory.md in der Collection des Projekts anlegt oder ergänzt — das Gerüst eines neuen Dokuments (Frontmatter mit schema_version 3, sources, exclude, helm_values; Rumpf, der sie erklärt), die Schreibweise der Listen, der Weg read → Diff → create oder write mit base_revision samt stale_revision, name_taken und outcome_unknown, und die Prüfung danach über den frisch geholten Abruf environment.
 ---
 
 Die Quellenkonfiguration ist das Dokument `keph:/k-playbook/inventory.md` in der Collection
@@ -41,7 +41,7 @@ Umsortieren, kein Neuformatieren, keine Kommentare entfernt, der Rumpf unangetas
 
 **Schreiben.**
 
-1. Lesen: Kephalaion `read` mit `collection` gleich `context.kephalaion.address` und `name`
+1. Lesen: Kephalaion `read` mit `collection` gleich `kephalaion.address` und `name`
    gleich `k-playbook/inventory.md`; merke dir die `revision`. Kommt `kind: none`, fehlt das
    Dokument.
 2. Den Diff gegen den gelesenen Text zeigen — bei einem neuen Dokument den ganzen Inhalt — und
@@ -52,7 +52,8 @@ Umsortieren, kein Neuformatieren, keine Kommentare entfernt, der Rumpf unangetas
    neu lesen, den Diff neu zeigen und neu bestätigen lassen, nie über den fremden Stand
    schreiben. Kommt `outcome_unknown`, erst mit `read` nachsehen, ob der Text angekommen ist,
    bevor noch einmal geschrieben wird.
-4. Prüfen: `k-playbook briefing --json` in der Shell — nicht das Briefing vom Anfang, das den
-   alten Stand trägt; `context.versionSources.state` steht auf `present` und trägt die neuen
-   Einträge. Steht er auf `invalid`, das Dokument **nicht** selbst nachbessern: die Meldung aus
-   `context.versionSources.error` nennen und den Nutzer entscheiden lassen.
+4. Prüfen: den Abruf `environment` frisch holen — `k_playbook_briefing` mit
+   `part: "environment"`, ersatzweise `k-playbook briefing --part environment` —, nicht einen
+   früheren Abruf, der den alten Stand trägt; `environment.versionSources.state` steht auf
+   `present` und trägt die neuen Einträge. Steht er auf `invalid`, das Dokument **nicht** selbst nachbessern: die Meldung aus
+   `environment.versionSources.error` nennen und den Nutzer entscheiden lassen.

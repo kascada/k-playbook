@@ -90,9 +90,9 @@ task 144 it is the document `keph:/k-playbook/inventory.md` in the project colle
 settings in the frontmatter (`schema_version: 3`, `sources`, `exclude`, `helm_values`;
 `roots` no longer exists, only paths below the project root are read); `/k-doc-inventory`
 creates it on the first confirmed addition, and without it the default sources apply. It
-is maintained manually and never overwritten by an update. Its status appears in the
-`versionSources` section of `k-playbook context` (`ref`, `state`), so no command reads it
-itself. The interface only displays the configuration in
+is maintained manually and never overwritten by an update. Its status appears as
+`environment.versionSources` in the partial call of the briefing (`ref`, `state`), so no command
+reads it itself. The interface only displays the configuration in
 the "Inventory" section, showing the document, its state, and the count of sources,
 exclusions, and configured Helm values; it does not edit it.
 That section also offers the inventory prompt, the same run as `k-playbook
@@ -168,9 +168,8 @@ fallback to the shipped layer alone.
 The origin values stay `dist`, `local`, `override` and `disabled`. A project-owned part from
 the collection carries its place as well: the field `location` with the `keph:` reference
 (`keph:/k-playbook/reviews/review-x.md`) in the briefing, in `k-playbook read --json`, in
-`k_playbook_doc_read` — for an assembled directory per part — and in the catalog entries
-of the context output; the plain-text briefing shows it next to the origin
-(`[local keph:/k-playbook/…]`).
+`k_playbook_doc_read` — for an assembled directory per part; the plain-text briefing shows it
+next to the origin (`[local keph:/k-playbook/…]`).
 
 The kind for rules is gone since task 135: nothing is shipped, read or listed for it.
 
@@ -181,7 +180,7 @@ Project-owned commands and skills live in `.k-playbook/commands/` and `.k-playbo
 versioned next to the configuration.
 
 For commands, it is the path below `commands/`, including the namespace: a local
-`commands/_shared/context.md` replaces exactly that file, while the rest of
+`commands/_shared/gh.md` replaces exactly that file, while the rest of
 `_shared/` remains shipped. A skill, however, is replaced as a whole:
 `SKILL.md`, `PLAYBOOK.md`, and templates must fit each other; a partially
 replaced skill cannot sensibly be composed.
@@ -221,12 +220,13 @@ and not registered.
 To learn what ultimately applies, do not query the filesystem but the tool:
 
 ```bash
-k-playbook context
+k-playbook briefing
 ```
 
-Its output lists the merged catalogs with the origin of each entry: `dist`,
-`local`, or `override`, and marks disabled content. See [The resolved working
-state](#the-resolved-working-state).
+Its output lists the instructions, reviews and guidelines that apply, already merged, and
+names the origin of every entry that is not shipped: `local`, `override`, or `disabled`
+(`--json` carries `origin` for every entry, `dist` included). See [The
+briefing](#the-briefing).
 
 Because commands and skills come from two sources, assistant destinations,
 `.claude/commands`, `.claude/skills`, and `.opencode/commands`, are real
@@ -250,7 +250,6 @@ project. They are two different objects and nothing to merge.
 `<hub>:k-playbook/defaults/guidelines/` (since task 131; before, `k-playbook/guidelines/`).
 `k_playbook_doc_read` (`k-playbook:/guidelines/<name>.md`) and the briefing
 (`documents.guidelines`) resolve only that layer, so the origin is always `dist`.
-`catalogs` does not list the kind, and the context output has no field `guidelines`.
 Project-owned guidelines live in `keph:/docs/guidelines/`; how a session is pointed to
 them is todo #40. From task 086 (2026-10-16) until task 148 the kind was a pair, merged
 by the same rule as `reviews/`.
@@ -260,14 +259,64 @@ program and is replaced when the program is updated; the shipped texts on the
 hub are replaced by the next release. A clone `k-playbook/` left over from the
 former model is not written to either; `/k-upgrade` deletes it.
 
-## The resolved working state
+## The briefing
 
 ```bash
-k-playbook context
+k-playbook briefing
 ```
 
-Outputs as JSON what a command would otherwise have to calculate itself from
-configuration and the filesystem:
+The briefing (task 086, 2026-10-16) is the one call at the start of a session:
+`k-playbook briefing [--json]` and the MCP tool `k_playbook_briefing`. It says what a
+session has to know: the date and the project (`now`, `project`), whether the project's
+collection is reachable (`kephalaion`), which instructions, reviews and guidelines apply, as
+references in the prefix scheme with title, description and origin
+(`k-playbook:/instructions/always/` with its parts, `on-demand/`, `reviews/`, `guidelines/`),
+what is pending in the project's collection -- own open tasks and workbench topics, at most 10
+each, and the number of open findings --, which service of the personal GitHub access file
+belongs to the repository, and what is wrong with the environment (`health`). References,
+never paths; no contents, with one exception: the text of the always-instructions itself
+(`documents.always.content`; the plain text starts with it after its head: session, the lines
+`now`, `project` and `kephalaion`, read-in-full request, titles of the parts), assembled as
+`k-playbook read k-playbook:/instructions/always/` assembles it, because every session reads
+it first. Documents go through the same overlay as references (`overlayDocDir` in
+`project/docref.go`), so an entry has the same origin wherever it appears. This means no
+command has to apply overlay rules itself. There is one answer, and everyone receives the
+same one.
+
+Environment facts only single commands need -- `gh`, `github`, `baseTools`,
+`versionSources`, `docs`, `remediation` -- are not in the briefing. A command fetches them
+where it needs them, with the partial call `k-playbook briefing --part environment` (MCP:
+`k_playbook_briefing` with `part: "environment"`), and reads them as `environment.<field>`.
+The partial call assigns no session identifier and is no reload of the briefing.
+
+`links` is normally absent, intentionally: the briefing brings assistant
+linking in line with the catalog, as described below, and a message that says
+the same thing on every invocation is ignored. If it is present, look at it:
+`healed` names commands and skills that have just been registered. They exist
+on disk, but the running assistant read its list at startup and does not yet
+know them; `note` says exactly that. `open` names destinations that cannot be
+resolved automatically: a real project file in the way, or a conflict in
+`CLAUDE.md`.
+
+`now` is present for another reason: commands place dates into persistent files,
+review logs, result directories, and summary-file names. Not every assistant's
+host tells it today's date, and a guessed date in a log is worse than none. It
+is the only field that ages: it identifies invocation time, not write time.
+
+The search starts at the working directory and proceeds upward. Without
+`.k-playbook/K-PLAYBOOK.yaml`, the call stops with a message; a `schema_version` other than
+`3` is a state under `project` (`available: false` with `message`), and nothing is linked
+then. Contract: [mcp.md](mcp.md#briefing-contract).
+
+## The resolved working state
+
+`k-playbook context` (MCP: `k_playbook_context`) is the older call. Since task 187
+(2026-11-24) no shipped text, no script and no function of the briefing uses it any more --
+with one exception: the paused commands `/k-review` and `/k-audit` take `catalogs.reviews`
+with the review modes from it until they are rebuilt. It still exists unchanged and goes in a
+step of its own; this section describes its output until then.
+
+It outputs as JSON:
 
 | Field | Content |
 |---|---|
@@ -292,52 +341,11 @@ shipped, project-owned or overriding — is the effective reference
 `k-playbook:/reviews/<name>`, read with `k_playbook_doc_read` or `k-playbook read`, because
 both layers lie in collections (tasks 131 and 143).
 
-This means no command has to apply overlay rules itself. There is one answer,
-and everyone receives the same one.
-
-**Beside the context output stands the briefing** (task 086, 2026-10-16):
-`k-playbook briefing [--json]` and the MCP tool `k_playbook_briefing`. The context
-output is the environment -- paths, configuration, tools, the merged catalogs with
-their paths. The briefing is what a session has to know at the start: which
-instructions, reviews and guidelines apply, as references in the prefix
-scheme with title, description and origin (`k-playbook:/instructions/always/` with
-its parts, `on-demand/`, `reviews/`, `guidelines/`), and what is pending in
-the project's collection -- own open tasks and workbench topics, the number of open
-findings. References, never paths; no contents, with one exception: the text of the
-always-instructions itself (`documents.always.content`, the plain text starts with
-it after a three-line head: session, read-in-full request, titles of the parts), assembled as `k-playbook read k-playbook:/instructions/always/` assembles it,
-because every session reads it first. Both go through the same overlay
-(`overlayDocDir` in `project/docref.go`), so an entry has the same origin wherever
-it appears.
-
-Since task 091 (2026-10-17) the briefing also carries **the rest of the context
-output**: everything in the table above that its own sections do not cover, in the
-section `context` (`--json`, MCP) resp. behind the separator line "Noch aus
-k-playbook context — wird abgebaut" (plain text). The rest comes from the same
-function as `k-playbook context` (`ContextForDir`), minus `catalogs.reviews`,
-which is `documents.reviews` -- the list stands at one place in the code
-(`briefingCoveredContextFields`). Nothing stands twice: environment facts are in
-the briefing only there. So one call is enough for the start of a session, and
-because the rest comes through `ContextForDir`, the briefing heals the assistant
-links too (`context.links`). If the context output cannot be built, that is a state
-(`context.available: false` with `context.message`), not an error. The rest is a
-transition: each later step takes one field out and gives it its own place in the
-briefing -- the authority is the table "Context field → future place" in
-`knowledge-aktuell.md` in the repository
---, and when it is empty, `k-playbook context` and `k_playbook_context` go. The first
-fields have gone that way (task 148): `instructions` no longer exists, because the reading
-order is `documents.always`, and `guidelines` no longer exists, because guidelines
-are `documents.guidelines`. Today the `AGENTS.md`
-block, `k-playbook context` and `catalogs` are unchanged; the switch comes step by step. Contract: [mcp.md](mcp.md#briefing-contract).
-
-`links` is normally absent, intentionally: the invocation brings assistant
-linking in line with the catalog, as described below, and a message that says
-the same thing on every invocation is ignored. If it is present, look at it:
-`healed` names commands and skills that have just been registered. They exist
-on disk, but the running assistant read its list at startup and does not yet
-know them; `note` says exactly that. `open` names destinations that cannot be
-resolved automatically: a real project file in the way, or a conflict in
-`CLAUDE.md`.
+From task 091 (2026-10-17) until task 187 the briefing carried the rest of this output in a
+transitional section `context`. That section is gone: `now`, `project`, `kephalaion` and
+`links` are sections of the briefing, `gh`, `github`, `baseTools`, `versionSources`, `docs`
+and `remediation` come with its partial call `environment`, and `schemaVersion`, `mcp`, `git`
+and the further fields of `kephalaion` and `gh` have no reader and no place there.
 
 `kephalaion` takes hub and collection from the `kephalaion:` block of
 `.k-playbook/K-PLAYBOOK.yaml` (see `kephalaion` under "Fields"); the account, its token file
@@ -346,7 +354,7 @@ and the node's address come from Kephalaion's client information (`kephalaion no
 (`override`, `default` or `only`). The check asks the node of this machine over MCP
 (`whoami`, with the header pair `X-Keph-Account-<hub>`/`X-Keph-Token-<hub>` and the token
 from Kephalaion's own file `<tokensDir>/<hub>/<account>.token`); it runs only when the block
-is present and never stops `context` — every failure is a `state` with its own `message`,
+is present and never stops the call — every failure is a `state` with its own `message`,
 which names the remedy: `not-configured`, `invalid-entry`, `kephalaion-missing`,
 `client-failed`, `node-address`, `account-choice-missing`, `token-missing`,
 `node-unreachable`, `hub-unknown`, `hub-never-synced`, `login-invalid`, `login-missing`,
@@ -355,25 +363,19 @@ which names the remedy: `not-configured`, `invalid-entry`, `kephalaion-missing`,
 subcommand and the MCP tool; internal callers that only need the catalogs do not ask the node.
 Details: `installer/docs/architecture.md`, section "Kephalaion-Anbindung".
 
-`now` is present for another reason: commands place dates into persistent files,
-review logs, result directories, and summary-file names. Not every assistant's
-host tells it today's date, and a guessed date in a log is worse than none. It
-is the only field that ages: it identifies invocation time, not write time.
-
 `gh` is a finding for this particular machine only: `installed`, `path`,
 `loggedIn`, `account`, `accounts`, and `tokenFromEnv`. `ready` summarizes what a
 command needs to know: gh exists and an account is configured. There is no
 project decision about gh: whether gh is used follows from the personal GitHub
 access file (`k-playbook:/docs/handbook/github-access.md`) and, without a service for the repository,
-from `ready`.
+from `ready`. The partial call `environment` carries `ready` and `account` only.
 
 The finding is read from gh configuration, not checked against the server: a
 stored token may have expired. If certainty is needed, run `gh auth status`;
 that requires network access and does not belong here.
 
 The invocation is deliberately cheap: it omits the security-tool preflight,
-because it starts `--version` for every tool and takes noticeable time.
-`context` must be usable at the start of every command. The gh finding costs
+because it starts `--version` for every tool and takes noticeable time. The gh finding costs
 nothing: it only checks `PATH` and `~/.config/gh/hosts.yml`, without a subprocess.
 
 The search starts at the working directory and proceeds upward. Without
@@ -615,10 +617,10 @@ The modes, from strictest to most permissive:
 **The default is `task-first`.** Tasks as the standard are the safe default:
 nothing changes in code without action, while direct fixes remain possible after
 approval. That default is a display value, not a decision. If the block is absent,
-`k-playbook context` reports `mode: task-first` alongside `configured: false`, and
-`configured` is the field that decides: `/k-remediation` must not guess a mode but
-explicitly ask for the current session, or have the policy set through `/k-gui`.
-`configured` belongs to the `k-playbook context` output, not to `K-PLAYBOOK.yaml`;
+`environment.remediation` (the partial call of the briefing) reports `mode: task-first`
+alongside `configured: false`, and `configured` is the field that decides: `/k-remediation`
+must not guess a mode but explicitly ask for the current session, or have the policy set
+through `/k-gui`. `configured` belongs to that output, not to `K-PLAYBOOK.yaml`;
 it is therefore not in the field table above.
 
 `pr_required` and `direct_fixes` are additionally in the file so commands can
@@ -639,7 +641,7 @@ Until task 128 a block `tools.gh` with `status` (`unknown`, `enabled`,
 `disabled`) held the project's decision whether it uses the GitHub CLI. It is
 gone: whether gh is in play is decided by the way to GitHub alone — with a
 service of the personal GitHub access file, its selected access; without one,
-`gh.ready` from the context output. An existing block is ignored, also with an
+`environment.gh.ready` from the partial call of the briefing. An existing block is ignored, also with an
 unknown value, and nothing fails on it. Setting up the project (`k-playbook
 upgrade`, or setting up and updating in the interface) removes it together with
 its comments, without asking, and says so in its answer
@@ -655,16 +657,15 @@ empty `tools:` goes as well.
 Which MCP servers the project requires -- by the key under which they appear in
 `.mcp.json` and `opencode.json`. Both YAML list forms are
 read: block form with dashes and flow form `[k-playbook, atlassian]`. Names
-must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`; any other name stops `context`, as
-an invalid language name does. The interface does not stop: the **/mcp-servers**
+must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`; any other name is an error when the
+configuration is read as a whole. The interface does not stop: the **/mcp-servers**
 page shows the required list as unreadable with the error, its matrix pill
 warns, and a server's detail page reports "Pflicht: unbekannt" instead of "no".
 Only `required` directly under `tools.mcp` counts; a `required` key deeper
 inside `mcp` is not the list.
 
-The block is optional. Without it, nothing is required and `context` reports
-`mcp.configured: false`; the **/mcp-servers** page of the interface then shows
-a snippet to copy. With it, the page marks every required name that is missing
+The block is optional. Without it, nothing is required; the **/mcp-servers** page of the
+interface then shows a snippet to copy. With it, the page marks every required name that is missing
 in one of the two assistant files. Nothing writes this block: it is edited by
 hand.
 
@@ -690,8 +691,8 @@ environments; several branches per environment are not expressible. The format i
 keyed on purpose, so that a later per-user layer can override single keys.
 
 An unknown value or key, an empty `allow` entry, an environment without a branch, an invalid
-branch name, or the same environment in two spellings (`Prod:` and `prod:`) stops `context`;
-environment names are compared case-insensitively. The interface does not stop: it shows the list and reports the
+branch name, or the same environment in two spellings (`Prod:` and `prod:`) is an error when
+the configuration is read as a whole; environment names are compared case-insensitively. The interface does not stop: it shows the list and reports the
 switch permission as not checkable. Both list forms are read for `allow`.
 
 Adding the block does not change `schema_version`: it is optional, and older installations
@@ -714,8 +715,8 @@ duplicates are skipped. A one-line value such as `exclude: [docs/]` is not read 
 `exclude: []` is the empty list.
 
 An entry that is absolute (leading `/` or `\`, a drive letter such as `C:\`, or `~/`) or that
-leaves `project.repo_root` with `..` is not used: `context` reports it under
-`docs.problems` with its reason and continues. A leading `/` counts as absolute even though
+leaves `project.repo_root` with `..` is not used: it is reported under
+`environment.docs.problems` with its reason, and reading continues. A leading `/` counts as absolute even though
 `.gitignore` would read it as anchored: the list names paths in the project, and an absolute
 path must not silently pass as a pattern. A leading `!` is removed for this check. An entry
 that contains a line break, carriage return or other control character (tab, NUL, DEL, NEL)
@@ -723,9 +724,9 @@ or a Unicode line or paragraph separator is rejected the same way: a pattern sta
 line. On reading this only hits such a character in the middle of a line or as an escape in a
 quoted entry.
 
-`k-playbook context` and the briefing carry the list as `context.docs.exclude` and the
-rejected entries as `context.docs.problems`. Commands read it from there, never from the file.
-`context.docs.exclude` also carries the backup target of the [`maintenance`](#maintenance)
+The partial call `environment` of the briefing carries the list as `environment.docs.exclude`
+and the rejected entries as `environment.docs.problems`. Commands read it from there, never from
+the file. `environment.docs.exclude` also carries the backup target of the [`maintenance`](#maintenance)
 block whenever that block is present, its target passes the checks and lies below
 `project.repo_root`, enabled or not: as an entry anchored at `project.repo_root` and marked as
 a directory, for example `/keph-backup/docs/` or `/sub/keph-backup/docs/` when the project
@@ -849,7 +850,7 @@ the exit code is 0 without a failed step (skipped is no failure), 1 once a step 
 an invalid call or an unknown step.
 
 `docs-backup` does nothing and reports `übersprungen` when the backup is off or the block is
-missing. Otherwise it needs `kephalaion.ok` as in `k-playbook context`, checks the target and
+missing. Otherwise it needs `kephalaion.ok` as in the briefing, checks the target and
 its marker, locks the target against a parallel run (a second run on the same target is
 rejected) and calls, without a shell,
 

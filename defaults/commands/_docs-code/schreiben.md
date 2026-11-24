@@ -5,7 +5,7 @@ description: "Modul für /k-docs-code und seine Sub-Agenten, vom Hauptkontext un
 
 Du schreibst ein Dokument der Code-Doku des Projekts in das Arbeitsverzeichnis `WORK_DIR`,
 mit den Datei-Werkzeugen — nicht nach Kephalaion, kein `publish`. Der Auftrag nennt dir
-`SCAN_ROOT` (`context.project.repoRoot`), die Ausschlüsse und den beschriebenen Stand, das
+`SCAN_ROOT` (`project.repoRoot`), die Ausschlüsse und den beschriebenen Stand, das
 Dokument (`dokument`) und seine `aktion`, die `pfade` und Anlässe, `WORK_DIR`, `GENERATED_AT`
 und die bisherige Fassung samt `hints`. Die Regeln des Laufs:
 

@@ -29,7 +29,7 @@ in der Kennzeilen-Tabelle von `k-playbook:/instructions/on-demand/tasks.md`. Wer
 Der Hauptkontext übergibt:
 
 - den `keph:`-Verweis des Task-Dokuments und seine aktuelle Revision,
-- `projectDir` für die k-playbook-Werkzeuge: `context.project.dir` des Hauptkontexts,
+- `projectDir` für die k-playbook-Werkzeuge: `project.dir` des Hauptkontexts,
 - die Ausführungswurzel — sie gilt nur für `git`. Liegt sie woanders als `projectDir`
   (`Target repo` im `## Ausführungskontext`), bleibt `projectDir` trotzdem das Projekt.
 - die Kennung des Snapshots dieses Tasks — ein Tree-Objekt in der Ausführungswurzel,

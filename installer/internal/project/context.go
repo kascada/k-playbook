@@ -243,8 +243,9 @@ func BuildContextWithLayers(projectDir string) (Context, DocLayers, error) {
 
 // buildContext ist BuildContext mit den Ebenen des Katalogs reviews: Dist die
 // mitgelieferte, Local die projekteigene; nil heißt je eine eigene
-// (NewProjectDefaultsSource, NewProjectLocalDocSource). Das Briefing reicht
-// seine durch, damit es dieselben Dokumente nicht zweimal vom Node liest.
+// (NewProjectDefaultsSource, NewProjectLocalDocSource). BuildContextWithLayers
+// reicht seine durch, damit dieselben Dokumente nicht zweimal vom Node gelesen
+// werden.
 func buildContext(projectDir string, shared DocLayers) (Context, error) {
 	config, err := ReadConfig(projectDir)
 	if err != nil {
@@ -741,18 +742,11 @@ func contextLinks(repair LinkRepair) *ContextLinks {
 // ContextForDir stellt den Kontext ab einem Startverzeichnis zusammen und
 // meldet, wenn keine Installation gefunden wurde.
 //
-// Dabei zieht er die Assistenten-Registrierung nach. Das gehört hierher, weil
-// dieser Aufruf am Anfang jeder Sitzung steht — über das Unterkommando context
-// und über MCP — und weil die Registrierung projektbezogen ist: sie folgt dem
-// Katalog dieses Projekts, nicht dem Weg, auf dem das Programm zu seinem
-// Stand kam.
+// Dabei zieht er die Assistenten-Registrierung nach — wie das Briefing
+// (BuildBriefingFrom), das seit Task 187 selbst heilt und am Anfang jeder
+// Sitzung steht. Die Registrierung ist projektbezogen: sie folgt dem Katalog
+// dieses Projekts, nicht dem Weg, auf dem das Programm zu seinem Stand kam.
 func ContextForDir(startDir string) (Context, error) {
-	return contextForDir(startDir, "", DocLayers{})
-}
-
-// contextForDir ist ContextForDir; liegt startDir im Projekt sharedDir, lesen
-// die Kataloge die Ebenen aus shared statt aus eigenen.
-func contextForDir(startDir string, sharedDir string, shared DocLayers) (Context, error) {
 	projectDir, err := Discover(startDir)
 	if errors.Is(err, ErrNotFound) {
 		return Context{}, fmt.Errorf("keine %s gefunden (gesucht ab %s aufwärts)", ConfigFileName, startDir)
@@ -766,11 +760,7 @@ func contextForDir(startDir string, sharedDir string, shared DocLayers) (Context
 	// neuen Konfiguration ab, wird auch nichts eingerichtet: ein Werkzeug, das
 	// die Fassung nicht versteht, soll die Registrierung nicht nach seinen
 	// Regeln umschreiben.
-	var layers DocLayers
-	if projectDir == sharedDir {
-		layers = shared
-	}
-	built, err := buildContext(projectDir, layers)
+	built, err := buildContext(projectDir, DocLayers{})
 	if err != nil {
 		return Context{}, err
 	}

@@ -429,7 +429,8 @@ der Projekt-Collection.
             oder anderem Steuerzeichen wird nicht eingetragen, sondern
             mit Grund gemeldet (Exit 1 nach der Ausgabe); eines, das schon
             dasteht, wird übersprungen. Ist nichts neu, bleibt die Datei
-            unberührt. Die Docs-Erzeuger lesen die Liste aus context.docs.exclude.
+            unberührt. Die Docs-Erzeuger lesen die Liste aus
+            environment.docs.exclude (k-playbook briefing --part environment).
             --json: config, exclude (die Liste danach), added, rejected
             (pattern, reason) und changed. Nach -- zählt alles als Muster.
 
@@ -499,7 +500,7 @@ status, revision, base, code, message), check, hint. Eine README mit failed
 endet mit Exit 1.
 
 Gesucht wird das Projekt ab dem Arbeitsverzeichnis aufwärts; gebraucht wird
-eine bereite Kephalaion-Anbindung (k-playbook context, kephalaion.ok) und für
+eine bereite Kephalaion-Anbindung (k-playbook briefing, kephalaion.ok) und für
 publish und readme ein Node ab v0.3.1; exclude add braucht keine. Dasselbe
 wie die MCP-Werkzeuge k_playbook_docs_checkout, k_playbook_docs_publish,
 k_playbook_docs_readme, k_playbook_docs_exclude_add, k_playbook_docs_scope,

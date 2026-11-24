@@ -81,7 +81,7 @@ Der Auftrag an den Sub-Agenten einer Gruppe
   mehreren gemeinsam, als `REVIEW_TARGETS` —, startet Critic und Editor selbst, wendet Edits an
   und hängt an jeden Task der Gruppe das Review-Log an. Den Command-Text liest er nicht,
 - nennt je Task der Gruppe den `keph:`-Verweis und die Revision sowie `projectDir`
-  (`context.project.dir`),
+  (`project.dir`),
 - bei einer Fortsetzung zusätzlich: den `Zwischenstand:` des vorigen Sub-Agenten, die
   Revisionen aus seinen Zeilen `Revision:` bzw. `Foreign-Change:` und die Antwort des Nutzers
   als Entscheidung.
@@ -132,7 +132,7 @@ You are read-only. Do not modify documents or files or call write/edit tools.
 
 ## Own open tasks
 <one line per own open task: the keph: reference>
-Read each task yourself with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <context.project.dir>); ignore everything from the first line "## Review-Log" on.
+Read each task yourself with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <project.dir>); ignore everything from the first line "## Review-Log" on.
 
 ## Groups of this run
 <one line per group: the task numbers>

@@ -20,7 +20,7 @@ den angegebenen Intent.
 
 Produces:
 
-- Ein `## Review-Log (<context.now.date>)` am Ende jedes geprüften Tasks, angehängt mit
+- Ein `## Review-Log (<now.date>)` am Ende jedes geprüften Tasks, angehängt mit
   `k_playbook_doc_append`, bzw. jeder geprüften Datei — auch ohne Änderung, dann mit dem
   Vermerk „keine Änderungen“.
 - Änderungen an den geprüften Tasks und Dateien, angewendet allein vom Moderator: an einem
@@ -44,7 +44,7 @@ include: _task/revisionskette.md
 
 Der Moderator hält die Revisionskette; ein `foreign_change` hält den Command für diesen Task
 an. Ist das Ziel ein Task oder leer, braucht der Command die Collection: Steht
-`context.kephalaion.ok` nicht auf `true`, endet er mit `context.kephalaion.message`
+`kephalaion.ok` nicht auf `true`, endet er mit `kephalaion.message`
 (Abschnitt „Ohne Kephalaion“ dort). Eine Instruction-Datei auf der Platte lässt sich auch
 ohne Collection prüfen.
 
@@ -75,7 +75,7 @@ include: _task/ziel-aufloesen.md
   und Schluss; geschrieben wird nichts. Die schon geprüften offenen Tasks, die nicht Ziel
   sind, merkst du dir als `UEBRIGE_TASKS`. Der Lauf ohne Ziel ist der **Lauf mit Gruppen**.
 - **Sonst ein Pfad auf der Platte:** eine Datei oder ein Verzeichnis mit `.md`-Dateien, relativ
-  zu `context.project.dir`. Gibt es ihn nicht, brich mit einer klaren Meldung ab. Sag dazu,
+  zu `project.dir`. Gibt es ihn nicht, brich mit einer klaren Meldung ab. Sag dazu,
   dass dies ein ausdrückliches Einzelziel ist und nicht die Task-Warteschlange. Bei einem
   Verzeichnis: alle `.md` direkt darin, ohne `done/`, `old/` und Archive, sortiert nach der
   führenden Nummer (auch mit `_`), Dateien ohne Nummer übersprungen. Keine → „Keine
@@ -130,7 +130,7 @@ Review gestartet
 Tasks:   <Liste der Ziele in Anzeigeform>
 Gruppen: <je Gruppe eine Zeile, siehe unten>
 Ablauf:  <je Gruppe ein Sub-Agent, parallel | Hauptkontext, Gruppen nacheinander | Hauptkontext>
-Projekt: <context.project.dir>
+Projekt: <project.dir>
 Runden:  max. 5
 ```
 

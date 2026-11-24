@@ -25,14 +25,14 @@ just created. A failed sync or a missing binary makes the preflight not ready; n
 falls back on it.
 
 All calls address the project's collection, `kephalaion.address` (`<hub>:<collection>`)
-from `k-playbook context`. Code: `installer/internal/kephalaion/` (`client.go` for the
+from the briefing. Code: `installer/internal/kephalaion/` (`client.go` for the
 session and `whoami`, `docs.go` for `list`, `read`, `create`, `write`, `rename`, `delete`).
 
 ## The tools k-playbook calls
 
 | Tool | Where | Called by | Arguments used |
 |---|---|---|---|
-| `whoami` | node | the binding check behind `k-playbook context` (`kephalaion` block) and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version) | none |
+| `whoami` | node | the binding check behind the briefing (`kephalaion` section) and the environment check, and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version) | none |
 | `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, `k_playbook_doc_grep` with `kind` (task 104), every todo access (task 097); `k_playbook_docs_checkout` on `docs/generated/<erzeuger>` with `recursive`, without `frontmatter` (task 109); `k_playbook_findings_check` on `queue/findings` with `recursive` and `frontmatter` (task 166) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
 | `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; `k_playbook_doc_append`, `_replace` and `_set_field` before every write, `k_playbook_doc_grep` per document (task 104); every todo access, one call per todo (task 097); `k_playbook_docs_checkout` per listed `.md`, `k_playbook_docs_publish` for the directory's `README.md` and, after a `conflict`, for the current revision (task 109); the README writer (`k_playbook_docs_readme`, publish, inventory, setup) for each `README.md` under `docs/` with a template, and the templates themselves in `<hub>:k-playbook/defaults/docs/` (task 137); `k_playbook_findings_check` once per finding (task 166) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
 | `create` | through the hub | `k_playbook_doc_create`; `todo add` (task 097); `k_playbook_docs_publish` for a document new in the working directory and for a missing `README.md` (task 109); the README writer for every missing `README.md` with a template (task 137) | `collection`, `name`, `content` (`""` for `doc_create`, the todo document for todos), `request_id` |

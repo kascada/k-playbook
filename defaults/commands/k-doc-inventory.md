@@ -37,10 +37,13 @@ Der Name steht im Werkzeug; dieser Text setzt ihn nicht zusammen.
 
 Aus dem Briefing brauchst du:
 
-- `context.kephalaion` — `ok`, `address`, `message`. Ohne `ok: true` endet der Command hier
+- `kephalaion` — `ok`, `address`, `message`. Ohne `ok: true` endet der Command hier
   (siehe die Ablage oben); `k-playbook inventory` bräche ohnehin mit
   `kephalaion_unavailable` ab.
-- `context.versionSources` — der Zustand der Quellenkonfiguration, des Dokuments
+
+Aus dem Abruf `environment`, den du in Schritt 2 holst — er steht nicht im Briefing:
+
+- `environment.versionSources` — der Zustand der Quellenkonfiguration, des Dokuments
   `keph:/k-playbook/inventory.md` in der Collection des Projekts (`ref`). Ihre Einstellungen
   stehen im Frontmatter. Werte sie **nicht** selbst aus — gelesen wird das Dokument nur in
   Schritt 4 und nur, um es zu ergänzen.
@@ -49,8 +52,8 @@ Aus dem Briefing brauchst du:
 
 Zwei Auskünfte, beide ohne eigene Dateilektüre:
 
-1. **Die Quellenkonfiguration** aus `context.versionSources`. Vier Zustände in `state`, und
-   mehr nicht:
+1. **Die Quellenkonfiguration** aus `environment.versionSources`. Hol dafür jetzt den Abruf
+   `environment`: `k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`. Vier Zustände in `state`, und mehr nicht:
    - `present` → gültig. `sources`, `exclude` und `helmValues` tragen den Inhalt; leere
      Listen heißen „nichts konfiguriert“. `schemaVersion` ist `3`.
    - `missing` → fehlt. Es gelten die Standardquellen unterhalb der Projektwurzel.
@@ -72,7 +75,7 @@ Zeige die Lage kompakt:
 ```text
 /k-doc-inventory — Quellenlage
 ─────────────────────────────────────
-Collection    <context.kephalaion.address>
+Collection    <kephalaion.address>
 Inventar      erhoben <generated.at>, <N> Quellen, <N> Abweichungen | fehlt
 Quellkonfig   keph:/k-playbook/inventory.md — vorhanden (<N> Quellen, <N> Ausschlüsse, <N> Helm-Werte) | fehlt | defekt: <error> | nicht erreichbar
 ```
@@ -136,7 +139,7 @@ Aufrufweg gleich:
   Frage 3 aus Schritt 3 ist diese Bestätigung nur zusammen mit der Diff-Bestätigung unten.
 - **Nur ergänzend.** Neue Einträge kommen ans Ende der jeweiligen Liste; bestehende
   Einträge, Kommentare und Reihenfolge bleiben unangetastet, im Frontmatter wie im Rumpf.
-- **Fehlt das Dokument** (`context.versionSources.state` ist `missing`), wird es bei der
+- **Fehlt das Dokument** (`environment.versionSources.state` ist `missing`), wird es bei der
   ersten bestätigten Ergänzung angelegt.
 - **Steht `state` auf `invalid` oder `unavailable`, wird nicht geschrieben** — weder
   angelegt noch ergänzt. Ein defektes Dokument repariert der Nutzer; über ein nicht
@@ -210,23 +213,23 @@ Kompakte Zusammenfassung:
 
 ## Fehlerfälle
 
-- `context.kephalaion.ok` ist nicht `true` → Kephalaion ist nicht bereit. Nenne
-  `context.kephalaion.message` und die Projekt-Collection auf der Setup-Seite (`/k-gui`).
+- `kephalaion.ok` ist nicht `true` → Kephalaion ist nicht bereit. Nenne
+  `kephalaion.message` und die Projekt-Collection auf der Setup-Seite (`/k-gui`).
   Keine Erhebung, kein Rückfall auf die Platte. Meldet `k-playbook inventory`
   `kephalaion_unavailable`, gilt dasselbe.
 - `k-playbook inventory` meldet `stale_revision` → zwischen Lesen und Schreiben hat jemand
   anders das Inventar geschrieben. Nichts wurde überschrieben. Den Lauf einmal wiederholen;
   meldet er es erneut, das sagen und nicht von Hand nachhelfen.
-- `context.versionSources.state` ist `invalid` → die Quellenkonfiguration ist defekt. Der
+- `environment.versionSources.state` ist `invalid` → die Quellenkonfiguration ist defekt. Der
   Erhebungslauf bricht damit ab und schreibt nichts; das Kommando meldet Dokument, Zeile und
   Parser-Meldung. Die Meldung weitergeben und das Dokument **nicht** selbst reparieren — eine
   defekte Konfiguration halb zu deuten hieße, eine andere Vertrauensgrenze anzuwenden als
   die aufgeschriebene. Ein Schlüssel `roots` (auch leer) oder `schema_version` unter `3`
   ist so ein Defekt: das Dokument stammt aus einer alten Vorlage; der Nutzer entfernt `roots`
   und hebt die Fassung.
-- `context.versionSources.state` ist `unavailable` → Kephalaion ist nicht erreichbar. Keine
+- `environment.versionSources.state` ist `unavailable` → Kephalaion ist nicht erreichbar. Keine
   Erhebung, kein Rückfall auf die Platte oder still auf die Standardquellen;
-  `context.versionSources.error` und `context.kephalaion.message` nennen.
+  `environment.versionSources.error` und `kephalaion.message` nennen.
 - `k-playbook inventory` meldet `unbekanntes Kommando` → die Installation ist älter als
   dieser Command. Melden, `/k-upgrade` nennen, und die Erhebung **nicht** von Hand nachbauen.
 - Die Zeile `README:` meldet `failed`, und das Kommando endet mit einem Fehler → gescheitert
@@ -246,7 +249,7 @@ Kompakte Zusammenfassung:
 - **Die Erhebung nachbauen.** Manifeste von Hand lesen, Versionen schätzen, Zeilen ergänzen
   — dann gäbe es zwei Auslegungen des Vertrags, und die zweite ginge in keine Prüfung ein.
 - **Die Quellenkonfiguration selbst auswerten.** Ihr Zustand steht in
-  `context.versionSources`. Wer das Dokument für die Auswertung liest, liest eine zweite,
+  `environment.versionSources`. Wer das Dokument für die Auswertung liest, liest eine zweite,
   womöglich andere Antwort. Gelesen wird es nur in Schritt 4, um es zu ergänzen.
 - **Die Quellenkonfiguration umschreiben.** Kein Umsortieren, kein Neuformatieren, kein
   Entfernen von Kommentaren, kein Schreiben ohne Bestätigung — sie ist handgepflegt.

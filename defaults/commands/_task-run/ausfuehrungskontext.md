@@ -19,9 +19,9 @@ Trägt der Task einen Abschnitt `## Ausführungskontext`, nimm daraus, soweit vo
 Behalte die Werte für den Erfolgspfad. Ist `PR required` wahr, muss der Command nach dem
 lokalen Commit einen PR eröffnen oder genau den fehlenden Schritt nennen, der das verhindert.
 
-`Target repo` wird relativ zu `context.project.repoRoot` aufgelöst, wenn es nicht absolut
+`Target repo` wird relativ zu `project.repoRoot` aufgelöst, wenn es nicht absolut
 ist. Steht es als Verweis `project:/<pfad>` da — so schreibt es `/k-remediation` —, gilt
-`<context.project.dir>/<pfad>`; `project:/` allein ist die Projektwurzel. Ohne
+`<project.dir>/<pfad>`; `project:/` allein ist die Projektwurzel. Ohne
 `Target repo` ist die Projektwurzel die Ausführungswurzel (`EXEC_ROOT`).
 
 Vor der Delegation der Branch-Preflight in der Ausführungswurzel:

@@ -25,10 +25,11 @@ include: _shared/erster-schritt.md
 
 include: _shared/docs.md
 
-Aus dem Briefing brauchst du `context.kephalaion` (`ok`, `address`, `message`),
-`context.project.dir`, `context.docs` (`exclude`, `problems`), `session` und `context.now`
-(`date`, `timestamp`). Ohne
-`context.kephalaion.ok: true` endet der Command hier, wie die Ablage oben sagt.
+Aus dem Briefing brauchst du `kephalaion` (`ok`, `address`, `message`),
+`project.dir`, `session` und `now` (`date`, `timestamp`). Ohne
+`kephalaion.ok: true` endet der Command hier, wie die Ablage oben sagt.
+`environment.docs` (`exclude`, `problems`) steht nicht im Briefing; du holst es in Schritt 2
+über den Abruf `environment`.
 
 Die Erzeuger und ihre Verzeichnisse:
 
@@ -42,7 +43,7 @@ Die Erzeuger und ihre Verzeichnisse:
 
 ## Schritt 2 — Bestand
 
-Ein Aufruf: Kephalaion `list` mit `collection` = `context.kephalaion.address`,
+Ein Aufruf: Kephalaion `list` mit `collection` = `kephalaion.address`,
 `path` = `docs`, `recursive: true`, `frontmatter: true` (bei `more` mit `cursor`
 weiterblättern). Daraus, ohne ein Dokument einzeln zu lesen:
 
@@ -57,7 +58,7 @@ weiterblättern). Daraus, ohne ein Dokument einzeln zu lesen:
 - Dokumente unter `docs/` außerhalb der Bereiche der Tabelle: unsortiert.
 
 Dazu der Stand der `README.md` gegen ihre Vorlagen: `k_playbook_docs_readme` mit
-`projectDir` = `context.project.dir` und `check: true` (ersatzweise
+`projectDir` = `project.dir` und `check: true` (ersatzweise
 `k-playbook docs readme --check --json`). Das schreibt nichts. Die Antwort nennt je Vorlage
 unter `k-playbook:/docs/` das Verzeichnis (`dir`), die README (`ref`) und `status`:
 `unchanged`, `missing` (fehlt), `differs` (weicht ab — von Hand geändert, älter als die
@@ -90,10 +91,11 @@ nennt dann `/k-upgrade`.
 
 Dazu auf der Platte, nur nachsehen:
 
-- `<context.project.dir>/.k-playbook/work/docs/<erzeuger>/` — ein Arbeitsverzeichnis, das
+- `<project.dir>/.k-playbook/work/docs/<erzeuger>/` — ein Arbeitsverzeichnis, das
   noch liegt, ist ein Lauf, der nicht veröffentlicht hat. Nenne Erzeuger und Alter der
   Merkdatei `<erzeuger>.checkout.json`.
-- `context.docs.problems` — verworfene Einträge in `docs.exclude`.
+- `environment.docs.problems` — verworfene Einträge in `docs.exclude`. Hol dafür jetzt den
+  Abruf `environment`: `k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`.
 
 `not_found` für `docs` heißt: Es gibt noch keine Projektdoku; das ist ein Stand, kein
 Fehler. `kephalaion_unavailable` heißt: nicht erreichbar; dann endet der Command wie in der
@@ -156,7 +158,7 @@ Gibt es keine Befunde, sag das in einer Zeile.
 ```text
 /k-docs — Stand
 ─────────────────────────────────────
-Collection  <context.kephalaion.address>
+Collection  <kephalaion.address>
 Inventar    erhoben <generated.at>, <entries> Einträge, <sources-read> Quellen gelesen,
             <deviations> Abweichungen | fehlt
 Code        <N> Dokumente (<N> k-docs-code, <N> ks-overlay-repo-analyse), zuletzt <generated.at> | leer
@@ -225,7 +227,7 @@ Aktion. Einen Rest nimmt nur `tools`, auch innerhalb von `alle`.
   seinen eigenen Bestätigungen; dieser Command fasst sie nicht zusammen. Endet einer ohne
   Ergebnis — abgelehnt, abgebrochen, Konflikt offen —, fragst du, ob die übrigen trotzdem
   laufen sollen. `tools` läuft nicht ohne Inventar. Zuletzt, auch wenn ein Erzeuger übersprungen
-  wurde: `k_playbook_docs_readme` mit `projectDir` = `context.project.dir`, ohne `pfad` und
+  wurde: `k_playbook_docs_readme` mit `projectDir` = `project.dir`, ohne `pfad` und
   ohne `check` (ersatzweise `k-playbook docs readme --json`) — es schreibt jede README, die
   fehlt oder von ihrer Vorlage abweicht. `publish` und das Inventar haben die ihrer
   Verzeichnisse schon geschrieben; dieser Aufruf holt die übrigen nach, etwa die von
@@ -245,7 +247,7 @@ roher Auftrag mit `pfade: .` wird nicht verdoppelt, gleich aus welcher Sitzung e
    Einreihen: Der Auftrag über `.` nimmt sie alle auf, auch die wartenden, und der Lauf geht
    dann über das ganze Projekt statt nur über ihre Dokumente. Ohne den vollen Lauf arbeitet
    `/k-docs-code` allein die feinen ab.
-2. Rufe `k_playbook_docs_order_add` mit `projectDir` = `context.project.dir`, `erzeuger:
+2. Rufe `k_playbook_docs_order_add` mit `projectDir` = `project.dir`, `erzeuger:
    code`, `pfade: ["."]`, `anlass: "Voller Lauf, eingereiht über /k-docs."`, `sitzung` =
    `session` und `title: "Code-Doku: voller Lauf über das ganze Projekt"` auf (ersatzweise
    `k-playbook docs order add code --pfad . --anlass "…" --sitzung <session> --title "…"
@@ -279,8 +281,8 @@ Schreiben kann angekommen sein: nicht wiederholen, mit `check: true` nachsehen.
 
 ## Fehlerfälle
 
-- `context.kephalaion.ok` ist nicht `true` oder `list` meldet `kephalaion_unavailable` →
-  kein Bericht; `context.kephalaion.message` nennen und auf die Projekt-Collection auf der
+- `kephalaion.ok` ist nicht `true` oder `list` meldet `kephalaion_unavailable` →
+  kein Bericht; `kephalaion.message` nennen und auf die Projekt-Collection auf der
   Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - Unbekanntes Argument → die gültigen nennen: `status`, `inventory`, `code`, `tools`,
   `alle`.

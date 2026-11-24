@@ -11,7 +11,7 @@ nicht. Der Auftrag nennt dir:
 
 - `TASK_REF` (den `keph:`-Verweis des Tasks) und `REVISION`,
 - das Arbeitsverzeichnis und `projectDir` für die k-playbook-Werkzeuge
-  (`context.project.dir`, auch wenn die Ausführungswurzel woanders liegt),
+  (`project.dir`, auch wenn die Ausführungswurzel woanders liegt),
 - bei einem `## Ausführungskontext`: die aufgelöste Ausführungswurzel, Base- und Work-Branch,
   die PR-Pflicht, die Entscheidung zum schmutzigen Arbeitsbaum und das Ergebnis des
   Branch-Preflights — verbindlicher Rahmen für dich,
@@ -25,7 +25,7 @@ include: k-playbook:/commands/_task/sub-agenten.md
 Führe zuerst `k-playbook briefing` aus und lies die Ausgabe; lies dann alle `CLAUDE.md` und
 `AGENTS.md` im Projektbaum. Lies den Task selbst mit `k_playbook_doc_read` und dazu
 `k-playbook:/instructions/on-demand/tasks.md`. Dein Briefing ist dein eigenes: `<datum>` unten
-ist `context.now.date` daraus.
+ist `now.date` daraus.
 
 include: k-playbook:/commands/_task/revisionskette.md
 

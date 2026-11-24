@@ -32,7 +32,7 @@ drankommt.
 **Sub-Agenten.** Bei sehr großen Repos teilst du Analyse und Schreiben auf, einen Sub-Agenten
 je Thema. Sein Auftrag beginnt mit: Führe zuerst `k-playbook briefing` aus und lies die
 Ausgabe; er liest als Anleitung `k-playbook:/commands/_docs-code/schreiben.md`
-(`k_playbook_doc_read`, `projectDir` = `context.project.dir`; die Werkzeuge
+(`k_playbook_doc_read`, `projectDir` = `project.dir`; die Werkzeuge
 `mcp__k-playbook__*` lädt er in Claude Code vorher mit der Werkzeugsuche). Du gibst ihm:
 `SCAN_ROOT`, die Ausschlüsse und den Stand aus dem Preflight, sein Thema, die Pfade und
 Anlässe seines Auftrags, `WORK_DIR`, `GENERATED_AT`, die bisherige Fassung seines Dokuments

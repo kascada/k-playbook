@@ -25,7 +25,8 @@ eingesetzt.
 - Das Verzeichnis liegt in `defaults/`, damit es mit dem Release gepackt wird und auf jedem
   Hub unter `<hub>:k-playbook/defaults/includes/` ankommt. Einen Baustein trägt es weiterhin
   nicht: Module, die nur Commands einbinden, liegen als relative Includes in
-  `defaults/commands/_shared/` (seit Task 094: `context.md`, `gh.md`, `base-tools.md`) — dem
+  `defaults/commands/_shared/` (seit Task 094, heute `erster-schritt.md`, `gh.md`,
+  `base-tools.md`, `docs.md` und `inventory-config.md`) — dem
   Namensraum für Command-Module; ein relatives
   Include bleibt in der Sorte `commands` und nimmt an deren Überlagerung teil. Hierher kommt
   erst ein Baustein, den mehr als eine Sorte nutzt, etwa später ein Skill-Text. Feste Testfälle

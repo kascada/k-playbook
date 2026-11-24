@@ -6,19 +6,23 @@ title: Das Briefing
 
 Das Briefing ist das Erste, was eine Sitzung liest, und es gilt für die ganze Sitzung: Liegt es
 vor, wird es nicht noch einmal geholt. Neu geladen wird es nur, wenn sich das Projekt, die
-Konfiguration, der Katalog oder die Installation geändert hat oder `context.now.date` nicht mehr
+Konfiguration, der Katalog oder die Installation geändert hat oder `now.date` nicht mehr
 stimmt — die vollständige Liste steht in `k-playbook:/instructions/on-demand/briefing-felder.md`.
 Felder aus zwei Ladungen werden nie gemischt.
 
 Die Felder jeder Sitzung:
 
-- `context.now.date` ist das Datum. Nie raten, nie `date` rufen.
-- `context.project.dir` ist die Wurzel des Projekts. Projekteigene Commands und Skills liegen
+- `now.date` ist das Datum. Nie raten, nie `date` rufen.
+- `project.dir` ist die Wurzel des Projekts. Projekteigene Commands und Skills liegen
   unter `.k-playbook/commands/` und `.k-playbook/skills/` im `project.dir`. Was k-playbook
   mitliefert, liegt nicht im Projekt.
 - `documents.*` sind Verweise, gelesen mit `k_playbook_doc_read`. Einträge mit der Herkunft
   `disabled` werden übersprungen; die Überlagerung ist schon gerechnet.
-- `work` ist die eigene offene Arbeit.
+- `work` ist die eigene offene Arbeit: je Liste höchstens 10 Einträge, `work.total` nennt die
+  Zahl aller; den Rest liefert `k_playbook_doc_list` (kind `tasks` bzw. `workbench`).
+
+Im Klartext stehen `now`, `project`, `kephalaion` und — nur wenn die Assistenten-Verlinkung
+etwas meldet — `links` unter diesen Namen gleich nach der Zeile `Sitzung:`.
 
 Die Umgebung: `health` ist die Umgebungsprüfung, im Klartext der Block `Umgebung:` gleich nach
 diesem Text. Nenne jeden Eintrag in deiner ersten Antwort (Stufe, Bereich, Satz). Einen Fehler
@@ -42,7 +46,12 @@ k-playbook selbst: Wie es aufgebaut ist, wie Anweisungen funktionieren und wie e
 aufgeteilt wird, steht in `k-playbook:/instructions/on-demand/k-playbook.md`. Lies es, bevor du
 dazu Auskunft gibst oder eine Projektregel anlegst, änderst, verschiebst oder abschaltest.
 
-Der Abschnitt `context` ist der Rest von `k-playbook context` unter denselben Namen. Alles Übrige
-zu den Feldern: `k-playbook:/instructions/on-demand/briefing-felder.md`.
+Der Abruf `environment`: Umgebungsangaben, die nur einzelne Commands brauchen (`gh`, `github`,
+`baseTools`, `versionSources`, `docs`, `remediation`), stehen nicht im Briefing. Ein Command holt
+sie an der Stelle, an der er sie braucht — `k_playbook_briefing` mit `part: "environment"`,
+ersatzweise `k-playbook briefing --part environment` — und liest sie als `environment.<feld>`.
+Der Abruf vergibt keine Sitzungskennung und ist kein Neuladen des Briefings: Er wird bei Bedarf
+frisch geholt, auch mehrmals je Sitzung. `health` bewertet und nennt Abhilfen, `environment`
+liefert die Rohwerte.
 
-<!-- NACHZIEHEN: Die context.-Namen wandern. Bekommt ein Feld seinen eigenen Platz im Briefing (docs/knowledge-aktuell.md, Tabelle „Context field → future place“), sind die Namen hier umzustellen. -->
+Alles Übrige zu den Feldern: `k-playbook:/instructions/on-demand/briefing-felder.md`.

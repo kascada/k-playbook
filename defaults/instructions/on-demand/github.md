@@ -15,7 +15,7 @@ die Shell, kein MCP-Werkzeug; eine Sitzung mit Shell ruft ihn dort auf.
 Maßgeblich ist das Repo, auf das der Befehl zielt, nicht das Arbeitsverzeichnis.
 
 - **Repo des Arbeitsverzeichnisses:** Die Briefing-Zeile `GitHub: dieses Repo = Dienst … —
-  run: …` nennt den Dienst, dazu das Feld `context.github.projectServices`. Beides zeigt den
+  run: …` nennt den Dienst, dazu das Feld `github.projectServices`. Beides zeigt den
   Stand beim Laden des Briefings.
 - **Ein anderes Repo** — `gh … --repo <owner>/<repo>`, `gh api` gegen eine andere Org,
   `git clone` eines fremden Repos: `k-playbook github show` nennt alle Dienste, je mit ihrem
@@ -26,7 +26,11 @@ Danach:
 - genau ein Dienst passt: diesen nehmen;
 - mehrere passen: den Nutzer fragen, welcher gilt;
 - keiner passt (keine Zugangsdatei, kein GitHub-Remote, kein Dienst mit diesem `repo`): wie
-  bisher, also nach `context.gh` (Abschnitt „Ohne Dienst“).
+  bisher, also nach `environment.gh` (Abschnitt „Ohne Dienst“).
+
+`environment.gh` und `environment.github` stehen nicht im Briefing. Wer eines der Felder
+braucht, holt an dieser Stelle den Abruf `environment` — `k_playbook_briefing` mit
+`part: "environment"`, ersatzweise `k-playbook briefing --part environment`.
 
 Commands und Reviews, die GitHub erreichen, entscheiden den Zugang an einer Stelle:
 `k-playbook:/commands/_shared/gh.md`. Sie binden sie ein oder lesen sie und wiederholen sie
@@ -62,14 +66,14 @@ Ersatz gibt es nicht.
 
 ### Ohne Dienst
 
-Ohne Dienst gilt der bisherige Weg über das aktive Konto von `gh`: `context.gh.ready` und das
-aktive Konto aus `context.gh` zählen nur hier. Geht dieser Weg nicht — `context.gh.ready` ist falsch,
+Ohne Dienst gilt der bisherige Weg über das aktive Konto von `gh`: `environment.gh.ready` und das
+aktive Konto aus `environment.gh` zählen nur hier. Geht dieser Weg nicht — `environment.gh.ready` ist falsch,
 oder ein Aufruf scheitert an der Anmeldung (etwa HTTP 401) —, lautet die Meldung: Lege die
 Zugangsdatei an. Dazu bietest du an, beim Einrichten zu helfen, statt nur auf die Anmeldung
 von `gh` zu verweisen:
 
 - `k-playbook github init` rufst du nur, wenn der Nutzer es will.
-- Den Eintrag für den Dienst schlägst du vor: `repo` aus `context.github.repo` bzw. aus dem
+- Den Eintrag für den Dienst schlägst du vor: `repo` aus `environment.github.repo` bzw. aus dem
   Ziel-Repo, die Zugangsart nach Rückfrage. `gh` braucht einen Zugang vom Typ `gh` oder
   `token`; `ssh` und `public` bedienen nur git.
 - Der Nutzer trägt den Eintrag ein; du schreibst die Datei nicht (Abschnitt „Verbote“).

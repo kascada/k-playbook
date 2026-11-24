@@ -34,7 +34,7 @@ Nummern aus der Liste, getrennt durch Komma oder Leerzeichen, auch Bereiche wie 
 eine Antwort auf keine der vier Formen oder nennt sie eine Nummer, die nicht in der Liste
 steht, wird nichts angelegt und einmal nachgefragt, wie sie gemeint ist.
 
-Je übernommenem Befund ein `k_playbook_todo_add` (`projectDir` = `context.project.dir`):
+Je übernommenem Befund ein `k_playbook_todo_add` (`projectDir` = `project.dir`):
 
 - `text` ist der Befund in einem Satz samt Ort (`datei:zeile` oder Prüfbefehl), so
   formuliert, dass er ohne Task und Lauf verständlich ist; einen kritischen kennzeichnet der

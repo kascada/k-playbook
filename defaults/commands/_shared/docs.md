@@ -24,7 +24,9 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
   gelten zusätzlich die Regeln aus `k-playbook:/commands/_docs/schreiblauf.md`: Zeitpunkt,
   Unklarheiten, keine Befunde, was nicht in die Doku gehört, Sub-Agenten.
 - Dauerhafte Ausschlüsse für den Code-Scan eines Projekts stehen in `docs.exclude` von
-  `K-PLAYBOOK.yaml`: gelesen aus `context.docs.exclude`, eingetragen nur über
+  `K-PLAYBOOK.yaml`: gelesen aus `environment.docs.exclude` — über den Abruf `environment`
+  (`k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`), dort, wo
+  ein Command die Liste braucht; im Briefing steht sie nicht —, eingetragen nur über
   `k_playbook_docs_exclude_add` (`k-playbook docs exclude add`) nach Bestätigung durch den
   Nutzer. Die Datei selbst liest und bearbeitet kein Docs-Command. Wie sie wirken, rechnet
   `k-playbook docs scope`; die Regeln stehen nur im Programm.
@@ -41,11 +43,11 @@ der Teil der Collection, den Kephalaion indiziert. Darunter gilt:
   Programm nicht an, dort mahnt Kephalaion. `index.md` entsteht beim Indizieren. Auch kein
   Eintrag „schon einmal“ — er wäre beim nächsten Schreiben weg.
 - Gelesen und geschrieben wird über die Verweisregel aus dem Briefing: `keph:`-Verweise mit
-  `k_playbook_doc_read` bzw. Kephalaion `read`, Collection = `context.kephalaion.address`.
-- Steht `context.kephalaion.ok` nicht auf `true`, ist die Ablage nicht erreichbar. Dann gibt es
+  `k_playbook_doc_read` bzw. Kephalaion `read`, Collection = `kephalaion.address`.
+- Steht `kephalaion.ok` nicht auf `true`, ist die Ablage nicht erreichbar. Dann gibt es
   kein Ergebnis und keinen Rückfall auf die Platte: nichts ersatzweise in eine Datei
   schreiben, keine Datei als gültig lesen. Sag, dass Kephalaion nicht bereit ist, nenne
-  `context.kephalaion.message`, und verweise auf die Projekt-Collection auf der Setup-Seite
+  `kephalaion.message`, und verweise auf die Projekt-Collection auf der Setup-Seite
   (`/k-gui`).
 
 ### Der Kopf

@@ -39,8 +39,8 @@ damit der Hinweis entfällt, den `k-playbook upgrade` im Terminal nach einer neu
 gibt — `/k-upgrade` aufzurufen —; hier läuft `/k-upgrade` schon.
 
 **Projekteigener Umbau.** Liegt im Projekt die Datei
-`<context.project.dir>/scripts/k-upgrade-umbau.sh`, führst du sie direkt danach aus, mit
-`context.project.dir` als Arbeitsverzeichnis:
+`<project.dir>/scripts/k-upgrade-umbau.sh`, führst du sie direkt danach aus, mit
+`project.dir` als Arbeitsverzeichnis:
 
     bash scripts/k-upgrade-umbau.sh
 
@@ -88,8 +88,8 @@ Für alle Umstellungen gilt:
   Antwort zu warten.
 - Bist du bei einem Eintrag unsicher, sag das in der Vorlage ausdrücklich, statt still zu
   entscheiden; in 3.8, das nichts vorlegt, steht es in der Meldung, ohne neue Rückfrage.
-- Braucht eine Umstellung die Projekt-Collection und steht `context.kephalaion.ok` nicht auf
-  `true`, wird sie übersprungen; sag das und nenne den Grund aus `context.kephalaion.message`.
+- Braucht eine Umstellung die Projekt-Collection und steht `kephalaion.ok` nicht auf
+  `true`, wird sie übersprungen; sag das und nenne den Grund aus `kephalaion.message`.
 
 Zurzeit gibt es eine Umstellung, 3.8; sie behält ihre Nummer, weil Programm und Doku auf sie
 verweisen.
@@ -97,15 +97,15 @@ verweisen.
 ### 3.8 — Clone `k-playbook/` und die `.gitignore`-Zeilen
 
 Bis v0.16.38 brauchte ein Projekt eine Kopie des k-playbook-Repos von GitHub unter
-`<context.project.dir>/k-playbook`: Das Programm zog sie nach und aktualisierte sich aus ihr.
+`<project.dir>/k-playbook`: Das Programm zog sie nach und aktualisierte sich aus ihr.
 Heute kommt alles mit dem Programm; es liest den Clone nicht mehr und zieht ihn nicht mehr
 nach. Diese Umstellung löscht den Clone ganz, ohne Rückfrage, und streicht danach aus den
 `.gitignore`-Dateien die Zeilen, die `k-playbook/` aus Git heraushalten — jede erst, wenn das
 Verzeichnis weg ist, damit nichts davon versehentlich in einen Commit gerät. Sie braucht die
 Collection nicht.
 
-**Anlass:** `<context.project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder
-eine `.gitignore` von `context.project.dir` bis `context.project.repoRoot` trägt eine der
+**Anlass:** `<project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder
+eine `.gitignore` von `project.dir` bis `project.repoRoot` trägt eine der
 Zeilen aus d) für ein Verzeichnis, das nicht mehr existiert.
 
 **Vorbedingung:** Schritt 2 hat die Zeile `Programm-Stand: nichts zu tun — …` ausgegeben, und
@@ -118,12 +118,12 @@ eigenes Upgrade.
 In allen Befehlen setzt du den Pfad in die doppelten Anführungszeichen ein; enthält er selbst
 `"`, `$`, `` ` `` oder `\`, steht davor ein `\`.
 
-**a) Prüfen, ob es ein Clone ist.** Liegt `<context.project.dir>/k-playbook` nicht, gehst du
+**a) Prüfen, ob es ein Clone ist.** Liegt `<project.dir>/k-playbook` nicht, gehst du
 zu d). Sonst:
 
 ```sh
-test -L "<context.project.dir>/k-playbook" && echo SYMLINK
-test -d "<context.project.dir>/k-playbook/.git" && ! test -L "<context.project.dir>/k-playbook/.git" && echo CLONE
+test -L "<project.dir>/k-playbook" && echo SYMLINK
+test -d "<project.dir>/k-playbook/.git" && ! test -L "<project.dir>/k-playbook/.git" && echo CLONE
 ```
 
 Ohne Rückfrage gelöscht wird nur ein echtes Verzeichnis, kein Symlink, in dem direkt ein
@@ -140,8 +140,8 @@ geänderten oder ignorierten Dateien und mit eigenen Commits darin. Vorher erheb
 davon verloren geht:
 
 ```sh
-git -C "<context.project.dir>/k-playbook" status --porcelain --ignored || echo FEHLGESCHLAGEN
-git -C "<context.project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes || echo FEHLGESCHLAGEN
+git -C "<project.dir>/k-playbook" status --porcelain --ignored || echo FEHLGESCHLAGEN
+git -C "<project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes || echo FEHLGESCHLAGEN
 ```
 
 Jede Zeile des ersten Befehls ist eine Datei oder ein Verzeichnis, das nicht vom Repo kam; der
@@ -160,23 +160,23 @@ dann nicht.
 ihn zuerst frei und löschst dann das Verzeichnis samt Inhalt im Dateisystem:
 
 ```sh
-chmod -R u+w -- "<context.project.dir>/k-playbook"
-rm -rf -- "<context.project.dir>/k-playbook"
+chmod -R u+w -- "<project.dir>/k-playbook"
+rm -rf -- "<project.dir>/k-playbook"
 ```
 
 Liegt das Verzeichnis danach noch, meldest du den Fehlschlag mit der Fehlermeldung; seine
 Zeilen in d) bleiben dann stehen. Committet wird nicht.
 
 **d) Die `.gitignore`-Zeilen streichen.** Durchsucht wird jede Datei `.gitignore` in den
-Verzeichnissen von `context.project.dir` aufwärts bis `context.project.repoRoot`, beide
-eingeschlossen. Liegt `context.project.repoRoot` nicht oberhalb von `context.project.dir` und
+Verzeichnissen von `project.dir` aufwärts bis `project.repoRoot`, beide
+eingeschlossen. Liegt `project.repoRoot` nicht oberhalb von `project.dir` und
 ist es auch nicht dasselbe Verzeichnis, bleibt es bei der `.gitignore` in
-`context.project.dir`. Gemeint sind nur Zeilen, die genau dieses Verzeichnis treffen;
+`project.dir`. Gemeint sind nur Zeilen, die genau dieses Verzeichnis treffen;
 verglichen wird die ganze Zeile, Leerraum am Zeilenende zählt nicht mit:
 
 - `k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, `**/k-playbook` und
   `**/k-playbook/`;
-- in einer `.gitignore` oberhalb von `context.project.dir` dazu die Formen mit dem Pfad von
+- in einer `.gitignore` oberhalb von `project.dir` dazu die Formen mit dem Pfad von
   ihrem Verzeichnis bis zum Projektverzeichnis, etwa `<projektpfad>/k-playbook/`, mit und ohne
   `/` vorn, mit und ohne `/` hinten.
 
@@ -185,11 +185,11 @@ Muster mit Platzhalter (`k-playbook*`) oder ein Pfad darunter (`k-playbook/dist/
 
 Je Zeile gilt, nach dem Stand, den c) hinterlassen hat:
 
-- Ihr Verzeichnis ist `<context.project.dir>/k-playbook`. Existiert es nicht oder nicht mehr,
+- Ihr Verzeichnis ist `<project.dir>/k-playbook`. Existiert es nicht oder nicht mehr,
   gleich wer es gelöscht hat, fällt die Zeile. Steht es noch — auch als Symlink oder weil a) bis c) es
   liegen ließen —, bleibt auch die Zeile, und die Meldung sagt warum.
-- Eine Zeile in einer `.gitignore` oberhalb von `context.project.dir` bleibt auch dann, wenn
-  sie unter `context.project.repoRoot` noch ein anderes vorhandenes Verzeichnis trifft, etwa
+- Eine Zeile in einer `.gitignore` oberhalb von `project.dir` bleibt auch dann, wenn
+  sie unter `project.repoRoot` noch ein anderes vorhandenes Verzeichnis trifft, etwa
   den Clone eines zweiten Projekts; die Meldung nennt die Zeile und dieses Verzeichnis. Eine
   Zeile ohne Pfad und ohne `/` vorn trifft jedes Verzeichnis dieses Namens unterhalb ihrer
   `.gitignore`, eine mit `/` vorn oder mit Pfad nur das eine ab ihrer `.gitignore`. Für die
@@ -205,7 +205,7 @@ liegen, auch wenn sie danach leer ist. Committet wird nicht. Ob eine geänderte 
 versioniert ist, sagt `git ls-files --error-unmatch <pfad>` in ihrem Verzeichnis.
 
 **Melden.** 3.8 meldet in Schritt 3 für den Clone genau eine dieser Zeilen, wenn
-`<context.project.dir>/k-playbook` lag oder die Vorbedingung fehlt:
+`<project.dir>/k-playbook` lag oder die Vorbedingung fehlt:
 
 - `k-playbook/ gelöscht` — darunter, eingerückt, jede Zeile aus b), die nicht vom Repo kam, und
   die Zahl der Commits, die auf keinem Remote lagen, wenn sie größer als 0 ist;
@@ -215,7 +215,7 @@ versioniert ist, sagt `git ls-files --error-unmatch <pfad>` in ihrem Verzeichnis
 - `k-playbook/ löschen wartet auf den Binärwechsel`.
 
 Dazu je `.gitignore`, in der eine der Zeilen steht, eine Zeile mit ihrem Pfad ab
-`context.project.repoRoot`: was gestrichen wurde und was bleibt, mit dem Verzeichnis, das die
+`project.repoRoot`: was gestrichen wurde und was bleibt, mit dem Verzeichnis, das die
 Zeile hält. Wurde eine versionierte `.gitignore` geändert, folgt eine Zeile: Sie steht jetzt
 als geändert in `git status` und gehört in den nächsten Commit des Projekts; andere Checkouts
 lassen `/k-upgrade` laufen, bevor sie mit `git add -A` committen — wer diesen Commit holt und

@@ -81,12 +81,12 @@ There is no list for this in the configuration.
 ## How do I know what ultimately applies?
 
 ```bash
-k-playbook context
+k-playbook briefing
 ```
 
-It outputs the resolved working state as JSON: directories, remediation policy, and the catalogs, with shipped and project-owned content already merged, an origin for each entry, and disabled entries marked.
+It outputs what applies: the project and its directories, the instructions, reviews and guidelines with shipped and project-owned content already merged, an origin for each entry that is not shipped, and disabled entries marked. The environment facts single commands need (remediation policy, base tools, `gh`) come with `k-playbook briefing --part environment`.
 
-The interface presents the same information in readable form in the `Resolved context` section.
+The interface presents the resolved paths and catalogs in readable form in the `Resolved context` section.
 
 ## Where do the instructions for a session live?
 

@@ -18,7 +18,7 @@ Mit `k_playbook_doc_append` und
 
 <!-- k-task-run: abgebrochen <TASK_FILE> -->
 **Status:** Teilweise ausgeführt - abgebrochen  
-**Datum:** <context.now.date>  
+**Datum:** <now.date>  
 **Abgebrochen bei:** <Schritt oder Etappe aus der Rückgabe>  
 **Grund:** <kurzer Grund>
 ```

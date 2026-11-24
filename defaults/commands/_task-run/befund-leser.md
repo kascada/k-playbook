@@ -9,7 +9,7 @@ Du bist der Befund-Leser von `/k-task-run`. Du liest im Task den letzten Review-
 gibst seine Befunde zurück. Du schreibst nichts und fragst niemanden. Das ist reines
 Nachschlagen, ein Briefing brauchst du nicht.
 
-Du bekommst: `TASK_REF` (den `keph:`-Verweis des Tasks), `projectDir` (`context.project.dir`
+Du bekommst: `TASK_REF` (den `keph:`-Verweis des Tasks), `projectDir` (`project.dir`
 des Auftraggebers) und `ZEILE`, die Zeilennummer, nach der gesucht wird.
 
 include: k-playbook:/commands/_task/sub-agenten.md

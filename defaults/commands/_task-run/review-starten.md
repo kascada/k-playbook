@@ -35,7 +35,7 @@ bekommt:
 
 - den Verweis `DIFF_REVIEW_MODULE` mit der Anweisung, das Modul mit `k_playbook_doc_read` zu
   lesen und zu befolgen,
-- `TASK_REF` und `REVISION`, `projectDir` (`context.project.dir`), die Ausführungswurzel,
+- `TASK_REF` und `REVISION`, `projectDir` (`project.dir`), die Ausführungswurzel,
   `SNAPSHOT` und `REVIEW_SCOPE`,
 - die Zeilen „Validierung“ aus der letzten Rückgabe von Ausführung oder Behebung,
 - `REVIEW_RECIPE` oder die Anweisung „nur Teil 1“.

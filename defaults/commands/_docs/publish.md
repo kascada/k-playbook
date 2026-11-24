@@ -3,7 +3,7 @@ title: publish und seine Antworten
 description: Modul für /k-docs-code und /k-docs-tools, vom Hauptkontext gelesen, wenn die Dokumente geschrieben sind — k_playbook_docs_publish aufrufen, die Antwort je Dokument melden (created, written, deleted, unchanged, conflict, failed) und mit den Ablehnungen und Fehlern umgehen (invalid_input, hints_changed, conflict, kephalaion_unavailable, outcome_unknown).
 ---
 
-Rufe `k_playbook_docs_publish` mit `projectDir` = `context.project.dir` und `erzeuger` = dem
+Rufe `k_playbook_docs_publish` mit `projectDir` = `project.dir` und `erzeuger` = dem
 Erzeuger des Commands auf (`code` bzw. `libs`; ersatzweise `k-playbook docs publish
 <erzeuger> --json`). `allow_hints: true` nur, wenn der Nutzer geänderte, neue oder mit einem
 Dokument entfallende `hints` bestätigt hat.

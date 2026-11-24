@@ -26,10 +26,10 @@ Produces:
 
 **Module.** Sonderfälle und Aufträge an Sub-Agenten stehen in Modulen, Verweisen
 `k-playbook:/commands/_task-run/<datei>.md`, `_task/…` und `_task-refine/…`. Der Hauptkontext
-liest ein Modul mit `k_playbook_doc_read` (`projectDir` = `context.project.dir`) erst, wenn der
+liest ein Modul mit `k_playbook_doc_read` (`projectDir` = `project.dir`) erst, wenn der
 Fall eintritt — nie vorsorglich —; einem Sub-Agenten, der ein Modul selbst liest, gibt er den Verweis, die Werte
 des Moduls und `_task/sub-agenten.md` (Briefing-Zeile, Lesewege). Eine gleichnamige Datei unter
-`<context.project.dir>/.k-playbook/commands/` ersetzt ein Modul (Überlagerung nach Dateipfad).
+`<project.dir>/.k-playbook/commands/` ersetzt ein Modul (Überlagerung nach Dateipfad).
 
 ## Schritt 1 — Briefing und Form
 
@@ -38,7 +38,7 @@ include: _shared/erster-schritt.md
 Verbindlich für Ablage, Nummernauflösung, Kennzeilen, Fortschrittszeilen und den Schreibweg
 eines Tasks ist `k-playbook:/instructions/on-demand/tasks.md`; lies sie mit
 `k_playbook_doc_read`, bevor du einen Task liest. Der Command braucht die Collection: Steht
-`context.kephalaion.ok` nicht auf `true`, endet er mit `context.kephalaion.message`
+`kephalaion.ok` nicht auf `true`, endet er mit `kephalaion.message`
 (Abschnitt „Ohne Kephalaion“ dort).
 
 **Hauptkontext und Task-Dokument.** Der Hauptkontext liest einen Task nur mit
@@ -62,7 +62,7 @@ include: _task/fertig-meldung.md
 ## Sperre des Arbeitsbaums
 
 Die Sperre hält und vergibt k-playbook: Was das Werkzeug `k_playbook_lock` (MCP-Server
-`k-playbook`, `projectDir` = `context.project.dir`) sagt, gilt. Gesperrt wird je Projekt; die
+`k-playbook`, `projectDir` = `project.dir`) sagt, gilt. Gesperrt wird je Projekt; die
 Sperre nimmt und prüft allein der Hauptkontext, nie ein Sub-Agent. Ein Task mit `Target repo`
 außerhalb des Projekts ist durch sie nicht geschützt.
 
@@ -149,12 +149,14 @@ die dort zurückfielen, mit dem Grund je Task; sonst weiter mit Schritt 4. Ohne 
 
 ## Schritt 4 — Diff und Review vorbereiten
 
-Ob ein Task einen Diff und ein Review bekommt, folgt aus dem Briefing:
+Ob ein Task einen Diff und ein Review bekommt, folgt aus `project.vcs` im Briefing und aus
+`environment.baseTools`. Das zweite steht nicht im Briefing: Hol es hier über den Abruf
+`environment` — `k_playbook_briefing` mit `part: "environment"`, ersatzweise `k-playbook briefing --part environment`.
 
-- `context.project.vcs` ist `git` und `git` steht nicht in `context.baseTools.missing`:
+- `project.vcs` ist `git` und `git` steht nicht in `environment.baseTools.missing`:
   `DIFF_ENABLED=true`. Fehlt `git`: `DIFF_ENABLED=false`; einmal sagen, dass damit Diff, Review
   und der Stopp bei kritischen Befunden entfallen, und den Befehl aus
-  `context.baseTools.installCommand` nennen.
+  `environment.baseTools.installCommand` nennen.
 - Sonst: `DIFF_ENABLED=false`, still weiter.
 
 Mit `DIFF_ENABLED=true` gilt
@@ -278,7 +280,7 @@ Starte einen General-Purpose-Sub-Agenten (OpenCode: `general`, Claude Code:
 `k-playbook:/commands/_task-run/ausfuehrung.md`, Abschnitt „Ausführung“. Du übergibst ihm den
 Verweis und diese Werte, nicht den Inhalt des Tasks:
 
-- `TASK_REF` und `REVISION`; das Arbeitsverzeichnis und `projectDir` (`context.project.dir`,
+- `TASK_REF` und `REVISION`; das Arbeitsverzeichnis und `projectDir` (`project.dir`,
   auch wenn die Ausführungswurzel woanders liegt),
 - bei `## Ausführungskontext`: die aufgelöste Ausführungswurzel, Base- und Work-Branch,
   PR-Pflicht, die Entscheidung zum schmutzigen Arbeitsbaum und das Ergebnis des
@@ -334,7 +336,7 @@ anhängen:
 
 <!-- k-task-run: ausgeführt <TASK_FILE> -->
 **Status:** Erfolgreich ausgeführt  
-**Datum:** <context.now.date>  
+**Datum:** <now.date>  
 **Zusammenfassung:** <Zusammenfassung aus der Rückgabe>
 ```
 

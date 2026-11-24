@@ -12,6 +12,6 @@ der Auftrag nennt ihm, was er braucht, und Texte als Verweis, nicht als Kopie.
 - In Claude Code sind die Werkzeuge `mcp__k-playbook__*` im Sub-Agenten oft verzögert; er lädt
   sie vor dem ersten Aufruf mit der Werkzeugsuche.
 - **Lesewege für Verweise:** `k-playbook:` und `keph:` mit `k_playbook_doc_read` (`ref` = der
-  Verweis, `projectDir` = `context.project.dir` des Auftraggebers), ersatzweise in der Shell
+  Verweis, `projectDir` = `project.dir` des Auftraggebers), ersatzweise in der Shell
   `k-playbook read <verweis>`; `project:/<pfad>` direkt von der Platte, ab `projectDir`.
 - Der Auftrag nennt `projectDir` immer, auch wenn die Ausführungswurzel woanders liegt.

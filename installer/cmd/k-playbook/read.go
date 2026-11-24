@@ -123,11 +123,11 @@ ab dem Arbeitsverzeichnis aufwärts.
   k-playbook:/reviews/review-<name>.md
   k-playbook:/commands/<name>.md
             Eine Datei: die lokale, sonst die mitgelieferte, unverändert mit
-            Frontmatter — dieselbe Überlagerung wie catalogs in k-playbook
-            context. Eine leere lokale Datei schaltet ab: kein Inhalt, ein
-            Hinweis auf stderr, Exit 0. Die lokale Fassung von instructions
-            und reviews liegt in der Collection des Projekts unter
-            keph:/k-playbook/<sorte>/, die von commands/ unter
+            Frontmatter — dieselbe Überlagerung wie documents in
+            k-playbook briefing. Eine leere lokale Datei schaltet ab: kein
+            Inhalt, ein Hinweis auf stderr, Exit 0. Die lokale Fassung von
+            instructions und reviews liegt in der Collection des Projekts
+            unter keph:/k-playbook/<sorte>/, die von commands/ unter
             .k-playbook/commands/.
   k-playbook:/guidelines/<name>.md
             Eine Leitlinie. Nur mitgeliefert: eine lokale Fassung gibt es

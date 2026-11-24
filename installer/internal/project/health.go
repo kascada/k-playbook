@@ -91,7 +91,7 @@ func healthKephalaion(_ context.Context, projectDir string) []health.Problem {
 // kephalaionMissingHint ist die Abhilfe, wenn kephalaion nirgends liegt.
 const kephalaionMissingHint = "Kephalaion ist auf diesem Rechner nicht installiert (kein " + kephalaion.BinaryName +
 	" im PATH, unter ~/.local/bin oder unter /usr/local/bin). Installieren mit " + UpgradeCommand + " oder " +
-	kephalaion.InstallCommand + "; danach die Anbindung prüfen (kephalaion status, k-playbook context)."
+	kephalaion.InstallCommand + "; danach die Anbindung prüfen (kephalaion status, k-playbook health)."
 
 // kephalaionHint nennt je Zustand den nächsten Schritt, wenn die Meldung
 // keine eigene Abhilfe trägt.
@@ -168,16 +168,16 @@ func healthVersionSources(ctx context.Context, projectDir string) []health.Probl
 			Level:   health.LevelError,
 			Area:    health.AreaVersionSources,
 			Message: "Die Quellenkonfiguration des Versionsinventars " + versionsources.DocRef + " ist nicht erreichbar.",
-			Hint: "Kephalaion auf diesem Rechner prüfen (kephalaion status, k-playbook context unter kephalaion); " +
-				"die Einzelheiten nennt k-playbook context unter versionSources.error.",
+			Hint: "Kephalaion auf diesem Rechner prüfen (kephalaion status); " +
+				"die Einzelheiten nennt k-playbook briefing --part environment unter versionSources.error.",
 		})
 	}
 	return append(problems, health.Problem{
 		Level:   health.LevelError,
 		Area:    health.AreaVersionSources,
 		Message: "Die Quellenkonfiguration des Versionsinventars " + versionsources.DocRef + " ist nicht lesbar, von unbekannter Fassung oder trägt roots.",
-		Hint: "Das Frontmatter des Dokuments korrigieren oder das Dokument entfernen; die Einzelheiten nennt k-playbook context " +
-			"unter versionSources.error, den Vertrag k-playbook:/docs/handbook/version-inventory.md.",
+		Hint: "Das Frontmatter des Dokuments korrigieren oder das Dokument entfernen; die Einzelheiten nennt " +
+			"k-playbook briefing --part environment unter versionSources.error, den Vertrag k-playbook:/docs/handbook/version-inventory.md.",
 	})
 }
 

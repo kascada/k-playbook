@@ -31,7 +31,7 @@ Wie weiter?
   `k_playbook_doc_append` und `since_revision: REVISION` anhängen:
 
   ```text
-  **Status nach Review:** abgeschlossen vom Nutzer (<context.now.date>)
+  **Status nach Review:** abgeschlossen vom Nutzer (<now.date>)
   ```
 
   Dann weiter wie 5f, Schritt 6 (nach `done/` verschieben, Snapshot freigeben); die

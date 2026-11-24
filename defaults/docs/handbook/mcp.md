@@ -1,18 +1,17 @@
 # The MCP Server
 
 k-playbook includes an MCP server. It gives an assistant the same information that
-`k-playbook context` provides on the command line: the resolved paths,
-the remediation policy, and the effective catalog
-for reviews -- shipped and project-owned reviews already merged. A catalog for checks no
-longer exists (task 155).
+`k-playbook briefing` provides on the command line: which instructions, reviews and guidelines
+apply -- shipped and project-owned already merged --, the own open work in the project's
+collection, and the resolved paths. A catalog for checks no longer exists (task 155).
 
-`k_playbook_context` and `k_playbook_briefing` are the only tools that also write as a side
+`k_playbook_briefing` and `k_playbook_context` are the only tools that also write as a side
 effect: they synchronize the project's assistant linking with the catalog, just as the
-subcommands do -- the briefing because its section `context` comes through the same function
-(`ContextForDir`). They write only when writing changes something, and only to symlinks created
-by k-playbook itself. The response lists what happened under `links` (`k_playbook_context`)
-resp. `context.links` (`k_playbook_briefing`); if the field is absent, everything was already
-up to date.
+subcommands do -- each calls `HealLinks` itself (the briefing since task 187; before that it
+healed only because its transitional section came through `ContextForDir`). They write only when
+writing changes something, and only to symlinks created by k-playbook itself. The response lists
+what happened under `links`; if the field is absent, everything was already up to date. The
+partial call `k_playbook_briefing` with `part: "environment"` writes nothing.
 
 The server offers the working state, the review and todo tools,
 `k_playbook_doc_read` for references, the `doc` tools for numbered documents in the
@@ -340,7 +339,7 @@ then nothing is written and the interface says so.
 
 | Tool | Purpose |
 |---|---|
-| `k_playbook_context` | return the resolved working state like `k-playbook context` and synchronize assistant linking |
+| `k_playbook_context` | return the resolved working state and synchronize assistant linking; no shipped text uses it any more except the paused `/k-review` and `/k-audit`, which take `catalogs.reviews` from it (see "Briefing Contract") |
 | `k_playbook_review_status` | **temporarily unavailable**, answers `reviews_paused` ([below](#review-tools-are-paused)); otherwise: read the selection basis for new runs or the status of an existing run |
 | `k_playbook_review_create` | **temporarily unavailable**, answers `reviews_paused`; otherwise: create a review run or return validated `run.json` in a dry run |
 | `k_playbook_review_scan` | **temporarily unavailable**, answers `reviews_paused`; otherwise: execute a run's tool entries through `review.Execute` |
@@ -363,12 +362,12 @@ then nothing is written and the interface says so.
 | `k_playbook_docs_checkout` | fetch `keph:/docs/generated/<erzeuger>/` (all `.md` except `README.md`) into the working directory `.k-playbook/work/docs/<erzeuger>/` and write the checkout record beside it; reports an existing working directory instead of overwriting it, `discard` fetches anew. `erzeuger` is one of the producer table, today `code` (`/k-docs-code`, skill `ks-overlay-repo-analyse`) and `libs` (`/k-docs-tools`, task 120); the input schema lists them as `enum` |
 | `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from its template `k-playbook:/docs/generated/<erzeuger>/README.md`, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty |
 | `k_playbook_docs_readme` | write the `README.md` of the directories under `keph:/docs/` from their templates `k-playbook:/docs/<pfad>/README.md` -- each one that is missing or differs (create, otherwise write with its revision); without `pfad` all templates, with `pfad` one; `check: true` writes nothing and reports `missing`, `differs` or `unchanged`; like `k-playbook docs readme` (task 137) |
-| `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `context.docs.exclude`; creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
+| `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `environment.docs.exclude` (the partial call of the briefing); creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
 | `k_playbook_docs_scope` | compute the scope of the docs producers that scan the code (`/k-docs-code`, `/k-docs-tools`) by rules that stand only in the program, not in the command texts (tasks 179 and 180; `k-playbook:/commands/_docs/scope.md` calls it), locally and without Kephalaion: `scanRoot` (`project.repoRoot`), `stand` (branch, commit, whether `git status --porcelain` is empty), the effective exclusions by origin under `exclude` and, with `pfad` (exactly one extra path, `EXTRA_PATH`), `extra`; `check` reports per path whether it is excluded and why; like `k-playbook docs scope` |
 | `k_playbook_docs_orders` | read the open documentation orders of a producer (`erzeuger`: `code` or `tools`) from `keph:/queue/docs/` and rate them (task 179): per order raw or split, waiting (with the remaining minutes) or ready; for `code` also the run (`full`, `partial`, `resume`, `none`), the merged raw orders (`rawOrders`), the open split orders (`splitOrders`), the waiting ones (`waiting`) and `nothingToDo`; like `k-playbook docs orders` |
 | `k_playbook_docs_order_add` | queue a raw documentation order or extend the open one of the same session (task 179): answer `created`, `extended`, `covered` or `skipped` with a reason (`no_generated_docs`, `kephalaion_unavailable`); like `k-playbook docs order add` |
 | `k_playbook_docs_orders_split` | write the split orders of `/k-docs-code` from the lines the user confirmed and close what they absorbed (task 179): per document `created`, `extended`, `skipped` or `failed`, then the raw orders to `done/`; like `k-playbook docs orders split --json` |
-| `k_playbook_briefing` | the briefing at session start: the text of the always-instructions (`documents.always.content`), which instructions, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, each with `problem` when its frontmatter is unreadable or its title looks cut off at ` #`, the number of open findings), the environment check under `health` (the same report as `k_playbook_health`), and in the transitional section `context` the rest of `k_playbook_context` that the briefing does not cover itself; heals the assistant links as a side effect (`context.links`); like `k-playbook briefing --json` |
+| `k_playbook_briefing` | the briefing at session start: date, project and Kephalaion binding in sections of their own (`now`, `project`, `kephalaion`), the text of the always-instructions (`documents.always.content`), which instructions, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, at most 10 each with `work.total` for the number of all, each with `problem` when its frontmatter is unreadable or its title looks cut off at ` #`, the number of open findings), the services of the personal GitHub access file for this repository (`github.projectServices`), and the environment check under `health` (the same report as `k_playbook_health`); heals the assistant links as a side effect (`links`); like `k-playbook briefing --json`. With `part: "environment"` it returns only the environment facts single commands need (`gh`, `github`, `baseTools`, `versionSources`, `docs`, `remediation`) under `environment`, like `k-playbook briefing --part environment --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing and writes nothing -- a missing access file is no entry and stays missing (`k-playbook github init` creates it); never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
 | `k_playbook_github_test` | ask GitHub whether the accesses of the personal access file `~/.config/k-playbook/github.yaml` work, for one `service` or all: the object of `k-playbook github test --json` under `test` -- without a file `ok: true` with `test.present: false` and a hint to `k-playbook github init`, nothing tested or created; per access `result` (`ok`, `failed`, `skipped`), `identity`, `read`, `write`, `expires`, `warning`, `message`, per service `selected` (the choice of `github run`) and `selectedOk`; the only tool that uses the network, several requests per access, ten seconds each, only on this call; never a token in the answer |
 | `k_playbook_gui_status` | report the state and the address of the project's interface without changing anything, like `k-playbook gui status` |
@@ -743,10 +742,10 @@ empty `defaults/`, a `k-playbook:` reference is `kephalaion_unavailable`, also w
 exists -- no fallback to the disk, and none to a leftover clone `k-playbook/`. For `commands/` that is the text of a command, while
 the file under `share/commands/` (unpacked to `~/.local/share/k-playbook/commands/`) is only the hull the assistant registers (task 092,
 [verweisschema.md](verweisschema.md#resolving-k-playbook)). The overlay is the one of
-`catalogs` in `k_playbook_context` (`overlayDocDir`): for `reviews`, name,
+`documents` in the briefing (`overlayDocDir`): for `reviews`, name,
 `origin` and `disabled` of an entry are the same over both ways, which a test checks.
 `guidelines` is not an overlay kind (task 148): it is read only from the shipped
-`<hub>:k-playbook/defaults/guidelines/`, and the context output has no field `guidelines`
+`<hub>:k-playbook/defaults/guidelines/`, and it stands only under `documents.guidelines`
 (see [k-playbook-format.md](k-playbook-format.md#what-exists-only-once)).
 
 Include lines (`include: <ref>`, absolute or relative within the same prefix) are replaced by
@@ -851,7 +850,7 @@ list item `- <full name> | <target or reason>` per finding handled or skipped, a
 each entry is there or not). Project-wide, no `done/`; the user reads and deletes them. The kind
 goes away once the procedure has proven itself.
 
-`<name>` is `kephalaion.user` from `k-playbook context`, the person, not the account.
+`<name>` is `kephalaion.user` from the briefing, the person, not the account.
 Everything under `queue/` has no user area; a table entry with a location under `queue/` and a
 user area is rejected. Directories come into being in Kephalaion with their first document.
 `tasks` starts at 001 like the other kinds (task 105); only the file name has to be unique,
@@ -1203,7 +1202,7 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   (the body lines `datum -- anlass`) and, for a raw order of `code`, `waiting` with
   `remainingMinutes`. For `code` the answer adds `waitMinutes` (120, the value lives only in the
   program, which computes with its own clock against `updated`, not against
-  `context.now.timestamp`), `run` and the lists. `run` is `full` when a raw order has
+  `now.timestamp`), `run` and the lists. `run` is `full` when a raw order has
   `pfade: .` (it takes every open raw order, waiting ones included, so `waiting` is empty),
   `partial` when ready raw orders exist, `resume` when only split orders are open (an earlier run
   was interrupted) and `none` otherwise. `rawOrders` is the list the run takes after merging:
@@ -1252,9 +1251,10 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
 ### Briefing Contract
 
 `k_playbook_briefing` is a thin wrapper over `project.BuildBriefing` (`project/briefing.go`);
-the subcommand `k-playbook briefing [--json]` calls the same function, without `--json` as a
-plain text for reading while testing. Its only input is `projectDir` (required by contract, like
-every tool). The briefing is the one call at the start of a session: **data, not prose** — it
+the subcommand `k-playbook briefing [--json]` calls the same function, without `--json` as the
+plain text -- the fallback route through the shell, see "Size" below. Its inputs are `projectDir`
+(required by contract, like every tool) and the optional `part` (see "The partial call
+`environment`"). The briefing is the one call at the start of a session: **data, not prose** — it
 lists what applies and what is pending as references in the prefix scheme
 ([verweisschema.md](verweisschema.md)), never paths, and with one exception never contents:
 `documents.always.content` carries the text of the always-instructions
@@ -1264,24 +1264,67 @@ session has to read that text first — a second call for it would be a detour. 
 `k-playbook briefing` therefore starts with this text, without the list of its parts; the parts
 with their origin are in the JSON only. Every other listed document is read with
 `k_playbook_doc_read` (`k-playbook:` references) or on the route of its prefix.
-Environment facts — paths, tools, `gh`, the Kephalaion binding — stand in the briefing only in
-the transitional section `context` (task 091): the rest of `k_playbook_context` that the
-briefing's own sections do not cover, built from the same function (`ContextForDir`), never
-rebuilt. So one call is enough for the start of a session, and the rest shows what is left of
-`k_playbook_context`; each later step takes one field out of it and gives it a place of its own
-(the authority is the table "Context field → future place" in
-`knowledge-aktuell.md` in the repository),
-and when the rest is empty, `k_playbook_context` and `k-playbook context` go. Until then both
-work unchanged. A test (`TestBriefingTraegtKeinFeldDerKontextausgabe`) keeps the top-level
-fields of the two outputs disjoint (`schemaVersion` excepted, which describes each output
-itself) and the rest complete: every field of `BuildContext` that is not covered is in
-`context`, the covered ones are not.
+Since task 187 (version 9) the briefing carries no rest of `k_playbook_context` any more; the
+transitional section `context` of task 091 is gone. What every session needs has sections of its
+own -- `now`, `project`, `kephalaion`, `github.projectServices` and `links` --, built from the
+same readers as the context output (`buildNow`, `ReadConfig`, `KephalaionStatus`,
+`contextGitHub`, `HealLinks`), never rebuilt. What only single commands read comes through the
+partial call `environment`. Fields nobody read are dropped from the briefing: the version of
+the configuration, `mcp`, `git`, `project.config`, `baseTools.matrix`, of `gh` everything except
+`ready` and `account`, and of the Kephalaion binding hub, collection, account, choice, state,
+rights, node and sync. So one call is enough for the start of a session.
+
+`k_playbook_context` and `k-playbook context` still exist, unchanged, and go in a step of their
+own. No shipped text, no script in the repository and no function of the briefing needs them any
+more, with one exception: the paused commands `/k-review` and `/k-audit` (with
+`_audit/review-scan-triage.md`) take `catalogs.reviews` -- the review modes `audit` and `review`
+per recipe -- from the context output until they are rebuilt; the briefing's `documents.reviews`
+lists the recipes without these modes. Giving the modes a place of their own is the precondition
+for removing the context output.
+
+**The partial call `environment`** (task 187). `k_playbook_briefing` with `part: "environment"`
+and `k-playbook briefing --part environment [--json]` return only this part
+(`BuildBriefingEnvironment` in `project/briefing.go`); without `part` the briefing does not
+contain it. The answer is `{ok: true, tool, projectDir, environment}`, on the command line
+`{"environment": {…}}`; the plain text shows the same fields indented under `environment:`. An
+unknown `part` is `invalid_input` (the subcommand: an error, no briefing).
+
+| Field | Content |
+|---|---|
+| `environment.available` | whether the part could be built; `false` with `environment.message` when the configuration is unreadable or of an unknown version -- the other fields are absent then |
+| `environment.gh` | the finding for the GitHub CLI on this machine: `ready` and `account` |
+| `environment.github` | the personal access file against the repository of the working directory, as in `k-playbook github show --json`: `file`, `present`, `problems`, `remote`, `repo`, `projectServices`, `services` (see `github-access.md`, *In the briefing*) |
+| `environment.baseTools` | the base tools k-playbook calls itself: `present`, `error`, `missing`, `ok`, `installCommand` |
+| `environment.versionSources` | the state of the source configuration `keph:/k-playbook/inventory.md` (see `version-inventory.md`) |
+| `environment.docs` | `exclude` and `problems` of the block `docs:` |
+| `environment.remediation` | the remediation policy |
+
+The partial call is not a briefing: it assigns no session identifier, returns neither
+instructions nor the work list, heals no links and does not count as reloading the briefing. A
+command fetches it fresh at the place where it needs one of the fields, also several times per
+session, and its fields stand beside those of the loaded briefing without that being a mix of
+two loads. Demarcation: `health` (in the plain text "Umgebung:") evaluates and names remedies,
+`environment` delivers the raw values. A test (`TestBriefingTeilabrufEnvironment`,
+`TestBriefingEnvironment`) checks that the partial call carries neither `session` nor `documents`
+nor `work` and that its values equal those of the context output.
+
+**Size** (task 187, measured 2026-11-24 with Claude Code in its default setting). A shell output
+of 30 000 characters or more is put into a file as a whole, with only a 2 KB preview in the
+context; an MCP answer is cut somewhere between about 45 000 and 53 000 characters. The plain
+text therefore stays small: the work lists are capped at 10 entries each, "Auf Abruf", "Reviews"
+and "Leitlinien" show reference and title only (the origin only when it is not `dist`, the
+description only in the JSON), and the rest of the context output is gone. A test
+(`TestBriefingKlartextBleibtUnterDerGrenze`) builds the plain text over the repository's
+`defaults/` with 40 open tasks and 40 workbench topics and requires at most 24 000 characters.
+The plain text is the fallback route through the shell (`k-playbook briefing`, without `--json`):
+only for it is the limit secured, and it shows every field a text reads from the briefing. The
+JSON is meant for MCP and has no limit of its own.
 
 The section `health` (version 4, task 098) is the environment check: the report of
 `health.Check` (`internal/health`), the same that `k_playbook_health` and `k-playbook health`
-return -- see "Health Contract" below. It **evaluates** fields of the section `context`
-(`kephalaion`, `baseTools`, `versionSources`) and replaces none of them; the context
-output stays unchanged. The area `github` evaluates no context field: it reads the personal
+return -- see "Health Contract" below. It **evaluates** the environment and names remedies;
+the raw values stand under `kephalaion` in the briefing and under `environment.baseTools` and
+`environment.versionSources` in the partial call. The area `github` reads the personal
 GitHub access file (`github-access.md`). In the plain text of `k-playbook briefing` the block stands right after
 the text of the always-instructions and before "Auf Abruf", so that a session reads it before
 it does anything: one line `Umgebung: keine Probleme` without a problem, otherwise `Umgebung:`
@@ -1299,37 +1342,57 @@ k-playbook troubleshooting`. That subcommand is a placeholder until its own task
 it will check Kephalaion first and then search for the next error of the environment step by
 step, and exits 0. `k-playbook health` still names the error under `kephalaion`.
 
-**Head of the plain text** (2026-10-25). `k-playbook briefing` without `--json` starts with three
-lines before the text of the always-instructions: `Sitzung: <session>`, the request to read the
+**Head of the plain text** (2026-10-25, extended with task 187). `k-playbook briefing` without
+`--json` starts, before the text of the always-instructions, with `Sitzung: <session>`, then a
+block of at most eight lines with the sections every session reads under their field names --
+`now: date … · timestamp …`, `project: dir … · repoRoot … · vcs … · languages …`,
+`kephalaion: ok … · address … · user … · message …` and, only when the link healing reports
+something, `links.healed:`, `links.open:` and `links.note:` (`briefingTextSections` in
+`cmd/k-playbook/briefing.go`); a section that could not be built says so in its place
+(`project: dir … · nicht verfügbar — <message>`). Then the request to read the
 output in full (`Lies diese Ausgabe ganz, nicht gekürzt: …`), and `Es gelten:` with the titles of
-the always-parts that are not disabled, joined by ` · ` (`briefingTextHead` in
-`cmd/k-playbook/briefing.go`). They stand first because sessions cut the output short in the
+the always-parts that are not disabled, joined by ` · ` (`briefingTextHead`). They stand first
+because sessions cut the output short in the
 shell: Claude Code read it with `| head -80` and missed both the instruction on findings and the
 identifier, which then stood at the end. Whatever is cut, these lines survive and name what the
-rest holds. The JSON answer is unchanged.
+rest holds.
 
-A successful answer is `{ok: true, tool, projectDir, schemaVersion, session, documents, work,
-projectDocs, health, context}`:
+**Rest of the plain text** (task 187). After the always-instructions and the block `Umgebung:`:
+"Auf Abruf", "Reviews" and "Leitlinien" with one line per document (`  <ref>  <title>`, with
+`[<origin> <location>]` between them only when the origin is not `dist`); "Eigene Arbeit" with one
+head line per list (`Offene Tasks (<total>) in keph:/user/<user>/tasks/:`, `Aktive Arbeitsstände
+(<total>, zuletzt geänderte zuerst) in keph:/user/<user>/workbench/:`), below it per entry file
+name and title -- the reference of an entry is directory plus file name -- and, when the list
+does not show all, `+ <n> weitere: k_playbook_doc_list (kind tasks)` resp. `(kind workbench)`;
+`Offene Befunde: <n>`; `Projektdoku:`; the line `GitHub:`; and last a line naming the partial
+call `environment`.
+
+A successful answer is `{ok: true, tool, projectDir, schemaVersion, session, now, project,
+kephalaion, documents, work, projectDocs, github, health}`, with `links` when there is something
+to report:
 
 | Field | Content |
 |---|---|
-| `schemaVersion` | the version of the briefing output, `"8"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, the directory of the former clone in the project) |
+| `schemaVersion` | the version of the briefing output, `"9"` (`"1"` had no `context`, `"2"` no `documents.always.content`, `"3"` no `health`, `"4"` no `session`, `"5"` still had the list of rules, `"6"` still had `context.playbook`, the directory of the former clone in the project, `"7"` still had `context.local`, `"8"` still had the transitional section `context` and uncapped work lists) |
 | `session` | the identifier of this session, new with every briefing: the time of the briefing as `YYYYMMDD-HHMMSS` and six hex characters of randomness (`newSessionID` in `project/briefing.go`), e.g. `20261024-183012-3fa9c1`. A session loads the briefing once, so the identifier stands for the session; what it writes and has to find again carries it -- a finding in `queue/findings/` under `sitzung`, which `/k-danke` looks for. It is assigned here because only Claude Code puts an identifier of its own into the environment (`CLAUDE_CODE_SESSION_ID`), OpenCode none (measured 2026-10-24). The plain text shows it as `Sitzung: <id>` in its first line (see "Head of the plain text" below) |
+| `now` | the moment of the call in the machine's time zone: `date` (`YYYY-MM-DD`) and `timestamp` (RFC 3339) -- the date a session writes into logs and names instead of guessing it |
+| `project` | `dir` (the main directory, where `.k-playbook/K-PLAYBOOK.yaml` lies; always present), `repoRoot`, `vcs` and `languages`. `available` is `false` with `message` when the configuration is unreadable, of an unknown version or names an inadmissible language -- a state like `work.available`, not an error: `dir` stays, the other fields and `links` are absent, the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
+| `kephalaion` | `ok` (whether `keph:` references are reachable), `message` (the sentence for the state, with the remedy on an error), `address` (`<hub>:<collection>`, the value for `collection` in the Kephalaion tools) and `user` (the own Kephalaion user, what `~` stands for; only with `ok`) |
 | `documents.always` | the assembled directory `k-playbook:/instructions/always/`: `ref`, `content` (the assembled text — parts without frontmatter, include lines replaced, disabled and empty parts skipped, joined by a blank line; `""` without parts; identical to what `k_playbook_doc_read` returns for `ref`), `parts` in the order of the text, `problems` (files without a leading number and parts whose include failed, each skipped — the briefing still comes about) |
 | `documents.onDemand`, `.reviews`, `.guidelines` | the entries of the kind, sorted by name, each a file to read on its own; `reviews` follows the catalog pattern `review-*.md`, `README.md`, dotfiles and subdirectories never appear |
 | each entry | `ref` (`k-playbook:/<kind>/<name>`), `title` (frontmatter `title`, else the first heading of any level, else the file name), `description` (frontmatter `description`, else `""`), `origin` (`dist`, `local`, `override`, or `disabled` for an entry an empty local file switched off; always `dist` under `documents.guidelines`, a kind without a local layer since task 148) |
 | `work.available` | whether the project's collection could be read; `false` with `work.message` when `kephalaion.ok` is not true, the node cannot be reached or a listing fails -- a state, not an error |
 | `work.user` | the own Kephalaion user whose work is listed |
-| `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`) and active workbench topics (`user/~/workbench/`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` and `problem` (unreadable frontmatter or a title that looks cut off at ` #`, as in `k_playbook_doc_list`; absent otherwise -- the plain text appends it to the line after ` — `) -- exactly what `k_playbook_doc_list` returns without `done`; "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
+| `work.tasks`, `work.workbench` | the own open tasks (`user/~/tasks/`), ordered by number, and active workbench topics (`user/~/workbench/`), ordered by last change with the newest first -- **at most 10 each** (`BriefingWorkLimit`), each `ref` (with the real user name), `title` (frontmatter `title`, else the file name), `updated` and `problem` (unreadable frontmatter or a title that looks cut off at ` #`, as in `k_playbook_doc_list`; absent otherwise -- the plain text appends it to the line after ` — `); "open" and "active" mean not in `done/`, a `status` frontmatter plays no role |
+| `work.total` | `tasks` and `workbench`: the number of all own open tasks and active workbench topics, also those the cap keeps out of the lists; `k_playbook_doc_list` (kind `tasks` resp. `workbench`) returns all of them |
 | `work.openFindings` | the number of documents in `queue/findings/` |
 | `projectDocs` | the entry of the project documentation: the directory reference `keph:/docs/` in the project's collection (task 101). It is read with Kephalaion `list` on `docs/` (`recursive`, `frontmatter`), not with `k_playbook_doc_read`; `docs/index.md` first once Kephalaion generates it. Without a ready binding the entry is out of reach, and there is no fallback to the disk |
 | `health` | the environment check: `ok` (`false` as soon as one entry has level `error`; warnings leave it `true`) and `problems` (always present, `[]` without a problem), each `level` (`error`, `warning`), `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message` (one sentence; service and key names may appear, never a token or a value from a file), `hint` (the remedy), sorted by area, then level (`error` first), then message -- exactly the report of `k_playbook_health`, see "Health Contract" |
-| `context.available` | whether the context output could be built; `false` with `context.message` when there is no installation, the configuration is unreadable or of an unknown version -- a state like `work.available`, not an error: the rest of the briefing stays, `ok` stays `true`, the subcommand exits 0 |
-| `context.<field>` | every top-level field of `k_playbook_context` under its name and with its value unchanged (`schemaVersion` of the configuration, `now`, `project`, `remediation`, `docs`, `gh`, `mcp`, `git`, `baseTools`, `catalogs`, `catalogsProblem` when the shipped layer of the catalogs could not be read, `versionSources`, `kephalaion`, `links` when there is something to report, `github`), in the order of the context output -- **minus** the fields the briefing covers itself, listed at exactly one place in the code (`briefingCoveredContextFields` in `project/briefing.go`): `catalogs.reviews` (`documents.reviews`). An object that is left empty this way is dropped as well, so `catalogs` does not appear in the section at all since the catalog `checks` was removed (task 155). The context output has no field `guidelines` any more (task 148); guidelines stand only under `documents.guidelines` |
-| `context.links` | the self-healing of the assistant links, exactly as `links` in `k_playbook_context`; absent when there was nothing to report |
+| `github.projectServices` | the services of the personal GitHub access file whose `repo` is the repository of the working directory, in file order; `[]` without a file, a remote or a matching service -- the value for `k-playbook github run <service>`. The plain text shows the line `GitHub:` with what `run` selects; the full object is `environment.github` in the partial call |
+| `links` | the self-healing of the assistant links the briefing triggers (`HealLinks`): `healed` (`added`, `removed`, `repointed`), `open` (per target `path`, `state`, `detail`) and `note`; absent when there was nothing to report, and when `project.available` is `false` -- then nothing is set up |
 
 All lists are always present, `[]` when empty. The documents come through the same overlay as
-`catalogs` in `k_playbook_context` and `k_playbook_doc_read` (`overlayDocDir`): local before
+`k_playbook_doc_read` (`overlayDocDir`): local before
 shipped, an empty local file disables. `guidelines` is the exception (task 148): the kind has
 no local layer, its entries come only from the shipped `<hub>:k-playbook/defaults/guidelines/`.
 
@@ -1366,7 +1429,7 @@ problem**. No entry ever carries a token or a value from a file;
 service names and key names may appear (`services.backend.access[1]: Der Pfad in file ist
 relativ.`), values never. The entry for an unreadable source configuration names the document
 `keph:/k-playbook/inventory.md`, not the parser's message, which may quote a line of it (that
-message stays in `context.versionSources.error`); the entry for an unreadable `github.yaml` names the line
+message stays in `environment.versionSources.error`); the entry for an unreadable `github.yaml` names the line
 number, not the line.
 
 The answer is `{ok: true, tool, projectDir, health: {ok, problems}}`. The report is nested under
@@ -1382,8 +1445,8 @@ is always present, `[]` without a problem. The sources in this version:
 | `kephalaion` | not configured | `error` (a `warning` until task 131) | enter the block `kephalaion:` (hub, collection) in `.k-playbook/K-PLAYBOOK.yaml` and commit it, or set up the binding in the GUI; without it there are no shipped texts (`k-playbook:`, the briefing) and `keph:` references, workbench and `work` are out of reach |
 | `kephalaion` | the block `kephalaion:` in `.k-playbook/K-PLAYBOOK.yaml` carries an `account:` | `warning` | remove the line and commit; the account of this machine is set with `kephalaion node account default <hub> <account>` |
 | `baseTools` | one entry per tool in `baseTools.missing` | `warning` | the `installCommand` of the base tools |
-| `versionSources` | the source configuration `keph:/k-playbook/inventory.md` is present, but unreadable, of an unknown schema version, or carries `roots` (`versionSources.state` `invalid`) | `error` | fix the frontmatter or remove the document; the details are in `context.versionSources.error` |
-| `versionSources` | the Kephalaion binding is ready, but the document cannot be read (`versionSources.state` `unavailable`); with a binding that is not ready this area stays silent, area `kephalaion` carries the error | `error` | check Kephalaion on this machine (`kephalaion status`, `kephalaion` in `k-playbook context`) |
+| `versionSources` | the source configuration `keph:/k-playbook/inventory.md` is present, but unreadable, of an unknown schema version, or carries `roots` (`versionSources.state` `invalid`) | `error` | fix the frontmatter or remove the document; the details are in `environment.versionSources.error` (`k-playbook briefing --part environment`) |
+| `versionSources` | the Kephalaion binding is ready, but the document cannot be read (`versionSources.state` `unavailable`); with a binding that is not ready this area stays silent, area `kephalaion` carries the error | `error` | check Kephalaion on this machine (`kephalaion status`); the details are in `environment.versionSources.error` |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |
 | `github` | the file reads, but a service has no `available` access -- every access is `unavailable` or `disabled`, judged without the network (`github-access.md`, "Availability"): `services.<name>: kein verfügbarer Zugang — <reason of the first access that is not disabled>` | `warning` | set up an access of that service in the file; `k-playbook github check` names the reason per access |
 | `share` | `K_PLAYBOOK_SHARE_DIR` is set but not an absolute path | `warning` | set it to an absolute path or remove it; until then the shipped commands and skills are missing |
@@ -1399,8 +1462,8 @@ any git error it stays silent: an unanswered question is no finding. It reuses t
 There is no area `gh` (task 128). A service without an available access warns under `github`;
 without a service and without a ready `gh` the check stays silent on purpose, even with a
 GitHub remote: as long as GitHub is not set up, there is nothing to warn about. It shows when a
-command wants to use GitHub and stops. `context.gh` carries only the finding for this machine
-(`installed`, `path`, `loggedIn`, `account`, `accounts`, `tokenFromEnv`, `ready`).
+command wants to use GitHub and stops. `environment.gh` carries only the finding for this machine
+(`ready`, `account`).
 
 Exit codes of the subcommand: 0 without an error (warnings do not count), 1 with at least one
 error, 2 on a call error (unknown option, no project). Error codes of the tool in `error.code`:

@@ -77,22 +77,68 @@ func TestBriefingWerkzeugListetDokumente(t *testing.T) {
 	if envelope.ProjectDocs != "keph:/docs/" {
 		t.Errorf("projectDocs %q", envelope.ProjectDocs)
 	}
-	// Der Rest von k_playbook_context steht im Abschnitt context, ohne die
-	// Felder, die documents schon liefert.
-	section := envelope.Context
-	if !section.Available || section.Message != "" {
-		t.Fatalf("context: %+v", section)
+	// Die Abschnitte, die jede Sitzung braucht, stehen im Briefing selbst.
+	if !envelope.Project.Available || envelope.Project.Dir != root || envelope.Now.Date == "" || envelope.Kephalaion.Message == "" ||
+		envelope.GitHub.ProjectServices == nil {
+		t.Errorf("project %+v, now %+v, kephalaion %+v, github %+v", envelope.Project, envelope.Now, envelope.Kephalaion, envelope.GitHub)
 	}
-	if raw, ok := section.Field("project"); !ok || !strings.Contains(string(raw), root) {
-		t.Errorf("context.project: %s", raw)
+	// Den Übergangsabschnitt context gibt es nicht mehr (Task 187), und ohne
+	// part enthält die Antwort den Teilabruf nicht.
+	text := result.Content[0].(*mcp.TextContent).Text
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(text), &raw); err != nil {
+		t.Fatal(err)
 	}
-	if _, ok := section.Field("guidelines"); ok {
-		t.Errorf("context trägt guidelines")
+	for _, absent := range []string{"context", "environment", "catalogs", "remediation", "baseTools"} {
+		if _, ok := raw[absent]; ok {
+			t.Errorf("Antwort trägt %s: %s", absent, raw[absent])
+		}
 	}
-	// reviews steht unter documents; einen anderen Katalog gibt es nicht mehr
-	// (rules Task 135, checks Task 155), also fällt catalogs ganz weg.
-	if raw, ok := section.Field("catalogs"); ok {
-		t.Errorf("context.catalogs: %s", raw)
+}
+
+// Der Teilabruf (Task 187): Mit part environment trägt die Antwort nur den
+// Umschlag und environment — weder session noch documents noch work — und
+// vergibt keine Sitzungskennung. Ein unbekannter Teil ist invalid_input.
+func TestBriefingWerkzeugTeilabrufEnvironment(t *testing.T) {
+	root := newDocProject(t)
+
+	result, _, err := briefingToolHandler(context.Background(), nil, briefingInput{ProjectDir: root, Part: project.BriefingPartEnvironment})
+	if err != nil {
+		t.Fatalf("briefing: %v", err)
+	}
+	text := result.Content[0].(*mcp.TextContent).Text
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(text), &raw); err != nil {
+		t.Fatalf("Antwort ist kein JSON: %v — %s", err, text)
+	}
+	if result.IsError || string(raw["ok"]) != "true" || raw["environment"] == nil {
+		t.Fatalf("Antwort: %s", text)
+	}
+	for _, absent := range []string{"session", "documents", "work", "schemaVersion", "health", "now", "project", "kephalaion", "links", "projectDocs"} {
+		if _, ok := raw[absent]; ok {
+			t.Errorf("Teilabruf trägt %s: %s", absent, raw[absent])
+		}
+	}
+	var envelope briefingEnvelope
+	if err := json.Unmarshal([]byte(text), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	environment := envelope.Environment
+	if environment == nil || !environment.Available || environment.GH == nil || environment.GitHub == nil || environment.BaseTools == nil ||
+		environment.VersionSources == nil || environment.Docs == nil || environment.Remediation == nil {
+		t.Errorf("environment: %+v", environment)
+	}
+
+	result, _, err = briefingToolHandler(context.Background(), nil, briefingInput{ProjectDir: root, Part: "work"})
+	if err != nil {
+		t.Fatalf("briefing: %v", err)
+	}
+	envelope = briefingEnvelope{}
+	if err := json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if !result.IsError || envelope.OK || envelope.Error == nil || envelope.Error.Code != "invalid_input" || envelope.Briefing != nil || envelope.Environment != nil {
+		t.Errorf("unbekannter Teil: %#v", envelope)
 	}
 }
 

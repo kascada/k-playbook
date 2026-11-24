@@ -10,7 +10,7 @@ allowed-tools: [Bash, mcp__k-playbook__k_playbook_todo_list, mcp__k-playbook__k_
 ## Erster Schritt
 
 Liegt das Briefing in dieser Sitzung vor, nimm es. Sonst rufe `k_playbook_briefing` mit
-`projectDir` = Arbeitsverzeichnis, ersatzweise `k-playbook briefing --json`. Ist k-playbook
+`projectDir` = Arbeitsverzeichnis, ersatzweise in der Shell `k-playbook briefing`. Ist k-playbook
 nicht installiert, brich ab und melde es. Die Regeln zum Briefing stehen in seinem Text der
 immer geltenden Anweisungen (`documents.always.content`).
 
@@ -26,7 +26,7 @@ In dieser Reihenfolge, der erste verfügbare gewinnt:
 
 1. **MCP-Werkzeuge.** Bietet der Client `k_playbook_todo_list`,
    `k_playbook_todo_add`, `k_playbook_todo_update` und `k_playbook_todo_delete`
-   an, werden sie benutzt. `projectDir` ist `context.project.dir` aus dem Briefing.
+   an, werden sie benutzt. `projectDir` ist `project.dir` aus dem Briefing.
 2. **Subkommando.** Bietet er sie nicht an, wird `k-playbook todo …` über Bash
    aufgerufen. Das ist der Normalfall und keine Notlösung: der MCP-Server wird
    pro Projekt registriert und kann fehlen, das Binary ist mit der Installation

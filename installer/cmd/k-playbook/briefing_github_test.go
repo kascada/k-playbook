@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -12,16 +13,6 @@ import (
 	"github.com/kascada/k-playbook/installer/internal/health"
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
-
-// githubSection baut einen Rest, der nur context.github trägt.
-func githubSection(t *testing.T, field project.ContextGitHub) project.BriefingContext {
-	t.Helper()
-	raw, err := json.Marshal(field)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return project.BriefingContext{Available: true, Fields: []project.BriefingContextField{{Name: "github", Value: raw}}}
-}
 
 func TestBriefingGitHubLine(t *testing.T) {
 	zero, one := 0, 1
@@ -66,19 +57,22 @@ func TestBriefingGitHubLine(t *testing.T) {
 			"GitHub: die Zugangsdatei hat Fehler — k-playbook github check nennt sie"},
 	}
 	for name, c := range cases {
-		if got := briefingGitHubLine(githubSection(t, c.field)); got != c.want {
+		field := c.field
+		if got := briefingGitHubLine(&field); got != c.want {
 			t.Errorf("%s:\n%s\nerwartet\n%s", name, got, c.want)
 		}
 	}
-	if got := briefingGitHubLine(project.BriefingContext{Available: true}); got != "" {
-		t.Errorf("ohne Feld: %q", got)
+	if got := briefingGitHubLine(nil); got != "" {
+		t.Errorf("ohne Objekt: %q", got)
 	}
 }
 
-// Im Klartext steht die Zeile nach Projektdoku und vor der Trennzeile, im
-// Rest github ohne services; weder Klartext noch JSON tragen einen
-// Token-Wert — nicht aus dem Remote, nicht aus der Token-Datei —, und repo
-// ist trotzdem gefüllt.
+// Im Klartext steht die Zeile nach Projektdoku und vor dem Hinweis auf den
+// Teilabruf; im JSON des Briefings stehen nur die Dienste dieses Repos
+// (github.projectServices), das volle Objekt samt services liefert der
+// Teilabruf environment. Weder Klartext noch JSON — auch nicht der Teilabruf —
+// tragen einen Token-Wert — nicht aus dem Remote, nicht aus der Token-Datei —,
+// und repo ist trotzdem gefüllt.
 func TestBriefingGitHubOhneTokenWert(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git nicht verfügbar")
@@ -114,41 +108,74 @@ func TestBriefingGitHubOhneTokenWert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("briefing --json: %v", err)
 	}
-	for _, output := range []string{text, asJSON} {
+	partText, err := runBriefingCaptured(t, "--part", "environment")
+	if err != nil {
+		t.Fatalf("briefing --part environment: %v", err)
+	}
+	partJSON, err := runBriefingCaptured(t, "--part", "environment", "--json")
+	if err != nil {
+		t.Fatalf("briefing --part environment --json: %v", err)
+	}
+	for _, output := range []string{text, asJSON, partText, partJSON} {
 		for _, secret := range []string{"ghp_remotegeheim", "x-access-token", "ghp_dateigeheim"} {
 			if strings.Contains(output, secret) {
 				t.Errorf("Ausgabe trägt %s:\n%s", secret, output)
 			}
 		}
 	}
-	line := "Projektdoku: keph:/docs/\nGitHub: dieses Repo = Dienst k-playbook — run: git über token " + tokenFile + ", api über token\n\n" + briefingContextSeparator
-	if !strings.Contains(text, line) {
+	line := "Projektdoku: keph:/docs/\nGitHub: dieses Repo = Dienst k-playbook — run: git über token " + tokenFile + ", api über token\n" + briefingEnvironmentHint
+	if !strings.HasSuffix(text, line) {
 		t.Errorf("Zeile fehlt oder steht falsch:\n%s", text)
-	}
-	_, rest, _ := strings.Cut(text, briefingContextSeparator)
-	if !strings.Contains(rest, "\n  github:\n") || !strings.Contains(rest, "    repo: kascada/k-playbook\n") || strings.Contains(rest, "services") {
-		t.Errorf("github im Rest:\n%s", rest)
 	}
 	var briefing project.Briefing
 	if err := json.Unmarshal([]byte(asJSON), &briefing); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := briefing.Context.Field("github")
-	var field project.ContextGitHub
-	if err := json.Unmarshal(raw, &field); err != nil {
-		t.Fatalf("context.github: %v\n%s", err, raw)
+	if len(briefing.GitHub.ProjectServices) != 1 || briefing.GitHub.ProjectServices[0] != "k-playbook" {
+		t.Errorf("github.projectServices: %+v", briefing.GitHub)
 	}
-	if field.Repo != "kascada/k-playbook" || field.Remote != "https://github.com/kascada/k-playbook.git" ||
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(asJSON), &raw); err != nil {
+		t.Fatal(err)
+	}
+	if string(compactJSON(t, raw["github"])) != `{"projectServices":["k-playbook"]}` {
+		t.Errorf("github im JSON des Briefings: %s", raw["github"])
+	}
+	field := environmentOf(t, partJSON).GitHub
+	if field == nil || field.Repo != "kascada/k-playbook" || field.Remote != "https://github.com/kascada/k-playbook.git" ||
 		len(field.ProjectServices) != 1 || len(field.Services) != 1 || field.Services[0].Selected == nil {
-		t.Errorf("context.github: %s", raw)
+		t.Errorf("environment.github: %+v", field)
+	}
+	if !strings.Contains(partText, "\n  github:\n") || !strings.Contains(partText, "    repo: kascada/k-playbook\n") {
+		t.Errorf("github im Klartext des Teilabrufs:\n%s", partText)
 	}
 }
 
-// Fehlt die Zugangsdatei, legt das Briefing nichts an — weder das Feld
-// context.github noch die Umgebungsprüfung desselben Briefings: Keine Datei
-// und kein Verzeichnis entstehen, die Umgebung nennt nichts im Bereich
-// github, und die Zeile sagt „GitHub: keine Zugangsdatei“; im JSON ist
-// present falsch. Ein symbolischer Link ohne Ziel an der Stelle der Datei
+// compactJSON nimmt Einrückung und Umbrüche aus einem JSON-Wert.
+func compactJSON(t *testing.T, raw json.RawMessage) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	if err := json.Compact(&b, raw); err != nil {
+		t.Fatalf("kein JSON: %v\n%s", err, raw)
+	}
+	return b.Bytes()
+}
+
+// environmentOf liest die JSON-Ausgabe des Teilabrufs environment.
+func environmentOf(t *testing.T, output string) project.BriefingEnvironment {
+	t.Helper()
+	var decoded briefingEnvironmentOutput
+	if err := json.Unmarshal([]byte(output), &decoded); err != nil {
+		t.Fatalf("Teilabruf ist kein JSON: %v\n%s", err, output)
+	}
+	return decoded.Environment
+}
+
+// Fehlt die Zugangsdatei, legt das Briefing nichts an — weder der Abschnitt
+// github noch die Umgebungsprüfung desselben Briefings, auch nicht der
+// Teilabruf environment: Keine Datei und kein Verzeichnis entstehen, die
+// Umgebung nennt nichts im Bereich github, und die Zeile sagt „GitHub: keine
+// Zugangsdatei“; im Teilabruf ist present falsch. Ein symbolischer Link ohne Ziel an der Stelle der Datei
 // ist dagegen belegt: Die Zeile nennt Fehler, und die Umgebungsprüfung
 // meldet einen error; auch dort entsteht nichts.
 func TestBriefingLegtBeiFehlenderZugangsdateiNichtsAn(t *testing.T) {
@@ -194,13 +221,16 @@ func TestBriefingLegtBeiFehlenderZugangsdateiNichtsAn(t *testing.T) {
 			t.Errorf("Umgebung mit Eintrag github: %+v", problem)
 		}
 	}
-	raw, _ := briefing.Context.Field("github")
-	var field project.ContextGitHub
-	if err := json.Unmarshal(raw, &field); err != nil {
-		t.Fatalf("context.github: %v\n%s", err, raw)
+	if len(briefing.GitHub.ProjectServices) != 0 {
+		t.Errorf("github.projectServices ohne Datei: %+v", briefing.GitHub)
 	}
-	if field.Present || field.File != config || len(field.Problems) != 0 || len(field.Services) != 0 || field.Repo != "kascada/k-playbook" {
-		t.Errorf("context.github ohne Datei: %s", raw)
+	partJSON, err := runBriefingCaptured(t, "--part", "environment", "--json")
+	if err != nil {
+		t.Fatalf("briefing --part environment --json: %v", err)
+	}
+	field := environmentOf(t, partJSON).GitHub
+	if field == nil || field.Present || field.File != config || len(field.Problems) != 0 || len(field.Services) != 0 || field.Repo != "kascada/k-playbook" {
+		t.Errorf("environment.github ohne Datei: %+v", field)
 	}
 	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
 		t.Fatalf("Verzeichnis der Zugangsdatei angelegt: %v", err)

@@ -15,7 +15,7 @@ Claude Code: `general-purpose`); ihre Prompts stehen unten und sind vollständig
 
 **Eingaben.** `REVIEW_TARGETS` (je Ziel der `keph:`-Verweis oder der absolute Pfad, die
 Anzeigeform, ob Task in der Collection oder Datei, bei einem Task `REVISION`), `projectDir`
-(`context.project.dir`); der Sub-Agent einer Gruppe bekommt sie im Auftrag, in Claude Code
+(`project.dir`); der Sub-Agent einer Gruppe bekommt sie im Auftrag, in Claude Code
 lädt er die Werkzeuge `mcp__k-playbook__*` zuerst mit der Werkzeugsuche. Verbindlich für den
 Schreibweg eines Tasks ist `k-playbook:/instructions/on-demand/tasks.md`; lies sie mit
 `k_playbook_doc_read`.
@@ -125,7 +125,7 @@ The executing agent will fill in details; focus on the big picture.
 
 ## Files to review
 <one line per target: the keph: reference or the absolute path>
-Read each target yourself: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <context.project.dir>), a path with your file reading tool.
+Read each target yourself: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <project.dir>), a path with your file reading tool.
 
 Check for:
 - FEHLER   — fundamentally wrong approach, contradiction, or missing critical piece
@@ -182,7 +182,7 @@ For an issue about a reference, propose the form with prefix by k-playbook:/inst
 
 ## Files
 <one line per target: the keph: reference or the absolute path>
-Read each target yourself: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <context.project.dir>), a path with your file reading tool.
+Read each target yourself: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <project.dir>), a path with your file reading tool.
 
 Output:
 1. Per changed target, the edits as pairs — ALT: the exact text to replace, long enough to occur exactly once in the document; NEU: its replacement. Insertions name the unique line before which or after which the text goes. Do not write to disk or to the collection.
@@ -242,7 +242,7 @@ Then list any genuinely new problems caused by the Editor's changes.
 
 ## Current state
 <one line per target: the keph: reference or the absolute path>
-Read each target yourself, now, after the Moderator applied the edits: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <context.project.dir>), a path with your file reading tool.
+Read each target yourself, now, after the Moderator applied the edits: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <project.dir>), a path with your file reading tool.
 
 Output:
 1. Response table:
@@ -274,7 +274,7 @@ You are read-only. Do not modify documents or files or call write/edit tools.
 
 ## Current task files
 <one line per target: the keph: reference or the absolute path>
-Read each target yourself: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <context.project.dir>), a path with your file reading tool.
+Read each target yourself: a keph: reference with the MCP tool k_playbook_doc_read (ref = the reference, projectDir = <project.dir>), a path with your file reading tool.
 
 Answer only: Can the task, as written, achieve the stated Intent?
 - Yes → state briefly why
@@ -302,7 +302,7 @@ fragt unnötig nach.
 
 Ergab die Prüfung keine Änderung, wird derselbe Block angehängt: Tabellen ohne Zeilen und
 unter `### Geänderte Dateien` der Vermerk `— keine Änderungen`. `<datum>` ist
-`context.now.date`.
+`now.date`.
 
 ```markdown
 ---

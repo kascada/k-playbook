@@ -28,8 +28,8 @@ Dieser Skill ist ein Schreiber des Erzeugers `code`: sein Verzeichnis ist
 `keph:/docs/generated/code/`, das er sich mit `/k-docs-code` teilt. Seine Dokumente
 erkennst du an `generated.by: ks-overlay-repo-analyse`.
 
-Aus dem Briefing brauchst du `context.kephalaion` (`ok`, `address`, `message`) und
-`context.project.dir`. Ohne `kephalaion.ok: true` kannst du analysieren, aber nichts
+Aus dem Briefing brauchst du `kephalaion` (`ok`, `address`, `message`) und
+`project.dir`. Ohne `kephalaion.ok: true` kannst du analysieren, aber nichts
 schreiben (siehe die Ablage oben); sag das vor Phase 1.
 
 ---
@@ -301,7 +301,7 @@ liegt, ändert an der Herkunft nichts.
 
 ### checkout
 
-Rufe `k_playbook_docs_checkout` mit `projectDir` = `context.project.dir` und
+Rufe `k_playbook_docs_checkout` mit `projectDir` = `project.dir` und
 `erzeuger: code` (ersatzweise `k-playbook docs checkout code --json`). `WORK_DIR` ist
 `dir` aus der Antwort.
 
@@ -383,7 +383,7 @@ Tabelle mit Zeile "Was liefert Base" | "Was ergänzt Overlay"
 
 ### publish
 
-Rufe `k_playbook_docs_publish` mit `projectDir` = `context.project.dir` und
+Rufe `k_playbook_docs_publish` mit `projectDir` = `project.dir` und
 `erzeuger: code` (ersatzweise `k-playbook docs publish code --json`); `allow_hints: true`
 nur nach bestätigten `hints`. Melde je Dokument `created`, `written`, `deleted`,
 `unchanged`, `conflict` oder `failed`.

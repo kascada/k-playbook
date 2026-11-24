@@ -18,7 +18,7 @@ der Hauptkontext die erste Zeile `^\*\*Zusammenfassung:\*\*` nach seiner Kennzei
 Der Hauptkontext löst Verweise im Intent nicht auf; der Critic liest sie. Starte einen
 General-Purpose-Sub-Agenten (OpenCode: `general`, Claude Code: `general-purpose`) als Critic.
 Er liest seinen Auftrag selbst: `k-playbook:/commands/_task-run/intent-check.md`. Du übergibst
-ihm den Verweis, `projectDir` (`context.project.dir`), den Intent wörtlich und die
+ihm den Verweis, `projectDir` (`project.dir`), den Intent wörtlich und die
 Zusammenfassungen der Sub-Agenten, je Task eine. Seine Rückgabe ist die Zeile
 `| Alignment | Begründung |` (Ja, Teilweise oder Nein).
 

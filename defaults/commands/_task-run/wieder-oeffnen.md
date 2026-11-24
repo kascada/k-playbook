@@ -13,7 +13,7 @@ der Antwort als `TASK_REF` und `REVISION`. Dann mit `k_playbook_doc_append` und
 `since_revision: REVISION` die Kennzeile anhängen (vorher gezählt, Revisionskette im Command):
 
 ```text
-<!-- k-task-run: wieder geöffnet <TASK_FILE> <context.now.date> -->
+<!-- k-task-run: wieder geöffnet <TASK_FILE> <now.date> -->
 ```
 
 Ihre Revision ist das neue `REVISION`. Ab dieser Zeile zählt eine frühere Kennzeile

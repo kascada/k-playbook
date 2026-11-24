@@ -20,9 +20,9 @@ Verbindlich für Ablage, Name und Nummer, Kopf, Aufbau, Intent-Regel und Zuschni
 Tasks ist `k-playbook:/instructions/on-demand/tasks.md`. Lies sie mit `k_playbook_doc_read`,
 bevor du den Entwurf schreibst; dieser Text wiederholt sie nicht.
 
-Steht `context.kephalaion.ok` nicht auf `true`, endet der Command hier, wie der Abschnitt
+Steht `kephalaion.ok` nicht auf `true`, endet der Command hier, wie der Abschnitt
 „Ohne Kephalaion“ dort sagt: kein Task auf der Platte, Meldung mit
-`context.kephalaion.message`.
+`kephalaion.message`.
 
 ## Schritt 2 — Kurzname bestimmen
 
@@ -57,7 +57,7 @@ baut das Werkzeug, mit Frontmatter mit `title` in doppelten
 Anführungszeichen (Regel in tasks.md unter „Kopf“). Ist der Task in einer Reihe nicht der letzte oder rein mechanisch, setzt du
 `noIntent: true`, sonst nicht.
 
-Rufe `k_playbook_task_create` mit `dryRun: true` auf (`projectDir` = `context.project.dir`,
+Rufe `k_playbook_task_create` mit `dryRun: true` auf (`projectDir` = `project.dir`,
 `title`, `name` = Kurzname aus Schritt 2, `body`). Die Antwort trägt den Text, wie er
 geschrieben würde (`rendered`), und die `warnings`. Meldet das Werkzeug `invalid_input`, stehen
 die Verstöße gesammelt in der Meldung: arbeite sie ein und rufe erneut auf, bevor du dem
@@ -80,7 +80,7 @@ Fehlerfälle:
 - `invalid_input`: Verstöße gegen den Aufbau; nichts wurde angelegt. Einarbeiten, Entwurf
   erneut zeigen.
 - `kephalaion_unavailable`: wie Schritt 1 — nichts auf die Platte, Meldung mit
-  `context.kephalaion.message`.
+  `kephalaion.message`.
 - `outcome_unknown`: nicht noch einmal anlegen, sondern mit `k_playbook_doc_list` (Sorte
   `tasks`, `name` = der Kurzname) nachsehen, ob der Task da ist; sonst den Nutzer fragen.
 

@@ -53,7 +53,7 @@ More examples:
 - **A `keph:` reference names neither hub nor collection.** Both stand in the block
   `kephalaion:` of `.k-playbook/K-PLAYBOOK.yaml` and are the same for everyone working on the
   project; the account of this machine is chosen by Kephalaion. k-playbook
-  supplies them as `kephalaion.address` in `k-playbook context` and uses them itself when
+  supplies them as `kephalaion.address` in the briefing and uses them itself when
   it resolves a `keph:` reference. If `kephalaion.ok` is not `true` there, `keph:`
   references are unreachable (`kephalaion_unavailable`), and a session says so rather than
   working around it.
@@ -91,8 +91,8 @@ keph:/user/~/tasks/
 keph:/user/~/workbench/
 ```
 
-- `~` is replaced by `kephalaion.user` from `k-playbook context`: the **user** (the person),
-  not the **account** (`kephalaion.account`, one per machine). The same person on two
+- `~` is replaced by `kephalaion.user` from the briefing: the **user** (the person),
+  not the **account** (one per machine, chosen by Kephalaion). The same person on two
   machines lands in the same directory.
 - `~` cannot clash with a real name: Kephalaion names match `^[a-z0-9][a-z0-9._-]{0,62}$`
   (`installer/internal/kephalaion/binding.go:149`).
@@ -127,7 +127,7 @@ subcommand `k-playbook read <ref>` (task 093). Both are thin hulls and behave th
 |---|---|
 | `project:` | `k_playbook_doc_read` / `k-playbook read`: the file read from disk below the project root (the directory holding `.k-playbook/K-PLAYBOOK.yaml`), one layer, no overlay; a session may also read the file directly, it is the same file |
 | `k-playbook:` | `k_playbook_doc_read` / `k-playbook read`, local before shipped; never directly from disk |
-| `keph:` | two routes until `010-verweise.md` is updated in the follow-up task, which also decides the default: `k_playbook_doc_read` / `k-playbook read`, which call the node's `read` through the Kephalaion client (`collection` = the binding's address, `name` = the path without the leading `/`, a segment `~` replaced by `kephalaion.user`); or Kephalaion `read` directly with `collection` = `kephalaion.address` from `k-playbook context` |
+| `keph:` | two routes until `010-verweise.md` is updated in the follow-up task, which also decides the default: `k_playbook_doc_read` / `k-playbook read`, which call the node's `read` through the Kephalaion client (`collection` = the binding's address, `name` = the path without the leading `/`, a segment `~` replaced by `kephalaion.user`); or Kephalaion `read` directly with `collection` = `kephalaion.address` from the briefing |
 
 What each prefix answers:
 
@@ -314,20 +314,20 @@ layer is never served alone.
 **`location`.** A part of the local layer that lies in the collection carries its place as a
 `keph:` reference next to the origin: `parts[].location` and `includes[].location` in the answer of
 `k-playbook read --json` and `k_playbook_doc_read`, `location` per entry and per part of
-`always` in the briefing, `location` per catalog entry of the context output — for `local`,
+`always` in the briefing — for `local`,
 `override` and `disabled` alike. The hint of a disabled file names it as well. The origin
 values themselves are unchanged.
 
 There is **one** overlay, not two: `overlayDocDir` in `docref.go` lays the two layers of a
 directory over each other -- same name wins locally, an empty local file disables -- and the
-catalogs of `k-playbook context` (`resolveCatalog`), the references here and the briefing all
+review catalog (`resolveCatalog`), the references here and the briefing all
 go through it. A test compares both ways for `reviews`: name, origin and
 `disabled` of every catalog entry are what `k-playbook:/<kind>/<name>` answers, and the
 content behind the reference is what the catalog's `path` names -- for a shipped entry that
 `path` is the reference itself. `guidelines` is not an overlay kind any more (task 148): for
 references and the briefing it has only the shipped layer
 `<hub>:k-playbook/defaults/guidelines/` (`docDistOnlyKinds`, like `docs/`), the overlay does
-not ask the local layer for it, and the context output has no field `guidelines`.
+not ask the local layer for it.
 
 ### A single file
 

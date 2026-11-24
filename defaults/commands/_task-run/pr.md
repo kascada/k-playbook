@@ -65,7 +65,8 @@ nehmen; `--body-file` bleibt der Weg. Ohne Dienst derselbe Aufruf ohne das voran
 `k-playbook github run <GH_SERVICE> --write --`.
 
 Gibt es nach dem Block oben keinen nutzbaren Weg — ein Dienst ohne Kanal `api`, ohne Dienst
-`context.gh.ready` falsch — oder scheitert Push oder PR an der Anmeldung, gib den
+`environment.gh.ready` falsch (aus dem Abruf `environment`, den der Block oben holt) — oder
+scheitert Push oder PR an der Anmeldung, gib den
 genauen Befehl (mit Dienst in der Form mit `k-playbook github run`) und den Inhalt der
 Body-Datei zum Nachmachen aus. Dazu kommt der Hinweis auf die Zugangsdatei samt dem Angebot,
 beim Einrichten zu helfen („Die Zugangsdatei als Abhilfe“ im Block oben).

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -61,7 +62,7 @@ func TestDefaultsAlwaysTraegtBriefingTeil(t *testing.T) {
 		t.Errorf("Frontmatter des Teils im zusammengebauten Text:\n%s", always.Content)
 	}
 	for _, want := range []string{
-		"`context.now.date`",
+		"`now.date`",
 		"`k-playbook:/instructions/on-demand/briefing-felder.md`",
 		"`k-playbook:/guidelines/betrieb.md`",
 		"`k-playbook:/instructions/on-demand/k-playbook.md`",
@@ -154,13 +155,13 @@ func TestDefaultsEinstiegsdateiKPlaybook(t *testing.T) {
 }
 
 // Das Blatt on-demand/briefing-felder.md nennt jedes Feld des Briefings:
-// jeden Schlüssel der obersten Ebene und jeden Schlüssel von context — als
-// `name` bzw. `context.name`, Unterfelder zählen nicht. Die Schlüssel kommen
-// auf demselben Weg zustande wie das Briefing selbst (Marshal eines gebauten
-// Briefings, briefingContextFields auf BuildContext), nicht durch Reflexion
-// über Context: die würde guidelines und catalogs.reviews verlangen, die das
-// Briefing herausnimmt. Optionale Felder werden gesetzt, damit sie in der
-// Liste sind.
+// jeden Schlüssel der obersten Ebene, jedes Feld der Abschnitte now, project,
+// kephalaion, github und links und jeden Schlüssel des Teilabrufs environment
+// — als `name`, `abschnitt.name` bzw. `environment.name`. Die Schlüssel
+// kommen auf demselben Weg zustande wie die Ausgabe selbst (Marshal eines
+// gebauten Briefings und eines gebauten Teilabrufs), nicht aus einer von Hand
+// gepflegten Liste. Optionale Felder werden gesetzt, damit sie in der Liste
+// sind.
 func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 	sheet := readRepoDefault(t, "instructions/on-demand/briefing-felder.md")
 	if !strings.HasPrefix(sheet, "---\ntitle: ") || !strings.Contains(sheet, "\ndescription: ") {
@@ -184,8 +185,11 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildBriefing: %v", err)
 	}
+	briefing.Links = &ContextLinks{Healed: LinkChanges{Added: []string{"x"}}, Open: []LinkIssue{{Path: "x"}}, Note: "x"}
+	briefing.Project.Message = "x"
+	briefing.Kephalaion.User = "x"
 	top := topLevelKeys(t, briefing)
-	if len(top) < 5 {
+	if len(top) < 10 {
 		t.Fatalf("Briefing mit %d Feldern oben: %v", len(top), top)
 	}
 	for key := range top {
@@ -193,39 +197,36 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 			t.Errorf("Blatt nennt das Feld `%s` nicht", key)
 		}
 	}
+	for section, value := range map[string]any{
+		"now": briefing.Now, "project": briefing.Project, "kephalaion": briefing.Kephalaion, "github": briefing.GitHub,
+		"links": briefing.Links, "work": briefing.Work,
+	} {
+		keys := topLevelKeys(t, value)
+		if len(keys) < 1 {
+			t.Fatalf("%s ohne Felder", section)
+		}
+		for key := range keys {
+			if !mentions(section + "." + key) {
+				t.Errorf("Blatt nennt `%s.%s` nicht", section, key)
+			}
+		}
+	}
 
-	built, err := BuildContext(root)
-	if err != nil {
-		t.Fatalf("BuildContext: %v", err)
+	environment := BuildBriefingEnvironment(root, root)
+	environment.Message = "x"
+	keys := topLevelKeys(t, environment)
+	if len(keys) < 8 {
+		t.Fatalf("environment mit %d Schlüsseln: %v", len(keys), keys)
 	}
-	if built.VersionSources == nil {
-		built.VersionSources = &VersionSources{}
-	}
-	built.Kephalaion = &kephalaion.Status{}
-	built.Links = &ContextLinks{}
-	built.GitHub = &ContextGitHub{}
-	fields, err := briefingContextFields(built)
-	if err != nil {
-		t.Fatalf("briefingContextFields: %v", err)
-	}
-	keys := []string{"available", "message"}
-	for _, field := range fields {
-		keys = append(keys, field.Name)
-	}
-	if len(keys) < 10 {
-		t.Fatalf("context mit %d Schlüsseln: %v", len(keys), keys)
-	}
-	for _, key := range keys {
-		if !mentions("context." + key) {
-			t.Errorf("Blatt nennt `context.%s` nicht", key)
+	for key := range keys {
+		if !mentions("environment." + key) {
+			t.Errorf("Blatt nennt `environment.%s` nicht", key)
 		}
 	}
-	// Die abgedeckten Felder stehen nicht als context.-Feld im Blatt, und das
-	// entfallene Feld playbook auch nicht (Task 157).
-	for _, covered := range []string{"context.guidelines", "context.catalogs.reviews", "context.playbook"} {
-		if mentions(covered) {
-			t.Errorf("Blatt nennt `%s`, das das Briefing nicht trägt", covered)
-		}
+	// Den Abschnitt context trägt das Briefing nicht mehr (Task 187): Das
+	// Blatt nennt kein Feld mehr unter diesem Präfix.
+	if strings.Contains(sheet, "`context.") || strings.Contains(sheet, "`context`") {
+		t.Errorf("Blatt nennt noch den Abschnitt context")
 	}
 	// Das Blatt nennt die Fassung, die das Programm ausgibt.
 	if want := "heute `\"" + BriefingSchemaVersion + "\"`"; !strings.Contains(sheet, want) {
@@ -237,7 +238,7 @@ func TestDefaultsBriefingFelderBlattIstVollstaendig(t *testing.T) {
 // als Wurzel, Leseort oder Ausschluss (Task 157): weder context.playbook.dir
 // noch playbook.dir, weder unter defaults/ noch unter share/. Die Wurzel
 // ist project.dir; ein liegengebliebener Clone steht als
-// fester Pfad <context.project.dir>/k-playbook/ da, nicht als Feld. Nur die
+// fester Pfad <project.dir>/k-playbook/ da, nicht als Feld. Nur die
 // Liste der Fassungen im Handbuch (mcp.md) nennt context.playbook noch, als
 // das, was Fassung 6 trug.
 func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
@@ -251,6 +252,120 @@ func TestMitgelieferteTexteNennenKeinPlaybookDir(t *testing.T) {
 // danach im Quell-Repo selbst keinen Treffer hat.
 func TestMitgelieferteTexteNennenKeinLokalesVerzeichnis(t *testing.T) {
 	assertShippedTextsLack(t, []string{"k-playbook-" + "local", "local" + ".dir"})
+}
+
+// Kein mitgelieferter Text liest noch aus dem Abschnitt context oder nennt den
+// context-Befehl als Weg (Task 187): Anweisungen, Leitlinien, Reviews,
+// Commands und Skills unter defaults/ und share/ nennen weder `context.` als
+// Feldpräfix noch `k-playbook context` bzw. `k_playbook_context` als Aufruf
+// noch `k-playbook briefing --json` als Ersatzweg über die Shell — der ist der
+// Klartext. Ein Zeilenumbruch zwischen den Wörtern zählt als Leerzeichen. Das
+// Handbuch unter defaults/docs/handbook/ prüft dieser Test nicht: Es
+// beschreibt Befehl und Werkzeug selbst und darf `--json` weiter nennen. Die
+// Stellen, die `catalogs.reviews` aus der Kontextausgabe holen (die gesperrten
+// /k-review und /k-audit mit _audit/review-scan-triage.md), nennen keinen der
+// Aufrufe und bleiben.
+func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
+	patterns := map[string]*regexp.Regexp{
+		"context. als Feldpräfix":       regexp.MustCompile(`(^|[^A-Za-z0-9_./-])context\.[A-Za-z]`),
+		"k-playbook context als Aufruf": regexp.MustCompile(`k-playbook context\b`),
+		"k_playbook_context als Aufruf": regexp.MustCompile(`k_playbook_context`),
+		"k-playbook briefing --json":    regexp.MustCompile(`k-playbook briefing --json`),
+		"den Abschnitt context":         regexp.MustCompile("Abschnitt `context`|unter `context`"),
+		"das Modul _shared/context.md":  regexp.MustCompile(`_shared/context\.md`),
+	}
+	space := regexp.MustCompile(`\s+`)
+	for _, dir := range []string{"defaults", "share"} {
+		root := filepath.Join("..", "..", "..", dir)
+		files := 0
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			rel := filepath.ToSlash(strings.TrimPrefix(path, root+string(filepath.Separator)))
+			if entry.IsDir() {
+				// Das Handbuch zieht Etappe 6 nach; testdata sind feste Fälle
+				// für die Includes.
+				if dir == "defaults" && (rel == "docs/handbook" || rel == "testdata") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !entry.Type().IsRegular() || filepath.Ext(path) == ".go" {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			files++
+			// Zeilenumbrüche zählen als Leerzeichen: `k-playbook briefing\n--json`
+			// ist derselbe Aufruf.
+			text := space.ReplaceAllString(string(data), " ")
+			for name, pattern := range patterns {
+				if loc := pattern.FindStringIndex(text); loc != nil {
+					from, to := max(0, loc[0]-60), min(len(text), loc[1]+60)
+					t.Errorf("%s/%s nennt %s: …%s…", dir, rel, name, text[from:to])
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("%s durchsuchen: %v", dir, err)
+		}
+		if files < 20 {
+			t.Fatalf("%s: nur %d Dateien gelesen", dir, files)
+		}
+	}
+	// Das Modul, das `k-playbook context` rief, gibt es nicht mehr.
+	if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", "_shared", "context.md")); !os.IsNotExist(err) {
+		t.Errorf("share/commands/_shared/context.md liegt noch (%v)", err)
+	}
+	// Der Ersatzweg über die Shell ist in jedem Text derselbe Satz wie im
+	// Modul erster-schritt.md.
+	const fallback = "ersatzweise in der Shell `k-playbook briefing`. Ist k-playbook"
+	for _, rel := range []string{
+		"defaults/commands/_shared/erster-schritt.md",
+		"share/commands/k-audit.md", "share/commands/k-danke.md", "share/commands/k-gui.md", "share/commands/k-review.md",
+		"share/commands/k-test-check.md", "share/commands/k-todo.md", "share/commands/k-verlauf.md",
+		"share/commands/k-vscode-project-color.md", "share/skills/befunde/SKILL.md",
+	} {
+		data, err := os.ReadFile(filepath.Join("..", "..", "..", filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatalf("%s lesen: %v", rel, err)
+		}
+		if !strings.Contains(space.ReplaceAllString(string(data), " "), fallback) {
+			t.Errorf("%s nennt den Ersatzweg über den Klartext nicht", rel)
+		}
+	}
+	// Die Ausnahme: /k-review holt catalogs.reviews weiter aus der
+	// Kontextausgabe, bis es neu gebaut ist.
+	if review := readRepoShare(t, "commands/k-review.md"); !strings.Contains(review, "Take `catalogs.reviews` from the context output.") {
+		t.Errorf("k-review.md holt catalogs.reviews nicht mehr aus der Kontextausgabe")
+	}
+	// Die Ausnahme gilt nur für catalogs.reviews: /k-audit und das Modul
+	// review-scan-triage.md holen den Katalog an keiner Stelle selbst aus der
+	// Kontextausgabe und nennen sie deshalb in keiner Schreibweise; die Felder
+	// von Schritt 1 in /k-audit (project.dir, now.date) kommen aus dem Briefing.
+	contextOutput := regexp.MustCompile(`(?i)context-ausgabe|kontextausgabe|context output|context-aufruf`)
+	for _, rel := range []string{"commands/k-audit.md", "commands/_audit/review-scan-triage.md"} {
+		if loc := contextOutput.FindString(readRepoShare(t, rel)); loc != "" {
+			t.Errorf("share/%s nennt die Kontextausgabe (%q), holt aber catalogs.reviews nicht daraus", rel, loc)
+		}
+	}
+	if audit := space.ReplaceAllString(readRepoShare(t, "commands/k-audit.md"), " "); !strings.Contains(audit, "Löse aus dem Briefing: - `RESOLVED_PROJECT_DIR` = `project.dir` - `TODAY` = `now.date`") {
+		t.Errorf("k-audit.md löst project.dir und now.date in Schritt 1 nicht aus dem Briefing auf")
+	}
+}
+
+// readRepoShare liest eine Datei aus share/ des Repos.
+func readRepoShare(t *testing.T, rel string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "share", filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatalf("share/%s lesen: %v", rel, err)
+	}
+	return string(data)
 }
 
 // assertShippedTextsLack liest jede Datei unter defaults/ und share/ und
@@ -317,10 +432,15 @@ func TestDefaultsCommandsSharedIncludes(t *testing.T) {
 	if lines := strings.Count(body, "\n") + 1; lines > 8 {
 		t.Errorf("erster-schritt.md hat %d Zeilen Rumpf, soll wenige bleiben:\n%s", lines, body)
 	}
-	for _, want := range []string{"`k_playbook_briefing`", "`k-playbook briefing --json`", "`documents.always.content`"} {
+	// Der Ersatzweg über die Shell ist der Klartext (Task 187): Nur für ihn
+	// ist gesichert, dass er in einem Stück ankommt.
+	for _, want := range []string{"`k_playbook_briefing`", "ersatzweise in der Shell `k-playbook briefing`.", "`documents.always.content`"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("erster-schritt.md nennt nicht %s", want)
 		}
+	}
+	if strings.Contains(body, "--json") {
+		t.Errorf("erster-schritt.md nennt noch --json:\n%s", body)
 	}
 	if strings.Contains(body, "k-playbook context") {
 		t.Errorf("erster-schritt.md ruft noch `k-playbook context`:\n%s", body)
@@ -580,8 +700,8 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 	// Kopf und Scope stehen seit Task 120 allein in _shared/docs.md; der Text
 	// des Commands verweist darauf und wiederholt sie nicht.
 	for _, repeated := range []string{
-		"SCAN_ROOT = context.project.repoRoot", "**Versteckte Pfade**", "`tests/fixtures/`", "Aus K-PLAYBOOK.yaml",
-		"context.docs.exclude", "context.docs.problems", "„Neu laden“", "(etwa `exclude: [docs/]`)", "k-playbook docs exclude add",
+		"SCAN_ROOT = project.repoRoot", "**Versteckte Pfade**", "`tests/fixtures/`", "Aus K-PLAYBOOK.yaml",
+		"environment.docs.exclude", "environment.docs.problems", "„Neu laden“", "(etwa `exclude: [docs/]`)", "k-playbook docs exclude add",
 		"`verified:` trägt nur ein Mensch", "`title` und `description` sind Pflicht", "eine Frage, eine\n  Datei",
 	} {
 		if strings.Contains(file, repeated) {
@@ -625,7 +745,7 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 	// Auftragskopf, nicht in den Texten.
 	for _, rule := range []string{"2 Stunden", "**Zusammenlegen.**", "`k_playbook_doc_create` mit `kind: docs`", "`code-<dokument ohne .md>`",
 		"Kephalaion `write` mit `base_revision`", "wenn ein Pfad des einen gleich einem Pfad des anderen ist oder darin liegt",
-		"`context.now.timestamp`", "Abschnitt „Wartezeit“"} {
+		"`now.timestamp`", "Abschnitt „Wartezeit“"} {
 		if strings.Contains(squashed, rule) {
 			t.Errorf("k-docs-code.md samt Modulen trägt die Programmregel %q", rule)
 		}
@@ -633,7 +753,7 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 	// Vom alten Lauf — Argument als Zusatzpfad, ORDERS aus dem Preflight,
 	// Abschluss nach einem aufgeräumten publish — bleibt im Text nichts.
 	for _, stale := range []string{"`EXTRA_PATH` aus `$ARGUMENTS`", "`ORDERS`", "<die Zeilen „Aufträge“ aus dem Abschnitt „Doku-Aufträge“>",
-		"`SCAN_ROOT`, `EXTRA_PATH`", "liegt außerhalb von `context.project.dir`", "argument-hint"} {
+		"`SCAN_ROOT`, `EXTRA_PATH`", "liegt außerhalb von `project.dir`", "argument-hint"} {
 		if strings.Contains(squashSpace(file), stale) {
 			t.Errorf("k-docs-code.md trägt noch %q", stale)
 		}
@@ -661,7 +781,7 @@ func TestDefaultsKDocsCodeIstHuelleUndText(t *testing.T) {
 		}
 	}
 	for _, needle := range []string{"mehrere\n  Schreiber", "k_playbook_docs_checkout", "`hints`", "`questions`", "aus ihrer Vorlage `k-playbook:/docs/<pfad>/README.md`", "`k-playbook docs readme`", "Indizieren",
-		"`docs.exclude`", "`context.docs.exclude`", "`k_playbook_docs_exclude_add`"} {
+		"`docs.exclude`", "`environment.docs.exclude`", "`k_playbook_docs_exclude_add`"} {
 		if !strings.Contains(shared, needle) {
 			t.Errorf("_shared/docs.md nennt %q nicht", needle)
 		}
@@ -815,7 +935,7 @@ func TestDefaultsKDocsToolsIstHuelleUndText(t *testing.T) {
 	for _, stale := range []string{
 		"k-playbook context", "/k-docs-index", "_docs/tools", ".claude/commands/", "LIBS_DIR", "Vorübergehend",
 		"type: Tool Reference", "last-reviewed:", "severity:", "version-pin:", "lib: ", "## Offene Fragen",
-		"SCAN_ROOT = context.project.repoRoot", "**Versteckte Pfade**", "Transitive-only",
+		"SCAN_ROOT = project.repoRoot", "**Versteckte Pfade**", "Transitive-only",
 		"Abschnitt „Scope“", "Abschnitt „Doku-Aufträge“",
 	} {
 		if strings.Contains(bundle, stale) {
@@ -1069,27 +1189,27 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 	}
 	section := squashSpace(file[start:end])
 	for _, needle := range []string{
-		"**Anlass:** `<context.project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder eine `.gitignore` von `context.project.dir` bis `context.project.repoRoot` trägt eine der Zeilen",
+		"**Anlass:** `<project.dir>/k-playbook` liegt, als Verzeichnis oder als Symlink, oder eine `.gitignore` von `project.dir` bis `project.repoRoot` trägt eine der Zeilen",
 		"**Vorbedingung:** Schritt 2 hat die Zeile `Programm-Stand: nichts zu tun — …` ausgegeben, und sie nennt `neuestes Release`",
 		"So schreibt sie erst ein Programm ab v0.16.39",
 		"Fehlt die Zeile oder nennt sie stattdessen `Installation`, löschst und änderst du nichts",
 		"`k-playbook/ löschen wartet auf den Binärwechsel`",
 		"braucht den Clone für sein eigenes Upgrade",
-		`test -L "<context.project.dir>/k-playbook" && echo SYMLINK`,
-		`test -d "<context.project.dir>/k-playbook/.git" && ! test -L "<context.project.dir>/k-playbook/.git" && echo CLONE`,
+		`test -L "<project.dir>/k-playbook" && echo SYMLINK`,
+		`test -d "<project.dir>/k-playbook/.git" && ! test -L "<project.dir>/k-playbook/.git" && echo CLONE`,
 		"nur ein echtes Verzeichnis, kein Symlink, in dem direkt ein Verzeichnis `.git` liegt",
 		"`.git` ist eine Datei wie in einem Submodul oder Worktree",
 		"`k-playbook/ ist ein Symlink, nichts gelöscht`",
 		"`k-playbook/ ist kein Clone, nichts gelöscht: <grund>`",
 		"auch mit unverfolgten, geänderten oder ignorierten Dateien und mit eigenen Commits darin",
-		`git -C "<context.project.dir>/k-playbook" status --porcelain --ignored`,
-		`git -C "<context.project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes`,
+		`git -C "<project.dir>/k-playbook" status --porcelain --ignored`,
+		`git -C "<project.dir>/k-playbook" rev-list --count HEAD --branches --not --remotes`,
 		"`k-playbook/ ließ sich nicht prüfen, nichts gelöscht: <fehler>`",
 		"jede Zeile des ersten Befehls, auch wenn es viele sind, und die Zahl der Commits",
 		"Das ist eine Meldung, keine Vorlage: Du wartest auf keine Antwort, und eine Rückfrage gibt es auch dann nicht.",
-		`chmod -R u+w -- "<context.project.dir>/k-playbook"`,
-		`rm -rf -- "<context.project.dir>/k-playbook"`,
-		"von `context.project.dir` aufwärts bis `context.project.repoRoot`, beide eingeschlossen",
+		`chmod -R u+w -- "<project.dir>/k-playbook"`,
+		`rm -rf -- "<project.dir>/k-playbook"`,
+		"von `project.dir` aufwärts bis `project.repoRoot`, beide eingeschlossen",
 		"`k-playbook`, `/k-playbook`, `k-playbook/`, `/k-playbook/`, `**/k-playbook` und `**/k-playbook/`",
 		"`<projektpfad>/k-playbook/`, mit und ohne `/` vorn, mit und ohne `/` hinten",
 		"Kommentare und alle anderen Muster bleiben stehen",
@@ -1108,7 +1228,7 @@ func TestDefaultsKUpgradeCloneLoeschen(t *testing.T) {
 	}
 	// Kein Befehl der Vorlage darf den Pfad ungequotet einsetzen, und keiner
 	// nimmt context.playbook.dir: Das Feld fällt mit Task 157.
-	for _, bare := range []string{"test -L <context.project.dir>", "rm -rf -- <context.project.dir>", "chmod -R u+w -- <context.project.dir>", "git -C <context.project.dir>", "context.playbook.dir"} {
+	for _, bare := range []string{"test -L <project.dir>", "rm -rf -- <project.dir>", "chmod -R u+w -- <project.dir>", "git -C <project.dir>", "context.playbook.dir"} {
 		if strings.Contains(section, bare) {
 			t.Errorf("3.8 setzt den Pfad ungequotet ein oder nennt das alte Feld: %q", bare)
 		}
@@ -1189,7 +1309,7 @@ func TestDefaultsDocsAuftraege(t *testing.T) {
 	// Task 180: Die Regeln selbst — der Wert der Wartezeit, die Suche nach dem
 	// Auftrag der Sitzung, das Schreiben mit base_revision — stehen nur im Programm.
 	for _, rule := range []string{"2 Stunden", "`^sitzung: <session>$`", "Kephalaion `write` mit `base_revision`", "`stale_revision`",
-		"`context.now.timestamp`", "`k_playbook_doc_create`"} {
+		"`now.timestamp`", "`k_playbook_doc_create`"} {
 		if strings.Contains(squashSpace(instruction), rule) {
 			t.Errorf("doku-auftraege.md trägt die Programmregel %q", rule)
 		}

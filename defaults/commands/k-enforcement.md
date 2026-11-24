@@ -30,14 +30,14 @@ include: _shared/erster-schritt.md
 Aus dem Briefing brauchst du:
 
 - `session` — die Kennung dieser Sitzung (Klartext: Zeile `Sitzung:`).
-- `context.project.dir`, `context.project.repoRoot`.
-- `context.kephalaion` — `ok`, `address`, `message` — für den Doku-Nachzug.
+- `project.dir`, `project.repoRoot`.
+- `kephalaion` — `ok`, `address`, `message` — für den Doku-Nachzug.
 
 **Prüfumfang.** Geprüft werden die geänderten Dateien des Arbeitsbaums gegen `HEAD`, samt
 unverfolgten. Du bestimmst sie einmal und hältst sie in einer Datei fest:
 
 ```bash
-ROOT="<context.project.repoRoot>"
+ROOT="<project.repoRoot>"
 if command -v git >/dev/null 2>&1; then
   CHANGED_FILES="$(mktemp)"
   { git -C "$ROOT" diff --name-only HEAD; git -C "$ROOT" ls-files --others --exclude-standard; } \
@@ -63,9 +63,9 @@ jeder Shell-Aufruf beginnt neu, die Variable überlebt ihn nicht. Die Pfade sind
 
 Command-specific policy:
 
-- Ohne Kephalaion (`context.kephalaion.ok` nicht `true`) ist die erzeugte Doku nicht
+- Ohne Kephalaion (`kephalaion.ok` nicht `true`) ist die erzeugte Doku nicht
   erreichbar: Der Doku-Nachzug wird nicht geprüft und nicht eingereiht, der Bericht nennt ihn
-  als offen mit `context.kephalaion.message`. Es gibt keinen Rückfall auf die Platte.
+  als offen mit `kephalaion.message`. Es gibt keinen Rückfall auf die Platte.
 
 ```text
 Enforcement-Check
@@ -125,7 +125,7 @@ und frag, bevor du etwas änderst.
 
 **Doku-Auftrag nach Freigabe.** Steht bei `code` oder `tools` „nachzuziehen“, frag, ob der
 Nachzug eingereiht werden soll. Nach Ja, je Erzeuger: `k_playbook_docs_order_add` mit
-`projectDir` = `context.project.dir`, `erzeuger` (`code` bzw. `tools`), `pfade` aus dem
+`projectDir` = `project.dir`, `erzeuger` (`code` bzw. `tools`), `pfade` aus dem
 Prüfumfang, so fein wie möglich, `anlass` (ein Satz) und `sitzung` = `session` (ersatzweise
 `k-playbook docs order add <code|tools> --pfad <pfad>… --anlass "<satz>" --sitzung <session>
 --json`). „Kein Doppel“ und „Wann nicht eingereiht wird“ rechnet das Programm nach

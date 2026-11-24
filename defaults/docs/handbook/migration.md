@@ -15,7 +15,7 @@ The migration to the project-local model is complete and incorporated into the d
 | Model, anchor, directory layout, overlay rules, configuration | [`k-playbook-format.md`](./k-playbook-format.md) |
 | Bootstrap, the setup steps, updating | [`installation.md`](./installation.md) |
 | Core model and standard workflows | [`manual.md`](./manual.md) |
-| Commands, `context` once per session | [`commands.md`](./commands.md) |
+| Commands, the briefing once per session | [`commands.md`](./commands.md) |
 | Recipes, results, remediation policy | [`code-review.md`](./code-review.md), [`k-playbook-format.md`](./k-playbook-format.md#remediation) |
 | Removed: `/k-install-security-tools`, `paths.*` | [`faq.md`](./faq.md) |
 | Tool: find anchors, linking, update, direct installation, legacy artifacts, web API | [`../installer/docs/architecture.md`](../../../installer/docs/architecture.md) |
@@ -73,7 +73,7 @@ only when the previous one is in place:
 3. Start. The tools run in parallel, each writing its SARIF file.
 4. Trigger the assistant reviews. The interface cannot do this itself -- it does not start an
    assistant session. It therefore displays commands to copy; reviews obtain their settings from
-   the `context` output, not from a separate source.
+   what k-playbook resolves, not from a separate source.
 5. Consolidate. This step is repeatable: if reviews run only afterward, invoke it again and
    their results are included.
 
@@ -98,7 +98,7 @@ findings at all -- it supplies `grype` and remains outside the merge.
 - The tool matrix carries `languages`, `install_method`, `install_ref`, and `asset_pattern`.
   `go install` remains reserved for tools that need Go anyway -- a purely Python project
   therefore needs no Go.
-- Languages are under `project.languages`, in the `context` output, and as a selection in the
+- Languages are under `project.languages`, in the briefing, and as a selection in the
   Security Tools block. The preselection is `python`.
 - The run model is in [`review-runs.md`](./review-runs.md): one run per day, `run.json` plus
   `entries/`, tools and reviews as entries in the same run. The interface creates runs but does

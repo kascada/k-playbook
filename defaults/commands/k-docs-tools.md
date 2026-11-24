@@ -42,8 +42,8 @@ include: _shared/docs.md
 Dieser Command ist der Schreiber des Erzeugers `libs`: sein Verzeichnis ist
 `keph:/docs/generated/libs/`, seine Dokumente tragen `generated.by: k-docs-tools`.
 
-Aus dem Briefing brauchst du `context.kephalaion` — `ok`, `address`, `message` — und
-`context.project.dir`. Ohne `ok: true` endet der Command hier (siehe die Ablage oben).
+Aus dem Briefing brauchst du `kephalaion` — `ok`, `address`, `message` — und
+`project.dir`. Ohne `ok: true` endet der Command hier (siehe die Ablage oben).
 
 **Das Inventar.** Lies `keph:/docs/generated/versions/inventory.md` mit `k_playbook_doc_read`
 (ersatzweise `k-playbook read`). Aus dem Kopf nimmst du `generated.at` und die Zahl der
@@ -75,7 +75,7 @@ ergänzen (`NEW_EXCLUDES`, wie im Modul zum Scope).
 ```text
 /k-docs-tools — Preflight
 ─────────────────────────────────────
-Collection    <context.kephalaion.address>
+Collection    <kephalaion.address>
 Ziel          keph:/docs/generated/libs/
 Inventar      erhoben <generated.at>, <N> Einträge | Hinweis: <Problem im Kopf>
 <die Scope-Zeilen aus dem Modul zum Scope>
@@ -88,11 +88,11 @@ Bei „nein“ abbrechen; nichts wurde geholt oder geschrieben.
 
 ## Schritt 2 — checkout
 
-Rufe `k_playbook_docs_checkout` mit `projectDir` = `context.project.dir` und
+Rufe `k_playbook_docs_checkout` mit `projectDir` = `project.dir` und
 `erzeuger: libs` (ersatzweise `k-playbook docs checkout libs --json`).
 
 - `state: checked_out` — das Arbeitsverzeichnis ist geholt. `WORK_DIR` ist `dir` aus der
-  Antwort, `WORK_DISPLAY_PATH` derselbe Pfad ab `context.project.dir`
+  Antwort, `WORK_DISPLAY_PATH` derselbe Pfad ab `project.dir`
   (`.k-playbook/work/docs/libs`).
 - `state: existing` — ein Arbeitsverzeichnis liegt schon da, etwa von einem
   abgebrochenen Lauf. Nichts wurde geholt oder überschrieben. Nenne `existing.since`,
@@ -136,7 +136,7 @@ bei Klasse A gezielt im Web, höchstens drei Abrufe), Dateiname, Kopf und Vorlag
 Steckbriefs. Recherchiere in Gruppen von etwa drei Kandidaten je Zwischenmeldung, damit der Nutzer den Fortschritt sieht. Bei vielen Kandidaten darfst du Recherche und Schreiben auf Sub-Agenten
 verteilen. Ihr Auftrag beginnt mit: Führe zuerst `k-playbook briefing` aus und lies die
 Ausgabe; er liest `k-playbook:/commands/_docs-tools/schreiben.md` mit `k_playbook_doc_read`
-(`projectDir` = `context.project.dir`; in Claude Code lädt er die Werkzeuge
+(`projectDir` = `project.dir`; in Claude Code lädt er die Werkzeuge
 `mcp__k-playbook__*` vorher mit der Werkzeugsuche) und bekommt von dir seinen Kandidaten mit
 den Zeilen aus Schritt 4, den Scope, `WORK_DIR`, `GENERATED_AT` und die bisherige Fassung
 seines Dokuments samt `hints`.
@@ -179,13 +179,13 @@ ergänzt hat. Kompakte Zusammenfassung:
 
 ## Fehlerfälle
 
-- `context.kephalaion.ok` ist nicht `true` oder ein Werkzeug meldet
-  `kephalaion_unavailable` → kein Lauf; `context.kephalaion.message` nennen und auf die
+- `kephalaion.ok` ist nicht `true` oder ein Werkzeug meldet
+  `kephalaion_unavailable` → kein Lauf; `kephalaion.message` nennen und auf die
   Projekt-Collection auf der Setup-Seite (`/k-gui`) verweisen. Kein Rückfall auf die Platte.
 - Das Inventar fehlt, und der Nutzer lässt es nicht erheben, oder `k-playbook inventory`
   scheitert → kein Lauf; die Meldung nennen und `/k-doc-inventory` als nächsten Schritt.
   Keine Manifeste selbst lesen.
-- `$ARGUMENTS` fehlt auf der Platte, liegt außerhalb von `context.project.dir` oder in
+- `$ARGUMENTS` fehlt auf der Platte, liegt außerhalb von `project.dir` oder in
   einem der immer ausgeschlossenen Verzeichnisse (`invalid_input` von `k_playbook_docs_scope`)
   → abbrechen, den Pfad nennen.
 - `k_playbook_docs_checkout` meldet `existing` → fragen: weitermachen oder verwerfen.

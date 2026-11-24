@@ -8,9 +8,10 @@ bevor der Code erneut analysiert wird.
 `k-playbook` hat zwei Aufgaben. Es **richtet ein**: Anker finden, Konfiguration anlegen,
 den MCP-Server registrieren, Assistenten verlinken. Und es
 **beantwortet, was gilt**:
-`context` löst Verzeichnisse, Instruktionen und Kataloge auf, damit kein Command das
-selbst tun muss. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug — siehe
-„Der MCP-Server".
+Das Briefing (`briefing`) löst Projekt, Anweisungen, Reviews und Leitlinien auf, damit kein
+Command das selbst tun muss; was nur einzelne Commands brauchen, liefert sein Teilabruf
+`environment`. Dieselbe Antwort gibt `mcp` einem Assistenten als Werkzeug
+(`k_playbook_briefing`) — siehe „Der MCP-Server".
 
 Alles Weitere — Reviews, Tasks — machen Commands und Skills im Assistenten, nicht
 dieses Programm.
@@ -195,25 +196,33 @@ Hülle darum (Parameter `includes`, `lines`, `section`); beide rufen
 `project.ResolveDocRefWith` (`project/docref.go`), das Briefing und ältere Aufrufer
 `project.ResolveDocRef` mit den Standardoptionen.
 
-`briefing [--json]` gibt das Briefing aus (Task 086): vorweg den Text der immer geltenden
+`briefing [--json]` gibt das Briefing aus (Task 086): Datum, Projekt und
+Kephalaion-Anbindung in eigenen Abschnitten (`now`, `project`, `kephalaion`), den Text der
+immer geltenden
 Anweisungen `k-playbook:/instructions/always/` (`documents.always.content`, zusammengebaut von
-derselben Funktion wie bei `read`, `joinDocDirParts`; im Klartext steht er am Anfang, ohne die
+derselben Funktion wie bei `read`, `joinDocDirParts`; im Klartext steht er nach dem Kopf, ohne die
 Liste seiner Teile), dann als Daten, welche Anweisungen, Reviews und Leitlinien für
 das Projekt gelten — `always/` mit seinen Teilen, `on-demand/`, `reviews/`,
 `guidelines/`, je Eintrag Verweis, Titel,
 Beschreibung (Frontmatter, sonst erste Überschrift) und Herkunft (`dist`, `local`, `override`,
 `disabled`; bei `guidelines/` immer `dist`, die Sorte hat seit Task 148 keine lokale Ebene) —
 und was in der Projekt-Collection für die eigene Arbeit ansteht: eigene offene
-Tasks und aktive Arbeitsstände (nicht in `done/`) mit Titel, die Zahl der offenen Befunde in
+Tasks (nach Nummer) und aktive Arbeitsstände (zuletzt geänderte zuerst; nicht in `done/`) mit
+Titel, je höchstens zehn (`BriefingWorkLimit`) mit der Zahl aller unter `work.total`, die Zahl
+der offenen Befunde in
 `queue/findings/`; ist Kephalaion nicht nutzbar, steht das dort (`work.available`). Verweise,
-keine Pfade, keine Inhalte außer dem Text der immer geltenden Anweisungen. Umgebungsangaben stehen nur im Übergangsabschnitt `context` (Task
-091): der Rest der Kontextausgabe, den das Briefing nicht selbst abdeckt, aus `ContextForDir`
-— derselben Funktion wie `k-playbook context` — ohne `catalogs.reviews`
-(Ausnahmeliste `briefingCoveredContextFields`, eine Stelle im Code; ein Feld `guidelines` hat
-die Kontextausgabe seit Task 148 nicht mehr); lässt sich
-die Kontextausgabe nicht bauen, steht das dort (`context.available`). Weil der Rest über
-`ContextForDir` kommt, zieht auch das Briefing die Assistenten-Verlinkung nach
-(`context.links`). Ebenfalls nur `ContextForDir` füllt `context.github` (Task 119,
+keine Pfade, keine Inhalte außer dem Text der immer geltenden Anweisungen.
+
+Seit Task 187 (Fassung `"9"`) trägt das Briefing keinen Rest der Kontextausgabe mehr; den
+Übergangsabschnitt `context` aus Task 091 gibt es nicht mehr. Was jede Sitzung braucht, baut
+`project.BuildBriefingFrom` selbst aus denselben Lesern wie die Kontextausgabe: `now`
+(`buildNow`), `project` (`briefingProject`: `ReadConfig`, `CheckSchema`, `ReadLanguages`; lässt
+sich die Konfiguration nicht lesen, steht `available: false` mit `message` da, `dir` bleibt),
+`kephalaion` (`ok`, `message`, `address`, `user` aus `KephalaionStatus`),
+`github.projectServices` und `links`. Das Briefing ruft `HealLinks` selbst — nach dem Lesen
+der Konfiguration, nur wenn sie lesbar ist — und zieht so die Assistenten-Verlinkung nach;
+vorher heilte es nur, weil sein Rest über `ContextForDir` kam. Für `github` läuft
+`contextGitHub` (Task 119,
 `project/githubcontext.go`): welcher Dienst der persönlichen GitHub-Zugangsdatei zum Repo des
 Startverzeichnisses gehört und was `github run` dafür wählt — `githubaccess.Load` (schreibt
 nie), `Judge` mit `selected`, das Remote roh über `projectRemoteURL`. Das Briefing legt nichts
@@ -222,15 +231,33 @@ Datei, ist `present` falsch, die Umgebung schweigt dazu, und die Zeile sagt „G
 Zugangsdatei“; ein Symlink ohne Ziel ist belegt (`present` wahr, ein error). Angelegt wird die
 Datei nur mit `k-playbook github init` oder dem Knopf der Oberfläche. Das Startverzeichnis
 reicht `project.BuildBriefingFrom` von CLI (Arbeitsverzeichnis) und MCP (`projectDir` vor der
-Suche) durch, damit der Rest derselbe ist wie bei `k-playbook context` im selben Verzeichnis.
+Suche) durch, damit ein eigenes Repo unterhalb des Projekts sein eigenes Remote bekommt.
 Im Klartext steht dazu nach `Projektdoku:` eine Zeile `GitHub: …` (`briefingGitHubLine` in
 `cmd/k-playbook/briefing.go`), gebaut aus `githubSelectionLines` wie bei `github show`; im
-Rest steht `github` ohne `services`. Im Klartext steht der Rest hinter der Trennzeile „Noch aus k-playbook
-context — wird abgebaut“. Die Listen kommen aus den vorhandenen Funktionen
+JSON des Briefings stehen nur die Dienste dieses Repos (`github.projectServices`), das volle
+Objekt bleibt im Programm (`BriefingGitHub.Access`, `json:"-"`).
+
+Der Teilabruf `briefing --part environment [--json]` (MCP: `part: "environment"`) liefert statt
+des Briefings nur `project.BuildBriefingEnvironment`: `gh` (`ready`, `account`), `github` (das
+volle Objekt), `baseTools` (ohne `matrix`), `versionSources`, `docs` und `remediation` — die
+Umgebungsangaben, die einzelne Commands an der Stelle holen, an der sie sie brauchen. Er
+vergibt keine Sitzungskennung, heilt nichts und gilt nicht als Neuladen des Briefings.
+Entfallen sind die Felder ohne Leser: die Fassung der Konfiguration, `mcp`, `git`,
+`project.config`, `baseTools.matrix`, von `gh` alles außer `ready` und `account`, von der
+Anbindung Hub, Collection, Konto, Wahl, Zustand, Rechte, Node und Sync.
+
+Der Klartext (`writeBriefingText`) ist der Weg über die Shell und bleibt deshalb klein
+(Task 187: Claude Code legt eine Shell-Ausgabe ab 30 000 Zeichen ganz in eine Datei): nach
+`Sitzung:` je eine Zeile `now:`, `project:`, `kephalaion:` und, nur wenn etwas zu melden ist,
+`links.healed:`, `links.open:`, `links.note:` (`briefingTextSections`); „Auf Abruf“, „Reviews“
+und „Leitlinien“ mit Verweis und Titel, die Herkunft nur, wenn sie nicht `dist` ist
+(`briefingEntryLine`); die Arbeitsliste mit Kopfzeile, Dateiname und Titel und dem Hinweis
+`+ <n> weitere: k_playbook_doc_list (kind …)` (`writeBriefingWorkList`). Ein Test hält den
+Klartext über `defaults/` mit 40 Tasks und 40 Arbeitsständen unter 24 000 Zeichen
+(`TestBriefingKlartextBleibtUnterDerGrenze`). Die Listen kommen aus den vorhandenen Funktionen
 (`overlayDocDir`/`assembleDocDir` in `project/docref.go`, `UserDocs.List` hinter
 `k_playbook_doc_list`), zusammengesetzt in `project.BuildBriefing` (`project/briefing.go`); das
-MCP-Werkzeug `k_playbook_briefing` ist die Hülle darum. Ohne `--json` ein Klartext zum Lesen
-beim Testen. Vertrag: [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Briefing Contract“.
+MCP-Werkzeug `k_playbook_briefing` ist die Hülle darum. Vertrag: [`../../defaults/docs/handbook/mcp.md`](../../defaults/docs/handbook/mcp.md), Abschnitt „Briefing Contract“.
 
 `doc create|list|done|reopen [--json]` legt nummerierte Dokumente in der Kephalaion-Collection
 des Projekts an, listet sie je User und verschiebt sie nach `done/` und zurück. Was eine Sorte
@@ -477,11 +504,12 @@ installer/
 │   ├── instructions.go          AGENTS.md im Hauptverzeichnis prüfen und ergänzen
 │   ├── gh.go                    gh-Befund dieses Rechners, Zeilenhelfer für verschachtelte Blöcke
 │   ├── gh_legacy.go             alten Block tools.gh beim Einrichten entfernen (Task 128)
-│   ├── kephalaion.go            KephalaionStatus: die Prüfung für ContextForDir,
+│   ├── kephalaion.go            KephalaionStatus: die Prüfung für Briefing und ContextForDir,
 │   │                            ProjectBinding (Hub, Collection aus K-PLAYBOOK.yaml)
 │   ├── kephalaion_block.go      Block kephalaion: zeilenweise lesen und schreiben
 │   │                            (SetKephalaionBinding, nie ein Account)
-│   ├── githubcontext.go         context.github für ContextForDir (Task 119): Load, Judge,
+│   ├── githubcontext.go         das Feld github für Briefing, Teilabruf environment und
+│   │                            ContextForDir (Task 119): Load, Judge,
 │   │                            das Remote ab dem Startverzeichnis (publicremote.go:
 │   │                            projectRemoteURL), githubRemoteRepo mit github.SSHAliasOf
 │   ├── githubroute.go           Weg der Oberfläche zu GitHub (Task 126): Dienst aus dem
@@ -526,12 +554,12 @@ installer/
 │   ├── inventoryrun.go          RunInventory: inventory.Run, danach die README von
 │   │                            docs/generated/versions/
 │   ├── docs_exclude.go          Block docs: — docs.exclude zeilenweise lesen und prüfen
-│   │                            (context.docs), AddDocsExclude trägt Muster ein
+│   │                            (environment.docs), AddDocsExclude trägt Muster ein
 │   ├── briefing.go              BuildBriefing: Dokumentlisten je Sorte und eigene Arbeit
 │   │                            aus der Collection, als Verweise (Task 086); dazu der
-│   │                            Abschnitt health (Task 098) und der
-│   │                            Übergangsabschnitt context — der Rest der Kontext-
-│   │                            ausgabe aus ContextForDir (Task 091)
+│   │                            Abschnitt health (Task 098), die Abschnitte now,
+│   │                            project, kephalaion, github und links und der
+│   │                            Teilabruf environment (Task 187)
 │   ├── health.go                die Quellen der Umgebungsprüfung: Kephalaion-Anbindung,
 │   │                            Basis-Werkzeuge, Quellenkonfiguration und die
 │   │                            GitHub-Zugangsdatei (über githubaccess) — bei init
@@ -895,12 +923,12 @@ reviews: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
 
 | Sorte | Einheit | Schlüssel | Abschalten durch |
 |---|---|---|---|
-| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_shared/context.md` | leere Datei |
+| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_audit/review-scan-triage.md` | leere Datei |
 | `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname | leere `SKILL.md` |
 
-Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse wie `_shared/` sind
-damit bis auf die einzelne Datei überlagerbar: ein Projekt ersetzt `_shared/context.md`
-und behält den Rest des Namensraums aus der Installation.
+Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse wie `_audit/` sind
+damit bis auf die einzelne Datei überlagerbar: ein Projekt ersetzt
+`_audit/review-scan-triage.md` und behält den Rest des Namensraums aus der Installation.
 
 Fragmente sind Namensraum-Dateien, deren erster Pfadteil mit `_` beginnt (`_shared/`,
 `_docs/`, `_task/` ...). `collectCommands()` nimmt sie weiter auf, damit sie überlagerbar
@@ -987,9 +1015,10 @@ verbraucht davon eine.
 ### Selbstheilung auf dem Lesepfad
 
 `HealLinks()` in `project/links.go` prüft, richtet ein, was sich einrichten lässt, und
-meldet als `LinkRepair`, was danach offen bleibt. Gerufen wird es von zwei Stellen, die
-beide **lesen** wollen: `assistantHandler()` (`GET /api/assistant`) und `ContextForDir()`
-— und damit vom Subkommando `context` wie vom MCP-Werkzeug.
+meldet als `LinkRepair`, was danach offen bleibt. Gerufen wird es von drei Stellen, die
+alle **lesen** wollen: `assistantHandler()` (`GET /api/assistant`), `BuildBriefingFrom()` —
+das Briefing, als Subkommando wie als MCP-Werkzeug, seit Task 187 mit eigenem Aufruf — und
+`ContextForDir()`.
 
 Der Grund ist eine Zuordnung, die lange falsch herum gedacht war. Welche Links gelten,
 folgt dem **Katalog dieses Projekts**, nicht dem Weg, auf dem das Programm zu seinem
@@ -1022,12 +1051,13 @@ leer, und genau sie ist das, was gelesen werden soll. Bei einem Ziel, das es vor
 nicht gab, bleibt sie leer und `Applied` trägt die Aussage: dort hat sich keine
 Registrierung verändert, dort ist eine entstanden.
 
-In der Kontextausgabe steht das Ergebnis als `links` und **fehlt im Normalfall**
+Im Briefing und in der Kontextausgabe steht das Ergebnis als `links` und **fehlt im Normalfall**
 (`contextLinks()` in `project/context.go`): eine Meldung, die bei jedem Aufruf dasselbe
 sagt, liest niemand mehr. `note` sagt dazu, was das für die laufende Sitzung heißt —
 nämlich nichts, weil Assistenten ihre Command-Liste beim Start lesen.
 
-`ContextForDir()` baut **erst** den Kontext und heilt **dann**. Bricht der Aufbau an
+`BuildBriefingFrom()` liest **erst** die Konfiguration (`briefingProject`) und heilt **dann**,
+`ContextForDir()` baut ebenso erst den Kontext. Bricht das Lesen an
 einer unlesbaren oder zu neuen Konfiguration ab, wird auch nichts eingerichtet: ein
 Werkzeug, das die Fassung nicht versteht, soll die Registrierung nicht nach seinen Regeln
 umschreiben.
@@ -1089,8 +1119,8 @@ Die drei Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Ein
   k-todo.md    -> ../../.k-playbook/share/commands/k-todo.md   dist
   k-review.md  -> ../../.k-playbook/commands/k-review.md       override
   k-eigen.md   -> ../../.k-playbook/commands/k-eigen.md        local
-  _shared/
-    context.md   -> ../../../.k-playbook/share/commands/_shared/context.md
+  _audit/
+    review-scan-triage.md   -> ../../../.k-playbook/share/commands/_audit/review-scan-triage.md
 ```
 
 ### Der Umweg-Link `.k-playbook/share`
@@ -1470,15 +1500,17 @@ Werkzeugprüfung generell zu teuer wäre. Entscheidend ist, **was** geprüft wir
 
 - **Versionsprüfung, teuer.** Der Security-Preflight startet je Tool einen Unterprozess
   und liest dessen `--version`. Das dauert spürbar, und ein hängendes Tool hält den
-  ganzen Aufruf auf; deshalb hat `CheckTools()` ein Timeout. So etwas gehört nicht an den
-  Anfang jedes Commands.
+  ganzen Aufruf auf; deshalb hat `CheckTools()` ein Timeout. So etwas gehört in keinen
+  Aufruf, den eine Sitzung zu Beginn oder ein Command an seiner Lesestelle macht.
 - **Anwesenheitsprüfung, billig.** Der Befund zu den Basis-Werkzeugen schlägt je Werkzeug
   nur im PATH nach — `exec.LookPath`, kein Unterprozess, keine Shell. Gemessen auf dem
   Entwicklungshost: rund 0,3 Millisekunden für die sieben Werkzeuge, gegen rund
   46 Millisekunden für den gesamten `k-playbook context`. Das ist etwa ein halbes Prozent
-  des Aufrufs. Deshalb steht `baseTools` im Kontext und `tools` nicht.
+  des Aufrufs. Deshalb steht `baseTools` in der Kontextausgabe und im Teilabruf
+  `environment` des Briefings, `tools` in keinem von beiden.
 
-`context` soll billig genug sein, um am Anfang jedes Commands zu stehen. Die Grenze
+Ein Befund, den Commands an ihrer Lesestelle holen — über den Teilabruf `environment` des
+Briefings —, soll billig genug dafür sein. Die Grenze
 verläuft zwischen Unterprozess und Nachschlagen, nicht zwischen Werkzeug und Nicht-Werkzeug.
 
 `CheckSchema()` läuft vor allem anderen. Bei einer anderen Fassung als `3` bricht
@@ -1495,7 +1527,7 @@ Prüfung des Remote-Stands (`git ls-remote` gegen den Upstream des Clones), dem 
 und aus `publicremote.go` die Umstellung eines SSH-Remotes auf
 `https://github.com/kascada/k-playbook.git`. Geblieben sind `GitOutput()` (jetzt in
 `gitrun.go`), `RepairMCPReport()`/`MCPRepairReport` (jetzt in `mcp.go`) und in
-`publicremote.go` die drei Lesefunktionen für `context.github` (`upstreamRemote()`,
+`publicremote.go` die drei Lesefunktionen für das Feld `github` (`upstreamRemote()`,
 `remoteRawURL()`, `projectRemoteURL()`).
 
 Was damit im Programm nicht mehr vorkommt: kein `git ls-remote` und kein `git pull` in
@@ -1897,8 +1929,8 @@ und `PlaybookDirName` bleiben für den Code, der Altbestand erkennt: `links.go` 
 `legacywrapper.go`, `reset.go` und `config.go` (`LegacyModels`, `suggestRepoRoot`).
 
 Die Fassungen des Briefings (`BriefingSchemaVersion` in `project/briefing.go`) dazu: Fassung
-7 trug noch `context.local`, Fassung 8 trägt es nicht mehr. Die heutige Fassung ist `"8"`;
-die einzige Wurzel im Abschnitt `context` ist `context.project.dir`.
+7 trug noch `context.local`, Fassung 8 nicht mehr. Die heutige Fassung ist `"9"` (Task 187):
+Den Abschnitt `context` gibt es nicht mehr, die einzige Wurzel ist `project.dir`.
 
 | Ort | Was | Wird aktualisiert durch |
 |---|---|---|
@@ -2023,7 +2055,7 @@ unverändert durch und rechnet nichts nach.
 ### Projektsprachen: erkannt statt geraten
 
 Welche Sprachen der Preflight bekommt, sagt `ReadLanguages()` in `project/languages.go`
-— an einer Stelle, damit Oberfläche, `k-playbook context` und der Preflight dieselbe
+— an einer Stelle, damit Oberfläche, Briefing (`project.languages`) und Preflight dieselbe
 Antwort geben. Steht `project.languages` in der Konfiguration, gilt es und sticht alles
 andere. Fehlt der Schlüssel, liefert `DetectLanguages()` die Sprachen aus den Manifesten
 des Projekts, und erst wenn die Erkennung leer ausfällt, greift `DefaultLanguages`
@@ -2040,7 +2072,7 @@ dazu, dass die Auswahl aus den Manifesten erkannt und noch nicht gespeichert ist
 
 **Keine Rekursion.** Geprüft wird nur die oberste Ebene von `project.repo_root` und,
 falls verschieden, die oberste Ebene des Hauptverzeichnisses. Ein rekursiver Lauf träfe
-`node_modules/`, `vendor/` und Monorepo-Rauschen und liefe bei jedem `k-playbook context`
+`node_modules/`, `vendor/` und Monorepo-Rauschen und liefe bei jedem Briefing
 mit; eine Ausschlussliste braucht es so nicht, denn auch ein liegengebliebener Clone
 `<projekt>/k-playbook/` ist ein Verzeichnis, kein Manifest.
 
@@ -2086,7 +2118,8 @@ Guard nicht ein zweites Mal gebaut wird.
 `DetectBaseTools()` in `project/basetools.go` liest die Matrix und prüft je Eintrag mit
 `exec.LookPath`. Kein Unterprozess, kein `--version`, keine Shell; die Kostenrechnung
 steht oben bei „Der Security-Tool-Preflight fehlt im Kontext bewusst". Das Ergebnis steht
-als `baseTools` neben `gh` in der Kontextausgabe.
+als `environment.baseTools` neben `environment.gh` im Teilabruf des Briefings (ohne `matrix`)
+und als `baseTools` in der Kontextausgabe.
 
 Das Skript wird von Go aus **nie** aufgerufen — auch nicht mit `--json`. Als
 Installationsbefehl meldet der Befund genau einen Aufruf:
@@ -2096,8 +2129,8 @@ Go, und liefe nach der ersten einseitigen Änderung auseinander. Gemeldet werden
 Matrix-Daten: Programmname, Rolle und die Methodenspalte, wie sie in der TSV steht.
 
 Fehlt die Matrix, ist das kein Abbruch: `present` wird `false`, `error` nennt den Zustand,
-`missing` bleibt leer. Der Kontext steht am Anfang jedes Commands und muss auch mit einer
-älteren Installation nutzbar bleiben.
+`missing` bleibt leer. Der Teilabruf `environment`, über den Commands den Befund holen, muss
+wie die Kontextausgabe auch mit einer älteren Installation nutzbar bleiben.
 
 **Bekannter Fehlalarm.** Gemessen wird Anwesenheit im PATH. Eine Shell-Funktion oder ein
 Alias steht nicht im PATH: Claude Code setzt eine Shell-Funktion `rg` auf das im eigenen
@@ -2105,12 +2138,12 @@ Binary mitgelieferte ripgrep, und dort meldet der Befund `rg` dauerhaft als fehl
 obwohl der Aufruf funktioniert. Das ist bekannt und wird hingenommen. In genau den
 Umgebungen, für die der Befund existiert — OpenCode, Cursor, ein normales Terminal —, ist
 er richtig, und dort fällt der Command sonst wortlos um. Die Alternative wäre, je Werkzeug
-eine Shell zu starten; das kostet den Unterprozess, den der Kontext gerade nicht ausgeben
-soll, und machte den Befund von der Shell des Aufrufers abhängig.
+eine Shell zu starten; das kostet den Unterprozess, den der Befund gerade nicht ausgeben
+soll, und machte ihn von der Shell des Aufrufers abhängig.
 
 **Warnen statt blockieren.** Ein fehlendes Basis-Werkzeug beendet keinen Lauf. Das ist der
-Unterschied zu `gh.ready`, das einen Command, der `gh` braucht, hart anhält. `commands/_shared/context.md`
-schreibt vor, dass ein Command die Lücke benennt — Werkzeug, Rolle, Installationsbefehl —
+Unterschied zu `gh.ready`, das einen Command, der `gh` braucht, hart anhält.
+`defaults/commands/_shared/base-tools.md` schreibt vor, dass ein Command die Lücke benennt — Werkzeug, Rolle, Installationsbefehl —
 und mit dem Rückfall weiterarbeitet, wo es einen gibt.
 
 ### Installationswege
@@ -2533,10 +2566,11 @@ Die Prüfung belegt, dass der Node auf `/mcp` antwortet, dass das Token aus der 
 Hub gilt und dass die Collection lesbar ist. Sie belegt nicht, dass die Header in der
 MCP-Konfiguration eines Assistenten dasselbe, noch gültige Token tragen.
 
-`k-playbook context` und das MCP-Werkzeug hängen das Ergebnis als `kephalaion` an
-(`project.KephalaionStatus`, gerufen in `ContextForDir`), mit demselben Status auch
-`versionSources` — die Quellenkonfiguration des Versionsinventars aus der Collection
-(`project.versionSourcesWithStatus`, Task 144), ohne den Node ein zweites Mal zu prüfen.
+Das Briefing trägt daraus den Abschnitt `kephalaion` (`ok`, `message`, `address`, `user`;
+`briefingKephalaion` über `project.KephalaionStatus`), sein Teilabruf `environment` mit
+demselben Status `versionSources` — die Quellenkonfiguration des Versionsinventars aus der
+Collection (`project.versionSourcesWithStatus`, Task 144), ohne den Node ein zweites Mal zu
+prüfen. Die Kontextausgabe hängt beides in `ContextForDir` an, mit allen Feldern des Status.
 `BuildContext` selbst hängt beides nicht an, fragt den Node seit Task 131 aber für den Katalog `reviews`: dessen
 mitgelieferte Ebene liegt in `<hub>:k-playbook` (siehe „Die mitgelieferte Ebene aus
 `<hub>:k-playbook`“).
@@ -2554,7 +2588,7 @@ und liest genau ein JSON-Objekt von stdout in `ClientInfo`; unbekannte Felder we
 Herkunft, Loopback-Adresse, Token-Datei unexportiert). `config.source: none` ist kein Fehler.
 Quelle der Exit-Codes und des Formats ist `kephalaion node client --help` (ab v0.4.0).
 
-`project.KephalaionStatus` (Kontextausgabe, Gesundheitsprüfung), der Doc-Client
+`project.KephalaionStatus` (Briefing, Kontextausgabe, Gesundheitsprüfung), der Doc-Client
 (`openKephClientFor` in `userdocs.go`) und die Oberfläche fragen die Auskunft je Aufruf neu;
 ein Zwischenspeicher hielte einen neuen Standard-Account sonst bis zum Neustart des
 MCP-Servers fest. Tests ersetzen das Binary über `kephalaion.LookupBinary` (`kephtest`),
@@ -2690,7 +2724,7 @@ setzen `kephtest.Store` ein. Subkommando (`cmd/k-playbook/docs.go`) und MCP-Werk
   eingerückt oder in der Spalte von `exclude:`;
   ein absolutes Muster, eines, das mit `..` aus `project.repo_root` führt, oder eines mit
   Zeilenumbruch oder anderem Steuerzeichen (`checkDocsExcludePattern`) landet mit
-  Grund in `context.docs.problems` statt in `context.docs.exclude`. `AddDocsExclude` prüft
+  Grund in `environment.docs.problems` statt in `environment.docs.exclude`. `AddDocsExclude` prüft
   ebenso, überspringt Doppelte, lässt die Datei bei nichts Neuem byte-gleich und fügt sonst
   nur die neuen Zeilen hinter den letzten Eintrag ein (`planDocsExcludeEdit`); jede andere
   Zeile, auch `include:`, Kommentare und Verworfenes, bleibt stehen. Nur ein fehlender Block
@@ -2768,7 +2802,7 @@ Schritte ohne KI und ohne Rückfrage, damit ihn später ein Cron-Job aufrufen ka
 - **Ziel.** `ResolveMaintenanceTarget` wertet Symlinks aus (für ein fehlendes Ziel auf dem
   nächsten vorhandenen Vorfahren) und prüft gegen `project.repoRoot`, Hauptverzeichnis, `.git` und
   `.k-playbook/`. Dasselbe geprüfte Ziel landet über `contextDocs` als
-  verankerter Eintrag in `context.docs.exclude`, nie in der Datei.
+  verankerter Eintrag in `environment.docs.exclude`, nie in der Datei.
 - **Export.** `runDocsBackup` (`project/maintenance_backup.go`) ruft
   `kephalaion node dir pull` als Prozess mit Argumentliste, ohne Shell und ohne Eingabe, in
   eigener Prozessgruppe. Ein SIGINT oder SIGTERM an `maintain` geht genau einmal an
@@ -2807,7 +2841,8 @@ Datei stechen. Gelesen werden dort nur `user` und die Namen unter `users`; die
 Token-Zeilen daneben werden übergangen und tauchen in keiner Antwort auf.
 
 **Kein Aufruf von `gh auth status`.** Der prüft den Token beim Server und kostet einen
-Netzzugriff. Deshalb steht der Befund anders als der Security-Preflight im Kontext: er
+Netzzugriff. Deshalb steht der Befund anders als der Security-Preflight im Teilabruf
+`environment` des Briefings und in der Kontextausgabe: er
 kostet nichts. Der Preis ist, dass ein abgelaufener Token als Anmeldung gilt — das sagen
 Karte und Doku ausdrücklich.
 
@@ -2826,7 +2861,7 @@ github.com nachzubauen.
 
 **Eigenes Paket `internal/github`.** In `internal/project/gh.go` steht der *netzfreie*
 Host-Befund: liegt `gh` im PATH, welche Konten sind hinterlegt. Der soll billig genug
-bleiben, um in jeder Kontextausgabe zu stehen. `internal/github` macht das Gegenteil: es
+bleiben, um in jedem Teilabruf `environment` des Briefings und in jeder Kontextausgabe zu stehen. `internal/github` macht das Gegenteil: es
 startet `gh` als Subprozess gegen die API, mit Frist, Fehlereinordnung und Auswertung
 der Antwort. Zwei Zuständigkeiten, zwei Pakete.
 
@@ -2840,7 +2875,7 @@ sie nicht mehr (Task 128); die Zustände `disabled` und `undecided` gibt es nich
 **Über den Dienst der Zugangsdatei (Task 126).** Nennt ein Dienst der persönlichen
 Zugangsdatei das Repo (Vertrag [`defaults/docs/handbook/github-access.md`](../../defaults/docs/handbook/github-access.md), Abschnitt *In the interface*), läuft
 `gh` mit dessen Kindumgebung, gewählt wie bei `k-playbook github run` und mit demselben Code.
-`project.ResolveGitHubRoute` bestimmt den Dienst aus dem Remote wie `context.github`
+`project.ResolveGitHubRoute` bestimmt den Dienst aus dem Remote wie das Feld `github`
 (`projectRemoteURL`, `githubRemoteRepo`), beurteilt nur ihn (`Judge`), wählt mit `Choose` ohne
 Optionen und nennt die Zeile von run (`RunLine`); `GitHubRoute.Environment` liest erst beim Start
 das Token (`ReadToken`) und baut `ChildEnv`. Ohne api-Kanal, ohne verfügbaren Zugang und bei
@@ -3694,8 +3729,8 @@ Pfaden: `GET /api/inventory/file` nimmt keinen Pfad aus der Anfrage entgegen, so
 genau das eine Dokument. Die Vertrauensgrenze aus `inventory/trust.go` gilt für den Anstoß
 unverändert und wird nicht zweitverwendet implementiert — ein abgelehnter Pfad steht in
 der Antwort so, wie die Fachlogik ihn meldet: angefragter Pfad, aufgelöster Pfad, Grund.
-Die Quellenkonfiguration liest derselbe `versionsources.Load` wie im Sammler und in
-`k-playbook context`, über denselben Store wie der Status (`inventoryState` öffnet ihn
+Die Quellenkonfiguration liest derselbe `versionsources.Load` wie im Sammler und im
+Teilabruf `environment` des Briefings, über denselben Store wie der Status (`inventoryState` öffnet ihn
 einmal); den Zustand bildet `project.VersionSourcesFrom`. Gerendert wird mit dem Goldmark aus `docs.go`; geteilt wird nur der
 Renderer, der Docs-Bereich selbst bleibt unberührt.
 
@@ -4267,7 +4302,8 @@ sortiert nach Bereich, dann Stufe, dann Satz. Die Prüfung bricht nicht beim ers
 ab, repariert nichts, und kein Eintrag nennt einen Token oder einen Wert aus einer Datei; der
 Eintrag zur unlesbaren Quellenkonfiguration nennt darum das Dokument
 `keph:/k-playbook/inventory.md`, nicht die Meldung des Lesers, die eine Zeile daraus
-zitieren kann (die steht weiter in `context.versionSources.error`).
+zitieren kann (die steht weiter in `environment.versionSources.error`, dem Teilabruf des
+Briefings).
 
 Das Paket `health` ist eine Sammelstelle, keine Prüfung: Es kennt Typen, `Register` und
 `Check`. Jede Quelle hängt sich mit `Register` ein; die drei aus dem Kontext — Kephalaion-Anbindung
@@ -4281,13 +4317,13 @@ der Importzyklus: Die Quellen lesen aus `project` (`DetectBaseTools`,
 `LoadVersionSources`, `kephalaionCheck`), und `project.Briefing` trägt den Report, also
 darf `health` `project` nicht importieren. Eine weitere Quelle — als Nächstes die persönliche
 GitHub-Datei `~/.config/k-playbook/github.yaml` — registriert sich genauso, ohne dass
-Briefing, CLI, MCP oder GUI sich ändern. `health` bewertet Felder der Kontextausgabe
-(`kephalaion`, `baseTools`, `versionSources`), ersetzt aber keines; der Abbau der
-Kontextausgabe ist ein anderer Schritt. Einen Bereich `gh` gibt es nicht mehr (Task 128):
+Briefing, CLI, MCP oder GUI sich ändern. `health` bewertet und nennt Abhilfen; die Rohwerte
+dazu stehen unter `kephalaion` im Briefing und unter `environment.baseTools` und
+`environment.versionSources` in seinem Teilabruf. Einen Bereich `gh` gibt es nicht mehr (Task 128):
 Ohne Dienst und ohne bereites gh bleibt die Prüfung bewusst still, auch bei einem Remote auf
 GitHub; ein Dienst ohne verfügbaren Zugang warnt unter `github`.
 
-Die Quelle `share` (`project/health_share.go`) bewertet kein Feld der Kontextausgabe. Sie
+Die Quelle `share` (`project/health_share.go`) bewertet keines dieser Felder. Sie
 warnt, wenn der Link `.k-playbook/share` zwischen Host und DevContainer springen wird: im
 Container (`/.dockerenv`, `/run/.containerenv`), ohne `K_PLAYBOOK_SHARE_DIR`, mit einem
 Projektordner, der laut `/proc/self/mountinfo` vom Host eingehängt ist. Ein Bind-Mount trägt
@@ -4359,14 +4395,16 @@ Projekt, ohne Datei, ohne MCP-Werkzeug.
 
 ## Der MCP-Server
 
-`k-playbook mcp` bietet den aufgelösten Arbeitsstand einem Assistenten als Werkzeug an,
-über stdin und stdout. Es ist die dritte Fassade auf `project.BuildContext`, neben dem
-Subkommando `context` und `GET /api/context`. Wer eine vierte Quelle aufmacht, bekommt
-zwangsläufig eine abweichende Antwort.
+`k-playbook mcp` bietet einem Assistenten das Briefing und die übrigen Werkzeuge an,
+über stdin und stdout. Der Einstieg einer Sitzung ist `k_playbook_briefing`
+(`mcpserver/briefing.go`), die Hülle um `project.BuildBriefingFrom`, mit `part: "environment"`
+um `project.BuildBriefingEnvironment`.
 
-Das erste Werkzeug ist `k_playbook_context`. Es gibt dasselbe JSON zurück wie das
+Das älteste Werkzeug ist `k_playbook_context`: die dritte Fassade auf `project.BuildContext`,
+neben dem Subkommando `context` und `GET /api/context`. Es gibt dasselbe JSON zurück wie das
 Subkommando — dieselbe Serialisierung, damit sich beide Seiten überhaupt vergleichen
-lassen. Dazu kommen zwei Familien nach demselben Muster „Subkommando trägt, MCP ist
+lassen. Kein mitgelieferter Text nutzt es mehr (Task 187); es besteht, bis es in einem eigenen
+Schritt gestrichen wird. Dazu kommen zwei Familien nach demselben Muster „Subkommando trägt, MCP ist
 Hülle": `k_playbook_review_*` (`review.go`) um die Review-Fachlogik — alle fünf zurzeit
 gesperrt, sie antworten mit `reviews_paused` (§„Die Review-Wege pausieren") — und `k_playbook_todo_*`
 (`todos.go`) um `project/todos.go`. Dazu kommt `k_playbook_doc_read`
@@ -5057,9 +5095,10 @@ Migration des `CLAUDE.md`-Symlinks zur Include-Datei auf dem Lesepfad. Eine bewu
 außerdem das Neuanlegen einer erfassten, lokal gelöschten `AGENTS.md` (§„Instruktionen").
 Jeder Weg ist idempotent — ein zweiter Lauf schreibt
 nichts —, hält den Start bei einem Fehler nicht auf und meldet nur, wenn wirklich etwas
-geschehen ist. Diese Wege sitzen bewusst hier und nicht auf dem Lesepfad: `ContextForDir()`
+geschehen ist. Diese Wege sitzen bewusst hier und nicht auf dem Lesepfad: `HealLinks()` —
+gerufen vom Briefing und von `ContextForDir()` —
 heilt ausschließlich Symlinks unter `.claude/` und `.opencode/`; Dateien im
-Projekt anzulegen darf nicht bei jedem Command-Aufruf einer KI-Sitzung passieren, der
+Projekt anzulegen darf nicht bei jedem Briefing einer KI-Sitzung passieren, der
 ausdrückliche `k-playbook`-Aufruf ist die richtige Stelle. Was nicht selbsttätig läuft
 und warum — gh-Entscheidung, Remediation-Modus, Update, Tool-Installation,
 `MCPStateStale` —, steht in den jeweiligen Abschnitten. Von „Tool-Installation läuft nicht
@@ -5434,8 +5473,8 @@ Hinweis auf die Port-Weiterleitung.
 - Keine Shell-Pipelines. Fachlogik ruft Go-Funktionen; Fremdprozesse sind nur das
   Security-Tool-Skript und `git`.
 - Kein YAML-Parser. Zeilenweises Lesen erhält Kommentare und unbekannte Blöcke.
-- Die Overlay-Regel liegt im Code, nicht in der Prosa. `context` gibt eine Antwort, und
-  alle Commands bekommen dieselbe.
+- Die Overlay-Regel liegt im Code, nicht in der Prosa. Das Briefing gibt eine Antwort, und
+  alle Sitzungen und Commands bekommen dieselbe.
 - Abgeschaltet wird über eine leere Datei, nicht über eine Liste in der Konfiguration.
   Ein Mechanismus statt zweier.
 - `git status --porcelain` und `git rev-list --count @{u}..HEAD` für den lokalen Zustand.

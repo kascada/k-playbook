@@ -494,7 +494,7 @@ function.
 
 ### Allowed Root
 
-Exactly one root is allowed: the **project root**, `project.dir` from `k-playbook context`,
+Exactly one root is allowed: the **project root**, `project.dir` from the briefing,
 namely the directory containing `K-PLAYBOOK.yaml`. It does not appear in the configuration.
 
 Nothing else. Since task 144 there are no additional roots: the former key `roots` depended
@@ -580,12 +580,13 @@ creates the document on the first confirmed addition and otherwise writes it wit
 revision as `base_revision`; the skeleton and the write path are in
 `defaults/commands/_shared/inventory-config.md`. The interface only shows it.
 
-**State through `context`.** Commands read configuration exclusively from
-`k-playbook context`. The state of this document, whether present, absent, invalid, or not
-reachable, and the configured sources, therefore belongs in the context output. The schema
-and field names are stated below under "State in the context output". The reader in
+**State through the briefing.** Commands read configuration exclusively from the
+briefing and its partial call `environment`. The state of this document, whether present,
+absent, invalid, or not reachable, and the configured sources, therefore belongs there, as
+`environment.versionSources`. The schema and field names are stated below under "State in
+the Environment Part". The reader in
 `installer/internal/versionsources/` is the **only** implementation, used by the
-collector, `installer/internal/project/versionsources.go` (context, health), and the
+collector, `installer/internal/project/versionsources.go` (environment part, health), and the
 interface.
 
 ### Fields
@@ -715,14 +716,16 @@ helm_values:
 ---
 ```
 
-### State in the Context Output
+### State in the Environment Part
 
-`k-playbook context` exposes the state of this document under the `versionSources` key. The
-context output thereby answers the question completely, and no command needs to read the
-document itself, the same rule that already applies to `K-PLAYBOOK.yaml`. The field is
-filled by `ContextForDir` (the subcommand, the MCP tool, the briefing), not by
-`BuildContext`, because it reads from the collection; tools that only need the catalog do
-not ask the node for it.
+The partial call `environment` of the briefing (`k-playbook briefing --part environment`,
+`k_playbook_briefing` with `part: "environment"`) exposes the state of this document as
+`environment.versionSources`. It thereby answers the question completely, and no command
+needs to read the document itself, the same rule that already applies to `K-PLAYBOOK.yaml`.
+A command fetches the part fresh where it needs the state -- after adding to the document,
+too --, since it is no reload of the briefing. The field is filled by
+`BuildBriefingEnvironment`, not by `BuildContext`, because it reads from the collection;
+tools that only need the catalog do not ask the node for it.
 
 ```json
 "versionSources": {
@@ -755,13 +758,13 @@ not ask the node for it.
 | `state` | yes | `present`, `missing`, `invalid`, or `unavailable` (below). |
 | `present` | yes | Whether the document exists. `false` under `unavailable`, which says nothing about the document. |
 | `schemaVersion` | no | The version declared by the document. Absent until something has been read. |
-| `sources` | no | The configured additional sources, in document order. Each entry has `path`, `kind`, `env`, `note`, `optional`, the same names as the YAML keys. An entry with an unknown `kind` or `env`, or an absolute `path`, is **included**: the context output shows the document as it stands, and omitting it would represent it differently. It is rejected only during the collection run, visibly there. |
+| `sources` | no | The configured additional sources, in document order. Each entry has `path`, `kind`, `env`, `note`, `optional`, the same names as the YAML keys. An entry with an unknown `kind` or `env`, or an absolute `path`, is **included**: the field shows the document as it stands, and omitting it would represent it differently. It is rejected only during the collection run, visibly there. |
 | `exclude` | no | The patterns where default detection does not search, verbatim as in the document. The fixed installation rule is **not** included because it does not come from the document. An absolute pattern that is therefore rejected is likewise not included: unlike `sources`, a pattern is not an entry one can inspect, but a rule that either applies or does not. |
 | `helmValues` | no | The configured Helm values, in document order, each with `path`, `key`, and `item`. As with `sources`, an entry the collection run rejects is **included**. |
 | `error` | no | Set under `invalid` and `unavailable`: the reason. |
 
 The field names are the frontmatter's YAML keys, in camelCase as everywhere else in the
-context output; only `schema_version` becomes `schemaVersion` and `helm_values` becomes
+briefing; only `schema_version` becomes `schemaVersion` and `helm_values` becomes
 `helmValues`. There is no renaming and no second terminology.
 
 Four states, and no more:
@@ -776,9 +779,9 @@ Four states, and no more:
   `error` carries the reason. There is no fallback to the disk and none, silently, to the
   default sources.
 
-The context invocation does **not** abort for an invalid or unreachable document. It runs
-at the start of every command; an invalid additional configuration must not disable every
-command. The state nevertheless remains visible, which is what `state` and `error` are for.
+The partial call does **not** abort for an invalid or unreachable document. Every command
+that needs an environment field fetches it; an invalid additional configuration must not
+disable all of them. The state nevertheless remains visible, which is what `state` and `error` are for.
 The inventory **collection run** does abort, as stated under "Error cases"; this is not a
 contradiction, but the distinction between reporting and collecting.
 
@@ -1028,8 +1031,8 @@ Every case has defined, visible behavior. There is no silent empty result anywhe
 
 | Case | Behavior |
 |---|---|
-| `keph:/k-playbook/inventory.md` is absent | No error. The default sources below the project root apply; the context output reports the state `missing`. |
-| The collection cannot be reached while reading the configuration | **Abort** before any collection; the context output reports `unavailable`. No fallback to disk, none to the default sources. |
+| `keph:/k-playbook/inventory.md` is absent | No error. The default sources below the project root apply; `environment.versionSources` reports the state `missing`. |
+| The collection cannot be reached while reading the configuration | **Abort** before any collection; `environment.versionSources` reports `unavailable`. No fallback to disk, none to the default sources. |
 | The document has no frontmatter, or the frontmatter is unreadable YAML | **Abort** before any collection, with document, line, and the parser message. Nothing is written. Partially interpreting an invalid configuration would mean applying a trust boundary other than the documented one. |
 | `schema_version` is absent or not `3` | **Abort**, as for `K-PLAYBOOK.yaml`. |
 | The frontmatter carries `roots`, even empty | **Abort**, with the line. `roots` was removed with schema version 3; see "Allowed Root". |

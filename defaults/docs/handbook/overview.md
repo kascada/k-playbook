@@ -77,9 +77,9 @@ is the union, with the project-owned entry winning for the same name. Guidelines
 are read shipped only; project-owned guidelines live in the project collection under
 `keph:/docs/guidelines/` and are not merged with the shipped ones (task 148).
 
-Nothing works this out for itself. `k-playbook context` resolves it once per
+Nothing works this out for itself. `k-playbook briefing` resolves it once per
 session and hands out the same answer to every command: the directories
-and the catalogs with `dist`, `local` and
+and the documents with `dist`, `local` and
 `override` already merged. The core model behind it is in
 [`manual.md`](./manual.md#core-model), the contract in
 [`k-playbook-format.md`](./k-playbook-format.md).
@@ -103,7 +103,7 @@ write into it, and `/k-danke` collects the findings of a session.
 ## The same picture, filled in
 
 What sits behind the two outer boxes: on the left, the means are shipped and
-project-owned at once, and `k-playbook context` resolves what actually applies.
+project-owned at once, and `k-playbook briefing` resolves what actually applies.
 On the right, the documentation and the findings live in the project collection,
 reached through MCP.
 
@@ -114,7 +114,7 @@ flowchart LR
     Recipes["Review recipes"] --> Effective
     Scanners["Scanners · tool matrix"] --> Effective
 
-    Effective["Effective set<br>shipped plus project-owned,<br>resolved by k-playbook context"]
+    Effective["Effective set<br>shipped plus project-owned,<br>resolved by k-playbook briefing"]
 
     Effective --> Build
     Effective --> Diagnose

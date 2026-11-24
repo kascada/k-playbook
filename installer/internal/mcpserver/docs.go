@@ -53,7 +53,7 @@ type docEnvelope struct {
 const docReadDescription = "Liest, was hinter einem Verweis im Präfixschema steht — project:/… eine Datei des Projekts ab seiner " +
 	"Wurzel, keph:/… ein Dokument der Projekt-Collection über den Kephalaion-Node (~ steht für den eigenen User; " +
 	"Anbindung nicht bereit: kephalaion_unavailable, kein Rückfall), k-playbook:/… lokal und mitgeliefert schon " +
-	"gegeneinander aufgelöst, dieselbe Überlagerung wie catalogs in k_playbook_context: eine lokale Datei ersetzt " +
+	"gegeneinander aufgelöst, dieselbe Überlagerung wie documents in k_playbook_briefing: eine lokale Datei ersetzt " +
 	"die gleichnamige mitgelieferte, eine leere schaltet sie ab; die lokale Fassung von instructions und reviews " +
 	"liegt in der Collection des Projekts unter keph:/k-playbook/<sorte>/; guidelines/ gibt es nur mitgeliefert, " +
 	"ohne lokale Fassung. Sorten unter k-playbook:: instructions/, " +

@@ -8,19 +8,19 @@ Der Scope gilt nur für die Erzeuger, die den Code durchsuchen: `/k-docs-code` u
 `ks-overlay-repo-analyse` die Repos, die er analysiert; beide wenden ihn nicht an.
 
 **Rechnen lässt ihn das Programm.** Rufe `k_playbook_docs_scope` mit `projectDir` =
-`context.project.dir` auf (ersatzweise `k-playbook docs scope [<pfad>] [--check <pfad>…]
+`project.dir` auf (ersatzweise `k-playbook docs scope [<pfad>] [--check <pfad>…]
 --json`). Die Ausschlüsse — immer, versteckte Pfade, weitere, `.gitignore`, `docs.exclude`
 samt verworfenen Einträgen —, ihre Wirkung und die Prüfung eines Zusatzpfads stehen nur im
 Programm; dieser Text wiederholt sie nicht, und du rechnest sie nicht nach.
 
 - `pfad` ist `EXTRA_PATH`, der **eine** Zusatzpfad aus `$ARGUMENTS`; ohne Argument oder wo der
   Command keinen nimmt, bleibt es weg. Die Antwort `invalid_input` heißt: der Pfad fehlt auf
-  der Platte, liegt außerhalb von `context.project.dir` oder in einem immer ausgeschlossenen
+  der Platte, liegt außerhalb von `project.dir` oder in einem immer ausgeschlossenen
   Verzeichnis — abbrechen und den Pfad nennen; ein anderes Projekt wird dort dokumentiert,
   nicht von hier.
 - `check` nimmt Pfade (etwa die eines Auftrags) und meldet je Pfad `excluded` mit `reason`
   und `by`: Ein ausgenommener Pfad führt zu keinem Dokument und ist nicht erreichbar.
-- Aus der Antwort: `scanRoot` ist `SCAN_ROOT` (immer `context.project.repoRoot`, nicht das
+- Aus der Antwort: `scanRoot` ist `SCAN_ROOT` (immer `project.repoRoot`, nicht das
   aktuelle Verzeichnis), `stand` Branch, Commit und `clean`, `extra` den geprüften
   Zusatzpfad, `exclude` die Ausschlüsse nach Herkunft (`always`, `hidden`, `further`,
   `gitignore`, `config`, `rejected`).
@@ -28,7 +28,7 @@ Programm; dieser Text wiederholt sie nicht, und du rechnest sie nicht nach.
   ausdrücklich nennt; eine Zusatzquelle aus einem `hint` gehört für dieses Dokument zum Scan,
   mit denselben Ausschlüssen — auch denen aus `NEW_EXCLUDES`, nie den immer ausgeschlossenen
   Verzeichnissen. Immer ausgeschlossen sind `.k-playbook/` und `k-playbook/` unter
-  `context.project.dir` und unter `context.project.repoRoot` sowie `keph-backup/` und `.git/`
+  `project.dir` und unter `project.repoRoot` sowie `keph-backup/` und `.git/`
   auf jeder Ebene.
 - Ist `gitignoreTruncated` gesetzt, hat die Grenze von 200 gelesenen `.gitignore` gegriffen: so
   viele Dateien blieben ungelesen; der Scope bleibt gültig, nenne den Hinweis im Preflight.
@@ -59,7 +59,7 @@ Ob sie gespeichert werden, fragt erst der Abschluss.
 **Ausschlüsse speichern.** Hat der Nutzer im Preflight Ausschlüsse ergänzt, fragst du im
 Abschluss einmal, ob sie dauerhaft in `K-PLAYBOOK.yaml` gespeichert werden sollen, und nennst
 sie dabei. Nach Ja rufst du `k_playbook_docs_exclude_add` mit `projectDir` =
-`context.project.dir` und `patterns` = `NEW_EXCLUDES` auf (ersatzweise
+`project.dir` und `patterns` = `NEW_EXCLUDES` auf (ersatzweise
 `k-playbook docs exclude add <muster>… --json`) und nennst `exclude` und `rejected` aus der
 Antwort. Danach lädst du das Briefing neu (`k-playbook:/instructions/on-demand/briefing-felder.md`,
 „Neu laden“). Bei Nein, oder wenn nichts ergänzt wurde, entfällt dieser Teil. Die Datei liest

@@ -141,7 +141,7 @@ The three targets are **actual directories with individual symlinks**, not direc
 
 The shipped commands and skills are unpacked by the binary once per machine into `~/.local/share/k-playbook/` (`$XDG_DATA_HOME/k-playbook/` when set). The individual links reach them through the one link `.k-playbook/share`: that link is absolute and depends on the machine's home directory, so `.k-playbook/.gitignore` keeps it out of version control, while every link through it stays relative and can be committed. Linking the shipped entries globally (`~/.claude/commands/`) is not an option: with the same name in both places Claude Code takes the global one, so a project could no longer replace a shipped command.
 
-**Host and DevContainer sharing the project.** If both work in the same project directory with different home directories, each one derives a different target for `.k-playbook/share` and points the link at its own home whenever it heals the links: on every briefing, `k-playbook context` and interface start. The other environment then loses all shipped commands and skills without an error, because Claude Code silently skips links without a target. Mounting `~/.local/share/k-playbook` under the host's path alone does not help: the binary in the container still derives its target from its own home.
+**Host and DevContainer sharing the project.** If both work in the same project directory with different home directories, each one derives a different target for `.k-playbook/share` and points the link at its own home whenever it heals the links: on every briefing and interface start. The other environment then loses all shipped commands and skills without an error, because Claude Code silently skips links without a target. Mounting `~/.local/share/k-playbook` under the host's path alone does not help: the binary in the container still derives its target from its own home.
 
 The fix is the variable `K_PLAYBOOK_SHARE_DIR`. It names the directory itself and takes precedence over `XDG_DATA_HOME` and the home directory; the binary unpacks there, links there and reads its scripts from there. k-playbook never sets it. The container sets it to the host's path, so both environments compute the same link target. On the host it stays unset. A relative value is an error that the link check reports by name, not a silent fallback to the home directory.
 
@@ -252,8 +252,6 @@ Mermaid diagrams are rendered if the machine has network access: the library is 
 ## Inspect what applies
 
 At the bottom is the **Resolved context** section. When expanded, it shows what a command sees: resolved paths, the effective catalog for reviews with its origin, shipped, project-owned, or replaced; a catalog for checks no longer exists (task 155). Guidelines are not listed there any more (task 148): they come shipped only, and the briefing names them. Disabled entries are included so their existence remains visible.
-
-It provides the same information as `k-playbook context`, only presented readably.
 
 The section loads only when expanded and changes nothing.
 
@@ -414,9 +412,9 @@ that the node answers on `/mcp` and that the token is valid at the hub. It does 
 whether the headers in an assistant's own MCP configuration carry the same, still valid token.
 The request to the node takes at most 3 seconds.
 
-`k-playbook context` carries the result in the block `kephalaion` (see
-[`k-playbook-format.md`](./k-playbook-format.md#the-resolved-working-state)), including
-`choice`, the origin of the account; the check never makes `context` fail. Every state in which
+The briefing carries the result in its section `kephalaion` (`ok`, `message`, `address`,
+`user`; see [`k-playbook-format.md`](./k-playbook-format.md#the-briefing)); the check never
+makes a call fail. Every state in which
 the binding does not work has a message with its remedy:
 
 | State | Meaning | Remedy in the message |
@@ -454,7 +452,7 @@ without a collection. "Collection ändern" on the status page opens the setup st
 
 ## GitHub CLI
 
-The **GitHub CLI** card shows the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and context output, never in configuration, because it differs on the next machine. There is nothing to decide on the card: whether `gh` is used follows from the personal GitHub access file (`k-playbook:/docs/handbook/github-access.md`) — with a service for the repository its selected access, without one this finding. Commands without a service stop when `gh` is missing or not logged in and name the access file as the remedy.
+The **GitHub CLI** card shows the **finding for this machine**: whether `gh` is in PATH and an account is stored. It appears only in the card and in the partial call `environment` of the briefing (`environment.gh`), never in configuration, because it differs on the next machine. There is nothing to decide on the card: whether `gh` is used follows from the personal GitHub access file (`k-playbook:/docs/handbook/github-access.md`) — with a service for the repository its selected access, without one this finding. Commands without a service stop when `gh` is missing or not logged in and name the access file as the remedy.
 
 Install and sign in through the terminal, just as with security tools: both change the host, and `gh auth login` needs a browser. The card shows the appropriate command.
 
@@ -544,7 +542,7 @@ The second deliberate exception to project locality, and a different type from s
 
 The matrix is in [`../share/scripts/base-tools.tsv`](../../../share/scripts/base-tools.tsv), separate from the security matrix: `scanners.tsv` refers to the latter through its `tool` column, and an `rg` in it would appear in every review run as a skipped entry.
 
-**A missing base tool warns; it does not block.** `k-playbook context` reports the state under `baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence stops a command that needs it.
+**A missing base tool warns; it does not block.** The environment check of the briefing names it, and `k-playbook briefing --part environment` reports the state under `environment.baseTools`; a command names the gap, uses a fallback where one exists, and continues. This distinguishes them from `gh`, whose absence stops a command that needs it.
 
 Inspect and install state:
 
@@ -607,7 +605,7 @@ Checklist for a project:
 - [ ] `.claude/commands`, `.claude/skills`, and `.opencode/commands` are directories with individual symlinks through `.k-playbook/share/` or to `.k-playbook/commands/` and `.k-playbook/skills/`; the interface reports them as configured.
 - [ ] `CLAUDE.md` is a regular file with the `@AGENTS.md` line outside backticks and code blocks, and `AGENTS.md` carries the prompt. An actual carried-over `CLAUDE.md` was renamed to `AGENTS.md`; a symlink from an older version was replaced with the include file. If `Conflict` appears instead, resolve it manually; until then, Claude Code cannot see the prompt.
 - [ ] `k-playbook version` prints the version of the installed program; `k-playbook version --all` names the newest release tag, and the program matches it or is newer.
-- [ ] `k-playbook context` completes and names the expected catalogs.
+- [ ] `k-playbook briefing` completes, names the expected instructions and reviews, and reports `Umgebung: keine Probleme`.
 - [ ] With VS Code in the environment: `k-playbook vscode status` names the embedded
       version and finds it installed in `~/.vscode-server/extensions`.
 

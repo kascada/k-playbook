@@ -11,8 +11,8 @@ Präfix sagt, wo der Inhalt liegt und wie du ihn liest.
 | `keph:/<pfad>` | Collection des Projekts in Kephalaion | Kephalaion `read` mit `collection` = `kephalaion.address` und `name` = Pfad ohne führenden `/` |
 | `keph:/<pfad>/` | ein Verzeichnis in der Collection des Projekts | Kephalaion `list` mit `collection` = `kephalaion.address`, `path` = Pfad ohne führenden `/`, `recursive` und `frontmatter`; dann `read` je Dokument |
 
-Die Felder `kephalaion.address`, `kephalaion.ok` und `kephalaion.user` stehen im Briefing
-unter `context` und in der Ausgabe von `k-playbook context`.
+Die Felder `kephalaion.address`, `kephalaion.ok` und `kephalaion.user` stehen im Briefing,
+im Klartext in der Zeile `kephalaion:` gleich nach `Sitzung:`.
 
 Beispiele:
 
@@ -45,8 +45,9 @@ Regeln:
 - **Die öffentliche Collection `<hub>:k-playbook` sprichst du nicht direkt an.** Ihr Inhalt
   ist das Mitgelieferte und kommt über `k-playbook:`.
 - **`~` als Pfadteil steht für dich**, genauer für deinen Kephalaion-User. In
-  `keph:/user/~/tasks/` ersetzt du `~` durch `kephalaion.user`, nicht durch
-  `kephalaion.account`: Das Konto gilt nur für diesen Rechner, der User ist die Person.
+  `keph:/user/~/tasks/` ersetzt du `~` durch `kephalaion.user`, nicht durch den Namen des
+  Kontos, den die Meldung `kephalaion.message` nennt: Das Konto gilt nur für diesen Rechner, der
+  User ist die Person.
   Nur ein ganzer Pfadteil `~` ist der Platzhalter. Verweise, die k-playbook selbst ausgibt,
   enthalten schon den echten Namen.
 - **Auf nichts unter `keph:/queue/` wird verwiesen, vor allem nicht auf Befunde.** Die Queue
