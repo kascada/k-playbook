@@ -404,7 +404,8 @@ the binding does not work has a message with its remedy:
 | `node-address` | `node.url` is not a loopback address | set `listen` under `node:` in the Kephalaion config to a loopback address |
 | `account-choice-missing` | several token files for the hub and no default | `kephalaion node account default <hub> <account>`; if the token directory is mounted read-only, as in the DevContainer, set the default on the host |
 | `token-missing` | no token file for the hub, only a waiting token (`.pending`), a token file elsewhere, or an unusable one | `kephalaion node account setup <hub> <account>` with a setup token from the admin, or first `kephalaion node setup <code>`; for a lone `.pending` the same `setup` call settles it |
-| `node-unreachable`, `hub-unknown`, `hub-never-synced`, `login-invalid`, `login-missing`, `replica-unreadable`, `collection-unreadable` | what the node or `whoami` reports | `kephalaion status`, `kephalaion node sync`, or another collection |
+| `node-unreachable`, `hub-unknown`, `login-invalid`, `login-missing`, `replica-unreadable`, `collection-unreadable` | what the node or `whoami` reports | `kephalaion status`, `kephalaion node sync`, or another collection |
+| `hub-never-synced` | the node has never synced the hub | `kephalaion node sync <hub>` on the node's machine, not in a pure client (in the DevContainer: on the host) |
 
 If a `.pending` lies next to the token file (an open `rotate`), the binding still works and the
 message adds `kephalaion node account check <hub> <account> --token-file <file>` to clean up.

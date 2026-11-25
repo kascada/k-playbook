@@ -304,12 +304,16 @@ für den Code-Scan in `docs.exclude` von `K-PLAYBOOK.yaml` ein (Task 116). Einze
 
 `docs scope [<pfad>] [--check <pfad>…] [--json]` rechnet den Scope der Code-Erzeuger
 (`project.DocsScope`, `project/docsscope.go`; die Muster im Stil einer `.gitignore` in
-`project/gitpattern.go`) — lokal, ohne Kephalaion; `docs orders <code|tools>` liest und bewertet die
+`project/gitpattern.go`) — lokal, ohne Kephalaion; `--check` nennt je Pfad auch `exists` und
+`suggest`; `docs orders <code|tools>` liest und bewertet die
 offenen Doku-Aufträge (Wartezeit von 2 Stunden nur hier, Zusammenlegen, Lauf voll, Teil oder
-Wiederaufnahme), `docs order add` reiht einen rohen Auftrag ein oder ergänzt den der Sitzung und
+Wiederaufnahme; ein Auftrag ohne gültigen Pfad ist `incomplete`), `docs order add` reiht einen
+rohen Auftrag ein oder ergänzt den der Sitzung (mit `corrected` und `missing`) und
 `docs orders split --json` schreibt die zerlegten Aufträge und schließt die rohen
 (`project.DocsOrders`, `project/docsorders.go`, `docsorderadd.go`, `docsordersplit.go`); alles
-Task 179. Das Programm entscheidet nur, was sich rechnen lässt; Zuordnung Pfad → Dokument und
+Task 179. Ein Pfad, dem das Repo-Verzeichnis ein zweites Mal vorangestellt ist, wird beim
+Lesen (`load`) und Einreihen berichtigt, am Dateisystem unter `project.repoRoot` geprüft
+(`docsRepoPrefixFix`, Task 193). Das Programm entscheidet nur, was sich rechnen lässt; Zuordnung Pfad → Dokument und
 `neu`/`entfaellt` bleiben bei der Sitzung. Vertrag: Handbuch `mcp.md`, Abschnitt „Scope and
 documentation orders“.
 
@@ -716,8 +720,10 @@ installer/
 │   │                            ReaderPool (bis zu n Sitzungen nebeneinander)
 │   ├── kephtest/                Collection im Speicher und Ersatz-Binary für die Auskunft
 │   │                            (nur Tests)
-│   ├── sync.go                  SyncHub: kephalaion node sync <hub> für eine frische
-│   │                            Replica (Vorprüfung der Befund-Queue, Task 166)
+│   ├── sync.go                  Client.SyncHub: Abgleich über das MCP-Werkzeug sync des
+│   │                            Nodes (ab v0.5.0, MinSyncNodeVersion) für eine frische
+│   │                            Replica, SyncError mit Abhilfe je Code (Vorprüfung der
+│   │                            Befund-Queue, Task 166, Task 194)
 │   └── check.go                 Prüfung und Zustände, lesbare Collections je Hub (ProbeHubs)
 ├── internal/versionsources/
 │   └── versionsources.go        die Quellenkonfiguration keph:/k-playbook/inventory.md
@@ -4105,11 +4111,21 @@ mechanisch ist: über 200 Namen prüfen und je Nutzer zählen. Der Command fäng
 Die Reihenfolge, je Stufe gesammelt statt beim ersten Problem abgebrochen, damit der Command
 alles auf einmal samt Zahl je Nutzer meldet:
 
-1. **Abgleich.** `kephalaion.SyncHub` (`internal/kephalaion/sync.go`) startet
-   `kephalaion node sync <hub>` über das Binary aus `FindBinary`, höchstens `SyncTimeout`
-   (eine Minute). Listen lesen die Replica; ohne Abgleich fehlt, was ein anderer Rechner gerade
-   angelegt hat. Bis dahin hatte das Programm keinen solchen Aufruf. Scheitert er oder fehlt
-   das Binary: Problem `sync`, die Prüfung läuft trotzdem weiter.
+1. **Abgleich.** `syncBinding` holt den Zugang wie die übrigen Aufrufe (`kephalaionAccess`,
+   `kephalaion.NewClient`) und ruft `Client.SyncHub` (`internal/kephalaion/sync.go`, Task 194):
+   in einer Sitzung `initialize`, `whoami` (Version mindestens `MinSyncNodeVersion`, v0.5.0;
+   ein älterer Node beantwortet das unbekannte Werkzeug mit -32602 wie ungültige Argumente,
+   deshalb entscheidet die Version) und das MCP-Werkzeug `sync` mit `hub`. Der Node antwortet
+   erst nach einem Abgleich, der nach der Anfrage begonnen hat, und wartet höchstens 40 s;
+   `SyncTimeout` (eine Minute) begrenzt den ganzen Aufruf, `ToolTimeout` gilt nicht. Kein
+   Prozess, keine Datenbank des Nodes auf diesem Rechner: Die Stufe geht auch in einem reinen
+   Client (DevContainer mit der config des Hosts). Erfolg ist nur eine Antwort ohne `isError`
+   mit dem Feld `revision` (auch 0) und ohne `last_error`; ihr Stand wird `sync` des Ergebnisses,
+   sonst der aus `whoami`. Jedes andere Ende — `isError`, unlesbare Antwort, Abbruch, Zeitgrenze,
+   Node zu alt, Zugang nicht zu öffnen — ist ein `*SyncError` und damit Problem `sync`; die
+   Codes des Werkzeugs wählen nur die Abhilfe (`syncFailureMessage`), die Meldung des Nodes
+   steht wörtlich darin. Die Prüfung läuft trotzdem weiter. Einen Rückfall auf
+   `kephalaion node sync` als Prozess gibt es nicht.
 2. **Anbindung und Rechte** aus `KephalaionStatus` (dem `whoami` des Nodes): nicht `ok` →
    Problem `kephalaion`, Ende; fehlt eines der Rechte `read`, `write`, `supersede`
    (`FindingsRequiredRights`) → je ein Problem `right`. Ohne `supersede` scheitert das Löschen

@@ -141,8 +141,10 @@ func printFindingsUsage(out io.Writer) {
 Aufruf:
   k-playbook findings check [--json]
 
-Die Vorprüfung vor /k-befunde-einordnen. Sie gleicht zuerst die Replica ab
-(kephalaion node sync <hub>), prüft dann die Rechte auf die Collection (read,
+Die Vorprüfung vor /k-befunde-einordnen. Sie fordert zuerst beim Node den
+Abgleich der Replica an (MCP-Werkzeug sync, Node ab Kephalaion v0.5.0; kein
+Prozess und keine Datenbank des Nodes auf diesem Rechner, geht also auch in
+einem reinen Client wie dem DevContainer), prüft dann die Rechte auf die Collection (read,
 write, supersede), dann jeden Eintrag unter queue/findings/ — jeder muss ein
 Befund nach dem Namensmuster <nummer>-<kurzname>.md sein, direkt in der
 Ablage — und liest zuletzt jeden Befund. Sie meldet alles auf einmal, nicht

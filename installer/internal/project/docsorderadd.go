@@ -58,14 +58,19 @@ type DocsOrderAddInput struct {
 
 // DocsOrderAddResult ist die Antwort von Add. Ref und Revision sind die des
 // Auftrags, der eingereiht wurde oder deckt; bei skipped fehlen sie.
+// Corrected nennt die berichtigten Eingabepfade (docsRepoPrefixFix), Missing
+// die Pfade, die es auch danach unter project.repoRoot nicht gibt; sie
+// ändern den Status nicht (Task 193).
 type DocsOrderAddResult struct {
-	Producer string   `json:"producer"`
-	Status   string   `json:"status"`
-	Ref      string   `json:"ref,omitempty"`
-	Revision int64    `json:"revision,omitempty"`
-	Pfade    []string `json:"pfade,omitempty"`
-	Reason   string   `json:"reason,omitempty"`
-	Message  string   `json:"message,omitempty"`
+	Producer  string               `json:"producer"`
+	Status    string               `json:"status"`
+	Ref       string               `json:"ref,omitempty"`
+	Revision  int64                `json:"revision,omitempty"`
+	Pfade     []string             `json:"pfade,omitempty"`
+	Corrected []DocsPathCorrection `json:"corrected,omitempty"`
+	Missing   []string             `json:"missing,omitempty"`
+	Reason    string               `json:"reason,omitempty"`
+	Message   string               `json:"message,omitempty"`
 }
 
 // DocsOrderAddUnavailable ist die Antwort, wenn die Kephalaion-Anbindung nicht
@@ -124,7 +129,8 @@ func (o *DocsOrders) Add(ctx context.Context, in DocsOrderAddInput) (DocsOrderAd
 	if err != nil {
 		return DocsOrderAddResult{}, err
 	}
-	result := DocsOrderAddResult{Producer: in.Producer, Pfade: pfade}
+	pfade, corrected := o.correctPaths(pfade)
+	result := DocsOrderAddResult{Producer: in.Producer, Pfade: pfade, Corrected: corrected, Missing: o.missingPaths(pfade)}
 	full := len(pfade) == 1 && pfade[0] == "."
 
 	if !full {

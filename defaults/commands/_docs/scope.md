@@ -19,7 +19,9 @@ Programm; dieser Text wiederholt sie nicht, und du rechnest sie nicht nach.
   Verzeichnis — abbrechen und den Pfad nennen; ein anderes Projekt wird dort dokumentiert,
   nicht von hier.
 - `check` nimmt Pfade (etwa die eines Auftrags) und meldet je Pfad `excluded` mit `reason`
-  und `by`: Ein ausgenommener Pfad führt zu keinem Dokument und ist nicht erreichbar.
+  und `by`: Ein ausgenommener Pfad führt zu keinem Dokument und ist nicht erreichbar. Dazu
+  `exists` (ob es den Pfad gibt) und `suggest` (der berichtigte Pfad, wenn das
+  Repo-Verzeichnis doppelt vorangestellt ist).
 - Aus der Antwort: `scanRoot` ist `SCAN_ROOT` (immer `project.repoRoot`, nicht das
   aktuelle Verzeichnis), `stand` Branch, Commit und `clean`, `extra` den geprüften
   Zusatzpfad, `exclude` die Ausschlüsse nach Herkunft (`always`, `hidden`, `further`,

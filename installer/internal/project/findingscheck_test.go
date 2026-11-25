@@ -2,8 +2,15 @@ package project
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -88,7 +95,10 @@ func findingsTestEnv(store FindingsStore, rights ...string) (findingsEnv, *[]str
 		binding: func() (kephalaion.Binding, error) {
 			return kephalaion.Binding{Hub: "vm", Collection: "k-playbook-dev"}, nil
 		},
-		sync: func(_ context.Context, hub string) error { synced = append(synced, hub); return nil },
+		sync: func(_ context.Context, binding kephalaion.Binding) (kephalaion.SyncState, error) {
+			synced = append(synced, binding.Hub)
+			return kephalaion.SyncState{LastSuccess: "2026-11-17T11:59:30Z", Revision: 7665}, nil
+		},
 		status: func() kephalaion.Status {
 			return kephalaion.Status{OK: true, State: kephalaion.StateOK, Address: "vm:k-playbook-dev", User: "kamran",
 				Rights: rights, Sync: &kephalaion.Sync{LastSuccess: "2026-11-17T11:59:00Z", Revision: &revision}}
@@ -143,7 +153,8 @@ func TestFindingsCheckBereit(t *testing.T) {
 		first.Created != findingsOld {
 		t.Fatalf("Eintrag: %+v", first)
 	}
-	if check.Sync == nil || check.Sync.At != "2026-11-17T11:59:00Z" || check.Sync.Revision == nil || *check.Sync.Revision != 7664 {
+	// Der Stand kommt aus der Antwort von sync, nicht aus whoami.
+	if check.Sync == nil || check.Sync.At != "2026-11-17T11:59:30Z" || check.Sync.Revision == nil || *check.Sync.Revision != 7665 {
 		t.Fatalf("sync: %+v", check.Sync)
 	}
 	if len(store.lists) != 1 || store.lists[0].Path != "queue/findings" || !store.lists[0].Recursive || !store.lists[0].Frontmatter {
@@ -188,7 +199,9 @@ func TestFindingsCheckOhneSupersede(t *testing.T) {
 func TestFindingsCheckAbgleichGescheitert(t *testing.T) {
 	store := &findingsFakeStore{docs: map[string]*findingsFakeDoc{"queue/findings/001-a.md": befund("kamran", findingsOld)}}
 	env, _ := findingsTestEnv(store, allFindingsRights...)
-	env.sync = func(context.Context, string) error { return errors.New("Der Abgleich ist gescheitert (Exit 1).") }
+	env.sync = func(context.Context, kephalaion.Binding) (kephalaion.SyncState, error) {
+		return kephalaion.SyncState{}, errors.New("Der Abgleich ist gescheitert.")
+	}
 	check := env.check(context.Background())
 	if check.Ready {
 		t.Fatal("bereit nach gescheitertem Abgleich")
@@ -199,19 +212,174 @@ func TestFindingsCheckAbgleichGescheitert(t *testing.T) {
 	if check.Total != 1 {
 		t.Fatalf("Bestand trotzdem gezählt: %d", check.Total)
 	}
+	// Ohne bestätigten Abgleich nennt whoami den Stand.
+	if check.Sync == nil || check.Sync.At != "2026-11-17T11:59:00Z" || *check.Sync.Revision != 7664 {
+		t.Fatalf("sync: %+v", check.Sync)
+	}
 }
 
-// Ohne Binary kephalaion: der echte Weg über kephalaion.SyncHub.
-func TestFindingsCheckOhneKephalaionBinary(t *testing.T) {
+// syncTestNode ist der Node eines reinen Clients für den echten Weg der
+// Stufe 1: initialize, whoami mit version, sync mit reply. Andere Werkzeuge
+// kennt er nicht.
+type syncTestNode struct {
+	version string
+	reply   func(hub string) (isError bool, structured string)
+	mu      sync.Mutex
+	hubs    []string
+}
+
+func (n *syncTestNode) synced() []string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return append([]string{}, n.hubs...)
+}
+
+// startSyncTestNode startet den Node und lenkt kephalaionAccess für den Hub
+// vm auf ihn, mit einer Token-Datei im Temp-Verzeichnis. Ein Binary
+// kephalaion gibt es nicht, eine Datenbank des Nodes auch nicht.
+func startSyncTestNode(t *testing.T, node *syncTestNode) {
+	t.Helper()
 	kephtest.NoBinary(t)
-	env, _ := findingsTestEnv(&findingsFakeStore{docs: map[string]*findingsFakeDoc{}}, allFindingsRights...)
-	env.sync = kephalaion.SyncHub
-	check := env.check(context.Background())
-	if check.Ready {
-		t.Fatal("bereit ohne Binary")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		var msg struct {
+			ID     *int   `json:"id"`
+			Method string `json:"method"`
+			Params struct {
+				Name      string         `json:"name"`
+				Arguments map[string]any `json:"arguments"`
+			} `json:"params"`
+		}
+		_ = json.Unmarshal(data, &msg)
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case msg.Method == "initialize":
+			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{}}}}`, *msg.ID)
+		case msg.Method == "notifications/initialized":
+			w.WriteHeader(http.StatusAccepted)
+		case msg.Method == "tools/call" && msg.Params.Name == "whoami":
+			writeKephResult(w, *msg.ID, false, fmt.Sprintf(`{"version":%q,"hubs":[],"unknown_hubs":[]}`, node.version))
+		case msg.Method == "tools/call" && msg.Params.Name == "sync":
+			hub, _ := msg.Params.Arguments["hub"].(string)
+			node.mu.Lock()
+			node.hubs = append(node.hubs, hub)
+			node.mu.Unlock()
+			isError, structured := node.reply(hub)
+			writeKephResult(w, *msg.ID, isError, structured)
+		default:
+			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"error":{"code":-32602,"message":"unknown tool"}}`, *msg.ID)
+		}
+	}))
+	t.Cleanup(server.Close)
+	tokens := kephtest.Token(t, filepath.Join(t.TempDir(), "tokens"), "vm", "kamran-wsl", "keph_FINDINGSLEAKCANARYabcdefghijklmnopqrstu1234")
+	original := kephalaionAccess
+	kephalaionAccess = func(hub string) (kephalaion.Access, error) {
+		return kephalaion.ResolveInfo(kephtest.Info(server.URL+"/mcp", tokens, kephtest.Hub(tokens, "vm", "kamran-wsl")), hub)
 	}
-	if got := problemKinds(check); len(got) != 1 || got[0] != "sync:" || !strings.Contains(check.Problems[0].Message, "nicht installiert") {
-		t.Fatalf("Probleme: %v %+v", got, check.Problems)
+	t.Cleanup(func() { kephalaionAccess = original })
+}
+
+// Reiner Client: kein Binary für den Abgleich, keine Datenbank des Nodes —
+// der echte Weg über syncBinding und das Werkzeug sync. Der Stand kommt aus
+// dessen Antwort.
+func TestFindingsCheckReinerClient(t *testing.T) {
+	node := &syncTestNode{version: kephalaion.MinSyncNodeVersion, reply: func(hub string) (bool, string) {
+		return false, `{"hub":"vm","sync":{"last_success":"2026-11-17T11:59:45Z","revision":8001}}`
+	}}
+	startSyncTestNode(t, node)
+	store := &findingsFakeStore{docs: map[string]*findingsFakeDoc{"queue/findings/001-a.md": befund("kamran", findingsOld)}}
+	env, _ := findingsTestEnv(store, allFindingsRights...)
+	env.sync = syncBinding
+	check := env.check(context.Background())
+	if !check.Ready || len(check.Problems) != 0 {
+		t.Fatalf("nicht bereit: %+v", check.Problems)
+	}
+	if got := node.synced(); len(got) != 1 || got[0] != "vm" {
+		t.Fatalf("sync: %v", got)
+	}
+	if check.Sync == nil || check.Sync.At != "2026-11-17T11:59:45Z" || *check.Sync.Revision != 8001 || check.Total != 1 {
+		t.Fatalf("Stand: %+v, total %d", check.Sync, check.Total)
+	}
+}
+
+// In jedem Fehlerfall des Abgleichs ist ready falsch, und die übrigen Stufen
+// laufen weiter.
+func TestFindingsCheckAbgleichFehlerfaelle(t *testing.T) {
+	cases := []struct {
+		name    string
+		version string
+		reply   func(string) (bool, string)
+		want    []string
+	}{
+		{name: "Node kennt sync nicht", version: "v0.4.3",
+			want: []string{kephalaion.MinSyncNodeVersion, "kephalaion upgrade am Rechner des Nodes"}},
+		{name: "Frist des Nodes", version: kephalaion.MinSyncNodeVersion,
+			reply: func(string) (bool, string) {
+				return true, `{"hub":"vm","error":{"code":"sync_timeout","message":"Hub vm: der Abgleich ist nach 40 s noch nicht beendet (Wartefrist)."}}`
+			},
+			want: []string{"Wartefrist", "erneut versuchen"}},
+		{name: "Fehler des Werkzeugs", version: kephalaion.MinSyncNodeVersion,
+			reply: func(string) (bool, string) {
+				return true, `{"hub":"vm","error":{"code":"unreachable","message":"Hub vm: nicht erreichbar."}}`
+			},
+			want: []string{"Hub vm: nicht erreichbar", "Hub und Netz prüfen"}},
+		{name: "Erfolg ohne revision", version: kephalaion.MinSyncNodeVersion,
+			reply: func(string) (bool, string) {
+				return false, `{"hub":"vm","sync":{"last_success":"2026-11-17T11:59:45Z"}}`
+			},
+			want: []string{"ohne Revision"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			node := &syncTestNode{version: tc.version, reply: tc.reply}
+			if node.reply == nil {
+				node.reply = func(string) (bool, string) {
+					t.Error("sync an einem zu alten Node aufgerufen")
+					return true, "{}"
+				}
+			}
+			startSyncTestNode(t, node)
+			store := &findingsFakeStore{docs: map[string]*findingsFakeDoc{"queue/findings/001-a.md": befund("kamran", findingsOld)}}
+			env, _ := findingsTestEnv(store, allFindingsRights...)
+			env.sync = syncBinding
+			check := env.check(context.Background())
+			if check.Ready {
+				t.Fatal("bereit nach gescheitertem Abgleich")
+			}
+			if got := problemKinds(check); len(got) != 1 || got[0] != "sync:" {
+				t.Fatalf("Probleme: %v", got)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(check.Problems[0].Message, want) {
+					t.Fatalf("%q fehlt: %s", want, check.Problems[0].Message)
+				}
+			}
+			if strings.Contains(check.Problems[0].Message, "FINDINGSLEAKCANARY") {
+				t.Fatalf("Token in der Meldung: %s", check.Problems[0].Message)
+			}
+			if check.Total != 1 || len(store.lists) != 1 {
+				t.Fatalf("übrige Stufen nicht gelaufen: total %d, lists %d", check.Total, len(store.lists))
+			}
+		})
+	}
+}
+
+// Lässt sich der Zugang zum Node nicht öffnen, ist das ein Problem der Art
+// sync; die übrigen Stufen laufen weiter.
+func TestFindingsCheckAbgleichOhneZugang(t *testing.T) {
+	original := kephalaionAccess
+	kephalaionAccess = func(string) (kephalaion.Access, error) { return kephalaion.Access{}, errors.New("keine Auskunft") }
+	t.Cleanup(func() { kephalaionAccess = original })
+	store := &findingsFakeStore{docs: map[string]*findingsFakeDoc{}}
+	env, _ := findingsTestEnv(store, allFindingsRights...)
+	env.sync = syncBinding
+	check := env.check(context.Background())
+	if got := problemKinds(check); check.Ready || len(got) != 1 || got[0] != "sync:" ||
+		!strings.Contains(check.Problems[0].Message, "keine Auskunft") {
+		t.Fatalf("ohne Zugang: %v %+v", got, check.Problems)
+	}
+	if len(store.lists) != 1 {
+		t.Fatal("Liste nicht gelaufen")
 	}
 }
 

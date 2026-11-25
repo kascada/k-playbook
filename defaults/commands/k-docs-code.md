@@ -49,8 +49,9 @@ Voller Lauf: /k-docs code reiht ihn ein, danach /k-docs-code.
 **Aufträge.** Lies `k-playbook:/commands/_docs/auftraege.md` mit `k_playbook_doc_read`
 (`projectDir` = `project.dir`) und rufe `k_playbook_docs_orders` mit `erzeuger: code`
 auf. Du merkst dir `RAW_ORDERS` (`rawOrders`), `SPLIT_ORDERS` (`splitOrders`) und `WAITING`
-(`waiting`); meldet `problems` unlesbare Aufträge oder Aufträge ohne lesbaren Zeitpunkt, nennst
-du sie im Preflight — ein Auftrag ohne Zeitpunkt gilt als reif und wird trotzdem abgearbeitet. Ein Auftrag
+(`waiting`); meldet `problems` unlesbare, unvollständige (`incomplete`, ohne Pfad) Aufträge,
+weggelassene oder berichtigte Pfade oder Aufträge ohne lesbaren Zeitpunkt, nennst du sie im
+Preflight — ein Auftrag ohne Zeitpunkt gilt als reif und wird trotzdem abgearbeitet. Ein Auftrag
 ist **zerlegt**, wenn er `dokument` trägt, sonst **roh**; offene zerlegte heißen, ein früherer Lauf ist unterbrochen, und dieser setzt dort wieder an.
 
 **Nichts zu tun.** Meldet die Antwort `nothingToDo`, endet der Command hier: Gibt es keinen
@@ -70,7 +71,8 @@ mit `check` = den Pfaden der Aufträge (ohne `.`). Fünf Abweichungen hat dieser
   bisherige Fassung und was sein Thema braucht, auch außerhalb der Pfade. Der Rest des
   Projekts wird nur im vollen Lauf gescannt.
 - **Die Ausschlüsse gelten** auch für die Pfade eines Auftrags (`checks`): Ein ausgenommener
-  Pfad führt zu keinem Dokument.
+  Pfad führt zu keinem Dokument. Pfade mit `exists: false` nennt der Preflight, mit `suggest`,
+  falls gesetzt.
 - Der Stand wird nur beschrieben, nie umgeschaltet; was der Preflight fragt, steht im Modul.
 
 Zeige den Preflight und lass ihn **einmal** bestätigen; der Nutzer darf dabei Ausschlüsse
@@ -169,7 +171,8 @@ einsetzt. In der Wiederaufnahme ohne rohe Aufträge entfällt die Analyse.
   vom Thema nichts bleibt.
 - Ein Pfad, den die Ausschlüsse ausnehmen, führt zu keinem Dokument. Folgt aus einem Auftrag
   deshalb kein Dokument, steht er unter „Ohne Dokument“, und Schritt 7 nennt den Nachzug als
-  offen.
+  offen. Ein unvollständiger roher Auftrag steht dort mit dem Grund „ohne Pfad“; ein
+  unvollständiger zerlegter wird wie bisher abgearbeitet.
 - Liegt für ein Dokument schon ein zerlegter Auftrag offen (`SPLIT_ORDERS`), gilt seine
   Zeile mit; er wird ergänzt statt verdoppelt.
 

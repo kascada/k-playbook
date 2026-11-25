@@ -529,7 +529,9 @@ der Projekt-Collection.
             einer, den docs.exclude ausnimmt, kommt dadurch in den Scan.
             --check meldet je Pfad (relativ zu SCAN_ROOT oder absolut), ob er
             ausgeschlossen ist: Grund always, hidden, further, gitignore, config
-            oder outside und das Muster. Fehlerhafter Zusatzpfad: invalid_input.
+            oder outside und das Muster; dazu, ob es ihn gibt (exists, sonst
+            „fehlt“), und bei doppelt vorangestelltem Repo-Verzeichnis den
+            berichtigten Pfad (suggest). Fehlerhafter Zusatzpfad: invalid_input.
             --json: scanRoot, projectDir, stand, extra, exclude, checks.
 
   orders    Liest die offenen Doku-Aufträge eines Erzeugers aus keph:/queue/docs/
@@ -543,7 +545,10 @@ der Projekt-Collection.
             (2 Stunden seit der letzten Änderung, ohne lesbare Änderung seit
             dem Anlegen, gerechnet mit der Uhr des Programms) steht nur im
             Programm; ohne beide Zeitpunkte ist ein Auftrag reif und steht
-            unter problems. Für tools nur die Liste.
+            unter problems. Ein Auftrag ohne gültigen Pfad trägt incomplete
+            und steht unter problems, ebenso weggelassene ungültige Pfade und
+            berichtigte (Repo-Verzeichnis doppelt vorangestellt). Für tools
+            nur die Liste.
             Braucht Kephalaion (kephalaion_unavailable).
 
   order add Reiht einen rohen Auftrag ein oder ergänzt den offenen derselben
@@ -554,8 +559,11 @@ der Projekt-Collection.
             kephalaion_unavailable (nicht bereit; kein Fehler, Exit 0). --pfad
             nimmt mehrere Pfade (relativ zu project.repoRoot), . ist der volle
             Lauf von /k-docs: Für ihn gelten „Ein Auftrag je Sitzung“ und „Noch
-            keine erzeugte Doku“ nicht. --json: producer, status, ref, revision,
-            pfade, reason, message.
+            keine erzeugte Doku“ nicht. Ein doppelt vorangestelltes
+            Repo-Verzeichnis wird berichtigt (corrected, from/to); Pfade, die
+            es auch danach nicht gibt, nennt missing — angenommen werden sie
+            trotzdem. --json: producer, status, ref, revision, pfade,
+            corrected, missing, reason, message.
 
   orders split
             Liest von stdin, was die Sitzung zerlegt und der Nutzer bestätigt hat:

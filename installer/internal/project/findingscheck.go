@@ -24,8 +24,12 @@ import (
 // statt beim ersten zu enden — der Command meldet alles auf einmal, samt Zahl
 // je Nutzer:
 //
-//  1. Replica abgleichen (kephalaion node sync <hub>). Ohne frischen Abgleich
-//     fehlt, was ein anderer Rechner gerade angelegt hat.
+//  1. Replica abgleichen: das MCP-Werkzeug sync des Nodes über den Zugang aus
+//     der Auskunft von Kephalaion (kephalaion.Client.SyncHub). Ohne frischen
+//     Abgleich fehlt, was ein anderer Rechner gerade angelegt hat. Kein
+//     Prozess und keine Datenbank des Nodes auf diesem Rechner: Die Stufe
+//     geht auch in einem reinen Client, der nur die config des Hosts und
+//     einen Weg zu dessen Node hat.
 //  2. Anbindung und Rechte: read, write, supersede. Ohne supersede scheitert
 //     das Löschen der Befunde anderer Nutzer.
 //  3. Die Liste unter queue/findings/: Jeder Eintrag folgt dem Namensmuster
@@ -54,8 +58,9 @@ const (
 	// FindingsProblemKephalaion: Die Anbindung ist nicht bereit, oder die
 	// Collection lässt sich nicht öffnen oder listen.
 	FindingsProblemKephalaion = "kephalaion"
-	// FindingsProblemSync: Der Abgleich der Replica ist gescheitert, oder das
-	// Binary kephalaion fehlt.
+	// FindingsProblemSync: Der Abgleich der Replica ist gescheitert, nicht
+	// bestätigt oder nicht rechtzeitig beendet, der Node ist zu alt für das
+	// Werkzeug sync, oder der Zugang zum Node ließ sich dafür nicht öffnen.
 	FindingsProblemSync = "sync"
 	// FindingsProblemRight: Ein Recht aus FindingsRequiredRights fehlt; Name
 	// ist das Recht.
@@ -150,7 +155,7 @@ type FindingsStore interface {
 // findingsEnv sind die Zugänge der Vorprüfung, austauschbar für Tests.
 type findingsEnv struct {
 	binding func() (kephalaion.Binding, error)
-	sync    func(ctx context.Context, hub string) error
+	sync    func(ctx context.Context, binding kephalaion.Binding) (kephalaion.SyncState, error)
 	status  func() kephalaion.Status
 	open    func(status kephalaion.Status) (FindingsStore, error)
 	now     func() time.Time
@@ -163,7 +168,7 @@ type findingsEnv struct {
 func CheckFindings(ctx context.Context, projectDir string) FindingsCheck {
 	return findingsEnv{
 		binding: func() (kephalaion.Binding, error) { return ProjectBinding(projectDir) },
-		sync:    kephalaion.SyncHub,
+		sync:    syncBinding,
 		status:  func() kephalaion.Status { return KephalaionStatus(projectDir) },
 		open: func(status kephalaion.Status) (FindingsStore, error) {
 			client, _, err := openKephClientStatus(projectDir, "", status)
@@ -193,14 +198,17 @@ func (env findingsEnv) check(ctx context.Context) (result FindingsCheck) {
 		problem(FindingsProblemKephalaion, "", err.Error())
 		return result
 	case binding.Hub != "":
-		if err := env.sync(ctx, binding.Hub); err != nil {
+		if state, err := env.sync(ctx, binding); err != nil {
 			problem(FindingsProblemSync, "", err.Error())
+		} else {
+			revision := state.Revision
+			result.Sync = &FindingsSync{At: state.LastSuccess, Revision: &revision}
 		}
 	}
 
-	// 2. Anbindung und Rechte.
+	// 2. Anbindung und Rechte. Den Stand des Abgleichs nennt sonst der Node.
 	status := env.status()
-	if status.Sync != nil {
+	if result.Sync == nil && status.Sync != nil {
 		result.Sync = &FindingsSync{At: status.Sync.LastSuccess, Revision: status.Sync.Revision}
 	}
 	if !status.OK {
@@ -296,6 +304,23 @@ func (env findingsEnv) check(ctx context.Context) (result FindingsCheck) {
 	sortFindings(result.Findings, func(i int) FindingItem { return result.Findings[i] })
 	sortFindings(result.Skipped, func(i int) FindingItem { return result.Skipped[i].FindingItem })
 	return result
+}
+
+// syncBinding fordert den Abgleich für den Hub der Anbindung beim Node an,
+// mit Endpunkt, Account und Token auf demselben Weg wie die übrigen Aufrufe
+// (kephalaionAccess, kephalaion.NewClient). Lässt sich der Zugang nicht
+// öffnen, ist das ein Fehler des Abgleichs; Stufe 2 meldet dieselbe Ursache
+// womöglich noch einmal als Anbindung.
+func syncBinding(ctx context.Context, binding kephalaion.Binding) (kephalaion.SyncState, error) {
+	access, err := kephalaionAccess(binding.Hub)
+	if err != nil {
+		return kephalaion.SyncState{}, fmt.Errorf("Abgleich nicht möglich: kein Zugang zum Node für den Hub %s: %v", binding.Hub, err)
+	}
+	client, err := kephalaion.NewClient(binding, access)
+	if err != nil {
+		return kephalaion.SyncState{}, fmt.Errorf("Abgleich nicht möglich: %v", err)
+	}
+	return client.SyncHub(ctx)
 }
 
 // findingsDir ist die Ablage der Sorte findings.

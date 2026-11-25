@@ -118,8 +118,12 @@ func kephalaionHint(state kephalaion.State) string {
 		return "Einen Standard-Account setzen: kephalaion node account default <hub> <account>; im DevContainer auf dem Host."
 	case kephalaion.StateTokenMissing, kephalaion.StateLoginInvalid, kephalaion.StateLoginMissing:
 		return "Token-Datei und Anmeldung des Accounts prüfen: kephalaion node account list, kephalaion status."
-	case kephalaion.StateHubUnknown, kephalaion.StateHubNeverSynced, kephalaion.StateReplicaUnreadable:
+	case kephalaion.StateHubUnknown, kephalaion.StateReplicaUnreadable:
 		return "Den Hub am Node prüfen und abgleichen: kephalaion status, kephalaion node sync."
+	case kephalaion.StateHubNeverSynced:
+		// Ohne Replica lehnt der Node einen Abgleich auf Anforderung ab
+		// (never_synced); den ersten macht nur der Rechner des Nodes selbst.
+		return "Den Hub am Rechner des Nodes abgleichen, nicht im Client: kephalaion node sync <hub>; im DevContainer auf dem Host."
 	case kephalaion.StateCollectionUnreadable:
 		return "Leserecht auf die Collection beantragen oder in der Oberfläche eine lesbare Collection wählen (k-playbook ohne Argument oder /k-gui; Statusseite, Karte „Kephalaion-Collection einrichten“)."
 	}

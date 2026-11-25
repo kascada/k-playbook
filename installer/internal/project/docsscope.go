@@ -79,11 +79,16 @@ type DocsScopeExclude struct {
 	Rejected  []DocsExcludeProblem  `json:"rejected"`
 }
 
-// DocsScopeCheck ist das Ergebnis von --check für einen Pfad: Excluded, ob er
-// ausgeschlossen ist, Reason die Herkunft (always, hidden, further,
-// gitignore, config) und By das Muster oder der Name, der ihn trifft.
+// DocsScopeCheck ist das Ergebnis von --check für einen Pfad: Exists, ob es
+// ihn gibt, Excluded, ob er ausgeschlossen ist, Reason die Herkunft (always,
+// hidden, further, gitignore, config) und By das Muster oder der Name, der
+// ihn trifft. Suggest ist der berichtigte Pfad, wenn es den Pfad nur deshalb
+// nicht gibt, weil das Repo-Verzeichnis ein zweites Mal vorangestellt ist
+// (docsRepoPrefixFix, Task 193).
 type DocsScopeCheck struct {
 	Path     string `json:"path"`
+	Exists   bool   `json:"exists"`
+	Suggest  string `json:"suggest,omitempty"`
 	Excluded bool   `json:"excluded"`
 	Reason   string `json:"reason,omitempty"`
 	By       string `json:"by,omitempty"`
@@ -377,6 +382,7 @@ func (s *docsScope) check(raw string) DocsScopeCheck {
 	if info, err := os.Stat(abs); err == nil {
 		isDir, exists = info.IsDir(), true
 	}
+	item.Exists = exists
 	// Einen Pfad, den es nicht gibt, kann niemand als Datei oder Verzeichnis
 	// belegen: Er gilt als Verzeichnis, wenn ihn ein Muster nur für
 	// Verzeichnisse trifft.
@@ -391,6 +397,11 @@ func (s *docsScope) check(raw string) DocsScopeCheck {
 	rel = filepath.ToSlash(rel)
 	if rel == "." {
 		return item
+	}
+	if !exists {
+		if fixed, ok := docsRepoPrefixFix(s.scanRoot, rel); ok {
+			item.Suggest = fixed
+		}
 	}
 	if s.alwaysExcludedAbs(abs, s.projectDir) {
 		item.Excluded, item.Reason = true, "always"

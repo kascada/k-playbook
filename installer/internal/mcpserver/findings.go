@@ -34,8 +34,9 @@ type findingsCheckEnvelope struct {
 func addFindingsTool(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: findingsCheckTool,
-		Description: "Vorprüfung der Befund-Queue keph:/queue/findings/ vor /k-befunde-einordnen. Gleicht zuerst die " +
-			"Replica ab (kephalaion node sync <hub>), prüft die Rechte read, write und supersede, dann jeden Eintrag unter " +
+		Description: "Vorprüfung der Befund-Queue keph:/queue/findings/ vor /k-befunde-einordnen. Fordert zuerst beim " +
+			"Node den Abgleich der Replica an (MCP-Werkzeug sync, Node ab Kephalaion v0.5.0; geht auch in einem reinen " +
+			"Client ohne Datenbank des Nodes), prüft die Rechte read, write und supersede, dann jeden Eintrag unter " +
 			"queue/findings/ (Namensmuster <nummer>-<kurzname>.md, direkt in der Ablage) und liest jeden Befund. " +
 			"Meldet alles auf einmal und zählt den Bestand auch, wenn sie nicht bereit ist. Antwort unter check: ready " +
 			"(true genau dann, wenn problems leer ist), problems (je kind — kephalaion, sync, right, name, subdir, " +

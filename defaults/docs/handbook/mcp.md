@@ -317,9 +317,9 @@ then nothing is written and the interface says so.
 | `k_playbook_docs_publish` | publish that working directory: create, write and delete against the revisions of the checkout, report `conflict` instead of overwriting, enforce frontmatter and unchanged `hints` (`allow_hints`), write the directory's `README.md` from its template `k-playbook:/docs/generated/<erzeuger>/README.md`, clean up only when nothing is open -- then also `.k-playbook/work/docs/` and `.k-playbook/work/` if they are left empty; `stand` compares the source state with the checkout; `check: true` writes nothing and reports the plan, all rejections, changed `hints` and foreseeable conflicts (task 195) |
 | `k_playbook_docs_readme` | write the `README.md` of the directories under `keph:/docs/` from their templates `k-playbook:/docs/<pfad>/README.md` -- each one that is missing or differs (create, otherwise write with its revision); without `pfad` all templates, with `pfad` one; `check: true` writes nothing and reports `missing`, `differs` or `unchanged`; like `k-playbook docs readme` (task 137) |
 | `k_playbook_docs_exclude_add` | add `patterns` to the block `docs.exclude` of `K-PLAYBOOK.yaml` -- the permanent exclusions of the docs producers' code scan, read back as `environment.docs.exclude` (the partial call of the briefing); creates the block if missing, leaves everything outside it unchanged, rejects absolute patterns, those leaving `project.repo_root` and those with a line break or other control character with a reason, skips duplicates, and leaves the file untouched when nothing is new; inserts only the new lines, every other line stays; a form it cannot extend safely, such as the flow form, is `unsupported` and nothing is written; like `k-playbook docs exclude add` |
-| `k_playbook_docs_scope` | compute the scope of the docs producers that scan the code (`/k-docs-code`, `/k-docs-tools`) by rules that stand only in the program, not in the command texts (tasks 179 and 180; `k-playbook:/commands/_docs/scope.md` calls it), locally and without Kephalaion: `scanRoot` (`project.repoRoot`), `stand` (branch, commit, whether `git status --porcelain` is empty), the effective exclusions by origin under `exclude` and, with `pfad` (exactly one extra path, `EXTRA_PATH`), `extra`; `check` reports per path whether it is excluded and why; like `k-playbook docs scope` |
-| `k_playbook_docs_orders` | read the open documentation orders of a producer (`erzeuger`: `code` or `tools`) from `keph:/queue/docs/` and rate them (task 179): per order raw or split, waiting (with the remaining minutes) or ready; for `code` also the run (`full`, `partial`, `resume`, `none`), the merged raw orders (`rawOrders`), the open split orders (`splitOrders`), the waiting ones (`waiting`) and `nothingToDo`; like `k-playbook docs orders` |
-| `k_playbook_docs_order_add` | queue a raw documentation order or extend the open one of the same session (task 179): answer `created`, `extended`, `covered` or `skipped` with a reason (`no_generated_docs`, `kephalaion_unavailable`); like `k-playbook docs order add` |
+| `k_playbook_docs_scope` | compute the scope of the docs producers that scan the code (`/k-docs-code`, `/k-docs-tools`) by rules that stand only in the program, not in the command texts (tasks 179 and 180; `k-playbook:/commands/_docs/scope.md` calls it), locally and without Kephalaion: `scanRoot` (`project.repoRoot`), `stand` (branch, commit, whether `git status --porcelain` is empty), the effective exclusions by origin under `exclude` and, with `pfad` (exactly one extra path, `EXTRA_PATH`), `extra`; `check` reports per path whether it exists (`exists`, with a corrected `suggest` when the repository directory is prefixed twice) and whether it is excluded and why; like `k-playbook docs scope` |
+| `k_playbook_docs_orders` | read the open documentation orders of a producer (`erzeuger`: `code` or `tools`) from `keph:/queue/docs/` and rate them (task 179): per order raw or split, waiting (with the remaining minutes) or ready; for `code` also the run (`full`, `partial`, `resume`, `none`), the merged raw orders (`rawOrders`), the open split orders (`splitOrders`), the waiting ones (`waiting`) and `nothingToDo`; an order without a valid path carries `incomplete` (task 193); like `k-playbook docs orders` |
+| `k_playbook_docs_order_add` | queue a raw documentation order or extend the open one of the same session (task 179): answer `created`, `extended`, `covered` or `skipped` with a reason (`no_generated_docs`, `kephalaion_unavailable`), plus `corrected` and `missing` for corrected and nonexistent paths (task 193); like `k-playbook docs order add` |
 | `k_playbook_docs_orders_split` | write the split orders of `/k-docs-code` from the lines the user confirmed and close what they absorbed (task 179): per document `created`, `extended`, `skipped` or `failed`, then the raw orders to `done/`; like `k-playbook docs orders split --json` |
 | `k_playbook_briefing` | the briefing at session start: date, project and Kephalaion binding in sections of their own (`now`, `project`, `kephalaion`), the text of the always-instructions (`documents.always.content`), which instructions, reviews and guidelines apply (references with title, description and origin), what is pending in the project's collection (own open tasks and workbench topics, at most 10 each with `work.total` for the number of all, each with `problem` when its frontmatter is unreadable or its title looks cut off at ` #`, the number of open findings), the services of the personal GitHub access file for this repository (`github.projectServices`), and the environment check under `health` (the same report as `k_playbook_health`); heals the assistant links as a side effect (`links`); like `k-playbook briefing --json`. With `part: "environment"` it returns only the environment facts single commands need (`gh`, `github`, `baseTools`, `versionSources`, `docs`, `remediation`) under `environment`, like `k-playbook briefing --part environment --json` |
 | `k_playbook_health` | check the project's environment and report every error and warning at once under `health` -- `ok` (no entry of level `error`) and `problems`, each `level`, `area` (`kephalaion`, `baseTools`, `versionSources`, `github`, `share`, `anchor`), `message`, `hint`; repairs nothing and writes nothing -- a missing access file is no entry and stays missing (`k-playbook github init` creates it); never names a token or a value from a file (service and key names may appear, values never); like `k-playbook health --json` |
@@ -1186,6 +1186,8 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   An extra path that does not exist, lies outside `project.dir` or inside an always-excluded
   directory is `invalid_input`. A hidden extra path and one that `docs.exclude` excludes enter
   the scan through the argument; `.git/` and `.k-playbook/` never do. `checks` has per path
+  `exists` (whether the path exists), `suggest` (set only when the path is missing because the
+  base name of `project.repoRoot` is prefixed a second time and the rest exists; task 193),
   `excluded`, `reason` (`always`, `hidden`, `further`, `gitignore`, `config`, `outside`) and `by`
   (the pattern). Patterns follow `.gitignore` rules (`*`, `?`, `**`, classes, trailing `/`,
   anchoring, `!`); the fixed list applies on every level.
@@ -1206,7 +1208,12 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   (`ref`, `pfade`, `updated`, `remainingMinutes`). `nothingToDo` with `reason` means no run: no
   open orders, or only waiting ones. `problems` names orders whose frontmatter cannot be read --
   they are missing from the list -- and raw orders of `code` without a readable time of change
-  or creation -- they count as ready, stay in the lists and are worked off. For `tools` there is only `orders` and `nothingToDo`, no
+  or creation -- they count as ready, stay in the lists and are worked off. It also names orders without a
+  valid path (they stay in `orders` with `incomplete: true`), invalid paths dropped while
+  reading, and paths corrected while reading (task 193): a path that does not exist, starts with
+  the base name of `project.repoRoot` and exists without that segment is read without it; the
+  order in the queue is not rewritten. Except for unreadable orders these lines appear only for
+  orders of the requested `erzeuger`. For `tools` there is only `orders` and `nothingToDo`, no
   waiting time. Without a ready Kephalaion binding: `kephalaion_unavailable`, no fallback to disk.
 - **`k_playbook_docs_order_add`** inputs: `erzeuger`, `pfade` (relative to `project.repoRoot`,
   `.` is the full run), `anlass` (one sentence), `sitzung` (the identifier from the briefing,
@@ -1221,7 +1228,11 @@ All four take `projectDir` (required by contract). Answers carry the usual envel
   (the binding is not ready: nothing is queued, not even on disk -- no tool error, the closing
   reports the missing follow-up as open). An order with `pfade: .` is the full run of `/k-docs`:
   "one order per session", "no duplicate" and "no generated documentation yet" do not apply to
-  it; an open raw order with `pfade: .` covers it. A missing input is `invalid_input`.
+  it; an open raw order with `pfade: .` covers it. The given `pfade` are corrected by the same
+  rule as in `k_playbook_docs_orders` before they are compared with the open order; `corrected`
+  lists each correction (`from`, `to`) and `missing` the paths that do not exist even then --
+  they are queued unchanged, a deleted path is a valid order, and `status` stays the same
+  (task 193). A missing input is `invalid_input`.
 - **`k_playbook_docs_orders_split`** inputs: `sitzung` (of the processor), `documents` and
   `raw`. Each document is `dokument` (`<NN>-<slug>.md`), `aktion` (`neu`, `umschreiben`,
   `entfaellt`), `pfade`, `anlaesse` (`datum`, `anlass`), optionally `anlass` (the summary,
@@ -1493,9 +1504,15 @@ per user -- and therefore lives in the program, not in the command text. Its onl
 In this order, collecting instead of stopping at the first problem, so the command reports
 everything at once together with the number per user:
 
-1. **Sync.** `kephalaion node sync <hub>` through the binary (`kephalaion.SyncHub`, at most one
-   minute). Lists read the replica; without a fresh sync, what another machine has just
-   created is missing. A failed sync or a missing binary is a problem of kind `sync`.
+1. **Sync.** The node's MCP tool `sync` (`kephalaion.Client.SyncHub`, task 194; node from
+   Kephalaion v0.5.0), with endpoint, account and token from the same client information as
+   every other call -- no process, no node database on this machine, so it also works in a
+   pure client such as a DevContainer. Lists read the replica; without a fresh sync, what
+   another machine has just created is missing. A failed, unconfirmed or unfinished sync, a
+   node too old for the tool, or access to the node that cannot be opened is a problem of
+   kind `sync` with a remedy per case
+   ([`kephalaion-client.md`](./kephalaion-client.md#the-tool-sync)); the other stages run on.
+   The answer's `sync` (`at`, `revision`) comes from the sync itself, otherwise from `whoami`.
 2. **Binding and rights.** The binding must be `ok` (otherwise kind `kephalaion`, and the check
    ends here); the rights on the collection must include `read`, `write` and `supersede` --
    without `supersede`, deleting another user's finding fails. Each missing right is a

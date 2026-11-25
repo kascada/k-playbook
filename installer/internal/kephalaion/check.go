@@ -256,7 +256,7 @@ func hubState(hub string, reply *whoamiOutput) (entry *whoamiHub, state State, m
 	case "invalid":
 		if entry.Sync.NeverSynced {
 			return entry, StateHubNeverSynced, fmt.Sprintf(
-				"Der Node hat den Hub %s noch nie abgeglichen; die Anmeldung lässt sich erst danach prüfen (kephalaion node sync).", hub)
+				"Der Node hat den Hub %s noch nie abgeglichen; die Anmeldung lässt sich erst danach prüfen (kephalaion node sync %s am Rechner des Nodes).", hub, hub)
 		}
 		return entry, StateLoginInvalid, fmt.Sprintf(
 			"Anmeldung ungültig: Der Hub %s nimmt Account und Token nicht an (gesperrt, ersetzt oder abgelaufen).", hub)

@@ -343,8 +343,9 @@ Unterkommandos:
             Hinweise stehen auf stderr. Dasselbe wie das MCP-Werkzeug
             k_playbook_doc_read.
   findings  Die Vorprüfung der Befund-Queue vor /k-befunde-einordnen:
-            k-playbook findings check [--json]. Gleicht die Replica ab
-            (kephalaion node sync), prüft die Rechte read, write und
+            k-playbook findings check [--json]. Fordert den Abgleich der
+            Replica beim Node an (MCP-Werkzeug sync, Node ab Kephalaion
+            v0.5.0), prüft die Rechte read, write und
             supersede, jeden Eintrag unter keph:/queue/findings/ auf das
             Namensmuster eines Befunds und liest jeden Befund; leere und
             in den letzten sechs Stunden geänderte werden übersprungen. Ergebnis: bereit oder

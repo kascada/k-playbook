@@ -98,10 +98,16 @@ func printDocsScope(out io.Writer, result project.DocsScopeResult) {
 		fmt.Fprintf(out, "              Grenze: nur die ersten %d .gitignore gelesen, %d weitere nicht\n", len(result.Exclude.Gitignore), result.GitignoreTruncated)
 	}
 	for _, item := range result.Checks {
+		text := "im Scope\t" + item.Path
 		if item.Excluded {
-			fmt.Fprintf(out, "ausgeschlossen\t%s\t%s\t%s\n", item.Path, item.Reason, item.By)
-		} else {
-			fmt.Fprintf(out, "im Scope\t%s\n", item.Path)
+			text = fmt.Sprintf("ausgeschlossen\t%s\t%s\t%s", item.Path, item.Reason, item.By)
 		}
+		if !item.Exists {
+			text += "\tfehlt"
+		}
+		if item.Suggest != "" {
+			text += "\tVorschlag: " + item.Suggest
+		}
+		fmt.Fprintln(out, text)
 	}
 }

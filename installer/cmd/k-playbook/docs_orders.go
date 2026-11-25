@@ -81,6 +81,9 @@ func printDocsOrders(out io.Writer, result project.DocsOrdersResult) {
 		} else {
 			state = fmt.Sprintf("zerlegt, %s %s", order.Dokument, order.Aktion)
 		}
+		if order.Incomplete {
+			state += ", unvollständig (ohne Pfad)"
+		}
 		fmt.Fprintf(out, "%s\t%s\t%s\t%s\n", order.Ref, order.Entstanden, state, order.Anlass)
 		fmt.Fprintf(out, "  %s\n", strings.Join(order.Pfade, ", "))
 	}
@@ -211,6 +214,12 @@ func printDocsOrderAdd(out io.Writer, result project.DocsOrderAddResult) {
 		text += fmt.Sprintf("\t%s: %s", result.Reason, result.Message)
 	}
 	fmt.Fprintln(out, text)
+	for _, c := range result.Corrected {
+		fmt.Fprintf(out, "berichtigt\t%s → %s\n", c.From, c.To)
+	}
+	for _, p := range result.Missing {
+		fmt.Fprintf(out, "fehlt\t%s\n", p)
+	}
 }
 
 // runDocsOrdersSplit ist `k-playbook docs orders split --json` (Task 179): liest

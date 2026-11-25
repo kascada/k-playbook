@@ -17,12 +17,15 @@ token comes from Kephalaion's own token file, goes only to the loopback address 
 appears in a result or an error. How the binding is found and checked: [`installation.md`](./installation.md#kephalaion-collection)
 and `installer/docs/architecture.md`, section "Kephalaion-Anbindung".
 
-Besides the client information, k-playbook starts the binary for one more thing: the
-preflight of the finding queue (`k_playbook_findings_check`, task 166) syncs the replica first
-with `kephalaion node sync <hub>` (`installer/internal/kephalaion/sync.go`, at most one
-minute), because lists read the replica and would otherwise miss what another machine has
-just created. A failed sync or a missing binary makes the preflight not ready; nothing else
-falls back on it.
+The client information is the only thing k-playbook starts the binary for. The preflight of
+the finding queue (`k_playbook_findings_check`, task 166) syncs the replica first, because
+lists read the replica and would otherwise miss what another machine has just created. Since
+task 194 it asks the node for that sync through the node's MCP tool `sync`
+(`Client.SyncHub` in `installer/internal/kephalaion/sync.go`) instead of starting
+`kephalaion node sync <hub>`: it needs neither the node's database nor its directory on this
+machine, so the preflight also works in a pure client -- a DevContainer with the host's config
+that reaches the host's node through a forwarder on loopback. Contract below,
+[the tool `sync`](#the-tool-sync).
 
 All calls address the project's collection, `kephalaion.address` (`<hub>:<collection>`)
 from the briefing. Code: `installer/internal/kephalaion/` (`client.go` for the
@@ -32,7 +35,8 @@ session and `whoami`, `docs.go` for `list`, `read`, `create`, `write`, `rename`,
 
 | Tool | Where | Called by | Arguments used |
 |---|---|---|---|
-| `whoami` | node | the binding check behind the briefing (`kephalaion` section) and the environment check, and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version) | none |
+| `whoami` | node | the binding check behind the briefing (`kephalaion` section) and the environment check, and every `doc` and `todo` call before it starts; again in the session of every `create`/`write`/`rename`/`delete` before the first attempt (node version), and before `sync` (node version) | none |
+| `sync` | node, which syncs its replica with the hub | `k_playbook_findings_check` before its other stages (task 194) | `hub` (the hub alias of the binding, always sent) |
 | `list` | node's replica | `k_playbook_doc_create` (next number), `k_playbook_doc_list`, `k_playbook_doc_grep` with `kind` (task 104), every todo access (task 097); `k_playbook_docs_checkout` on `docs/generated/<erzeuger>` with `recursive`, without `frontmatter` (task 109), likewise `k_playbook_docs_publish` in check mode for the revisions of the directory (task 195); `k_playbook_findings_check` on `queue/findings` with `recursive` and `frontmatter` (task 166) | `collection`, `path`, `recursive: true`, `frontmatter` (only for listing), `limit: 1000`, `cursor` |
 | `read` | node's replica | `k_playbook_doc_read` and `k-playbook read` for a `keph:` reference (task 093), also as the target of an include; `k_playbook_doc_append`, `_replace` and `_set_field` before every write, `k_playbook_doc_grep` per document (task 104); every todo access, one call per todo (task 097); `k_playbook_docs_checkout` per listed `.md`, `k_playbook_docs_publish` for the directory's `README.md` and, after a `conflict`, for the current revision (task 109), in check mode only for the `README.md` (task 195); the README writer (`k_playbook_docs_readme`, publish, inventory, setup) for each `README.md` under `docs/` with a template, and the templates themselves in `<hub>:k-playbook/defaults/docs/` (task 137); `k_playbook_findings_check` once per finding (task 166) | `collection`, `name` (the path without the leading `/`, `~` already replaced) |
 | `create` | through the hub | `k_playbook_doc_create`; `todo add` (task 097); `k_playbook_docs_publish` for a document new in the working directory and for a missing `README.md` (task 109); the README writer for every missing `README.md` with a template (task 137) | `collection`, `name`, `content` (`""` for `doc_create`, the todo document for todos), `request_id` |
@@ -154,6 +158,47 @@ So `node_unreachable`/`kephalaion_unavailable` only ever means that the first at
 never sent or the node said that nothing was stored; every path on which the hub may have
 been reached ends in success, rejection or `outcome_unknown`.
 
+## The tool `sync`
+
+`Client.SyncHub` (task 194) asks the node to sync its replica of the binding's hub and waits
+for the answer. The node needs Kephalaion v0.5.0 or later (`MinSyncNodeVersion`); there is no
+fallback to starting `kephalaion node sync`, not even on the node's own machine.
+
+1. One session with its own time limit, `SyncTimeout` (one minute) for the whole call:
+   `initialize`, `whoami`, `sync`. It lies above the node's fixed wait of 40 seconds, so the
+   node can report its own timeout; `ToolTimeout` does not apply.
+2. `whoami` gives the node's version. A node before v0.5.0 does not know the tool, and its SDK
+   answers an unknown tool with JSON-RPC error -32602, the same as for invalid arguments -- so
+   the version decides, not the answer. Too old is an error naming the minimum version and the
+   remedy `kephalaion upgrade` **on the node's machine** (in a pure client that command would
+   only update the container's binary). A version without semver (a dev build) counts as
+   recent enough; a -32602 there is a failed sync.
+3. `tools/call sync` with `{"hub": "<alias>"}` and the header pair of the hub. The node answers
+   only after a sync has ended that began after the request arrived.
+
+Success is only an answer without `isError` whose `sync` carries the field `revision` (0 is
+valid: a hub entry without a wanted collection) and no `last_error`; `SyncHub` returns
+`last_success` and `revision` so the preflight needs no second request. Everything else is a
+`*SyncError` -- every `isError`, an unreadable answer, a success without `revision` or with
+`last_error`, a cancelled call, the own time limit. The node's `error.message` is passed on
+verbatim, every text runs through the token redaction. The codes only choose the remedy:
+
+| Code or case | Remedy in the message |
+|---|---|
+| node too old (`whoami.version` before v0.5.0) | `kephalaion upgrade` on the node's machine |
+| node not reachable (session does not open) | check on the node's machine that `kephalaion serve` runs (`kephalaion status`) |
+| `unreachable` | check hub and network, then try again |
+| `unsupported` | check the hub entry on the node's machine (transport `ssh` is not synced) |
+| `sync_timeout` (node's wait of 40 s over; the sync goes on in the background) | try again in a minute |
+| own time limit over | general |
+| `unknown_hub`, `not_readable` (one case: hub not known at the node, or the login there not valid) | `kephalaion status` shows the node's hubs and the login; check the binding's hub, account and token |
+| `unauthenticated` (the hub does not accept the node) | on the node's machine, not here: `kephalaion node hub check <hub>` |
+| `never_synced` (the hub entry has no replica yet) | on the node's machine, not here: `kephalaion node sync <hub>` |
+| `internal`, `invalid`, `hub_refused`, `unsupported_version`, an unknown code, an error without code, an unreadable answer, success without `revision` or with `last_error` | general: try again; if it stays, call `kephalaion node sync <hub>` by hand and fix the reason |
+
+`kephalaion node sync <hub>` by hand stays right in a pure client too: since v0.5.0 it takes
+the same MCP route there.
+
 ## Measured
 
 At hub `vm`, collection `k-playbook-dev`, with the CLI of a freshly built binary
@@ -221,6 +266,8 @@ In the Kephalaion repository (`github.com/kephalaion/kephalaion`):
   the node takes the hub's rows into its replica.
 - `docs/begriffe.md`, "write error codes" — the node's own codes `unreachable`,
   `outcome_unknown`, `unsupported` and `internal`.
+- `docs/installation.md`, "Einen Abgleich anfordern" (from v0.5.0) — the tool `sync`: call,
+  wait, success, the codes and the table "Codes je Fall".
 
 The tool descriptions a node reports over MCP (`tools/list`) are the short form of the
 same.

@@ -103,6 +103,13 @@ entstanden: <ältestes Datum der aufgegangenen Aufträge>
     Doppelt ist nur derselbe Pfad für dasselbe Dokument.
   - Für `tools` begründen die Pfade den Lauf und erscheinen in seinem Preflight; sie engen den
     Scope nicht ein. `/k-docs-tools` läuft immer über das ganze Projekt.
+  - Ist einem Pfad das Repo-Verzeichnis ein zweites Mal vorangestellt (`<repo>/<pfad>`, den es
+    so nicht gibt, `<pfad>` aber schon), berichtigt das Programm ihn beim Einreihen und beim
+    Lesen und nennt es (`corrected` bzw. `problems`). Ein Auftrag ohne gültigen Pfad ist
+    unvollständig (`incomplete`).
+  - Mit der Antwort beim Einreihen: `corrected` verlangt nichts. `missing` nennt Pfade, die es
+    nicht gibt — ein gelöschter ist richtig und bleibt; einen falsch geschriebenen reiht die
+    Sitzung mit dem richtigen Pfad erneut ein (der falsche bleibt ohne Folgen im Auftrag).
 - `dokument` trägt nur ein zerlegter Auftrag: der Dateiname seines Dokuments unter
   `keph:/docs/generated/code/`, ohne Verzeichnis. Die Zeile steht genau so im Kopf, weil Suche
   und Bericht den zerlegten Auftrag an `^dokument: ` erkennen.

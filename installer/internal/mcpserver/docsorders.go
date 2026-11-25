@@ -107,8 +107,8 @@ func addDocsOrderTools(server *mcp.Server) {
 			"project.dir, keph-backup/ und .git/ auf jeder Ebene), hidden (excluded, excepted), further (die weiteren festen Ausschlüsse), gitignore (je .gitignore unter " +
 			"project.repoRoot file und patterns), config (docs.exclude) und rejected (verworfene Einträge mit reason); gitignoreTruncated (nur gesetzt, wenn die Grenze von 200 .gitignore gegriffen hat: die Zahl der nicht gelesenen). pfad ergänzt " +
 			"den Scope um genau einen Pfad; fehlt er, liegt er außerhalb von project.dir oder in einem immer ausgeschlossenen " +
-			"Verzeichnis, ist das invalid_input. check meldet je Pfad checks (path, excluded, reason: always, hidden, further, gitignore, " +
-			"config oder outside, by). Ob ein anderer Stand beschrieben wird und was der Nutzer im Preflight ergänzt, bleibt bei der " +
+			"Verzeichnis, ist das invalid_input. check meldet je Pfad checks (path, exists — ob es ihn gibt —, suggest — der berichtigte Pfad bei doppelt " +
+			"vorangestelltem Repo-Verzeichnis —, excluded, reason: always, hidden, further, gitignore, config oder outside, by). Ob ein anderer Stand beschrieben wird und was der Nutzer im Preflight ergänzt, bleibt bei der " +
 			"Sitzung. Hülle über `k-playbook docs scope`.",
 	}, docsScopeTool)
 	mcp.AddTool(server, &mcp.Tool{
@@ -126,7 +126,9 @@ func addDocsOrderTools(server *mcp.Server) {
 			"(SPLIT_ORDERS) und waiting (WAITING: ref, pfade, remainingMinutes). nothingToDo (mit reason) heißt: kein Lauf — " +
 			"keine offenen Aufträge oder nur wartende. problems nennt Aufträge, deren Frontmatter nicht lesbar ist (sie fehlen " +
 			"in der Liste), und rohe Aufträge für code ohne lesbaren Zeitpunkt der Änderung und des Anlegens (sie gelten als reif " +
-			"und werden abgearbeitet). Für tools stehen nur orders und nothingToDo da. Die Zuordnung Pfad → Dokument und jede " +
+			"und werden abgearbeitet), Aufträge ohne gültigen Pfad (sie tragen incomplete und bleiben in orders), weggelassene " +
+			"ungültige Pfade und berichtigte (Repo-Verzeichnis doppelt vorangestellt; der Auftrag in der Queue bleibt) — außer zu " +
+			"unlesbaren Aufträgen nur für den gefragten Erzeuger. Für tools stehen nur orders und nothingToDo da. Die Zuordnung Pfad → Dokument und jede " +
 			"Nutzerentscheidung bleiben bei der Sitzung. kephalaion_unavailable: Anbindung nicht bereit, kein Rückfall auf die " +
 			"Platte. Hülle über `k-playbook docs orders`.",
 	}, docsOrdersTool)
@@ -143,7 +145,8 @@ func addDocsOrderTools(server *mcp.Server) {
 			"(ein offener Auftrag deckt schon, nichts geschrieben) oder skipped mit reason: no_generated_docs (unter " +
 			"keph:/docs/generated/<erzeuger>/ liegt noch kein Dokument) oder kephalaion_unavailable (Anbindung nicht bereit, " +
 			"nicht auf die Platte eingereiht; das ist kein Fehler des Werkzeugs, der Abschluss nennt den Nachzug als offen) —, " +
-			"dazu ref, revision, pfade und message. Fehlende Eingaben sind invalid_input. Hülle über `k-playbook docs order add`.",
+			"dazu ref, revision, pfade und message, corrected (from, to: ein doppelt vorangestelltes Repo-Verzeichnis, " +
+			"berichtigt) und missing (Pfade, die es auch danach nicht gibt; angenommen, der Status bleibt). Fehlende Eingaben sind invalid_input. Hülle über `k-playbook docs order add`.",
 	}, docsOrderAddTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: docsToolOrdersSplit,

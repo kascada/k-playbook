@@ -224,3 +224,28 @@ func TestDocsScopeOhneGit(t *testing.T) {
 		t.Errorf("docs.exclude: %+v", result.Exclude)
 	}
 }
+
+// --check nennt je Pfad, ob es ihn gibt, und schlägt bei einem doppelt
+// vorangestellten Repo-Verzeichnis den berichtigten Pfad vor (Task 193).
+func TestDocsScopeExistenz(t *testing.T) {
+	root := docsScopeProject(t)
+	doubled := filepath.Base(root) + "/src/a.go"
+	result, err := DocsScope(context.Background(), root, DocsScopeOptions{Check: []string{"src/a.go", "src", "src/fehlt.go", doubled}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]DocsScopeCheck{
+		"src/a.go":     {Path: "src/a.go", Exists: true},
+		"src":          {Path: "src", Exists: true},
+		"src/fehlt.go": {Path: "src/fehlt.go"},
+		doubled:        {Path: doubled, Suggest: "src/a.go"},
+	}
+	if len(result.Checks) != len(want) {
+		t.Fatalf("checks: %+v", result.Checks)
+	}
+	for _, check := range result.Checks {
+		if expected := want[check.Path]; check != expected {
+			t.Errorf("%s: %+v, erwartet %+v", check.Path, check, expected)
+		}
+	}
+}

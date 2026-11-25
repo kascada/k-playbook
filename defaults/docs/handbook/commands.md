@@ -137,9 +137,9 @@ The documentation commands do not compute everything in their text. Four subcomm
 
 | Subcommand | MCP tool | Does |
 |---|---|---|
-| `k-playbook docs scope [<pfad>] [--check <pfad>…]` | `k_playbook_docs_scope` | computes the scan scope of `/k-docs-code` and `/k-docs-tools`: scan root, state of the work tree, every exclusion by origin, an extra path, and per path whether it is excluded; needs no Kephalaion |
-| `k-playbook docs orders <code\|tools>` | `k_playbook_docs_orders` | reads and rates the open documentation orders: raw or split, waiting (waiting time of two hours, only in the program) or ready, the run, the merged raw orders |
-| `k-playbook docs order add <code\|tools> --pfad … --anlass … --sitzung …` | `k_playbook_docs_order_add` | queues a raw order or extends the open one of the session: `created`, `extended`, `covered`, `skipped` |
+| `k-playbook docs scope [<pfad>] [--check <pfad>…]` | `k_playbook_docs_scope` | computes the scan scope of `/k-docs-code` and `/k-docs-tools`: scan root, state of the work tree, every exclusion by origin, an extra path, and per path whether it exists (with a suggested correction) and whether it is excluded; needs no Kephalaion |
+| `k-playbook docs orders <code\|tools>` | `k_playbook_docs_orders` | reads and rates the open documentation orders: raw or split, waiting (waiting time of two hours, only in the program) or ready, the run, the merged raw orders; orders without a valid path are marked incomplete |
+| `k-playbook docs order add <code\|tools> --pfad … --anlass … --sitzung …` | `k_playbook_docs_order_add` | queues a raw order or extends the open one of the session: `created`, `extended`, `covered`, `skipped`, plus corrected and missing paths |
 | `k-playbook docs orders split --json` | `k_playbook_docs_orders_split` | writes the split orders from the lines the user confirmed and closes the raw orders they absorbed |
 
 The mapping from path to document, `neu` and `entfaellt` and every decision of the user stay

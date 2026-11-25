@@ -26,7 +26,8 @@ Doku-Nachzug in `k-playbook:/instructions/always/220-regeln-anwenden.md` und
   `session` seines Briefings. „Kein Doppel“ und „Wann nicht eingereiht wird“ rechnet das
   Programm nach `doku-auftraege.md`; die Antwort sagt `status`: `created` oder `extended`
   (eingereiht), `covered` (ein Auftrag deckt schon, mit `ref`), `skipped` (`no_generated_docs`:
-  nichts nachzuziehen; `kephalaion_unavailable`: nichts eingereiht, der Nachzug bleibt offen).
+  nichts nachzuziehen; `kephalaion_unavailable`: nichts eingereiht, der Nachzug bleibt offen),
+  dazu wahlweise `corrected` und `missing` — was damit zu tun ist, steht in `doku-auftraege.md`.
   Das geschieht ohne Rückfrage: Ein Auftrag ändert keine Doku, er merkt den Nachzug vor. Ist
   das Werkzeug unbekannt (`invalid_input`) oder meldet `k-playbook docs` `unbekannter
   Unterbefehl`, ist die Installation älter: melden, `/k-upgrade` nennen, nichts von Hand

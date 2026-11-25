@@ -3,6 +3,8 @@ package project
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -605,5 +607,190 @@ func TestDocsOrdersKopfEinschleusen(t *testing.T) {
 	}
 	if !strings.Contains(content, "entstanden: 2026-11-10\n") {
 		t.Errorf("entstanden: %s", content)
+	}
+}
+
+// Ein offener Auftrag ohne gültigen Pfad ist unvollständig: Er bleibt in der
+// Liste, trägt incomplete und steht unter problems. Ein weggelassener
+// ungültiger Pfad steht mit Grund unter problems. Beides nur für Aufträge des
+// gefragten Erzeugers (Task 193).
+func TestDocsOrdersUnvollstaendig(t *testing.T) {
+	at := docsOrdersClock()
+	docsOrdersNow(t, at)
+	orders, store := newDocsOrders(t)
+	old := at.Add(-5 * time.Hour)
+	head := func(producer, pfade string) string {
+		return "---\ntitle: \"t\"\nerzeuger: " + producer + "\n" + pfade + "anlass: \"a\"\nsitzung: s\nentstanden: 2026-11-20\n---\n"
+	}
+	putOrder(store, "queue/docs/001-ohne.md", head("code", ""), old)
+	putOrder(store, "queue/docs/002-leer.md", head("code", "pfade: []\n"), old)
+	putOrder(store, "queue/docs/003-ungueltig.md", head("code", "pfade:\n  - /abs/pfad\n  - ../draussen\n"), old)
+	putOrder(store, "queue/docs/004-gemischt.md", head("code", "pfade:\n  - installer/a\n  - /abs/b\n"), old)
+	putOrder(store, "queue/docs/005-zerlegt.md", "---\ntitle: \"z\"\nerzeuger: code\ndokument: 01-z.md\naktion: umschreiben\nanlass: \"a\"\nsitzung: s\nentstanden: 2026-11-10\n---\n", old)
+	putOrder(store, "queue/docs/006-tools.md", head("tools", "pfade:\n  - /abs/tools\n"), old)
+	putOrder(store, "queue/docs/007-tools-ohne.md", head("tools", ""), old)
+
+	result, err := orders.Orders(context.Background(), "code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	incomplete := map[string]bool{}
+	for _, order := range result.Orders {
+		incomplete[strings.TrimPrefix(order.Ref, "keph:/queue/docs/")] = order.Incomplete
+	}
+	want := map[string]bool{"001-ohne.md": true, "002-leer.md": true, "003-ungueltig.md": true, "004-gemischt.md": false, "005-zerlegt.md": true}
+	if len(incomplete) != len(want) {
+		t.Errorf("Aufträge: %v", incomplete)
+	}
+	for name, expected := range want {
+		if got, ok := incomplete[name]; !ok || got != expected {
+			t.Errorf("%s: incomplete %v (da: %v), erwartet %v", name, got, ok, expected)
+		}
+	}
+	problems := strings.Join(result.Problems, "\n")
+	for _, name := range []string{"001-ohne.md", "002-leer.md", "003-ungueltig.md", "005-zerlegt.md"} {
+		if !strings.Contains(problems, "keph:/queue/docs/"+name+": ohne gültigen Pfad — unvollständig") {
+			t.Errorf("%s: Zeile „unvollständig“ fehlt: %q", name, problems)
+		}
+	}
+	if strings.Contains(problems, "004-gemischt.md: ohne gültigen Pfad") {
+		t.Errorf("gemischter Auftrag als unvollständig gemeldet: %q", problems)
+	}
+	for _, line := range []string{
+		`keph:/queue/docs/003-ungueltig.md: Pfad weggelassen — "/abs/pfad"`,
+		`keph:/queue/docs/003-ungueltig.md: Pfad weggelassen — "../draussen" führt aus project.repoRoot heraus`,
+		`keph:/queue/docs/004-gemischt.md: Pfad weggelassen — "/abs/b"`,
+	} {
+		if !strings.Contains(problems, line) {
+			t.Errorf("Zeile %q fehlt: %q", line, problems)
+		}
+	}
+	if strings.Contains(problems, "tools") {
+		t.Errorf("Zeilen zu tools in der Antwort für code: %q", problems)
+	}
+	// Ein unvollständiger roher Auftrag bleibt eine eigene Gruppe.
+	groups := 0
+	for _, raw := range result.RawOrders {
+		if len(raw.Pfade) == 0 {
+			groups++
+		}
+	}
+	if groups != 3 {
+		t.Errorf("Gruppen ohne Pfad: %d, %+v", groups, result.RawOrders)
+	}
+
+	tools, err := orders.Orders(context.Background(), "tools")
+	if err != nil {
+		t.Fatal(err)
+	}
+	problems = strings.Join(tools.Problems, "\n")
+	if !strings.Contains(problems, "006-tools.md: Pfad weggelassen") || !strings.Contains(problems, "007-tools-ohne.md: ohne gültigen Pfad") ||
+		strings.Contains(problems, "003-ungueltig.md") || tools.NothingToDo {
+		t.Errorf("tools: %+v", tools)
+	}
+}
+
+// docsOrdersRepo legt ein Repo-Verzeichnis namens myrepo mit Dateien an und
+// gibt seinen Pfad zurück.
+func docsOrdersRepo(t *testing.T, files ...string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "myrepo")
+	for _, file := range files {
+		full := filepath.Join(root, filepath.FromSlash(file))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// Berichtigt wird nur der eindeutige Fall: das Repo-Verzeichnis ein zweites
+// Mal vorangestellt, den Pfad gibt es so nicht, ohne das erste Segment schon.
+func TestDocsRepoPrefixFix(t *testing.T) {
+	root := docsOrdersRepo(t, "installer/a.go", "myrepo/both.go", "both.go", "lib/x.go")
+	cases := []struct {
+		in, want string
+		ok       bool
+	}{
+		{"myrepo/installer/a.go", "installer/a.go", true},
+		{"myrepo/installer", "installer", true},
+		{"myrepo/both.go", "", false},       // beide Schreibweisen
+		{"myrepo/nope.go", "", false},       // keine
+		{"other/installer/a.go", "", false}, // erstes Segment nicht der Basisname
+		{"installer/a.go", "", false},       // gibt es
+		{"myrepo", "", false},               // kein Rest
+		{".", "", false},
+	}
+	for _, c := range cases {
+		got, ok := docsRepoPrefixFix(root, c.in)
+		if got != c.want || ok != c.ok {
+			t.Errorf("%s: %q %v, erwartet %q %v", c.in, got, ok, c.want, c.ok)
+		}
+	}
+	if _, ok := docsRepoPrefixFix("", "myrepo/installer/a.go"); ok {
+		t.Error("ohne repoRoot berichtigt")
+	}
+}
+
+// load berichtigt die Pfade jedes Auftrags, Orders nennt die Berichtigung nur
+// für den gefragten Erzeuger; Add berichtigt die Eingabe, ein berichtigter
+// Pfad ist vom offenen Auftrag gedeckt, ein fehlender, nicht berichtigbarer
+// wird unverändert angenommen und unter missing genannt (Task 193).
+func TestDocsOrdersBerichtigung(t *testing.T) {
+	at := docsOrdersClock()
+	docsOrdersNow(t, at)
+	orders, store := newDocsOrders(t)
+	orders.repoRoot = docsOrdersRepo(t, "installer/a.go", "installer/b.go", "go.mod")
+	old := at.Add(-5 * time.Hour)
+	putOrder(store, "queue/docs/001-doppelt.md", rawOrder("S1", "2026-11-20", "myrepo/installer/a.go", "installer/a.go", "geloescht.go"), old)
+	store.Put("queue/docs/002-tools.md", strings.Replace(rawOrder("S2", "2026-11-20", "myrepo/go.mod"), "erzeuger: code", "erzeuger: tools", 1))
+	store.Put("docs/generated/code/01-a.md", "---\ntitle: A\ndescription: D\n---\n")
+
+	result, err := orders.Orders(context.Background(), "code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Orders) != 1 || strings.Join(result.Orders[0].Pfade, ",") != "installer/a.go,geloescht.go" {
+		t.Fatalf("berichtigte Pfade: %+v", result.Orders)
+	}
+	problems := strings.Join(result.Problems, "\n")
+	if !strings.Contains(problems, `keph:/queue/docs/001-doppelt.md: Pfad "myrepo/installer/a.go" berichtigt zu "installer/a.go"`) {
+		t.Errorf("Berichtigung fehlt: %q", problems)
+	}
+	if strings.Contains(problems, "go.mod") || strings.Contains(problems, "geloescht.go") {
+		t.Errorf("fremder Erzeuger oder gelöschter Pfad unter problems: %q", problems)
+	}
+	content, _ := store.Content("queue/docs/001-doppelt.md")
+	if !strings.Contains(content, "myrepo/installer/a.go") {
+		t.Error("Auftrag in der Queue umgeschrieben")
+	}
+	tools, _ := orders.Orders(context.Background(), "tools")
+	if len(tools.Orders) != 1 || tools.Orders[0].Pfade[0] != "go.mod" || !strings.Contains(strings.Join(tools.Problems, "\n"), "berichtigt zu \"go.mod\"") {
+		t.Errorf("tools: %+v", tools)
+	}
+
+	covered := docsOrderAdd(t, orders, "code", "S1", "Noch einmal", "myrepo/installer/a.go")
+	if covered.Status != DocsOrderCovered || len(covered.Corrected) != 1 ||
+		covered.Corrected[0] != (DocsPathCorrection{From: "myrepo/installer/a.go", To: "installer/a.go"}) || covered.Missing != nil {
+		t.Errorf("gedeckt nach Berichtigung: %+v", covered)
+	}
+
+	extended := docsOrderAdd(t, orders, "code", "S1", "Weg", "myrepo/installer/b.go", "neu/fehlt.go")
+	if extended.Status != DocsOrderExtended || strings.Join(extended.Missing, ",") != "neu/fehlt.go" ||
+		strings.Join(extended.Pfade, ",") != "installer/a.go,geloescht.go,installer/b.go,neu/fehlt.go" {
+		t.Errorf("ergänzt: %+v", extended)
+	}
+	content, _ = store.Content("queue/docs/001-doppelt.md")
+	if strings.Contains(content, "  - myrepo/") || !strings.Contains(content, "  - neu/fehlt.go\n") {
+		t.Errorf("ergänzter Auftrag trägt nicht die berichtigten Pfade:\n%s", content)
+	}
+
+	created := docsOrderAdd(t, orders, "code", "S3", "Gelöscht", "weg/datei.go")
+	if created.Status != DocsOrderCreated || strings.Join(created.Pfade, ",") != "weg/datei.go" ||
+		strings.Join(created.Missing, ",") != "weg/datei.go" || created.Corrected != nil {
+		t.Errorf("fehlender Pfad: %+v", created)
 	}
 }

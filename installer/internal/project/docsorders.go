@@ -3,7 +3,9 @@ package project
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -104,6 +106,14 @@ type DocsOrder struct {
 	Waiting          bool            `json:"waiting,omitempty"`
 	RemainingMinutes int             `json:"remainingMinutes,omitempty"`
 	Lines            []DocsOrderLine `json:"lines,omitempty"`
+	// Incomplete: der Auftrag trägt nach dem Lesen keinen gültigen Pfad
+	// (Task 193). Er bleibt in der Liste und steht unter problems.
+	Incomplete bool `json:"incomplete,omitempty"`
+	// notes sind die Zeilen für problems, die beim Lesen zu diesem Auftrag
+	// entstanden — weggelassene und berichtigte Pfade. Orders schreibt sie
+	// erst nach dem Filtern nach Erzeuger, damit sie nur beim gefragten
+	// stehen.
+	notes []string
 }
 
 // DocsRawOrder ist, was aus rohen Aufträgen nach dem Zusammenlegen wird
@@ -145,6 +155,10 @@ type DocsOrdersResult struct {
 // schreiben. Alles geht über die Collection des Projekts, ohne Rückfall.
 type DocsOrders struct {
 	docs *UserDocs
+	// repoRoot ist project.repoRoot (RepoRootDir), an dem Pfade geprüft und
+	// berichtigt werden. Leer — etwa in Tests ohne Projekt — entfallen
+	// Prüfung und Berichtigung.
+	repoRoot string
 }
 
 // NewDocsOrders baut den Zugang über einen Store; user ist kephalaion.user.
@@ -164,7 +178,14 @@ var OpenDocsOrders = func(projectDir string) (*DocsOrders, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewDocsOrders(client, user)
+	orders, err := NewDocsOrders(client, user)
+	if err != nil {
+		return nil, err
+	}
+	if config, err := ReadConfig(projectDir); err == nil {
+		orders.repoRoot = RepoRootDir(projectDir, config)
+	}
+	return orders, nil
 }
 
 // ValidDocsOrderProducer prüft den Erzeuger eines Auftrags.
@@ -219,6 +240,78 @@ func cleanDocsOrderPaths(raw []string) ([]string, error) {
 	return out, nil
 }
 
+// DocsPathCorrection ist eine Berichtigung: From der Pfad, wie er kam, To
+// der berichtigte.
+type DocsPathCorrection struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// docsPathExists sagt, ob es einen Pfad (normiert, relativ) unter repoRoot
+// gibt; . gibt es immer. Geprüft wird am Dateisystem, nicht an git.
+func docsPathExists(repoRoot, p string) bool {
+	if p == "." {
+		return true
+	}
+	_, err := os.Lstat(filepath.Join(repoRoot, filepath.FromSlash(p)))
+	return err == nil
+}
+
+// docsRepoPrefixFix berichtigt einen Pfad (normiert, relativ), dem das
+// Repo-Verzeichnis ein zweites Mal vorangestellt ist: Den Pfad gibt es unter
+// repoRoot nicht, sein erstes Segment ist der Basisname von repoRoot, und den
+// Rest (nicht leer) gibt es dort. Nur dieser eindeutige Fall wird berichtigt
+// — gibt es beide Schreibweisen oder keine, bleibt der Pfad. Ohne repoRoot
+// gibt es nichts zu berichtigen.
+func docsRepoPrefixFix(repoRoot, p string) (string, bool) {
+	if repoRoot == "" || p == "." {
+		return "", false
+	}
+	first, rest, ok := strings.Cut(p, "/")
+	if !ok || rest == "" || first != filepath.Base(repoRoot) {
+		return "", false
+	}
+	if docsPathExists(repoRoot, p) || !docsPathExists(repoRoot, rest) {
+		return "", false
+	}
+	return rest, true
+}
+
+// correctPaths berichtigt eine normierte Pfadliste nach docsRepoPrefixFix,
+// ohne Doppelte danach, und nennt jede Berichtigung.
+func (o *DocsOrders) correctPaths(paths []string) ([]string, []DocsPathCorrection) {
+	if o.repoRoot == "" {
+		return paths, nil
+	}
+	out := make([]string, 0, len(paths))
+	var corrected []DocsPathCorrection
+	for _, p := range paths {
+		if fixed, ok := docsRepoPrefixFix(o.repoRoot, p); ok {
+			corrected = append(corrected, DocsPathCorrection{From: p, To: fixed})
+			p = fixed
+		}
+		if !containsString(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out, corrected
+}
+
+// missingPaths nennt die Pfade, die es unter project.repoRoot nicht gibt;
+// ohne repoRoot keine.
+func (o *DocsOrders) missingPaths(paths []string) []string {
+	if o.repoRoot == "" {
+		return nil
+	}
+	var missing []string
+	for _, p := range paths {
+		if !docsPathExists(o.repoRoot, p) {
+			missing = append(missing, p)
+		}
+	}
+	return missing
+}
+
 // docsPathContains sagt, ob der Pfad a gleich b ist oder b darin liegt; . ist
 // alles.
 func docsPathContains(a, b string) bool {
@@ -257,9 +350,10 @@ func docsPathsCovered(have, add []string) bool {
 }
 
 // parseDocsOrder liest einen Auftrag aus seinem Dokument. Ein Frontmatter,
-// das sich nicht lesen lässt, gibt problem zurück.
-func parseDocsOrder(ref string, entry kephalaion.Entry, read kephalaion.ReadResult) (DocsOrder, string) {
-	order := DocsOrder{Ref: ref, Pfade: []string{}, Revision: read.Revision}
+// das sich nicht lesen lässt, gibt problem zurück. dropped nennt die Pfade,
+// die als ungültig weggelassen wurden, je mit Grund.
+func parseDocsOrder(ref string, entry kephalaion.Entry, read kephalaion.ReadResult) (order DocsOrder, dropped []string, problem string) {
+	order = DocsOrder{Ref: ref, Pfade: []string{}, Revision: read.Revision}
 	order.Created = docsOrderStamp(entry.Created, read.Created)
 	order.Updated = docsOrderStamp(entry.Updated, read.Updated)
 	content := ""
@@ -268,11 +362,11 @@ func parseDocsOrder(ref string, entry kephalaion.Entry, read kephalaion.ReadResu
 	}
 	block, ok := inventory.FrontmatterBlock([]byte(content))
 	if !ok {
-		return order, "Frontmatter fehlt"
+		return order, nil, "Frontmatter fehlt"
 	}
 	root, err := yamllite.Parse([]byte(block))
 	if err != nil {
-		return order, fmt.Sprintf("Frontmatter nicht lesbar: %v", err)
+		return order, nil, fmt.Sprintf("Frontmatter nicht lesbar: %v", err)
 	}
 	order.Title = strings.TrimSpace(root.Get("title").Str())
 	order.Producer = strings.TrimSpace(root.Get("erzeuger").Str())
@@ -285,22 +379,25 @@ func parseDocsOrder(ref string, entry kephalaion.Entry, read kephalaion.ReadResu
 	if order.Dokument != "" {
 		order.Kind = DocsOrderKindSplit
 	}
+	takePath := func(value string) {
+		if value = strings.TrimSpace(value); value == "" {
+			return
+		}
+		cleaned, err := cleanDocsOrderPath(value)
+		if err != nil {
+			dropped = append(dropped, "Pfad weggelassen — "+err.Error())
+			return
+		}
+		order.Pfade = append(order.Pfade, cleaned)
+	}
 	switch node := root.Get("pfade"); {
 	case node == nil:
 	case node.Kind == yamllite.Sequence:
 		for _, item := range node.Items {
-			if value := strings.TrimSpace(item.Value); value != "" {
-				if cleaned, err := cleanDocsOrderPath(value); err == nil {
-					order.Pfade = append(order.Pfade, cleaned)
-				}
-			}
+			takePath(item.Value)
 		}
 	case node.Kind == yamllite.Scalar:
-		if value := strings.TrimSpace(node.Value); value != "" {
-			if cleaned, err := cleanDocsOrderPath(value); err == nil {
-				order.Pfade = append(order.Pfade, cleaned)
-			}
-		}
+		takePath(node.Value)
 	}
 	for _, line := range strings.Split(string(inventory.Body([]byte(content))), "\n") {
 		line = strings.TrimSpace(line)
@@ -313,12 +410,15 @@ func parseDocsOrder(ref string, entry kephalaion.Entry, read kephalaion.ReadResu
 		}
 		order.Lines = append(order.Lines, DocsOrderLine{Anlass: line})
 	}
-	return order, ""
+	return order, dropped, ""
 }
 
 // load liest alle offenen Aufträge (ohne done/) mit Inhalt, sortiert nach
 // Verweis. Problems nennt die Aufträge, deren Frontmatter sich nicht lesen
-// ließ; sie fehlen in der Liste.
+// ließ; sie fehlen in der Liste. Die Pfade jedes Auftrags sind berichtigt
+// (correctPaths), damit Orders, Add und Split dieselben sehen; der Auftrag in
+// der Queue bleibt dafür, wie er ist. Was zu einem gelesenen Auftrag zu sagen
+// ist — weggelassene und berichtigte Pfade —, steht in seinen notes.
 func (o *DocsOrders) load(ctx context.Context) ([]DocsOrder, []string, error) {
 	kind, ok := o.docs.anyKind("docs")
 	if !ok {
@@ -342,10 +442,18 @@ func (o *DocsOrders) load(ctx context.Context) ([]DocsOrder, []string, error) {
 		if read.Kind != kephalaion.ReadKindDocument {
 			continue
 		}
-		order, problem := parseDocsOrder(ref, entry, read)
+		order, dropped, problem := parseDocsOrder(ref, entry, read)
 		if problem != "" {
 			problems = append(problems, ref+": "+problem)
 			continue
+		}
+		for _, note := range dropped {
+			order.notes = append(order.notes, ref+": "+note)
+		}
+		var corrected []DocsPathCorrection
+		order.Pfade, corrected = o.correctPaths(order.Pfade)
+		for _, c := range corrected {
+			order.notes = append(order.notes, fmt.Sprintf("%s: Pfad %q berichtigt zu %q — Repo-Verzeichnis doppelt vorangestellt", ref, c.From, c.To))
 		}
 		orders = append(orders, order)
 	}
@@ -407,6 +515,11 @@ func (o *DocsOrders) Orders(ctx context.Context, producer string) (DocsOrdersRes
 	for _, order := range all {
 		if order.Producer != producer {
 			continue
+		}
+		result.Problems = append(result.Problems, order.notes...)
+		if len(order.Pfade) == 0 {
+			order.Incomplete = true
+			result.Problems = append(result.Problems, order.Ref+": ohne gültigen Pfad — unvollständig")
 		}
 		if producer == DocsOrderCode && order.Kind == DocsOrderKindRaw {
 			// Ohne lesbaren Zeitpunkt (docsRawOrderAge) ist der Auftrag reif —

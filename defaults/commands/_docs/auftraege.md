@@ -21,7 +21,7 @@ nicht nachgerechnet. Die Antwort trägt:
   unterbrochen) oder `none`; `waitMinutes` ist die Wartezeit.
 - `orders` — je Auftrag `ref`, `erzeuger`, `pfade`, `anlass`, `entstanden`, `updated`, bei
   einem zerlegten `dokument` und `aktion`, bei einem wartenden `waiting` mit
-  `remainingMinutes`.
+  `remainingMinutes`, ohne gültigen Pfad `incomplete`.
 - Für `code` dazu `rawOrders` (die rohen nach dem Zusammenlegen, je mit den Verweisen
   `refs` der Aufträge, die darin aufgegangen sind, den vereinigten `pfade`, den gesammelten
   `anlaesse` und dem ältesten `entstanden`), `splitOrders` (die offenen zerlegten) und
@@ -30,7 +30,8 @@ nicht nachgerechnet. Die Antwort trägt:
   `tools` nur: es gibt keine offenen Aufträge, der Lauf kann trotzdem laufen.
 - `problems` — Aufträge, die das Programm nicht lesen konnte (sie fehlen in den Listen), und
   rohe Aufträge ohne lesbaren Zeitpunkt der Änderung und des Anlegens (sie gelten als reif,
-  stehen in `rawOrders` und werden abgearbeitet); nennen, nicht raten.
+  stehen in `rawOrders` und werden abgearbeitet), unvollständige Aufträge, weggelassene
+  ungültige und berichtigte Pfade; nennen, nicht raten.
 
 Bei `tools` ist jeder offene Auftrag Teil von `orders`; eine Wartezeit gibt es nicht.
 
