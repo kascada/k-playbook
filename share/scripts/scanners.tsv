@@ -123,8 +123,8 @@
 #              njsscan.yaml).
 #
 # Die Ausschlüsse stehen in args und bekommen keine eigene Spalte. Jedes Werkzeug
-# schreibt sie anders — ruff --exclude, trivy --skip-dirs, semgrep --exclude, grype
-# --exclude — und gitleaks kennt dafür überhaupt kein Flag, sondern nur eine Allowlist
+# schreibt sie anders — ruff --exclude, semgrep --exclude; trivy und grype tragen
+# zurzeit keine — und gitleaks kennt dafür überhaupt kein Flag, sondern nur eine Allowlist
 # in seiner Konfiguration (gitleaks.toml daneben). Eine eigene Spalte könnte deshalb
 # nur dieselben werkzeugeigenen Bruchstücke tragen wie args: Struktur ohne Bedeutung.
 # Trüge sie stattdessen allgemeine Muster, müsste der Ausführer sie je Werkzeug

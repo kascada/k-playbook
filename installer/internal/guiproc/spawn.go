@@ -46,7 +46,8 @@ type Child struct {
 
 // HostCareEnv ist die zweite Marke neben ServeEnv: der Server pflegt vor dem
 // Start den Wirt wie ein argumentloser Aufruf — MCP-Registrierung,
-// Aufräumen von Altlasten —, öffnet aber keinen Browser.
+// Berechtigungen der Clients für GitHub und AGENTS.md (careForHost in
+// cmd/k-playbook/gui.go) —, öffnet aber keinen Browser.
 //
 // Gesetzt wird sie beim Neustart nach einer Programmaktualisierung. Dort gibt
 // es keinen argumentlosen Aufruf, der die Pflege sonst übernähme, und das neue

@@ -53,7 +53,7 @@ Ergebnisse dieses Commands:
 - `review-input.json` und `review-input.md` nach dem Merge,
 - Perspektiven-Reports aktiver Katalog-Rezepte im Laufordner,
 - optional `review-triage.md` nach Anwendung des Moduls
-  `commands/_audit/review-scan-triage.md`.
+  `k-playbook:/commands/_audit/review-scan-triage.md`.
 
 Argument-Behandlung ist Pflicht: der Command darf nie eigenmächtig ein anderes
 Datum wählen als angegeben.
@@ -75,7 +75,7 @@ Command-specific policy:
 - Das Laufverzeichnis wird nie geraten. Für bestehende Läufe kommt es aus
   `k_playbook_review_status`, für neue Läufe aus `k_playbook_review_create`.
 - `scan-triage` ist ein AI-Eintrag aus dem Command-Modul
-  `commands/_audit/review-scan-triage.md`, kein Eintrag aus
+  `k-playbook:/commands/_audit/review-scan-triage.md`, kein Eintrag aus
   `catalogs.reviews`.
 - `review-triage.md` wird direkt in den vom MCP-Status gelieferten Laufordner
   geschrieben. `k_playbook_review_write_ai_entry` schreibt danach nur
@@ -412,7 +412,7 @@ Führe diesen Schritt erst aus, wenn `review-input.json` und `review-input.md` i
 Laufordner vorhanden sind. `scan-triage` darf vorhandene Perspektiven-Reports als Kontext
 nutzen, aggregiert sie aber nicht in einem zweiten Merge-Schritt.
 
-Wende `commands/_audit/review-scan-triage.md` wortlaut-treu an: das Modul lesen und
+Wende `k-playbook:/commands/_audit/review-scan-triage.md` wortlaut-treu an: das Modul lesen und
 befolgen, ohne seine Regeln hier zu wiederholen. Welche Belege es liest, wie es bündelt,
 wie es KI-Evidence gewichtet und welche Prioritäten und Kategorien es vergibt, steht im
 Modul und nirgends sonst. Hier steht nur, was das Modul nicht wissen kann:

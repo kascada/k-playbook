@@ -369,11 +369,6 @@ func runContext(options Options, run review.Run) RunContext {
 	}
 }
 
-// entryMode liefert die Betriebsart eines Eintrags für den Merge.
-//
-// Nur AI-Einträge haben eine: review.EntryMode macht aus dem leeren Feld die
-// Vorgabe perspective, und die einem Tool-Eintrag zuzuschreiben behauptete eine
-// Betriebsart, die es dort nicht gibt.
 // aiEntryTimes liest die Zeiten eines AI-Eintrags unter den Namen, die
 // k_playbook_review_write_ai_entry schreibt: startedAt und finishedAt. Die
 // Datei eines AI-Eintrags trägt sie so — dieselbe Struktur ist Eingabe des
@@ -397,6 +392,11 @@ func aiEntryTimes(runDir string, name string) (string, string) {
 	return times.StartedAt, times.FinishedAt
 }
 
+// entryMode liefert die Betriebsart eines Eintrags für den Merge.
+//
+// Nur AI-Einträge haben eine: review.EntryMode macht aus dem leeren Feld die
+// Vorgabe perspective, und die einem Tool-Eintrag zuzuschreiben behauptete eine
+// Betriebsart, die es dort nicht gibt.
 func entryMode(entry review.Entry) review.Mode {
 	if entry.Kind != review.KindAI {
 		return ""
@@ -534,6 +534,13 @@ func readSARIF(path string, tool string, mode review.Mode, job JobSummary, sever
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+	return parseSARIF(data, path, tool, mode, job, severityMapping)
+}
+
+// parseSARIF liest die Funde aus schon gelesenem SARIF; path nennt nur die
+// Quelle in der Fehlermeldung. Der Merge auf ein Arbeitsverzeichnis gibt hier
+// das bereinigte SARIF aus der Prüfung hinein.
+func parseSARIF(data []byte, path string, tool string, mode review.Mode, job JobSummary, severityMapping SeverityMapping) ([]Finding, error) {
 	var document sarifDocument
 	if err := json.Unmarshal(data, &document); err != nil {
 		return nil, fmt.Errorf("%s ist kein lesbares SARIF-JSON: %w", path, err)

@@ -249,3 +249,26 @@ func TestDocsScopeExistenz(t *testing.T) {
 		}
 	}
 }
+
+// Ein Verzeichnis namens k-playbook gehört nicht zu den immer ausgeschlossenen
+// (Task 196, V1): Ein keph-backup/ darunter nennt keph-backup/ als Grund, nicht
+// /k-playbook/, und ein Pfad darunter ohne keph-backup/ bleibt im Scope.
+func TestDocsScopeKPlaybookIstKeinImmerAusschluss(t *testing.T) {
+	root := docsScopeProject(t)
+	result, err := DocsScope(context.Background(), root, DocsScopeOptions{Check: []string{
+		"k-playbook/keph-backup/x", "k-playbook/x",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byPath := map[string]DocsScopeCheck{}
+	for _, check := range result.Checks {
+		byPath[check.Path] = check
+	}
+	if got := byPath["k-playbook/keph-backup/x"]; !got.Excluded || got.Reason != "always" || got.By != "keph-backup/" {
+		t.Errorf("k-playbook/keph-backup/x: %+v, erwartet always wegen keph-backup/", got)
+	}
+	if got := byPath["k-playbook/x"]; got.Excluded {
+		t.Errorf("k-playbook/x ausgeschlossen: %+v", got)
+	}
+}

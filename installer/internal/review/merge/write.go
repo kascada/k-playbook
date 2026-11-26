@@ -13,9 +13,20 @@ import (
 const markdownGroupLimit = 80
 
 func writeAtomic(path string, data []byte) error {
+	return writeAtomicPerm(path, data, 0o644, true)
+}
+
+// writeAtomicPerm schreibt über eine temporäre Datei im Zielverzeichnis und
+// benennt sie dann um. perm sind die Rechte der fertigen Datei; mkdir legt
+// das Verzeichnis bei Bedarf an. Der Merge auf ein Arbeitsverzeichnis legt
+// nichts an — das Verzeichnis gibt es schon, mit seinen engen Rechten — und
+// schreibt mit 0600.
+func writeAtomicPerm(path string, data []byte, perm os.FileMode, mkdir bool) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+	if mkdir {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
 	}
 	temp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*")
 	if err != nil {
@@ -31,7 +42,7 @@ func writeAtomic(path string, data []byte) error {
 		os.Remove(name)
 		return err
 	}
-	if err := os.Chmod(name, 0o644); err != nil {
+	if err := os.Chmod(name, perm); err != nil {
 		os.Remove(name)
 		return err
 	}
@@ -46,8 +57,14 @@ func markdown(result Result) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "# Review-Input %s\n\n", result.Run.Name)
 	fmt.Fprintf(&builder, "Erzeugt: %s\n\n", result.Generated)
-	fmt.Fprintf(&builder, "Lauf: `%s` (%s), Zustand: `%s`, abgeleitet: `%s`\n\n",
-		result.Run.Dir, strings.Join(result.Run.Languages, ", "), result.Run.State, result.Run.DerivedState)
+	if len(result.Run.Languages) == 0 {
+		// Der Merge auf ein Arbeitsverzeichnis kennt keine Sprachauswahl.
+		fmt.Fprintf(&builder, "Lauf: `%s`, Zustand: `%s`, abgeleitet: `%s`\n\n",
+			result.Run.Dir, result.Run.State, result.Run.DerivedState)
+	} else {
+		fmt.Fprintf(&builder, "Lauf: `%s` (%s), Zustand: `%s`, abgeleitet: `%s`\n\n",
+			result.Run.Dir, strings.Join(result.Run.Languages, ", "), result.Run.State, result.Run.DerivedState)
+	}
 
 	statusCounts := countEntries(result.Entries)
 	fmt.Fprintf(&builder, "## Überblick\n\n")

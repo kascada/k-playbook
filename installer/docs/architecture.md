@@ -909,21 +909,25 @@ reviews: **gleicher Name gewinnt projekteigen, ein leerer Eintrag schaltet ab.**
 
 | Sorte | Einheit | Schlüssel | Abschalten durch |
 |---|---|---|---|
-| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `_audit/review-scan-triage.md` | leere Datei |
+| `commands` | eine `*.md`-Datei | Pfad ab `commands/`, z. B. `k-todo.md` | leere Datei |
 | `skills` | ein Verzeichnis mit `SKILL.md` | Verzeichnisname | leere `SKILL.md` |
 
-Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse wie `_audit/` sind
-damit bis auf die einzelne Datei überlagerbar: ein Projekt ersetzt
-`_audit/review-scan-triage.md` und behält den Rest des Namensraums aus der Installation.
+Commands werden **rekursiv** aufgelöst. Namensraum-Verzeichnisse sind damit bis auf die
+einzelne Datei überlagerbar: ein Projekt ersetzt eine Datei eines Namensraums und behält den
+Rest aus der Installation. Unter `share/commands/` liegen seit Task 197 keine Fragmente
+mehr; die Module der Commands stehen unter `defaults/commands/` und kommen als
+`k-playbook:/commands/<pfad>` über `ResolveDocRef`, mit derselben lokalen Ebene
+`.k-playbook/commands/`.
 
 Fragmente sind Namensraum-Dateien, deren erster Pfadteil mit `_` beginnt (`_shared/`,
 `_docs/`, `_task/` ...). `collectCommands()` nimmt sie weiter auf, damit sie überlagerbar
 und als Include auflösbar bleiben, und `ResolveRegistry()` zeigt sie der Oberfläche mit
 Herkunft. `ActiveRegistry()` lässt sie bei Commands aus (`IsFragmentName`; Skills bleiben
 unberührt): sie werden weder verlinkt noch beim Assistenten registriert, und ein
-vorhandener Link darauf räumt das nächste Nachziehen ab. Wer ein Fragment selbst braucht,
-etwa `review.go` für `_audit/review-scan-triage.md`, löst über `ResolveRegistry()` auf
-und überspringt abgeschaltete Einträge selbst.
+vorhandener Link darauf räumt das nächste Nachziehen ab. Wer ein Modul selbst braucht,
+etwa `review.go` für `_audit/review-scan-triage.md` (`scanTriageCandidate`), löst den
+Verweis `k-playbook:/commands/<pfad>` auf und überspringt ein abgeschaltetes Ergebnis
+selbst.
 
 Das Frontmatter jedes aufgelösten, nicht abgeschalteten Commands und Skills prüft die
 health-Quelle `frontmatter` (`project/health_frontmatter.go`) mit `gopkg.in/yaml.v3`;
@@ -1108,8 +1112,6 @@ Die drei Katalog-Ziele sind **echte Verzeichnisse** mit je einem Symlink pro Ein
   k-todo.md    -> ../../.k-playbook/share/commands/k-todo.md   dist
   k-review.md  -> ../../.k-playbook/commands/k-review.md       override
   k-eigen.md   -> ../../.k-playbook/commands/k-eigen.md        local
-  _audit/
-    review-scan-triage.md   -> ../../../.k-playbook/share/commands/_audit/review-scan-triage.md
 ```
 
 ### Der Umweg-Link `.k-playbook/share`
@@ -4488,8 +4490,10 @@ Beide gehen durch `mcpTargetNeedsWrite()`; der Modus ist der einzige Unterschied
 selbsttätigen Aufrufer — der Start (`repairMCPRegistration()` in `cmd/k-playbook/gui.go`)
 und der Projektschritt von `k-playbook upgrade` — gehen über `project.RepairMCPReport()`
 (Ergebnis `MCPRepairReport.Repaired`, ein Fehlschlag in `Message`). `upgrade --check`
-meldet keine MCP-Einträge und sagt damit weniger, als ein Lauf täte; die Lücke ist
-hingenommen. Die Grenze ist gemessen, nicht geraten:
+fragt `project.PlanMCPRepair()` im selben Modus: dieselbe Entscheidung über
+`planMCPTarget()` und `mcpTargetNeedsWrite()`, samt Messung der Versionierung, ohne zu
+schreiben; je Datei, die ein Lauf ergänzte, eine Zeile „MCP-Registrierung würde in … ergänzt“.
+Die Grenze ist gemessen, nicht geraten:
 
 - **Ein vorhandener Eintrag** bleibt im selbsttätigen Modus immer liegen:
   `MCPStateStale`, `MCPStateUnreadable`, `MCPStateAmbiguousTarget` und

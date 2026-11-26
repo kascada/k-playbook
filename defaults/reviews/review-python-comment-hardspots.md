@@ -154,7 +154,7 @@ rezeptspezifisch ist:
   nicht selbst zusammen: der Merge bündelt sie zu einer Gruppe je Rule-ID und Datei, und
   ihre Zahl ist die Aussage, die die Triage daraus liest.
 - Keine Priorität `P1`–`P3`, keine Kategoriebuchstaben `S`/`T`/`K`/`F`/`A`/`X`, keine
-  Bündelung. Das ist Sache von `commands/_audit/review-scan-triage.md`.
+  Bündelung. Das ist Sache von `k-playbook:/commands/_audit/review-scan-triage.md`.
 
 **Mengendeckel: höchstens 25 Funde je Lauf.** Niedriger als bei einem Befund-Rezept, weil
 jeder Fund hier eine Frage an einen Menschen ist: Was diese Funde auslösen, ist eine

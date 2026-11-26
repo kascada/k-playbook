@@ -212,6 +212,16 @@ func (env findingsEnv) check(ctx context.Context) (result FindingsCheck) {
 		result.Sync = &FindingsSync{At: status.Sync.LastSuccess, Revision: status.Sync.Revision}
 	}
 	if !status.OK {
+		// Dieselbe Ursache einmal: Abgleich und Anbindung gehen über
+		// denselben Node, Account und Hub. Ist die Anbindung daran nicht
+		// bereit, ist ein gescheiterter Abgleich ihre Folge und entfällt;
+		// nur eine nicht lesbare Collection lässt den Abgleich des Hubs
+		// unberührt, dann ist sein Scheitern eine eigene Ursache.
+		if status.State != kephalaion.StateCollectionUnreadable {
+			result.Problems = slices.DeleteFunc(result.Problems, func(p FindingsProblem) bool {
+				return p.Kind == FindingsProblemSync
+			})
+		}
 		problem(FindingsProblemKephalaion, "", "Kephalaion ist nicht bereit: "+status.Message)
 		return result
 	}

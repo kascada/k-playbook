@@ -19,13 +19,12 @@ dort sind schreibgeschützt.
 
 Die Projekte verlinken die Einträge durch `.k-playbook/share` (siehe
 `installer/docs/architecture.md`, „Der Umweg-Link `.k-playbook/share`“).
-Verlinkt werden nur die Commands und Skills selbst. Die Fragmente unter
-`commands/_audit/` und `commands/_review-run/` stehen nicht in den
-Verzeichnissen der Assistenten (`.claude/commands/`, `.opencode/commands/`);
-im Projekt liegen sie nur hinter dem Umweg-Link, etwa
-`.k-playbook/share/commands/_audit/review-scan-triage.md`. Ein Command nennt
-ein solches Modul relativ zu diesem Verzeichnis, etwa
-`commands/_audit/review-scan-triage.md`.
+Verlinkt werden nur die Commands und Skills selbst. Fragmente — Module unter
+einem Namensraum mit `_` vorn — liegen hier nicht mehr: Seit Task 197 stehen
+auch die Module der Review-Familie (`_audit/`, `_review-run/`) unter
+`defaults/commands/` und werden wie alle Module als
+`k-playbook:/commands/<pfad>` gelesen, etwa
+`k-playbook:/commands/_audit/review-scan-triage.md`.
 
 Hier ist die einzige Fassung; `commands/` und `skills/` oben im Repo gibt es seit
 2026-10-25 nicht mehr. Eine Änderung hier ändert das Binary und verlangt damit

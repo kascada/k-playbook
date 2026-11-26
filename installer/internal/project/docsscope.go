@@ -291,8 +291,8 @@ func docsHiddenPath(rel string) bool {
 }
 
 // collectGitignores sammelt die .gitignore unter SCAN_ROOT, die Wurzel
-// zuerst. Verzeichnisse, die ohnehin ausgeschlossen sind, werden nicht
-// betreten; ein tieferes Verzeichnis namens k-playbook gehört nicht dazu.
+// zuerst. Verzeichnisse, die ohnehin ausgeschlossen sind (alwaysExcludedRel),
+// und versteckte werden nicht betreten.
 func (s *docsScope) collectGitignores() ([]DocsScopeIgnoreFile, int) {
 	files := []DocsScopeIgnoreFile{}
 	truncated := 0
@@ -437,11 +437,9 @@ func (s *docsScope) check(raw string) DocsScopeCheck {
 // docsScopeAlwaysName nennt, welches immer ausgeschlossene Verzeichnis einen
 // Pfad trifft, in der Schreibweise von docsScopeAlways.
 func docsScopeAlwaysName(abs string, projectDir string) string {
-	for _, name := range []string{ProjectDirName, "k-playbook"} {
-		dir := filepath.Join(projectDir, name)
-		if abs == dir || strings.HasPrefix(abs, dir+string(filepath.Separator)) {
-			return "/" + name + "/"
-		}
+	dir := filepath.Join(projectDir, ProjectDirName)
+	if abs == dir || strings.HasPrefix(abs, dir+string(filepath.Separator)) {
+		return "/" + ProjectDirName + "/"
 	}
 	for _, part := range strings.Split(filepath.ToSlash(abs), "/") {
 		if part == "keph-backup" {

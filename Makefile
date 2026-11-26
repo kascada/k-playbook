@@ -69,10 +69,10 @@ help: ## Zeigt diese Hilfe an
 	@echo "Danach genügt überall:  k-playbook"
 	@echo ""
 
-# -buildvcs=false ist kein Detail: ohne das stempelt Go den Commit-Hash ins
-# Binary. Jeder Commit ergäbe dann vier neue Binaries à 12 MB, die der nächste
-# `git add -A` mitnimmt — auch wenn sich am Code nichts geändert hat. Gelesen
-# wird die Revision von niemandem.
+# -buildvcs=false ist kein Detail: ohne das stempelt Go Commit-Hash und
+# Änderungsstand ins Binary. `make release` baut vor dem Release-Commit, CI den
+# getaggten Commit; mit Stempel gingen die Binaries und damit SHA256SUMS
+# auseinander. Gelesen wird die Revision von niemandem.
 define build_binaries
 	@mkdir -p "$(INSTALLER_DIST_DIR)"
 	@set -eu; \
@@ -89,8 +89,8 @@ dist: ## Baut die Binaries aller Plattformen nach ./dist/
 	$(call build_binaries,$(INSTALLER_RELEASE_TARGETS))
 
 # Für den Entwicklungs-Loop: die drei fremden Plattformen kostet jeder Durchlauf
-# Zeit, gestartet wird ohnehin nur diese. Die anderen Binaries bleiben auf dem
-# committeten Stand — `make dist` baut vor einem Release alle vier.
+# Zeit, gestartet wird ohnehin nur diese. Die anderen Binaries in dist/ bleiben,
+# wie sie zuletzt gebaut wurden — `make dist` und `make release` bauen alle vier.
 dist-host: ## Baut nur das Binary dieser Plattform nach ./dist/
 	$(call build_binaries,$(INSTALLER_HOST_TARGET))
 
@@ -118,7 +118,17 @@ gui: dev-install ## Baut, installiert und startet die GUI
 	-"$$HOME/.local/bin/$(INSTALLER_BINARY)" stop
 	"$$HOME/.local/bin/$(INSTALLER_BINARY)"
 
-test: ## Führt die Tests aus
+# Dieselben Aufrufe wie der Testlauf in der CI (.github/workflows/test.yml):
+# go vet, die gofmt-Prüfung und go test.
+test: ## Führt go vet, die gofmt-Prüfung und die Tests aus
+	cd installer && go vet ./...
+	@set -eu; \
+	  cd installer; \
+	  unformatiert="$$(gofmt -l .)"; \
+	  if [ -n "$$unformatiert" ]; then \
+	    printf 'gofmt: diese Dateien sind nicht formatiert:\n%s\n' "$$unformatiert" >&2; \
+	    exit 1; \
+	  fi
 	cd installer && go test ./...
 	@if command -v node >/dev/null 2>&1; then \
 	  $(MAKE) --no-print-directory vscode-test; \
@@ -153,15 +163,16 @@ vscode-vsix: ## Baut die VSIX der VS-Code-Erweiterung neu (braucht Node)
 	@printf 'Gebaut: %s\n' "$(VSCODE_VSIX)"
 	@printf 'Die Datei ist eingecheckt — die Änderung gehört in denselben Commit.\n'
 
-# Ein Release läuft in zwei Schritten, und die Reihenfolge ist nicht beliebig.
+# Ein Release läuft in zwei Schritten:
 #
 #   make release VERSION=v0.1.0   baut, schreibt VERSION und SHA256SUMS,
 #                                 committet beides und pusht nur den Tag
 #   ... CI baut, prüft gegen SHA256SUMS und lädt die Assets hoch ...
 #   make release-publish VERSION=v0.1.0   bringt denselben Commit auf main
 #
-# Andersherum zeigte VERSION auf main eine Zeit lang auf einen Tag ohne
-# Downloads.
+# release-publish prüft vorher, dass HEAD der getaggte Commit ist und alle
+# Assets im Release liegen. Den ganzen Ablauf samt Rundfrage und Sicherung
+# fährt `make -C priv release` (Dev-Repo unter priv/).
 #
 # Das Programm und bin/install brauchen die Reihenfolge nicht: Sie lesen
 # nicht VERSION, sondern das neueste veröffentlichte Release (die

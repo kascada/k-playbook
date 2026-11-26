@@ -155,8 +155,30 @@ async function loadConfig() {
 // vorhandene Datei, und diese Grenze soll auch hier sichtbar bleiben.
 let configOutdated = false;
 
+// Nach dem Anlegen oder Zurücksetzen steht die Meldung des Servers in der
+// Karte, bis der Nutzer „Weiter“ drückt; erst dann lädt die Seite neu. Sie
+// trägt, was sonst nirgends steht: den Namen der Sicherungsdatei und den
+// Hinweis auf einen gescheiterten Schlüsselwechsel der Laufzeitdatei.
+let configCreated = false;
+
 async function onConfigClick() {
+  if (configCreated) {
+    // Die Kopfzeile wird serverseitig gefüllt und muss den neuen Ort zeigen.
+    window.location.reload();
+    return;
+  }
   await createConfig(configOutdated ? "/api/config/reset" : "/api/config");
+}
+
+// Zeigt die Meldung nach dem Anlegen oder Zurücksetzen, vor dem Neuladen.
+function renderConfigCreated(data) {
+  configCreated = true;
+  elements.configFacts.replaceChildren();
+  elements.configForm.classList.add("hidden");
+  elements.configMessage.textContent = data.message || "";
+  setBlockState(elements.configPill, elements.configCreate, "ok", CONFIG_LABELS);
+  elements.configCreate.className = "primary";
+  elements.configCreate.textContent = "Weiter";
 }
 
 async function createConfig(endpoint) {
@@ -174,8 +196,7 @@ async function createConfig(endpoint) {
     });
     const data = await response.json();
     if (data.installed) {
-      // Die Kopfzeile wird serverseitig gefüllt und muss den neuen Ort zeigen.
-      window.location.reload();
+      renderConfigCreated(data);
       return;
     }
     renderConfig(data);

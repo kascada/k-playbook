@@ -299,6 +299,8 @@ then nothing is written and the interface says so.
 | `k_playbook_review_scan` | **temporarily unavailable**, answers `reviews_paused`; otherwise: execute a run's tool entries through `review.Execute` |
 | `k_playbook_review_merge` | **temporarily unavailable**, answers `reviews_paused`; otherwise: consolidate a run through `merge.Run` into `review-input.json` and `review-input.md` |
 | `k_playbook_review_write_ai_entry` | **temporarily unavailable**, answers `reviews_paused`; otherwise: write the status and result of an AI review entry |
+| `k_playbook_review_workdir` | determine the working directory of a single review (`/k-review`, task 197), not paused: `recipe` names the recipe key; without `dir` it creates a new directory directly under `/tmp` (`$TMPDIR` is ignored) through `os.MkdirTemp`, with project, recipe, timestamp and a random part in the name and mode `0700`; with an absolute `dir` it takes that path, creates it with `0700` if missing, refuses a symlink or a file and warns (`warnings`) when it lies inside the project or is open to others; answer `dir`, `created`, `default`, `insideProject`; like `k-playbook review workdir` ([below](#single-review-tools)) |
+| `k_playbook_review_merge_dir` | check and merge the finding lists `<entry>.sarif` of a working directory (absolute `dir`), not paused: each is checked against the recipe with that key (tool name, `audit.ruleIds`, findings outside `audit.scope.paths` dropped and counted), then `review-input.json` and `review-input.md` are written beside them with mode `0600` -- dedupe, stable group IDs and severity as in a run, no known decisions (`warnings` says so); `check: true` only checks and writes nothing; an invalid list is `sarif_invalid` with every file and reason, nothing written; like `k-playbook review merge` ([below](#single-review-tools)) |
 | `k_playbook_todo_list` | list the project todos; `includeDone` adds the completed ones, `search` filters by text |
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, reopen it, or set, change or remove its origin (`origin`; `""` removes it) |
@@ -334,8 +336,8 @@ reads the status and makes its own decision from it.
 
 ### Review Tools Are Paused
 
-The storage of review results is being rebuilt, and until it stands every review path is
-locked (task 147). The five tools `k_playbook_review_status`, `k_playbook_review_create`,
+The storage of review results is being rebuilt, and until it stands every path of an audit
+run is locked (task 147). The five tools `k_playbook_review_status`, `k_playbook_review_create`,
 `k_playbook_review_scan`, `k_playbook_review_merge` and `k_playbook_review_write_ai_entry`
 stay in the tool list with their names and schemas, but each call is answered with the error
 code `reviews_paused` and one sentence giving the reason, marked as a tool error:
@@ -364,10 +366,36 @@ locked the same way and end with the same sentence and exit code 1. The interfac
 runs either: `GET /api/reviews` answers with the same sentence, and the **Reviews** page
 shows it.
 
-`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
+`<ergebnisort>` stands for the location of audit results. It is not decided yet; audit runs
+are paused until then.
+
+Not locked are the two tools of a single review, `k_playbook_review_workdir` and
+`k_playbook_review_merge_dir` (task 197): they create no run, read none and need no results
+location ([Single Review Tools](#single-review-tools)).
 
 The sections below describe the contract of the five tools as it applies again once the
 lock is lifted.
+
+### Single Review Tools
+
+`/k-review` collects a finding list into a working directory and summarizes it there; both
+tools answer in the envelope below (`tool`, `project` with `inputDir` and `root`, `data`,
+`warnings`). Neither depends on `review.Paused`.
+
+- `k_playbook_review_workdir` — input `projectDir`, `recipe`, optional absolute `dir`. `data`
+  is `{dir, created, default, insideProject, warnings}`; the warnings are also in the envelope.
+  Errors: `invalid_input` (no `recipe`, relative `dir`), `project_not_found`, `workdir_failed`
+  (the directory could not be created, a symlink, a file).
+- `k_playbook_review_merge_dir` — input `projectDir`, absolute `dir`, optional `check`. `data`
+  is `{dir, checkOnly, sources: [{entry, sarif, findings, droppedFindings, droppedPaths, note}],
+  outputs: {reviewInputJSON, reviewInputMarkdown}, findings, groups, warnings}`; with `check`
+  there are no `outputs` and no `groups`. Errors: `invalid_input` (relative or missing `dir`),
+  `project_not_found`, `sarif_invalid` (`details.problems` with `sarif` and `reason` per file),
+  `sarif_missing` (no `<entry>.sarif` in the directory), `read_failed`, `merge_failed`. On any
+  error nothing is written.
+
+The schema of `review-input.json` is in `k-playbook:/commands/_review-run/review-input-contract.md`;
+the merge itself in [`review-runs.md`](./review-runs.md#merging-a-single-review-without-a-run).
 
 ### Review Response Contract
 
@@ -1282,11 +1310,11 @@ rights, node and sync. So one call is enough for the start of a session.
 The tool `k_playbook_context` and the subcommand `k-playbook context` were removed with task 188.
 A call of the subcommand ends with one sentence on stderr that names `k-playbook briefing` and,
 for the environment details, `k-playbook briefing --part environment`, and exit code 1; the tool
-list no longer carries the tool. The paused commands `/k-review` and `/k-audit` (with
-`_audit/review-scan-triage.md`) took `catalogs.reviews` -- the review modes `audit` and `review`
-per recipe -- from that output; their text stays as the template for the rebuild and carries a
-`NACHZIEHEN` comment: the recipe list will come from the briefing's `documents.reviews`, the modes
-from the frontmatter of the recipe the command reads anyway. The internal functions
+list no longer carries the tool. The commands `/k-review` and `/k-audit` took `catalogs.reviews`
+-- the review modes `audit` and `review` per recipe -- from that output. `/k-review`, rebuilt with
+task 197, takes the recipe list from the briefing's `documents.reviews` and the modes from the
+frontmatter of the recipe it reads anyway; the paused `/k-audit` keeps its text as the template
+for the rebuild and carries a `NACHZIEHEN` comment that says the same. The internal functions
 `BuildContext` and `BuildContextWithLayers` stay, for the context view of the interface
 (`GET /api/context`) and the catalog of the review tools.
 
@@ -1459,7 +1487,7 @@ is always present, `[]` without a problem. The sources in this version:
 | `versionSources` | the Kephalaion binding is ready, but the document cannot be read (`versionSources.state` `unavailable`); with a binding that is not ready this area stays silent, area `kephalaion` carries the error | `error` | check Kephalaion on this machine (`kephalaion status`); the details are in `environment.versionSources.error` |
 | `github` | the personal access file `~/.config/k-playbook/github.yaml` says something wrong: one entry per problem of the reader (`github-access.md`, "Reading the file"), the problem's path (`file`, `services.<name>`, `services.<name>.access[<i>]`) in front of the message because an entry has no `path` field | `error` | the reader's hint: fix that place in the file |
 | `github` | the file reads, but a service has no `available` access -- every access is `unavailable` or `disabled`, judged without the network (`github-access.md`, "Availability"): `services.<name>: kein verfügbarer Zugang — <reason of the first access that is not disabled>` | `warning` | set up an access of that service in the file; `k-playbook github check` names the reason per access |
-| `github` | the project has a GitHub service, and the client permissions for "GitHub über run" are missing in `.claude/settings.local.json` or `.opencode/opencode.jsonc` (`github-access.md`, "Client permissions"); a target file tracked by git or reached through a symlink stays unwritten on purpose and is no entry | `warning` | `k-playbook upgrade`, or "Einrichten" of the MCP registration in the interface |
+| `github` | the project has a GitHub service, and the client permissions for "GitHub über run" are missing in `.claude/settings.local.json` or `.opencode/opencode.jsonc` (`github-access.md`, "Client permissions"); a target file tracked by git or reached through a symlink stays unwritten on purpose and is no entry | `warning` | `k-playbook upgrade`, or the button of the MCP card in the interface ("Einrichten", or "Erneut eintragen" once the MCP entries stand) |
 | `github` | no service (anymore), but a target file still carries k-playbook's permission entries -- bare `gh`, the allowed way without a service, is blocked | `warning` | `k-playbook upgrade` removes them |
 | `github` | with a service, a project file (`.claude/settings.json`, `opencode.json`, `opencode.jsonc`, `.opencode/opencode.json`) or a foreign entry of a target file contradicts the rule -- one entry per file, naming the rules and whether k-playbook's entries currently override them | `warning` | remove the named entries; `k-playbook upgrade --check` names an example line and the proposal per entry |
 | `share` | `K_PLAYBOOK_SHARE_DIR` is set but not an absolute path | `warning` | set it to an absolute path or remove it; until then the shipped commands and skills are missing |
@@ -1514,7 +1542,10 @@ everything at once together with the number per user:
    ([`kephalaion-client.md`](./kephalaion-client.md#the-tool-sync)); the other stages run on.
    The answer's `sync` (`at`, `revision`) comes from the sync itself, otherwise from `whoami`.
 2. **Binding and rights.** The binding must be `ok` (otherwise kind `kephalaion`, and the check
-   ends here); the rights on the collection must include `read`, `write` and `supersede` --
+   ends here). The same cause appears once (task 196): sync and binding go through the same
+   node, account and hub, so when the binding is not ready for any reason other than an
+   unreadable collection (`collection-unreadable`), a `sync` problem from stage 1 is dropped
+   and only the `kephalaion` problem stays. The rights on the collection must include `read`, `write` and `supersede` --
    without `supersede`, deleting another user's finding fails. Each missing right is a
    problem of kind `right` with the right as `name`.
 3. **Entries.** Every entry under `queue/findings/` (listed recursively from the replica) is a

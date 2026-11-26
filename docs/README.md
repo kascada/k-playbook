@@ -105,7 +105,7 @@ questions and the ordered work list.
 - `/k-audit` / `review-scan-triage` / `review-triage` -> [`review-runs.md`](../defaults/docs/handbook/review-runs.md#assessing-with-review-scan-triage), [`commands.md`](../defaults/docs/handbook/commands.md#review-flow)
 - `/k-task-refine` / `task hardening` -> [`task-flow.md`](../defaults/docs/handbook/task-flow.md)
 - `review-input` / `merge` / `consolidation` -> [`review-runs.md`](../defaults/docs/handbook/review-runs.md#consolidating-with-k-playbook-merge)
-- `evidence contract` / `review-input.json` schema / `stableId` generation -> [`../share/commands/_review-run/review-input-contract.md`](../share/commands/_review-run/review-input-contract.md)
+- `evidence contract` / `review-input.json` schema / `stableId` generation -> [`../defaults/commands/_review-run/review-input-contract.md`](../defaults/commands/_review-run/review-input-contract.md)
 - `audit.mode` / `perspective` / `evidence recipe` / `scope.paths` / `ruleIds` -> [`review-runs.md`](../defaults/docs/handbook/review-runs.md#catalog-recipes-in-the-run)
 - `known decisions` / `stableId` / `pathGlob` -> [`review-runs.md`](../defaults/docs/handbook/review-runs.md#effect-of-known-decisionsmd)
 - `reviews` -> [`code-review.md`](../defaults/docs/handbook/code-review.md)

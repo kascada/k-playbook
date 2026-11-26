@@ -497,3 +497,38 @@ func TestFindingNamePattern(t *testing.T) {
 		}
 	}
 }
+
+// Dieselbe Ursache steht einmal im Ergebnis (Task 196, V7): Fehlt etwa das
+// Token, scheitern Abgleich und Anbindung daran; gemeldet wird nur die
+// Anbindung. Liegt die Anbindung allein an der Collection, ist ein
+// gescheiterter Abgleich des Hubs eine eigene Ursache und bleibt stehen.
+func TestFindingsCheckDieselbeUrsacheEinmal(t *testing.T) {
+	for _, test := range []struct {
+		state kephalaion.State
+		want  []string
+	}{
+		{kephalaion.StateTokenMissing, []string{"kephalaion:"}},
+		{kephalaion.StateNodeUnreachable, []string{"kephalaion:"}},
+		{kephalaion.StateHubNeverSynced, []string{"kephalaion:"}},
+		{kephalaion.StateCollectionUnreadable, []string{"sync:", "kephalaion:"}},
+	} {
+		t.Run(string(test.state), func(t *testing.T) {
+			store := &findingsFakeStore{docs: map[string]*findingsFakeDoc{}}
+			env, synced := findingsTestEnv(store, allFindingsRights...)
+			env.sync = func(context.Context, kephalaion.Binding) (kephalaion.SyncState, error) {
+				*synced = append(*synced, "vm")
+				return kephalaion.SyncState{}, errors.New("Abgleich nicht möglich: kein Token")
+			}
+			env.status = func() kephalaion.Status {
+				return kephalaion.Status{State: test.state, Message: "nicht bereit"}
+			}
+			check := env.check(context.Background())
+			if got := problemKinds(check); check.Ready || strings.Join(got, " ") != strings.Join(test.want, " ") {
+				t.Errorf("Probleme %v, erwartet %v", got, test.want)
+			}
+			if len(*synced) != 1 {
+				t.Errorf("Abgleich %d-mal angefordert, erwartet einmal", len(*synced))
+			}
+		})
+	}
+}

@@ -250,10 +250,12 @@ type GitHubPermissionsReport struct {
 // damit Tests ohne Zugangsdatei und Remote auskommen.
 var gitHubPermissionServices = resolveGitHubPermissionServices
 
-// resolveGitHubPermissionServices liest die Dienste, deren repo das Repo der
-// Projektwurzel ist — dieselbe Quelle wie die Briefing-Zeile GitHub, ohne die
-// Beurteilung der Zugänge. Ohne Zugangsdatei, ohne GitHub-Remote oder ohne
-// passenden Dienst ist die Liste leer. Ein Fehler heißt: nicht geklärt.
+// resolveGitHubPermissionServices liest die Dienste, deren repo das Repo unter
+// project.repo_root ist — derselbe Ort wie in der Oberfläche
+// (githubClientRoute in webui/github.go, RepoRootDir), ohne die Beurteilung
+// der Zugänge. Ist die Konfiguration nicht lesbar, gilt das Hauptverzeichnis.
+// Ohne Zugangsdatei, ohne GitHub-Remote oder ohne passenden Dienst ist die
+// Liste leer. Ein Fehler heißt: nicht geklärt.
 func resolveGitHubPermissionServices(projectDir string) ([]string, error) {
 	path, err := githubaccess.Path()
 	if err != nil {
@@ -269,7 +271,11 @@ func resolveGitHubPermissionServices(projectDir string) ([]string, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), githubContextTimeout)
 	defer cancel()
-	repo := githubRemoteRepo(projectRemoteURL(ctx, projectDir), result.Services)
+	gitDir := projectDir
+	if config, err := ReadConfig(projectDir); err == nil {
+		gitDir = RepoRootDir(projectDir, config)
+	}
+	repo := githubRemoteRepo(projectRemoteURL(ctx, gitDir), result.Services)
 	if repo == "" {
 		return nil, nil
 	}
@@ -387,7 +393,10 @@ func checkGitHubPermissionsTarget(projectDir string, target GitHubPermissionsTar
 		case own.complete:
 			status.State = GitHubPermissionsOK
 			status.Unexcluded = file.exists && gitExcludeNeeded(projectDir, target.Path)
-		case file.exists && mcpTargetTracked(projectDir, path):
+		case mcpTargetTracked(projectDir, path):
+			// Auch eine im Arbeitsbaum gelöschte Datei: ls-files sieht sie
+			// im Index, und neu angelegt erschiene sie als Änderung einer
+			// erfassten Datei.
 			status.State = GitHubPermissionsTracked
 			status.Detail = "von git erfasst; k-playbook schreibt die Berechtigungen nur in eine nicht erfasste Datei"
 		default:

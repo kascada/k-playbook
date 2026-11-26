@@ -90,8 +90,8 @@ func Collect(options Options) (Result, error) {
 // gewinnt sie: ihr Label ist ausdrücklich gesetzt, das der Standarderkennung
 // abgeleitet.
 //
-// Die Ausschlüsse wirken deshalb auch nur auf die Standarderkennung. Wer die
-// Installation oder einen ausgeschlossenen Bereich doch im Inventar haben will,
+// Die Ausschlüsse wirken deshalb auch nur auf die Standarderkennung. Wer einen
+// ausgeschlossenen Bereich doch im Inventar haben will,
 // schreibt die Quelle in `sources:` — dann steht sie da, ausdrücklich und mit
 // eigenem Label.
 func planSources(boundary *Boundary, config versionsources.Config) ([]candidate, []Exclusion, []Rejection) {

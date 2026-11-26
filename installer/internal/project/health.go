@@ -119,7 +119,7 @@ func kephalaionHint(state kephalaion.State) string {
 	case kephalaion.StateTokenMissing, kephalaion.StateLoginInvalid, kephalaion.StateLoginMissing:
 		return "Token-Datei und Anmeldung des Accounts prüfen: kephalaion node account list, kephalaion status."
 	case kephalaion.StateHubUnknown, kephalaion.StateReplicaUnreadable:
-		return "Den Hub am Node prüfen und abgleichen: kephalaion status, kephalaion node sync."
+		return "Den Hub am Rechner des Nodes prüfen und abgleichen: kephalaion status, kephalaion node sync <hub>; im DevContainer auf dem Host."
 	case kephalaion.StateHubNeverSynced:
 		// Ohne Replica lehnt der Node einen Abgleich auf Anforderung ab
 		// (never_synced); den ersten macht nur der Rechner des Nodes selbst.

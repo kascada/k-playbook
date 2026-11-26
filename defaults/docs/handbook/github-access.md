@@ -907,7 +907,8 @@ into quoted text in both; chains with `&&`, `;` and `|` are checked part by part
   tracks nor ignores the file, k-playbook adds it to `.git/info/exclude` (path from the
   repository root). A file tracked by git, a file reached through a symlink and a file whose
   permissions are not an object or list stay untouched.
-- **When.** "Einrichten" of the MCP registration in the interface (`POST /api/mcp`), the
+- **When.** The button of the MCP card in the interface (`POST /api/mcp`; labelled "Einrichten",
+  or "Erneut eintragen" once the MCP entries stand, and writing the permissions either way), the
   project step of `k-playbook upgrade` and the start care of the program all write the same:
   missing entries are added, nothing else in the file changes (comments and foreign keys stay;
   the file is re-indented once, as with MCP). In OpenCode k-playbook's entries are moved to the

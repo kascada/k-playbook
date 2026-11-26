@@ -158,10 +158,11 @@ func selectEntries(runDir string, run review.Run, wanted []string) ([]review.Ent
 
 // resolveTools übernimmt die Auflösung des Preflights.
 //
-// Gesucht wird nicht selbst im PATH: der Preflight bricht vorher ab, wenn ein
-// Projekt-venv aktiv ist, und liefert genau das Werkzeug, dessen Vorhandensein
-// er geprüft hat. Host-lokale Werkzeuge dürfen nie aus einem Projekt-venv
-// erkannt werden; das venv gehört dem Projekt.
+// Gesucht wird nicht selbst im PATH: der Preflight liefert genau das Werkzeug,
+// dessen Vorhandensein er geprüft hat. Ist ein Projekt-venv aktiv, misst er
+// es mit (toolScope project-venv) und weist es nicht ab; abgebrochen wird nur
+// eine Installation mit --install (install-security-tools.sh). Ein Werkzeug
+// aus dem venv käme so in den Lauf.
 func resolveTools(preflight project.ToolPreflight) map[string]review.Tool {
 	tools := map[string]review.Tool{}
 	for _, tool := range preflight.Tools {

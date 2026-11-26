@@ -16,9 +16,10 @@
 //
 // Repariert und geschrieben wird nichts — auch die Quelle github legt eine
 // fehlende Zugangsdatei nicht an; das tut nur `k-playbook github init`. Kein
-// Eintrag nennt einen Token oder
-// einen Wert aus einer Datei — Dienst- und Schlüsselnamen dürfen vorkommen,
-// Werte nie: nur Stufe, Bereich, einen Satz und die Abhilfe.
+// Eintrag nennt einen Token oder ein Geheimnis aus einer Datei — Dienst- und
+// Schlüsselnamen dürfen vorkommen, dazu Berechtigungsregeln aus den
+// Einstellungsdateien der Clients (Quelle github, health_githubperms.go), die
+// keine Geheimnisse tragen: nur Stufe, Bereich, einen Satz und die Abhilfe.
 package health
 
 import (
@@ -59,7 +60,8 @@ type Problem struct {
 	// Area ist der Bereich, aus dem der Eintrag stammt.
 	Area string `json:"area"`
 	// Message ist ein Satz, der sagt, was nicht stimmt — nie ein Token oder
-	// ein Wert aus einer Datei.
+	// ein Geheimnis aus einer Datei; Berechtigungsregeln der Clients darf er
+	// zitieren.
 	Message string `json:"message"`
 	// Hint ist die Abhilfe: was der Nutzer tun kann.
 	Hint string `json:"hint"`

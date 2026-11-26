@@ -19,7 +19,10 @@ func init() {
 }
 
 // gitHubPermissionsHint ist die Abhilfe für fehlende und veraltete Einträge.
-const gitHubPermissionsHint = "k-playbook upgrade ausführen oder in der Oberfläche bei der MCP-Registrierung „Einrichten“ drücken; Hintergrund: k-playbook:/instructions/on-demand/github.md."
+// Der Knopf der MCP-Karte heißt nach dem Zustand der MCP-Einträge „Einrichten“
+// oder „Erneut eintragen“ (app.js, MCP_LABELS) und schreibt in beiden Fällen
+// auch die Berechtigungen; der Hinweis nennt deshalb beide Namen.
+const gitHubPermissionsHint = "k-playbook upgrade ausführen oder in der Oberfläche auf der Karte k-playbook-MCP „Einrichten“ bzw. „Erneut eintragen“ drücken; Hintergrund: k-playbook:/instructions/on-demand/github.md."
 
 func healthGitHubPermissions(_ context.Context, projectDir string) []health.Problem {
 	report := CheckGitHubPermissions(projectDir)

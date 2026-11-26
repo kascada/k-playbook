@@ -20,7 +20,7 @@ import (
 // nicht in einen Heartbeat.
 //
 // Rein lesend: Es wird nichts repariert, und kein Eintrag nennt einen Token
-// oder einen Wert aus einer Datei — das stellt das Paket health sicher, die
+// oder ein Geheimnis aus einer Datei — das stellt das Paket health sicher, die
 // Oberfläche reicht die Einträge nur durch. Werte aus der Anfrage gehen nicht
 // in die Prüfung ein.
 

@@ -213,7 +213,9 @@ const resultsDirUndecidedCode = "results_dir_undecided"
 const reviewPausedPrefix = "Vorübergehend nicht verfügbar: Die Ablage der Review-Ergebnisse wird umgebaut; " +
 	"das Werkzeug antwortet mit " + review.PausedCode + " und schreibt nichts. Sonst: "
 
-// addReviewTools meldet die fünf Review-Werkzeuge an.
+// addReviewTools meldet die Review-Werkzeuge an: die fünf des Audit-Laufs und
+// die beiden eines eigenständigen Reviews (addReviewWorkdirTools,
+// review_workdir.go), die ohne Lauf arbeiten und nicht gesperrt sind.
 //
 // Alle fünf sind gesperrt, solange die Review-Wege pausieren (review.Paused,
 // Task 147): status, create, scan, merge und write_ai_entry bleiben mit Namen
@@ -245,6 +247,7 @@ func addReviewTools(server *mcp.Server) {
 		Name:        reviewToolWriteAIEntry,
 		Description: reviewPausedPrefix + "Schreibt den Status eines AI-Review-Eintrags in dessen eigene Entry-Datei.",
 	}, pausedReviewTool(reviewToolWriteAIEntry, reviewWriteAIEntryTool))
+	addReviewWorkdirTools(server)
 }
 
 // reviewProjectInput ist, was jede Eingabe eines Review-Werkzeugs über
@@ -1378,7 +1381,7 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 		}
 		candidates = append(candidates, candidate)
 	}
-	if candidate, ok := scanTriageCandidate(env); ok {
+	if candidate, ok := scanTriageCandidateWith(layers, scanTriageRef()); ok {
 		candidates = append(candidates, candidate)
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
@@ -1418,29 +1421,50 @@ func buildSelectionBase(env reviewEnvironment) (reviewSelectionBase, reviewToolE
 	}, reviewToolError{}
 }
 
+// scanTriageCandidate ist der Audit-Eintrag scan-triage aus dem Triage-Modul.
+//
+// Das Modul liegt seit Task 197 unter defaults/commands/ und kommt damit als
+// Verweis k-playbook:/commands/_audit/review-scan-triage.md über die Ebenen
+// des Projekts — mitgeliefert aus der öffentlichen Collection, projekteigen
+// aus .k-playbook/commands/, eine leere Datei dort schaltet ab. Der Pfad des
+// Kandidaten ist dieser Verweis; gelesen wird er mit k_playbook_doc_read. Ein
+// Modul, das sich nicht auflösen lässt, ergibt keinen Kandidaten.
 func scanTriageCandidate(env reviewEnvironment) (reviewCandidate, bool) {
-	// Das Modul ist ein Fragment und fehlt deshalb in ActiveRegistry.
-	for _, entry := range project.ResolveRegistry(env.Root, project.KindCommands) {
-		if entry.Name != scanTriageModule || entry.Disabled {
-			continue
-		}
-		resultRequired := true
-		return reviewCandidate{
-			Name:            scanTriageEntry,
-			Kind:            review.KindAI,
-			Title:           "Review-Triage",
-			Selectable:      true,
-			DefaultSelected: true,
-			Detail:          "Command-Modul " + scanTriageModule,
-			Path:            entry.Path,
-			RecipeKey:       scanTriageEntry,
-			RecipePath:      entry.Path,
-			RecipeOrigin:    entry.Origin,
-			ResultRequired:  &resultRequired,
-			DefaultResult:   scanTriageResult,
-		}, true
+	return scanTriageCandidateWith(project.ProjectDocLayers(env.Root), scanTriageRef())
+}
+
+// scanTriageRef ist der Verweis auf das Triage-Modul.
+func scanTriageRef() string {
+	return project.DocSchemeKPlaybook + ":/commands/" + scanTriageModule
+}
+
+// scanTriageCandidateWith ist scanTriageCandidate über schon geöffnete
+// Ebenen: Die Auswahl (buildSelectionBase) hat die mitgelieferte Ebene für den
+// Katalog schon offen und öffnet sie für das Modul nicht ein zweites Mal.
+func scanTriageCandidateWith(layers project.DocLayers, ref string) (reviewCandidate, bool) {
+	resolved, err := project.ResolveDocRefWith(context.Background(), layers, ref, project.DocReadOptions{Raw: true})
+	if err != nil || resolved.Disabled {
+		return reviewCandidate{}, false
 	}
-	return reviewCandidate{}, false
+	origin := "dist"
+	if len(resolved.Parts) > 0 && resolved.Parts[0].Origin != "" {
+		origin = resolved.Parts[0].Origin
+	}
+	resultRequired := true
+	return reviewCandidate{
+		Name:            scanTriageEntry,
+		Kind:            review.KindAI,
+		Title:           "Review-Triage",
+		Selectable:      true,
+		DefaultSelected: true,
+		Detail:          "Command-Modul " + scanTriageModule,
+		Path:            ref,
+		RecipeKey:       scanTriageEntry,
+		RecipePath:      ref,
+		RecipeOrigin:    origin,
+		ResultRequired:  &resultRequired,
+		DefaultResult:   scanTriageResult,
+	}, true
 }
 
 func validateCreateSelection(base reviewSelectionBase, requested []reviewSelectionInput) ([]review.Entry, reviewToolError) {

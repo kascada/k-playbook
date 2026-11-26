@@ -427,6 +427,31 @@ func TestApplyGitHubPermissionsLaesstErfassteDatei(t *testing.T) {
 	}
 }
 
+// Eine von git erfasste Zieldatei bleibt unberührt, auch wenn sie im
+// Arbeitsbaum fehlt (Task 196, V2): git fragt die Prüfung unabhängig davon, ob
+// die Datei da ist.
+func TestApplyGitHubPermissionsLaesstGeloeschteErfassteDatei(t *testing.T) {
+	root := permissionsRepo(t)
+	stubGitHubPermissionServices(t, []string{"k-playbook-dev"}, nil)
+	writeFile(t, claudeLocal(root), `{"permissions":{}}`+"\n")
+	gitRun(t, root, "add", "-f", ".claude/settings.local.json")
+	gitRun(t, root, "commit", "-qm", "erfasst")
+	if err := os.Remove(claudeLocal(root)); err != nil {
+		t.Fatal(err)
+	}
+
+	report := ApplyGitHubPermissions(root)
+	if state := statusOf(t, report, GitHubPermissionsClaude).State; state != GitHubPermissionsTracked {
+		t.Errorf("Zustand %s, erwartet tracked", state)
+	}
+	if _, err := os.Stat(claudeLocal(root)); !os.IsNotExist(err) {
+		t.Errorf("gelöschte erfasste Datei neu angelegt: %v", err)
+	}
+	if slices.Contains(report.Written, ".claude/settings.local.json") {
+		t.Errorf("geschrieben = %v", report.Written)
+	}
+}
+
 // Eine Form, in die sich nichts eintragen lässt, wird nicht angefasst.
 func TestApplyGitHubPermissionsLaesstUnlesbareDatei(t *testing.T) {
 	root := permissionsRepo(t)
@@ -585,5 +610,27 @@ func TestHealthGitHubPermissionsErfassteDatei(t *testing.T) {
 	gitRun(t, root, "commit", "-qm", "erfasst")
 	if problems := healthGitHubPermissions(context.Background(), root); len(problems) != 0 {
 		t.Errorf("erfasste Dateien: %v", problems)
+	}
+}
+
+// Die Berechtigungen bestimmen den Dienst auf demselben Weg wie die
+// Oberfläche (Task 196, V3): aus dem Remote des Repos unter project.repo_root.
+// Nachgestellt ist der Fall, in dem das Hauptverzeichnis in keinem Repo liegt
+// und repo_root auf ein Unterverzeichnis mit eigenem Repo zeigt.
+func TestGitHubPermissionServicesAusRepoRoot(t *testing.T) {
+	githubFakes(t)
+	githubConfig(t, githubTwoServices)
+	projectDir := t.TempDir()
+	repo := filepath.Join(projectDir, "sub")
+	run(t, projectDir, "git", "init", "-q", "-b", "main", repo)
+	run(t, repo, "git", "remote", "add", "origin", "https://github.com/kascada/k-playbook.git")
+	writeFile(t, ConfigPath(projectDir), "schema_version: "+SchemaVersion+"\n\nproject:\n  repo_root: sub\n  vcs: git\n")
+
+	services, err := resolveGitHubPermissionServices(projectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(services, []string{"k-playbook"}) {
+		t.Errorf("Dienste %v, erwartet [k-playbook] aus dem Repo unter repo_root", services)
 	}
 }

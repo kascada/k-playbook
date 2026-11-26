@@ -1,7 +1,3 @@
-# Private/local material
-.priv/
-/installer/bin/
-
 # Zwei Repos über derselben Wurzel: Dieses Verzeichnis ist Arbeitsverzeichnis
 # des Quell-Repos (kascada/k-playbook) und des privaten Dev-Repos
 # (kascada/k-playbook-dev; Git-Verzeichnis priv/.git, core.worktree = ../..).
@@ -22,11 +18,12 @@
 # In einem echten Zielprojekt wird .k-playbook/K-PLAYBOOK.yaml committet, hier
 # nicht (siehe oben).
 
-# Registrierung des MCP-Servers. Ihr Kommando ist der absolute Pfad des Binarys
-# auf diesem Rechner — was hier passt, passt anderswo nicht. Wer die
-# Registrierung braucht, legt sie in der Oberfläche an;
-# defaults/docs/handbook/mcp.md nennt den Weg. In einem echten Zielprojekt gehört die Datei
-# dagegen ins Repository.
+# Registrierung des MCP-Servers für Claude Code. Sie entsteht beim Einrichten in
+# der Oberfläche und bei der Startpflege; Einrichten schreibt den absoluten Pfad
+# des Binarys auf diesem Rechner — was hier passt, passt anderswo nicht.
+# Versioniert ist hier nur opencode.json, in der portablen Form `k-playbook`.
+# defaults/docs/handbook/mcp.md nennt den Weg und wann ein Zielprojekt die
+# Datei in portabler Form einchecken kann.
 /.mcp.json
 
 # Secrets and local environment
@@ -48,9 +45,7 @@ venv/
 *.log
 *.tmp
 
-# Go build artifacts
-/installer/k-playbook-installer
-# Ergebnis von `go build ./cmd/...` im Ordner installer/
+# Ergebnis von `go build ./cmd/k-playbook` im Ordner installer/
 /installer/k-playbook
 
 # Die Plattform-Binaries sind Release-Assets und werden nicht mehr versioniert:
@@ -65,13 +60,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local security-tool downloads and outputs
-codeql-cli/
-codeql-*.zip
-databases/
-results/
-
 # Ablage der Playwright-Werkzeuge. Sie speichern Snapshots und Screenshots nur
-# unter dem Arbeitsverzeichnis, nicht im Scratchpad; ein Release mit git add -A
-# nähme das Verzeichnis sonst mit.
+# unter dem Arbeitsverzeichnis, nicht im Scratchpad. Der Release-Lauf unter
+# priv/ (make -C priv release, priv/bin/release, Schritt 1) und
+# make -C priv sichern-quelle führen im Quell-Repo git add -A aus und nähmen
+# das Verzeichnis sonst mit.
 .playwright-mcp/

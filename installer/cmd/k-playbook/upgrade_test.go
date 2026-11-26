@@ -1256,3 +1256,36 @@ func TestUpgradeOpenCodeReloadMitEchtemAufruf(t *testing.T) {
 		t.Errorf("Aufrufe = %q, erwartet service status, dann reload", calls)
 	}
 }
+
+// Der Projektschritt lehnt eine Fassung von K-PLAYBOOK.yaml ab, die dieses
+// Programm nicht versteht, mit derselben Meldung wie das Briefing, und
+// schreibt nichts (Task 196, V4); --check sagt dasselbe voraus.
+func TestUpgradeProjektschrittLehntNichtAkzeptierteFassungAb(t *testing.T) {
+	root := upgradeProjectDir(t, "v0.16.8")
+	setOwnVersion(t, "v0.16.8")
+	config := "schema_version: 1\n\nproject:\n  repo_root: .\n  vcs: git\n"
+	if err := os.WriteFile(project.ConfigPath(root), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := project.ReadConfig(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := project.CheckSchema(parsed).Error()
+
+	for _, args := range [][]string{{"--check"}, nil} {
+		stdout := runUpgradeText(t, args...)
+		if !strings.Contains(stdout, "Projekt: nicht nachgezogen — "+want) && !strings.Contains(stdout, "Projekt: ein Lauf zöge nichts nach — "+want) {
+			t.Errorf("upgrade %v nennt die Meldung des Briefings nicht:\n%s", args, stdout)
+		}
+	}
+	if content, _ := os.ReadFile(filepath.Join(root, project.RootInstructionsFile)); string(content) != alteAgentsVorlage {
+		t.Error("der Projektschritt hat AGENTS.md verändert")
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
+		t.Errorf("der Projektschritt hat .claude angelegt: %v", err)
+	}
+	if content, _ := os.ReadFile(project.ConfigPath(root)); string(content) != config {
+		t.Errorf("der Projektschritt hat K-PLAYBOOK.yaml verändert:\n%s", content)
+	}
+}

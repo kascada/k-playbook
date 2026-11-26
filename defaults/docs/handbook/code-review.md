@@ -1,23 +1,27 @@
 # Code Review Flow
 
 This page describes how a review runs in k-playbook: the two paths that lead into it, the
-artifacts they create, the result families, and the handoff to `/k-remediation`.
+artifacts they create, the recipe families, and the handoff to `/k-remediation`.
 
-Both paths end in the same artifact, `review-triage.md`, and in the same handoff — for
-`/k-review` that holds in report mode; an interactive run moderates edits and creates no result
-family. What differs is state, tooling, and scope. Either way, k-playbook separates three steps: **run** a review or
-audit, **store** its results under `<ergebnisort>`, and **work through** them with
-`/k-remediation`.
+Both paths end in the same artifact, `review-triage.md`: a checklist with one row per bundle,
+sorted by priority, with a "done" column, and every finding in detail below. For `/k-review`
+that holds for report recipes; an interactive run moderates edits and creates no result file.
+What differs is state, tooling, and scope.
 
-`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
-
-**Paused (task 147).** The storage of review results is being rebuilt, and until it stands
-all of this is locked: `/k-review`, `/k-audit` and `/k-remediation` only say that they are
-temporarily unavailable, `k-playbook scan` and `k-playbook merge` end with an error, and the
-five MCP tools `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`
-answer `reviews_paused`, read nothing and write nothing
+**`/k-review` runs again (task 197); the rest is still paused.** `/k-review` is built from two
+building blocks — collect (a recipe writes its findings as a SARIF finding list into a working
+directory) and summarize (the Go merge writes `review-input.json`, the triage writes
+`review-triage.md`) — and keeps its results only in that working directory, by default a new
+directory under `/tmp/` that only the own user can read. It uses two MCP tools that create no
+audit run and are not locked: `k_playbook_review_workdir` and `k_playbook_review_merge_dir`
+(CLI `k-playbook review workdir|merge`). Still locked (task 147), because the storage of audit
+results is being rebuilt: `/k-audit` and `/k-remediation` only say that they are temporarily
+unavailable, `k-playbook scan` and `k-playbook merge` end with an error, and the five MCP tools
+`k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry` answer
+`reviews_paused`, read nothing and write nothing
 ([`mcp.md`](./mcp.md#review-tools-are-paused)). The interface shows the message of the lock
-instead of runs. This page describes the flow as the code implements it behind the lock.
+instead of runs. Where this page describes the audit path, it describes the code behind the
+lock; `<ergebnisort>` stands for the location of audit results, which is not decided yet.
 
 **Which page owns what.** So that the boundary does not slip again: this page describes both
 paths, the family flow, and the family artifacts. [`review-runs.md`](./review-runs.md) describes
@@ -27,18 +31,19 @@ here instead of repeated.
 
 ## The Two Paths
 
-| | `/k-audit` | `/k-review <name>` |
+| | `/k-audit` | `/k-review <name> [working directory]` |
 |---|---|---|
 | State | `run.json`, `entries/`, resumable | none |
-| MCP | yes, five tools | **no** |
+| MCP | yes, five tools (paused) | two tools: `k_playbook_review_workdir`, `k_playbook_review_merge_dir` |
 | Scanners | Go, through `review.Execute` | none |
-| `review-input.json` | Go, through `merge.Run` | the assistant, core of the contract only |
-| Consolidation across sources | yes | no |
-| Location | `<ergebnisort>/YYYY-MM-DD/` | `<ergebnisort>/<family>/YYYY-MM-DD/` |
+| `review-input.json` | Go, through `merge.Run` | Go, through `merge.MergeDir` on the working directory |
+| Consolidation across sources | yes | no — one recipe, one finding list |
+| known decisions | matched by the merge | not matched; the result says so in one sentence |
+| Location | `<ergebnisort>/YYYY-MM-DD/` | the working directory: given, or new under `/tmp/` (`0700`) |
 
-MCP belongs to `/k-audit`. Its `allowed-tools` list carries the five `k_playbook_review_*` tools,
-and the whole run is driven through them. `/k-review` works **without** MCP: it carries no MCP
-tool at all, starts no scanner, and holds no run state.
+`/k-audit` drives its whole run through the five `k_playbook_review_*` run tools. `/k-review`
+starts no scanner and holds no run state; it only lets the program create the working directory
+and run the merge on it.
 
 ## Division of Labour
 
@@ -55,9 +60,10 @@ flowchart TD
     G --> H
     H --> T["review-triage.md"]
     I["/k-review <name>"] --> J{"Review mode"}
-    J -->|interactive| K["Moderated edits, no result family"]
-    J -->|report mode| L["review-input.json, written by the assistant"]
-    L --> M["review-scan-triage"]
+    J -->|interactive| K["Moderated edits, no result file"]
+    J -->|report| L["Collect: <recipe>.sarif in the working directory"]
+    L --> R["Go: merge.MergeDir"]
+    R --> M["review-scan-triage"]
     M --> T
     T --> N["/k-remediation"]
     N --> O["Tasks in the project collection"]
@@ -75,7 +81,7 @@ flowchart TD
 - The interface creates no run. Its `GET /api/reviews` lists none either: it answers with the
   message of the lock.
 
-Consolidation happens at **one** point: in the audit run. The merge deduplicates across tools,
+Consolidation across sources happens at **one** point: in the audit run. The merge deduplicates across tools,
 records coverage from `known-decisions.md`, and the triage assigns priority and category. No
 downstream step repeats the same work at a higher level.
 
@@ -103,29 +109,34 @@ Details of the run itself — `run.json`, `entries/`, entry states, repair, and 
 
 ## /k-review
 
-`/k-review` runs review recipes against the current project. The command is the entry point for
-structured reviews outside a specific GitHub PR.
+`/k-review` runs a single review recipe against the current project. The command is the entry
+point for structured reviews outside a specific GitHub PR. It is a thin wrapper over the text
+`k-playbook:/commands/k-review.md`.
 
 Invocations:
 
 ```text
 /k-review
-/k-review tech
-/k-review secret-scanning
+/k-review code
+/k-review tech /tmp/mein-review
 ```
 
-Without an argument, the command shows the effective recipe set from the shipped layer
-(`<hub>:k-playbook/defaults/reviews/`) and the project-owned one (`keph:/k-playbook/reviews/` in
-the project collection).
+The first argument is the recipe, the second an optional working directory (relative paths
+count from the project root). Without an argument, the command offers the recipes from
+`documents.reviews` of the briefing — shipped (`<hub>:k-playbook/defaults/reviews/`) and
+project-owned (`keph:/k-playbook/reviews/`), already resolved against each other — that are
+enabled for `/k-review` (`review.enabled`, default `true`). It reads the modes from the
+frontmatter of each recipe:
 
-The command:
+- **Report** (`handoff` is set): the recipe must carry an evidence contract — `audit.mode:
+  evidence`, `audit.ruleIds`, `audit.scope.paths`. Today that is `review-code` and
+  `review-tech`.
+- **Interactive** (no `handoff`): today `review-python-comment-hardspots`.
 
-- derives locations from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`.
-- writes the log and results to `<ergebnisort>`.
-- separates the generic flow from concrete review criteria.
-- lets project-owned recipes completely replace shipped recipes with the same filename.
-- considers `<ergebnisort>/known-decisions.md` so that deliberate decisions do not repeatedly
-  appear as new findings. The file is maintained by hand and generated by no review.
+Not selectable through `/k-review`: the four perspective recipes (`review-sast`,
+`review-secret-scanning`, `review-dependency-cve`, `review-iac-container`), which assess scanner
+evidence of an audit run and collect nothing themselves, and `review-dependabot-alerts`, which
+cannot write an evidence SARIF yet. All five carry `review.enabled: false`.
 
 Interactive reviews moderate one location at a time:
 
@@ -135,38 +146,43 @@ Interactive reviews moderate one location at a time:
 - Show a proposal for each location and wait for approval.
 - Apply only confirmed changes.
 
-Report-mode reviews create result artifacts:
+A report review runs three steps:
+
+1. **Working directory.** `k_playbook_review_workdir` takes the given path or creates a new
+   directory directly under `/tmp/` (`$TMPDIR` is ignored) through `os.MkdirTemp`: project, recipe
+   and timestamp in the name plus a random part, mode `0700`, no intermediate directory another
+   user could have created first. A path inside the project triggers a warning: later scanner
+   runs would read it.
+2. **Collect** (`k-playbook:/commands/_review-run/erheben.md`). The recipe writes its findings
+   as `<recipe>.sarif` into the working directory, in the same result form as in the audit run,
+   and checks it with `k_playbook_review_merge_dir` and `check: true`: tool name equals the
+   recipe key, every rule ID from `audit.ruleIds`, findings outside `audit.scope.paths` are
+   dropped and counted. Collecting never summarizes.
+3. **Summarize** (`k-playbook:/commands/_review-run/zusammenfassen.md`).
+   `k_playbook_review_merge_dir` writes `review-input.json` and `review-input.md` (mode `0600`)
+   with the same dedupe, stable group IDs and severity as the audit merge, without known
+   decisions; then the triage module writes `review-triage.md`.
+
+The working directory afterwards holds:
 
 ```text
-<ergebnisort>/<family>/<YYYY-MM-DD>/review-input.json
-<ergebnisort>/<family>/<YYYY-MM-DD>/review-triage.md
-<ergebnisort>/<family>/<YYYY-MM-DD>/raw/
+<working directory>/<recipe>.sarif
+<working directory>/review-input.json
+<working directory>/review-input.md
+<working directory>/review-triage.md
 ```
 
-In report mode the assistant writes `review-input.json` itself, following the **core** of the
-evidence contract; the merge-only fields stay out, because `/k-review` runs no MCP tool and the
-Go merge is never available here. A `/k-review` run therefore consolidates nothing: it does not
-deduplicate against other sources, and its family directory sits outside every run directory.
+`review-triage.md` is self-contained: a header (recipe, scope, date, working directory), a
+table with one row per bundle sorted `P1` → `P3` with a "done" column, then per bundle its
+reasoning, next step and every finding with location, rule ID, level and message, and a residual
+section for groups in no bundle. Nobody needs to read the JSON. The format is defined in
+`k-playbook:/commands/_audit/review-scan-triage.md`; the evidence contract in
+`k-playbook:/commands/_review-run/review-input-contract.md`.
 
-`assessment.md` and `findings.md` are now only legacy artifacts in existing historical result
-directories. New report reviews with `result-family` write `review-input.json` as the evidence
-contract and `review-triage.md` as the handoff. The contract itself is in
-`commands/_review-run/review-input-contract.md`; it applies equally to the audit and report paths
-and identifies what only the merge provides.
-
-Every report recipe requires a `result-family`; there is no alternative path. If it is missing
-from the frontmatter, `/k-review` stops instead of placing a result in a substitute location.
-
-Typical review families:
-
-- `/k-review secret-scanning`
-- `/k-review dependency-cve`
-- `/k-review dependabot-alerts`
-- `/k-review iac-container`
-- `/k-review sast`
-- `/k-review tech`
-- `/k-review code`
-- `/k-review python-comment-hardspots`
+`/k-review` keeps no log and no due date, reads no `known-decisions.md`, and writes nothing to
+Kephalaion. A `/k-review` run consolidates nothing across sources; its working directory sits
+outside every audit run. There is no follow-up command yet: `/k-remediation` still reads only
+the old triage format.
 
 ## /k-remediation
 
@@ -231,24 +247,27 @@ Reason:
 - They create their own structured raw data such as JSON, SARIF-like reports, or SBOMs.
 - Non-zero exit codes often mean substantive findings, not technical errors.
 - Results must be deduplicated, prioritized, and assessed.
-- Raw artifacts must permanently reside under `<ergebnisort>/<family>/YYYY-MM-DD/raw/`.
+- Raw artifacts must reside in the run directory under `raw/`.
 - Remediation needs stable finding IDs, status values, and source evidence.
 
-These tools therefore run through report-mode reviews:
+These tools run only in the audit run, through `k_playbook_review_scan`; `/k-review` starts no
+scanner. A perspective recipe assesses their evidence in the same run:
 
-| Tool | Review | Result family |
-|---|---|---|
-| `gitleaks` | `/k-review secret-scanning` | `secret-scanning` |
-| `trufflehog` | `/k-review secret-scanning` | `secret-scanning` |
-| `pip-audit` | `/k-review dependency-cve` | `dependency-cve` |
-| `trivy` | `/k-review dependency-cve` and `/k-review iac-container` | `dependency-cve` / `iac-container` |
-| `syft` | `/k-review iac-container` | `iac-container` |
-| `grype` | `/k-review dependency-cve` or `/k-review iac-container` | `dependency-cve` / `iac-container` |
-| `semgrep` | `/k-review sast` | `sast` |
-| `gosec` | `/k-review sast` | `sast` |
-| `ruff` | `/k-review sast` | `sast` |
-| `njsscan` | `/k-review sast` | `sast` |
-| GitHub Dependabot Alerts | `/k-review dependabot-alerts` | `dependabot-alerts` |
+| Tool | Audit perspective |
+|---|---|
+| `gitleaks` | `review-secret-scanning` |
+| `trufflehog` | `review-secret-scanning` |
+| `pip-audit` | `review-dependency-cve` |
+| `trivy` | `review-dependency-cve` and `review-iac-container` |
+| `syft` | `review-iac-container` |
+| `grype` | `review-dependency-cve` or `review-iac-container` |
+| `semgrep` | `review-sast` |
+| `gosec` | `review-sast` |
+| `ruff` | `review-sast` |
+| `njsscan` | `review-sast` |
+
+GitHub Dependabot Alerts are not a tool entry; `review-dependabot-alerts` is not selectable for
+now (see below).
 
 ## The Families in Detail
 
@@ -257,11 +276,11 @@ These tools therefore run through report-mode reviews:
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-secret-scanning.md` |
-| Results | `<ergebnisort>/secret-scanning/YYYY-MM-DD/` |
+| `/k-review` | not selectable (`review.enabled: false`); audit only |
 | Audit perspective | `<ergebnisort>/YYYY-MM-DD/review-secret-scanning.md` |
 | Audit scope | `gitleaks`, `trufflehog` |
 
-Typical artifacts: `review-input.json`, `review-triage.md`, `raw/gitleaks-*.json`,
+Typical raw artifacts in the audit run: `raw/gitleaks-*.json`,
 `raw/trufflehog.json`.
 
 The tools are provided locally on the host by
@@ -272,11 +291,11 @@ The tools are provided locally on the host by
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-dependency-cve.md` |
-| Results | `<ergebnisort>/dependency-cve/YYYY-MM-DD/` |
+| `/k-review` | not selectable (`review.enabled: false`); audit only |
 | Audit perspective | `<ergebnisort>/YYYY-MM-DD/review-dependency-cve.md` |
 | Audit scope | `pip-audit`, `trivy`, `grype`, `osv-scanner`, `govulncheck` |
 
-Typical artifacts: `review-input.json`, `review-triage.md`, `raw/pip-audit.json`,
+Typical raw artifacts in the audit run: `raw/pip-audit.json`,
 `raw/trivy-fs.json`, and, where needed, `raw/grype.json`.
 
 This recipe is active in the audit run model. It assesses the groups from `review-input.json`
@@ -287,13 +306,11 @@ that carry at least one evidence item from an audit-scope tool.
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-dependabot-alerts.md` |
-| Results | `<ergebnisort>/dependabot-alerts/YYYY-MM-DD/` |
+| `/k-review` | not selectable for now (`review.enabled: false`, task 197) |
 | Audit run model | disabled; rationale and examined alternatives are in the recipe |
 
-Typical artifacts: `review-input.json`, `review-triage.md`, `raw/dependabot-alerts-open.jsonl` as
-an auditable import, and `raw/dependabot-alerts-summary.tsv` for rapid triage.
-
-This family uses GitHub as its source. It is particularly suitable when a project does not use
+The recipe has no way to its findings right now: the hand-written `review-input.json` of the old
+report path is gone, and an evidence SARIF does not fit its source yet (todo 84). This family uses GitHub as its source. It is particularly suitable when a project does not use
 local dependency scanners or first wants to assess the alert set present in GitHub. Intentionally
 disabled Dependabot PRs, for example `open-pull-requests-limit: 0`, are not a finding.
 
@@ -302,12 +319,12 @@ disabled Dependabot PRs, for example `open-pull-requests-limit: 0`, are not a fi
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-iac-container.md` |
-| Results | `<ergebnisort>/iac-container/YYYY-MM-DD/` |
+| `/k-review` | not selectable (`review.enabled: false`); audit only |
 | Audit perspective | `<ergebnisort>/YYYY-MM-DD/review-iac-container.md` |
 | Audit scope | `trivy`, `syft`, `grype` |
 
-Typical artifacts: `review-input.json`, `review-triage.md` for container, image, IaC, and
-filesystem findings, `raw/trivy-*.json`, and, where needed, `raw/syft-*.json` and
+Typical raw artifacts in the audit run, for container, image, IaC, and filesystem findings:
+`raw/trivy-*.json`, and, where needed, `raw/syft-*.json` and
 `raw/grype-*.json`.
 
 This recipe is active in the audit run model. It assesses the groups from `review-input.json`
@@ -318,11 +335,11 @@ that carry at least one evidence item from an audit-scope tool.
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-sast.md` |
-| Results | `<ergebnisort>/sast/YYYY-MM-DD/` |
+| `/k-review` | not selectable (`review.enabled: false`); audit only |
 | Audit perspective | `<ergebnisort>/YYYY-MM-DD/review-sast.md` |
 | Audit scope | `semgrep`, `gosec`, `ruff`, `njsscan` |
 
-Typical artifacts: `review-input.json`, `review-triage.md`, `raw/semgrep.sarif`,
+Typical raw artifacts in the audit run: `raw/semgrep.sarif`,
 `raw/gosec.sarif`, `raw/ruff.sarif`, and `raw/njsscan.sarif`.
 
 This recipe is active in the audit run model. It assesses the groups from `review-input.json`
@@ -335,27 +352,26 @@ secrets to Secret Scanning, and IaC or container configuration to IaC/Container.
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-tech.md` |
-| Results | `<ergebnisort>/tech/YYYY-MM-DD/` |
+| `/k-review` | report; working directory with `tech.sarif` and `review-triage.md` |
 | Audit entry | Evidence source `tech`, SARIF under `<ergebnisort>/YYYY-MM-DD/raw/tech.sarif` |
 
-Typical artifacts in report mode: `review-input.json` and `review-triage.md`. This recipe operates
-in two modes with the same review criteria; only the result form differs. See also **Recipes as
-evidence sources** below.
+Through `/k-review` and in the audit run it writes the same SARIF finding list; only where it
+lands differs. See also **Recipes as evidence sources** below.
 
 ### Code Review
 
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-code.md` |
-| Results | `<ergebnisort>/code/YYYY-MM-DD/` |
+| `/k-review` | report; working directory with `code.sarif` and `review-triage.md` |
 | Audit entry | Evidence source `code`, SARIF under `<ergebnisort>/YYYY-MM-DD/raw/code.sarif` |
 | Diff of a task | Section `## Ergebnisform für den Diff eines Tasks` in the recipe, for `/k-task-run` |
 
-Typical artifacts in report mode: `review-input.json` and `review-triage.md`. The recipe reviews
+Through `/k-review` it writes `code.sarif` into the working directory. The recipe reviews
 source code in Go, Python, shell, JavaScript, and TypeScript in four directions — correctness,
 security, performance, and maintainability — with `code-*` rule IDs. It is tool-neutral and needs
-no assistant-specific skill. Its criteria are the same in all three result forms; only the result
-form differs, and in an audit run the recipe does not report again what another source of the same
+no assistant-specific skill. Its criteria are the same in both result forms — the SARIF finding
+list and the section for the diff of a task —; and in an audit run the recipe does not report again what another source of the same
 run already covers: scanner entries in state `done` for their language and direction, and the
 evidence entry `tech` when it is selected. It takes the entry states from the status output of
 `/k-audit`. Run on its own, through `/k-review` or for the diff of a task, nothing is excluded.
@@ -378,25 +394,19 @@ evidence. They run before the merge, read only their frozen `scope.paths`, and w
 | `review-python-comment-hardspots.md` | `python-comment-hardspots` | Python sources; locations without reconstructable rationale, with `hardspot-*` rule IDs. |
 | `review-code.md` | `code` | Source code in Go, Python, shell, JavaScript, and TypeScript; correctness, security, performance, and maintainability findings with `code-*` rule IDs. |
 
-All three remain selectable through `/k-review`: `review-tech` and `review-code` in report mode with
-the `tech` and `code` result families, and `review-python-comment-hardspots` interactively. The
-review criteria are the same in both modes; only the result form differs.
+All three remain selectable through `/k-review`: `review-tech` and `review-code` as reports, which
+write the same SARIF into the working directory instead of `raw/`, and
+`review-python-comment-hardspots` interactively. The review criteria are the same on both paths.
 
-### Family-Only Recipes in the Audit Run Model
-
-Some catalog recipes remain selectable through `/k-review` but are disabled for `/k-audit` until
-their inputs are available as evidence in `review-input.json` or a separate scope contract exists:
+### Recipes Outside Both Paths
 
 | Recipe | Reason |
 |---|---|
-| `review-dependabot-alerts.md` | Input arrives externally through `gh api` — with a service of the personal access file through `k-playbook github run` (`defaults/commands/_shared/gh.md`) — and is not yet a tool entry in the run merge. |
+| `review-dependabot-alerts.md` | Input arrives externally through `gh api` — with a service of the personal access file through `k-playbook github run` (`defaults/commands/_shared/gh.md`) — and is not yet a tool entry in the run merge; its open advisory IDs fit no closed `audit.ruleIds` list. Disabled for `/k-audit` and, since task 197, for `/k-review`. |
 
-The recipe contains its detailed examination itself: its **Position in the audit run
-model** section states which part of the evidence contract blocks it and what a conversion would
-require. Until then, its `review-triage.md` goes directly to `/k-remediation`, **without**
-consolidation across families and **without** deduplication against other sources. The same
-applies to every independent `/k-review` run of a family recipe: the family directory is outside
-every run directory and is not combined with the audit run.
+The recipe contains its detailed examination itself: its **Position in the audit run model**
+section states which part of the evidence contract blocks it and what a conversion would
+require.
 
 ## Directories
 
@@ -405,117 +415,76 @@ Recipes and results are strictly separate:
 ```text
 <hub>:k-playbook/defaults/reviews/     shipped recipes
 keph:/k-playbook/reviews/              project-owned recipes, overlay (project collection)
-<ergebnisort>/known-decisions.md       deliberately made decisions, maintained by hand
-<ergebnisort>/                         everything reviews create
+<working directory>/                   everything one /k-review run creates
+<ergebnisort>/                         everything an audit run creates (paused)
+<ergebnisort>/known-decisions.md       deliberately made decisions, maintained by hand (audit)
 ```
 
 `reviews/` contains only `review-<name>.md`. This keeps it a pure overlay directory, where every
 file follows the same rule: same filename, the local file completely wins.
 
-`known-decisions.md` is maintained by hand and created by no review, so it is input rather than
-output. Everything generated is next to it:
+The working directory of `/k-review` is a parameter. Without it, the program creates
+`/tmp/k-review-<project>-<recipe>-<timestamp>-<random>/` with mode `0700`; files the merge
+writes get `0600`. Outside the project, later scanner runs do not read it. `/tmp/` does not
+survive a restart everywhere (in WSL it does not); whoever wants to keep a result copies
+`review-triage.md`. Keeping a result in Kephalaion on request is todo 78.
+
+The audit layout behind the lock:
 
 ```text
 <ergebnisort>/
 ├── known-decisions.md            deliberate decisions, maintained by hand
-├── log.md                        when each review ran
-├── YYYY-MM-DD/                   an audit run
-└── <family>/YYYY-MM-DD/
-    ├── review-input.json
-    ├── review-triage.md
-    ├── run-metadata.json
-    └── raw/
-```
-
-Example:
-
-```text
-<ergebnisort>/secret-scanning/2026-07-24/
-├── review-input.json
-├── review-triage.md
-├── run-metadata.json
-└── raw/
-    └── gitleaks.json
+└── YYYY-MM-DD/                   an audit run: run.json, entries/, raw/, review-input.*, review-triage.md
 ```
 
 ### Results Are Not Project Knowledge
 
 A review is repeatable from the code. Its result is a state from one machine at one point in
 time, not project knowledge. That holds for everything a review writes, not only for raw scanner
-output: `raw/` and `entries/`, generated documents `review-input.md`, `review-input.json`,
-`run.json`, and `review-triage.md`, review documents per family, plus `log.md` and, where they
-still exist, old `summary-YYYY-MM-DD.md` files.
+output: `raw/` and `entries/`, finding lists `<recipe>.sarif`, generated documents
+`review-input.md`, `review-input.json`, `run.json`, and `review-triage.md`, plus, where they
+still exist, old `log.md` and `summary-YYYY-MM-DD.md` files.
 
-`log.md` is also personal: when someone scanned on their machine is not the project's concern.
-And raw output from a secret scanner contains discovered secrets in clear text; it must never
+Raw output from a secret scanner contains discovered secrets in clear text; it must never
 enter the repository.
 
 Whatever is genuinely project knowledge does not stay in a result: a deliberate decision is
 written by hand into `known-decisions.md`, and remediation turns findings into tasks.
 
-## Artifacts Per Family
+## Artifacts
 
-Every new report/scan family creates these files:
+- `<recipe>.sarif` (working directory) or `raw/<entry>.sarif` (audit run): the finding list of
+  an evidence recipe. Scanners write their raw output under `raw/` of the audit run.
+- `review-input.json` and `review-input.md`: the evidence contract and its compact view, always
+  written by the Go merge — on the working directory by `k_playbook_review_merge_dir`, in the
+  audit run by `k_playbook_review_merge`. The schema is specified in exactly one place:
+  `k-playbook:/commands/_review-run/review-input-contract.md`. There is no hand-written
+  `review-input.json` any more.
+- `review-triage.md`: the result file, the same form for review and audit — a header, one table
+  row per bundle sorted by priority with a "done" column, every finding in detail below, and a
+  residual section, so that no finding drops out silently. Format:
+  `k-playbook:/commands/_audit/review-scan-triage.md`.
 
-- `review-input.json`: the evidence contract. Its schema is specified in exactly one place:
-  `commands/_review-run/review-input-contract.md`. That document also describes which fields only
-  the merge fills and what applies when they are absent.
-- `review-triage.md`: a consistent final artifact with header, bundle table, bundle details,
-  unbundled findings, and coverage from known decisions.
-- `raw/`: auditable original output, for example SARIF, JSON, or tool logs.
-- `run-metadata.json` or equivalent: auditable run metadata.
+Raw artifacts are auditable. They must not be shortened, overwritten, or corrected in content
+after writing; the merge only removes findings outside the path scope of an evidence recipe and
+says how many. Corrections are made through a new run.
 
-Raw artifacts and run metadata are auditable. They must not be shortened, overwritten, or
-corrected in content after writing. Corrections are made through new raw files plus an updated
-assessment.
-
-`review-triage.md` is curated. It may be updated traceably, for example with a
-`## Remediation status` section, but the original raw evidence remains unchanged. `assessment.md`
-and `findings.md` are legacy artifacts of older result families and are read only when no
-`review-triage.md` exists.
-
-For runs in the new run model (`<ergebnisort>/YYYY-MM-DD/`), a second artifact pair is
-added: `review-input.json` and `review-input.md` from `k-playbook merge`. They consolidate `raw/`
-and `entries/` and serve as input for assessment by the assistant. Details are in
-[`review-runs.md`](./review-runs.md#consolidating-with-k-playbook-merge).
-
-Who writes `review-input.json` therefore depends on the path: in the audit run it is the Go merge,
-with the merge-only fields filled; on the family path it is the assistant, following the core of
-the evidence contract and without those fields. The file name is the same, the guarantees are not.
-
-The curated final product of both assessment paths is `review-triage.md`: directly under
-`<ergebnisort>/YYYY-MM-DD/` for audits, and under
-`<ergebnisort>/<family>/YYYY-MM-DD/` for targeted report reviews. Only the scope
-differs. Active audit catalog recipes contribute differently depending on `audit.mode`. A
+Active audit catalog recipes contribute differently depending on `audit.mode`. A
 **perspective** (`mode: perspective`) additionally writes one perspective file directly into the
 run directory, for example `review-secret-scanning.md`; it reads the same merge evidence, filters
 through its stored `scope.tools`, and serves only as context for `scan-triage`. An **evidence
 source** (`mode: evidence`) writes no Markdown at all; it runs before the merge and stores
 `raw/<entry>.sarif`, whose findings subsequently appear as groups with the `ai-<entry>-` prefix in
-`review-input.json` and thus follow the same path as scanner findings. `/k-remediation` works
-against `review-triage.md`; legacy `assessment.md`/`findings.md` remain fallback only for family
-directories without `review-triage.md`.
+`review-input.json` and thus follow the same path as scanner findings.
+
+`assessment.md`, `findings.md` and `summary-*.md` are legacy artifacts of older result families;
+only the paused `/k-remediation` still reads them.
 
 ## Review Log
 
-`/k-review` maintains the log beside the results:
-
-```text
-<ergebnisort>/log.md
-```
-
-For each family, it contains the latest run, when the next is due, mode and focus, and a log line
-with scope, output, and handoff.
-
-Example handoff:
-
-```text
-/k-remediation <ergebnisort>/secret-scanning/2026-07-24/review-triage.md
-```
-
-Alongside this, `<ergebnisort>/known-decisions.md` records what was deliberately decided. The
-merge step reads this single file and writes its effect visibly into `review-input.json` and
-`review-input.md`; the assessment then takes this information solely from the JSON.
+There is none any more. `/k-review` kept `log.md` with the last run and due date of each recipe
+(`interval-weeks`); both are gone with task 197. `interval-weeks` stays in the recipes'
+frontmatter until a central schedule takes it over.
 
 ## Status Model
 
@@ -548,13 +517,8 @@ finding is covered by a documented decision.
 
 ## Handoff
 
-After a report-mode review, `/k-review` names the next handoff, typically:
-
-```text
-/k-remediation <ergebnisort>/<family>/<YYYY-MM-DD>/review-triage.md
-```
-
-`/k-audit` closes the same way, with the run directory instead of the family directory:
+A `/k-review` report names no follow-up command for now: `/k-remediation` reads the old triage
+format (`## Bündel`, `## Bündel-Details`) and is paused. `/k-audit` closed with the run directory:
 
 ```text
 /k-remediation <ergebnisort>/<YYYY-MM-DD>/review-triage.md
@@ -575,9 +539,9 @@ delegation.
 ## Scope
 
 - `/k-audit` is the only place where findings from multiple sources are consolidated and
-  deduplicated. It is also the only review path that uses the MCP server.
-- `/k-review` assesses or creates findings but does not directly implement larger remediation,
-  and consolidates nothing.
+  deduplicated, and the only path that uses the five run tools of the MCP server.
+- `/k-review` creates findings for one recipe and summarizes them, but does not directly
+  implement larger remediation and consolidates nothing across sources.
 - `/k-remediation` starts no scanners, accepts exactly one result file, and does not re-prioritize
   project-wide.
 - Larger implementation proceeds through tasks, `/k-task-refine`, and `/k-task-run`.

@@ -173,7 +173,7 @@ type BriefingGitHub struct {
 // BriefingEnvironment ist der Teilabruf environment (Task 187): die
 // Umgebungsangaben, die nicht jede Sitzung braucht, sondern einzelne Commands
 // an der Stelle, an der sie sie brauchen — unter denselben Namen und mit
-// denselben Unterfeldern wie in der Kontextausgabe, ohne die Felder, die kein
+// denselben Unterfeldern wie im Kontext (BuildContext), ohne die Felder, die kein
 // Text liest (von gh bleiben ready und account, baseTools verliert matrix).
 // Abgrenzung zu Health: health bewertet und nennt Abhilfen, environment
 // liefert die Rohwerte.
@@ -433,6 +433,18 @@ func briefingProject(projectDir string) BriefingProject {
 	section.VCS = config.VCS
 	section.Languages = languages
 	return section
+}
+
+// AcceptedConfig meldet, ob die Konfiguration lesbar ist und ihre Fassung
+// akzeptiert — dieselbe Prüfung und dieselbe Meldung wie im Briefing
+// (readBriefingConfig). Die Schreibwege POST /api/assistant, POST /api/mcp und
+// der Projektschritt von `k-playbook upgrade` schreiben nur ohne Fehler: Ein
+// Werkzeug, das die Fassung nicht versteht, soll das Projekt nicht nach seinen
+// Regeln einrichten. Keiner dieser Wege hebt die Fassung; das tut nur das
+// Zurücksetzen in der Oberfläche (POST /api/config/reset).
+func AcceptedConfig(projectDir string) error {
+	_, err := readBriefingConfig(projectDir)
+	return err
 }
 
 // readBriefingConfig liest die Konfiguration und prüft ihre Fassung. Bei

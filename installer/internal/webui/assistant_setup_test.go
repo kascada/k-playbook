@@ -115,3 +115,21 @@ func TestEinrichtenNenntReadmes(t *testing.T) {
 		t.Errorf("der README-Schritt fehlt im Antworttext: %s", message)
 	}
 }
+
+// Ergänzt das Einrichten den Block maintenance, nennt die Antwort den Schritt
+// (Task 196, V8): Die Änderung an der versionierten K-PLAYBOOK.yaml will
+// committet werden und darf nicht still geschehen.
+func TestEinrichtenNenntMaintenanceBlock(t *testing.T) {
+	root := newProject(t)
+	config := "schema_version: " + project.SchemaVersion + "\n\nproject:\n  repo_root: .\n  vcs: git\n"
+	writeFile(t, project.ConfigPath(root), config)
+
+	message := setupMessage(root)
+
+	if readFile(t, project.ConfigPath(root)) == config {
+		t.Fatal("der Block maintenance wurde nicht ergänzt; der Test prüft nichts")
+	}
+	if !strings.Contains(message, "Block "+project.MaintenanceBlockName+" in "+project.ConfigFileName+" ergänzt") {
+		t.Errorf("die Antwort nennt das Ergänzen nicht: %s", message)
+	}
+}

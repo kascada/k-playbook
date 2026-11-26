@@ -42,14 +42,14 @@ Findet Fehler im Quellcode in vier Richtungen — Korrektheit, Sicherheit, Perfo
 Wartbarkeit: Stellen, an denen der Code etwas anderes tut als beabsichtigt, angreifbar ist,
 unnötig Last erzeugt oder den Leser in die Irre führt.
 
-Der generische Ablauf gehört dem jeweiligen Aufrufer. Dieses Rezept hat drei
+Der generische Ablauf gehört dem jeweiligen Aufrufer. Dieses Rezept hat zwei
 Ergebnisformen:
 
-- den Report für `/k-remediation`, ausgeführt über `/k-review`,
-- das SARIF im Audit-Lauf von `/k-audit` (`audit.mode: evidence`),
+- die SARIF-Fundliste (`audit.mode: evidence`) — dieselbe in `/k-review`, wo der Baustein
+  Erheben sie ins Arbeitsverzeichnis schreibt, und im Audit-Lauf von `/k-audit`,
 - den Abschnitt für den Diff eines Tasks, den `/k-task-run` nutzt.
 
-Die Prüfkriterien unten gelten in allen dreien gleich. Unterschiedlich sind allein die
+Die Prüfkriterien unten gelten in beiden gleich. Unterschiedlich sind allein die
 Ergebnisform am Ende der Datei und, ob im selben Lauf eine andere Quelle schon Belege
 liefert (Abschnitt „Ausschluss je Lauf").
 
@@ -206,7 +206,7 @@ Was im Audit bleibt:
 
 ## Ausschlüsse
 
-Diese Ausschlüsse begrenzen den Scope im Evidence-Lauf und im Report. Die zentralen
+Diese Ausschlüsse begrenzen den Scope jeder Fundliste. Die zentralen
 Ausschlüsse der Modulsuche — `vendor/`, `node_modules/`,
 `testdata/` und Punkt-Verzeichnisse — gelten geerbt und stehen deshalb
 nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
@@ -217,12 +217,12 @@ nicht noch einmal in `scope.paths`. Zusätzlich bleiben außen vor:
 - Private und vertrauliche Bereiche: `priv/`, `secure/`.
 - Aufgabenlisten, Notizen und Ergebnisordner: `tasks/`, `results/`.
 
-Konfiguration, Container und IaC liegen außerhalb von `scope.paths`; ein Fund dort würde im
-Evidence-Lauf beim Melden verworfen.
+Konfiguration, Container und IaC liegen außerhalb von `scope.paths`; ein Fund dort würde
+beim Prüfen der Fundliste verworfen.
 
 ## Mengendeckel
 
-**Höchstens 40 Funde je Lauf**, im Evidence-Lauf und im Report. Die Triage belegt jeden
+**Höchstens 40 Funde je Lauf**, in `/k-review` wie im Audit. Die Triage belegt jeden
 KI-Fund am Code, bevor sie ihn priorisiert; jenseits dieser Größenordnung wird aus dem
 Beleg eine Abarbeitung. Der Deckel ist eine Anweisung an dieses Rezept und wird beim Melden
 nicht erzwungen. Für den Diff eines Tasks gilt kein Deckel.
@@ -235,45 +235,31 @@ Auswahlregel bei Überschreitung:
 3. Es bleibt stehen, was zuerst kommt: `error` vor `warning` vor `note`; bei gleichem
    `level` das Bündel mit mehr Instanzen; bei gleicher Zahl alphabetisch nach Pfad, dann
    nach Rule-ID. Damit trifft ein zweiter Lauf über denselben Stand dieselbe Auswahl.
-4. Nenne die Zahl der ausgelassenen Bündel und Funde — im Evidence-Lauf im `reason` der
-   Fertigmeldung, im Report in der Abschlussmeldung von `/k-review`. Ein stillschweigend
-   gekürztes Ergebnis sähe aus wie ein vollständiges.
+4. Nenne die Zahl der ausgelassenen Bündel und Funde — im Audit im `reason` der
+   Fertigmeldung, in `/k-review` in der Abschlussmeldung. Ein stillschweigend gekürztes
+   Ergebnis sähe aus wie ein vollständiges.
 
-## Ergebnisform in `/k-review` (Report-Modus)
+## Ergebnisform (SARIF)
 
-Dieses Review moderiert keine Freigaben pro Fund. Es erzeugt ein vollständiges Ergebnis,
-das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
-
-`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
-
-Die Ergebnisfamilie ist `code`; der Lauf schreibt in den Family-Ordner
-`<ergebnisort>/code/<datum>/` und dort genau zwei Dateien — `review-input.json`
-nach dem Belegvertrag und `review-triage.md` als Endartefakt. Den Ablauf beschreibt
-`/k-review`, 5b; rezeptspezifisch ist:
-
-- Jeder Fund geht mit Ort, Rule-ID, `level` und dem Satz, der ihn trägt, in
-  `review-input.json`. Die Rule-IDs sind dieselben wie im Audit-Lauf.
-- Der Ausschluss je Lauf greift nicht; der Mengendeckel gilt.
-- Bündelung, Priorität und Kategorie vergibt das Triage-Modul beim Schreiben von
-  `review-triage.md`, nicht dieses Rezept.
-- Keine Code-Änderungen aus diesem Review heraus.
-
-## Ergebnisform im Audit-Lauf (`mode: evidence`)
-
-Der Eintrag heißt `code` und schreibt genau ein Artefakt: `raw/code.sarif`. Ein
-Markdown-Ergebnis, ein Family-Ordner oder ein zweites `review-input.*` entstehen nicht.
-Den Ablauf beschreibt `/k-audit`, Schritt 5; rezeptspezifisch ist:
+Dieses Rezept moderiert keine Freigaben pro Fund. Es liefert eine Fundliste: eine
+SARIF-Datei für den Eintrag `code`, in `/k-review` wie im Audit-Lauf dieselbe. In
+`/k-review` schreibt sie der Baustein Erheben als `<arbeitsverzeichnis>/code.sarif`
+(`k-playbook:/commands/_review-run/erheben.md`), im Audit-Lauf als `raw/code.sarif`
+(`/k-audit`, Schritt 5). Ein Markdown-Ergebnis oder ein zweites `review-input.*` entsteht
+nicht: den Beleg schreibt der Merge, die Ergebnisdatei die Triage. Rezeptspezifisch ist:
 
 - `tool.driver.name` ist `code` — der Eintragsname, nicht der Rezeptdateiname.
 - Jeder Fund trägt eine `ruleId` aus der Liste oben, das dort festgelegte `level`, genau
   einen Fundort mit projektrelativem Pfad und Startzeile und eine `message.text` von
   einem Satz.
-- Der Ausschluss je Lauf gilt, mit den Zuständen aus der Statusausgabe.
+- Der Ausschluss je Lauf gilt nur im Audit, mit den Zuständen aus der Statusausgabe; in
+  `/k-review` greift er nicht. Der Mengendeckel gilt in beiden.
 - Mehrere Instanzen desselben Problems in derselben Datei sind mehrere Funde. Fasse sie
   nicht selbst zusammen: der Merge bündelt sie zu einer Gruppe je Rule-ID und Datei.
 - Keine Priorität `P1`–`P3`, keine Kategoriebuchstaben `S`/`T`/`K`/`F`/`A`/`X`, keine
   Bündelung, keine Reihenfolgeempfehlung. Das ist Sache von
-  `commands/_audit/review-scan-triage.md`.
+  `k-playbook:/commands/_audit/review-scan-triage.md`.
+- Keine Code-Änderungen aus diesem Review heraus.
 
 ## Ergebnisform für den Diff eines Tasks
 
@@ -315,24 +301,22 @@ solchen Fehlern aufbauen würde; das begründet sie, ist aber kein zweites Krite
 
 ## Handoff
 
-Nach Abschluss der Analyse und dem Log-Eintrag nennt `/k-review` Pfad und exakten
-Handoff-Befehl. Remediation ist ausdrücklich nicht Teil dieses Reviews. Im Audit-Lauf gibt
-es keinen Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage. Das
-Review für den Diff eines Tasks geht an `/k-task-run` zurück.
+Remediation ist ausdrücklich nicht Teil dieses Reviews. In `/k-review` endet der Lauf mit
+der Ergebnisdatei `review-triage.md` im Arbeitsverzeichnis; einen Folge-Command gibt es
+nicht, solange `/k-remediation` dieses Format nicht liest. Im Audit-Lauf gibt es keinen
+Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage. Das Review für den
+Diff eines Tasks geht an `/k-task-run` zurück.
 
 **Eigenständiger `/k-review`-Lauf.** Dieses Rezept läuft im Audit als Evidence-Quelle mit;
 dort steckt sein Beleg schon im gemeinsamen Merge. Über `review.enabled: true` bleibt es
-daneben einzeln aufrufbar, und ein solcher Lauf legt einen eigenen Family-Ordner
-**außerhalb** jedes Laufordners an:
+daneben einzeln aufrufbar. Ein solcher Lauf arbeitet in einem eigenen Arbeitsverzeichnis —
+übergeben oder vom Programm neu unter `/tmp/` angelegt — und hinterlässt dort:
 
 ```text
-<ergebnisort>/code/<datum>/
-```
-
-Sein `review-triage.md` geht direkt an `/k-remediation`:
-
-```text
-/k-remediation <ergebnisort>/code/<datum>/review-triage.md
+<arbeitsverzeichnis>/code.sarif
+<arbeitsverzeichnis>/review-input.json
+<arbeitsverzeichnis>/review-input.md
+<arbeitsverzeichnis>/review-triage.md
 ```
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen

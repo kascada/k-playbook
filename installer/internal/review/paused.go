@@ -9,6 +9,12 @@ import "errors"
 // merge nicht, und die Oberfläche zeigt statt der Läufe die Meldung der
 // Sperre. Gesperrt wird an den Einstiegen; der Review-Code darunter bleibt.
 //
+// Nicht gesperrt ist der Weg eines eigenständigen Reviews (Task 197): Das
+// Paket review/workdir bestimmt ein Arbeitsverzeichnis und fasst die
+// Fundlisten darin zusammen (CLI `k-playbook review`, MCP
+// k_playbook_review_workdir und k_playbook_review_merge_dir). Er legt keinen
+// Lauf an, liest keinen und braucht ResultsDir nicht.
+//
 // Die Sperre nennt keinen Termin: Sie gilt, bis die neue Ablage steht. Wer sie
 // aufhebt, braucht zusätzlich zwei Dinge: den Ort der Ergebnisse (ResultsDir
 // liefert bis zur Entscheidung nur einen Fehler) und einen Ausschluss dieses

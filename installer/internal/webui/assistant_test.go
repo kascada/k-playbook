@@ -190,3 +190,50 @@ func TestAssistentUndMCPOhneInstallation(t *testing.T) {
 		t.Errorf("MCP: kein Zustand gemessen: %+v", mcp)
 	}
 }
+
+// Die Schreibwege der Karten lehnen eine Fassung ab, die dieses Werkzeug nicht
+// versteht, mit derselben Meldung wie das Briefing (Task 196, V4):
+// POST /api/assistant und POST /api/mcp schreiben dann nichts.
+func TestSchreibwegeLehnenNichtAkzeptierteFassungAb(t *testing.T) {
+	for _, test := range []struct{ name, config string }{
+		{"unbekannte Fassung", "schema_version: 99\n\nproject:\n  repo_root: .\n  vcs: git\n"},
+		{"ältere Fassung", "schema_version: 1\n\nproject:\n  repo_root: .\n  vcs: git\n"},
+	} {
+		for _, endpoint := range []struct {
+			path    string
+			handler http.HandlerFunc
+		}{
+			{"/api/assistant", applyAssistantHandler},
+			{"/api/mcp", applyMCPHandler},
+		} {
+			t.Run(test.name+" "+endpoint.path, func(t *testing.T) {
+				root := assistantProject(t)
+				writeFile(t, project.ConfigPath(root), test.config)
+				config, err := project.ReadConfig(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := project.CheckSchema(config).Error()
+				before := treeListing(t, root)
+
+				recorder := httptest.NewRecorder()
+				endpoint.handler(recorder, httptest.NewRequest(http.MethodPost, endpoint.path, nil))
+				var response struct {
+					Message string `json:"message"`
+				}
+				if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+					t.Fatalf("Antwort nicht lesbar: %v — %s", err, recorder.Body.String())
+				}
+				if recorder.Code != http.StatusConflict {
+					t.Errorf("Status %d, erwartet %d", recorder.Code, http.StatusConflict)
+				}
+				if !strings.Contains(response.Message, want) {
+					t.Errorf("Message %q nennt die Meldung des Briefings nicht: %q", response.Message, want)
+				}
+				if after := treeListing(t, root); strings.Join(before, "\n") != strings.Join(after, "\n") {
+					t.Errorf("%s hat das Projekt verändert:\nvorher:  %v\nnachher: %v", endpoint.path, before, after)
+				}
+			})
+		}
+	}
+}

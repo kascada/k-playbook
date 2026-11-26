@@ -232,8 +232,9 @@ func acceptedMCPCommandForms() []mcpCommandForm {
 // isPortableCommandForm meldet, ob das Kommando der bloße Name des
 // installierten k-playbook ist.
 //
-// Das ist die **eincheckbare** Form. Sie steht in den beiden MCP-Dateien dieses
-// Quell-Repos und in jedem Projekt, das seine Registrierung teilen will: ein
+// Das ist die **eincheckbare** Form. Sie steht in opencode.json dieses
+// Quell-Repos (die versionierte MCP-Datei; .mcp.json ist ausgeblendet und trägt
+// sie hier ebenfalls) und in jedem Projekt, das seine Registrierung teilen will: ein
 // absoluter Pfad trägt ein `$HOME` und ist damit an eine Umgebung gebunden,
 // der Name ist es nicht. Host und DevContainer lösen ihn über ihre je eigene
 // PATH auf ihr je eigenes Binary auf — genau der DevContainer-Vertrag aus
@@ -629,22 +630,13 @@ func describeMCPEntry(value any) string {
 func applyMCPTarget(projectRoot string, target MCPTarget, command string, args []string, scope MCPWriteScope) (string, error) {
 	file := filepath.Join(projectRoot, target.Path)
 
-	doc, exists, err := readJSONObject(file)
-	if err != nil {
-		// Nicht lesbar heißt: nicht anfassen. Die Prüfung meldet es.
-		return "", nil
-	}
-
-	section, ok := mcpSection(doc.content, target.Schema)
-	if !ok {
-		return "", nil
-	}
-	found, present := section[MCPServerKey]
-	if !mcpTargetNeedsWrite(projectRoot, target, doc.content, exists, found, present, scope) {
+	doc, exists, write := planMCPTarget(projectRoot, target, scope)
+	if !write {
 		return "", nil
 	}
 
 	var encoded []byte
+	var err error
 	if exists {
 		_, sectionPresent := doc.content[string(target.Schema)]
 		encoded, err = patchMCPFile(doc.raw, target, sectionPresent, doc.content, command, args)
@@ -662,6 +654,40 @@ func applyMCPTarget(projectRoot string, target MCPTarget, command string, args [
 		return "", fmt.Errorf("%s schreiben: %w", target.Path, err)
 	}
 	return command, nil
+}
+
+// planMCPTarget liest eine Zieldatei und sagt, ob der Schreibweg im Umfang
+// scope sie schriebe (mcpTargetNeedsWrite). Eine nicht lesbare Datei oder ein
+// Abschnitt, der kein Objekt ist, wird nicht angefasst; die Prüfung meldet es.
+func planMCPTarget(projectRoot string, target MCPTarget, scope MCPWriteScope) (jsonDocument, bool, bool) {
+	doc, exists, err := readJSONObject(filepath.Join(projectRoot, target.Path))
+	if err != nil {
+		return doc, exists, false
+	}
+	section, ok := mcpSection(doc.content, target.Schema)
+	if !ok {
+		return doc, exists, false
+	}
+	found, present := section[MCPServerKey]
+	return doc, exists, mcpTargetNeedsWrite(projectRoot, target, doc.content, exists, found, present, scope)
+}
+
+// PlanMCPRepair nennt die MCP-Dateien, relativ zum Hauptverzeichnis, die
+// RepairMCP im Umfang scope jetzt schriebe — ohne etwas zu schreiben. Dieselbe
+// Entscheidung wie beim Schreiben (planMCPTarget), samt der Messung, ob git
+// die Datei erfasst. Ohne installiertes k-playbook schriebe RepairMCP nichts,
+// und die Liste ist leer. Aufrufer ist `k-playbook upgrade --check`.
+func PlanMCPRepair(projectRoot string, scope MCPWriteScope) []string {
+	if _, _, err := MCPCommand(); err != nil {
+		return nil
+	}
+	var paths []string
+	for _, target := range MCPTargets(projectRoot) {
+		if _, _, write := planMCPTarget(projectRoot, target, scope); write {
+			paths = append(paths, target.Path)
+		}
+	}
+	return paths
 }
 
 // mcpTargetNeedsWrite ist die eine Stelle, an der alle Schreibwege ihre

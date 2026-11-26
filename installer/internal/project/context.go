@@ -192,7 +192,7 @@ func catalogKindNamed(name string) catalogKind {
 // defaults/guidelines/. Eine lokale Ebene hat sie seit Task 148 nicht mehr
 // (docDistOnlyKinds); projekteigene Guidelines liegen unter
 // keph:/docs/guidelines/ (Todo #40). Bewusst nicht in
-// catalogKinds(): Die Kontextausgabe nennt keine Guidelines, das Briefing
+// catalogKinds(): Der Kontext (BuildContext) nennt keine Guidelines, das Briefing
 // liefert sie unter documents.guidelines.
 var guidelinesKind = catalogKind{name: "guidelines", dirName: docGuidelinesRoot, suffix: ".md"}
 
@@ -287,8 +287,7 @@ func buildContext(projectDir string, shared DocLayers) (Context, error) {
 		if errDefaultsUnavailable(err) {
 			// Eine Ebene in einer Collection fehlt — die mitgelieferte oder
 			// die projekteigene: keine Kataloge aus der anderen allein. Der
-			// Rest der Kontextausgabe bleibt — er trägt unter kephalaion,
-			// warum.
+			// Rest des Kontexts bleibt; CatalogsProblem sagt, warum.
 			context.Catalogs[kind.name] = []CatalogEntry{}
 			context.CatalogsProblem = err.Error()
 			continue

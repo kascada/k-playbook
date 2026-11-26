@@ -56,8 +56,7 @@ func Render(result Result, at string) string {
 }
 
 // statKeys sind die Schlüssel unter generated.stats, in der Reihenfolge des
-// Vertrags. Dieselben Schlüssel standen bis Task 120 im Block `inventory:`;
-// status.go liest einen solchen Bestand bis zum nächsten Lauf weiter.
+// Vertrags; status.go liest sie dort.
 var statKeys = []string{
 	"sources-configured", "sources-read", "entries", "deviations", "rejected", "sources-excluded", "sources-unevaluable",
 }

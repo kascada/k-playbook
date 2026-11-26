@@ -37,10 +37,10 @@ review:
 Findet Tech-Debt-Kandidaten in Quell- und Infrastrukturdateien: Stellen, an denen die
 Struktur des Codes die nächste Änderung teurer macht, als sie sein müsste.
 
-Der generische Ablauf wird von `/k-review` orchestriert. Dieses Rezept arbeitet in zwei
-Betriebsarten: als Report für `/k-remediation` und als Evidence-Quelle im Audit-Lauf
-(`audit.mode: evidence`). Die Prüfkriterien unten gelten in beiden gleich; unterschiedlich
-ist allein die Ergebnisform am Ende der Datei.
+Der generische Ablauf gehört dem jeweiligen Aufrufer. Dieses Rezept hat eine
+Ergebnisform, die SARIF-Fundliste (`audit.mode: evidence`): dieselbe in `/k-review`, wo der
+Baustein Erheben sie ins Arbeitsverzeichnis schreibt, und im Audit-Lauf von `/k-audit`. Die
+Prüfkriterien unten gelten in beiden gleich.
 
 ## Was als Fund zählt
 
@@ -105,30 +105,14 @@ Eine Folge der geerbten Punkt-Regel, die leicht durchrutscht: CI-Konfigurationen
 `.github/` liegen außerhalb jedes Pfad-Scopes. `**/*.yml` trifft sie nicht, und ein Fund
 dort würde beim Melden verworfen.
 
-## Ergebnisform in `/k-review` (Report-Modus)
+## Ergebnisform (SARIF)
 
-Dieses Review moderiert keine Freigaben pro Fund. Es erzeugt ein vollständiges
-Ergebnis, das anschließend im Rahmen von `/k-remediation` einzeln durchgegangen wird.
-
-`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
-
-Die Ergebnisfamilie ist `tech`; der Lauf schreibt in den Family-Ordner
-`<ergebnisort>/tech/<datum>/` und dort genau zwei Dateien — `review-input.json`
-nach dem Belegvertrag und `review-triage.md` als Endartefakt. Den Ablauf beschreibt
-`/k-review`, 5b; rezeptspezifisch ist:
-
-- Jeder Fund geht mit Ort, Rule-ID, `level` und dem Satz, der ihn trägt, in
-  `review-input.json`. Die Rule-IDs sind dieselben wie im Audit-Lauf.
-- Bündelung, Priorität und Kategorie vergibt das Triage-Modul beim Schreiben von
-  `review-triage.md`, nicht dieses Rezept. Auch hier gilt: keine eigene Reihenfolge in der
-  Fundliste.
-- Keine Code-Änderungen aus diesem Review heraus.
-
-## Ergebnisform im Audit-Lauf (`mode: evidence`)
-
-Der Eintrag heißt `tech` und schreibt genau ein Artefakt: `raw/tech.sarif`. Ein
-Markdown-Ergebnis, ein Family-Ordner oder ein zweites `review-input.*` entstehen nicht.
-Den Ablauf beschreibt `/k-audit`, Schritt 5; rezeptspezifisch ist:
+Dieses Review moderiert keine Freigaben pro Fund. Es liefert eine Fundliste: eine
+SARIF-Datei für den Eintrag `tech`, in `/k-review` wie im Audit-Lauf dieselbe. In
+`/k-review` schreibt sie der Baustein Erheben als `<arbeitsverzeichnis>/tech.sarif`
+(`k-playbook:/commands/_review-run/erheben.md`), im Audit-Lauf als `raw/tech.sarif`
+(`/k-audit`, Schritt 5). Ein Markdown-Ergebnis oder ein zweites `review-input.*` entsteht
+nicht: den Beleg schreibt der Merge, die Ergebnisdatei die Triage. Rezeptspezifisch ist:
 
 - `tool.driver.name` ist `tech` — der Eintragsname, nicht der Rezeptdateiname.
 - Jeder Fund trägt eine `ruleId` aus der Liste oben, das dort festgelegte `level`, genau
@@ -139,7 +123,8 @@ Den Ablauf beschreibt `/k-audit`, Schritt 5; rezeptspezifisch ist:
   ihre Zahl ist die Aussage, die die Triage daraus liest.
 - Keine Priorität `P1`–`P3`, keine Kategoriebuchstaben `S`/`T`/`K`/`F`/`A`/`X`, keine
   Bündelung, keine Reihenfolgeempfehlung. Das ist Sache von
-  `commands/_audit/review-scan-triage.md`.
+  `k-playbook:/commands/_audit/review-scan-triage.md`.
+- Keine Code-Änderungen aus diesem Review heraus.
 
 **Mengendeckel: höchstens 40 Funde je Lauf.** Die Triage belegt jeden KI-Fund am Code,
 bevor sie ihn priorisiert; jenseits dieser Größenordnung wird aus dem Beleg eine
@@ -155,31 +140,24 @@ Auswahlregel bei Überschreitung:
 3. Es bleibt stehen, was zuerst kommt: `error` vor `warning` vor `note`; bei gleichem
    `level` das Bündel mit mehr Instanzen; bei gleicher Zahl alphabetisch nach Pfad, dann
    nach Rule-ID. Damit trifft ein zweiter Lauf über denselben Stand dieselbe Auswahl.
-4. Nenne die Zahl der ausgelassenen Bündel und Funde im `reason` der Fertigmeldung. Ein
-   stillschweigend gekürztes Ergebnis sähe aus wie ein vollständiges.
+4. Nenne die Zahl der ausgelassenen Bündel und Funde — im Audit im `reason` der
+   Fertigmeldung, in `/k-review` in der Abschlussmeldung. Ein stillschweigend gekürztes
+   Ergebnis sähe aus wie ein vollständiges.
 
 ## Handoff
 
-Nach Abschluss der Analyse und dem Log-Eintrag nennt `/k-review` Pfad und exakten
-Handoff-Befehl. Remediation ist ausdrücklich nicht Teil dieses Reviews. Im Audit-Lauf gibt
-es keinen Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage.
+Remediation ist ausdrücklich nicht Teil dieses Reviews. In `/k-review` endet der Lauf mit
+der Ergebnisdatei `review-triage.md` im Arbeitsverzeichnis; einen Folge-Command gibt es
+nicht, solange `/k-remediation` dieses Format nicht liest. Im Audit-Lauf gibt es keinen
+Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage.
 
-**Eigenständiger `/k-review`-Lauf nach dem Umbau.** Dieses Rezept läuft im Audit als
-Evidence-Quelle mit; dort steckt sein Beleg schon im gemeinsamen Merge. Über
-`review.enabled: true` bleibt es daneben einzeln aufrufbar, und ein solcher Lauf legt
-einen eigenen Family-Ordner **außerhalb** jedes Laufordners an:
-
-```text
-<ergebnisort>/tech/<datum>/
-```
-
-Sein `review-triage.md` geht direkt an `/k-remediation`:
-
-```text
-/k-remediation <ergebnisort>/tech/<datum>/review-triage.md
-```
+**Eigenständiger `/k-review`-Lauf.** Dieses Rezept läuft im Audit als Evidence-Quelle mit;
+dort steckt sein Beleg schon im gemeinsamen Merge. Über `review.enabled: true` bleibt es
+daneben einzeln aufrufbar. Ein solcher Lauf arbeitet in einem eigenen Arbeitsverzeichnis —
+übergeben oder vom Programm neu unter `/tmp/` angelegt — und hinterlässt dort `tech.sarif`,
+`review-input.json`, `review-input.md` und `review-triage.md`.
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen
-Befunde**. `/k-remediation` nimmt genau eine Ergebnisdatei; ein Befund, den derselbe Tag
-auch im Audit-Lauf trägt, steht dann in beiden Ergebnissen einmal. Wer beide Seiten
-zusammen sehen will, nimmt den Audit-Lauf — dort und nur dort sitzt die Zusammenführung.
+Befunde**: Ein Befund, den der Audit-Lauf auch trägt, steht dann in beiden Ergebnissen
+einmal. Wer beide Seiten zusammen sehen will, nimmt den Audit-Lauf — dort und nur dort
+sitzt die Zusammenführung.

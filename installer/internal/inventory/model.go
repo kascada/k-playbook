@@ -196,7 +196,7 @@ type Rejection struct {
 // trotzdem — ein stiller Filter wäre eine Lücke, die niemand sieht.
 type Exclusion struct {
 	Pattern string `json:"pattern"`
-	// Origin ist `installation` (feste Regel) oder `configured` (aus `exclude:`).
+	// Origin ist `configured` (aus `exclude:`); andere Herkünfte gibt es nicht.
 	Origin string `json:"origin"`
 	Reason string `json:"reason"`
 	// Skipped ist die Zahl der Quellen, die diese Regel übergangen hat. `0`

@@ -209,7 +209,7 @@ func TestUpgradeLaesstFremdenMCPEintragStehen(t *testing.T) {
 
 // Der Projektschritt repariert im Umfang des Starts: Er ergänzt auch einen
 // fehlenden Eintrag, wenn die Zieldatei nicht von git erfasst ist. --check
-// meldet davon nichts — die hingenommene Lücke.
+// meldet vorher, dass er das täte, und schreibt nichts.
 func TestUpgradeErgaenztFehlendenMCPEintrag(t *testing.T) {
 	root := upgradeProjectDir(t, "v0.17.0")
 	installTargetInPath(t)
@@ -218,8 +218,11 @@ func TestUpgradeErgaenztFehlendenMCPEintrag(t *testing.T) {
 	mustWriteMCPFile(t, project.ConfigPath(root), "schema_version: "+project.SchemaVersion+"\n\nproject:\n  repo_root: .\n  vcs: none\n")
 	foreign := `{"mcpServers":{"fremd":{"command":"anderes","args":["dienen"]}}}` + "\n"
 	mustWriteMCPFile(t, filepath.Join(root, ".mcp.json"), foreign)
-	if check := runUpgradeText(t, "--check"); strings.Contains(check, "MCP") {
-		t.Errorf("--check meldet den fehlenden Eintrag — die Lücke ist geschlossen, der Test und die Doku ziehen nach:\n%s", check)
+	if check := runUpgradeText(t, "--check"); !strings.Contains(check, "Projekt: MCP-Registrierung würde in .mcp.json ergänzt") {
+		t.Errorf("--check meldet den fehlenden Eintrag nicht:\n%s", check)
+	}
+	if content, err := os.ReadFile(filepath.Join(root, ".mcp.json")); err != nil || string(content) != foreign {
+		t.Errorf("--check hat .mcp.json verändert: %v\n%s", err, content)
 	}
 
 	stdout := runUpgradeText(t)

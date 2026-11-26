@@ -300,9 +300,10 @@ catalog from the same function (`BuildContextWithLayers`). The subcommand `k-pla
 and the MCP tool `k_playbook_context`, which output it before, were removed with task 188: a
 call of the subcommand ends with one sentence on stderr naming `k-playbook briefing` and
 `k-playbook briefing --part environment`, and exit code 1. What commands need comes with the
-briefing and its partial call `environment`. The paused commands `/k-review` and `/k-audit`
-took `catalogs.reviews` with the review modes from that output; they carry a `NACHZIEHEN` note
-for their rebuild.
+briefing and its partial call `environment`. `/k-review` and `/k-audit` took
+`catalogs.reviews` with the review modes from that output. `/k-review`, rebuilt with task 197,
+takes the recipes from `documents.reviews` and the modes from each recipe's frontmatter; the
+paused `/k-audit` carries a `NACHZIEHEN` note for its rebuild.
 
 The view's answer carries under `context`:
 

@@ -49,7 +49,8 @@ import (
 // nachgezogen.
 //
 // (2) das Projekt — ApplyAssistantSetup, also Einordnen von
-// CLAUDE.md/AGENTS.md, Anstoß ersetzen, Verlinkung; danach immer die
+// CLAUDE.md/AGENTS.md, Anstoß anlegen oder anhängen, Verlinkung und die
+// fehlenden Felder des Blocks maintenance; danach immer die
 // MCP-Einträge
 // (project.RepairMCPReport im Umfang des Starts,
 // MCPWriteUnversioned), danach die Berechtigungen der Clients für
@@ -77,9 +78,10 @@ import (
 // `upgrade --check --json`, nie --auto), den Programm-Stand gegenüber dem
 // neuesten Release-Tag
 // — der Tag ist auch hier bekannt — und baut die Projektprüfung aus den
-// Check-Funktionen — es meldet, was ein Lauf täte. Die MCP-Einträge nennt es
-// nicht: die fehlenden, die ein Lauf in einer nicht von git erfassten Datei
-// ergänzt, hängen an der Messung der Versionierung.
+// Check-Funktionen — es meldet, was ein Lauf täte, auch die MCP-Einträge, die
+// ein Lauf in einer nicht von git erfassten Datei ergänzte
+// (project.PlanMCPRepair, dieselbe Messung der Versionierung wie beim
+// Schreiben), und die Berechtigungen der Clients für GitHub.
 //
 // Hinweis auf /k-upgrade: Hat ein Lauf das Binary ersetzt, sagt die letzte
 // Zeile, dass /k-upgrade in einer Sitzung die Umstellungen nachzieht, die eine
@@ -219,8 +221,9 @@ type upgradeProjectReport struct {
 	// ausgenommen wurde, was unberührt bleibt, und jeder Widerspruch des
 	// Projekts mit Vorschlag.
 	GitHubPermissions []string `json:"githubPermissions,omitempty"`
-	// Pending nennt bei --check, was ein Lauf an AGENTS.md, CLAUDE.md,
-	// Verlinkung und MCP-Einträgen täte.
+	// Pending nennt bei --check, was ein Lauf an AGENTS.md, CLAUDE.md, am
+	// Block maintenance, an Verlinkung, MCP-Einträgen und den Berechtigungen
+	// der Clients für GitHub täte.
 	Pending []string `json:"pending,omitempty"`
 	// Changed: der Lauf hat etwas geschrieben.
 	Changed bool   `json:"changed"`
@@ -241,7 +244,7 @@ func runUpgrade(args []string) error {
 			printUpgradeUsage(os.Stdout)
 			return nil
 		default:
-			return fmt.Errorf("unbekannte Option %s — erwartet wird upgrade [--check] [--json]", arg)
+			return fmt.Errorf("unbekannte Option %s — erwartet wird upgrade [--check] [--json] oder upgrade --project-only [--json]", arg)
 		}
 	}
 	if options.check && options.projectOnly {
@@ -685,8 +688,17 @@ func describeKephalaionCheckFailed(check program.KephalaionCheck) []string {
 // Die MCP-Reparatur läuft auch unter --project-only, immer im Umfang des
 // Starts (MCPWriteUnversioned): Ein Lauf ergänzt einen fehlenden Eintrag bzw.
 // eine fehlende Datei, wenn die Zieldatei nicht von git erfasst ist.
+//
+// Versteht das Programm die Fassung von K-PLAYBOOK.yaml nicht, schreibt der
+// Schritt nichts und meldet das mit derselben Meldung wie das Briefing
+// (project.AcceptedConfig); Error trägt sie, Setup bleibt leer.
 func upgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
+	if err := project.AcceptedConfig(projectDir); err != nil {
+		report.Root = project.CheckRootInstructions(projectDir)
+		report.Error = err.Error()
+		return report
+	}
 	before := project.CheckLinks(projectDir)
 	pending := project.PendingLinkChanges(before)
 
@@ -758,7 +770,11 @@ func (r upgradeProjectReport) messages() []string {
 	for _, line := range r.GitHubPermissions {
 		lines = append(lines, "Projekt: "+line)
 	}
-	if r.Error != "" {
+	switch {
+	case r.Error != "" && r.Setup == nil:
+		// Abgelehnt, bevor etwas geschrieben wurde (AcceptedConfig).
+		lines = append(lines, "Projekt: nicht nachgezogen — "+r.Error)
+	case r.Error != "":
 		lines = append(lines, "Projekt: nicht vollständig nachgezogen — "+r.Error)
 	}
 	if len(lines) == 0 {
@@ -782,6 +798,12 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 	report := upgradeProjectReport{}
 	root := project.CheckRootInstructions(projectDir)
 	report.Root = root
+	// Wie der Lauf (upgradeProject): Bei einer Fassung, die das Programm
+	// nicht versteht, schriebe er nichts.
+	if err := project.AcceptedConfig(projectDir); err != nil {
+		report.Pending = []string{"ein Lauf zöge nichts nach — " + err.Error()}
+		return report
+	}
 
 	switch {
 	case !root.Present:
@@ -809,6 +831,9 @@ func checkUpgradeProject(projectDir string) upgradeProjectReport {
 		report.Pending = append(report.Pending, "Verlinkung würde nachgezogen — "+describeLinkCounts(report.Links)+".")
 	case !project.LinksOK(statuses):
 		report.Pending = append(report.Pending, "Verlinkung würde eingerichtet.")
+	}
+	for _, path := range project.PlanMCPRepair(projectDir, project.MCPWriteUnversioned) {
+		report.Pending = append(report.Pending, "MCP-Registrierung würde in "+path+" ergänzt (Eintrag oder Datei fehlt, die Datei ist nicht von git erfasst).")
 	}
 	permissions := project.CheckGitHubPermissions(projectDir)
 	for _, status := range permissions.Statuses {
@@ -941,8 +966,13 @@ Drei Schritte, je Schritt eine Meldung, in dieser Reihenfolge:
      die Verlinkung der Commands und Skills, in K-PLAYBOOK.yaml die fehlenden
      Felder des Blocks maintenance mit den Vorgaben (Doku-Sicherung aus,
      vorhandene Werte bleiben), danach immer die MCP-Einträge: ein
-     fehlender wird ergänzt, wenn die Zieldatei nicht von git erfasst ist. Projekt-Prosa in AGENTS.md bleibt
-     unangetastet.
+     fehlender wird ergänzt, wenn die Zieldatei nicht von git erfasst ist.
+     Zuletzt die Berechtigungen der Clients für GitHub: in einem Projekt mit
+     GitHub-Dienst die Einträge von k-playbook in .claude/settings.local.json
+     und .opencode/opencode.jsonc (nur in einer nicht von git erfassten
+     Datei, die dann in .git/info/exclude kommt), ohne Dienst ihr Entfernen;
+     Widersprüche des Projekts werden mit Vorschlag gemeldet. Projekt-Prosa
+     in AGENTS.md bleibt unangetastet.
 
 Hat das Binary gewechselt und liegt opencode im PATH, fragt der Lauf
 opencode service status; meldet der eine URL, lädt opencode reload alle

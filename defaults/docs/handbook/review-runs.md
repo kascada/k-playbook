@@ -6,14 +6,16 @@ progress in it. For the artifacts created by an individual review, see
 emerged, see [`migration.md`](./migration.md).
 
 **Paused (task 147).** The storage of review results is being rebuilt. Until it stands,
-nothing creates, reads or writes a run: `/k-audit`, `/k-review` and `/k-remediation` only say
-so, `k-playbook scan` and `k-playbook merge` end with an error and exit code 1, and the five
+nothing creates, reads or writes a run: `/k-audit` and `/k-remediation` only say so,
+`k-playbook scan` and `k-playbook merge` end with an error and exit code 1, and the five
 MCP tools `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`
 answer `reviews_paused` ([`mcp.md`](./mcp.md#review-tools-are-paused)). The interface shows
 the message of the lock instead of runs. This page describes the run as the code implements
-it behind the lock.
+it behind the lock. Not locked is the merge for a single review, which needs no run
+([below](#merging-a-single-review-without-a-run)); `/k-review` runs on it since task 197.
 
-`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
+`<ergebnisort>` stands for the location of audit results. It is not decided yet; audit runs
+are paused until then.
 
 ## The Run Is the Container
 
@@ -29,7 +31,7 @@ A run consists of **entries**, and an entry has a **kind**:
 
 Both are entries in the same run. Only the path to get there differs: the result for both
 ends up in the same directory and therefore later in the same consolidation. The standard
-module entry `scan-triage` comes from `commands/_audit/review-scan-triage.md`; it
+module entry `scan-triage` comes from `k-playbook:/commands/_audit/review-scan-triage.md`; it
 intentionally does not belong to `catalogs.reviews` and therefore does not appear in the
 GUI selection for review recipes.
 
@@ -56,11 +58,11 @@ rename the existing directory.
 know this directory: a run without a tool entry does not need it. An evidence source also
 writes here, to `raw/<entry>.sarif`, and creates the directory if no tool ran before it.
 
-**There are two locations for raw data.** The result families under
-`<ergebnisort>/<family>/YYYY-MM-DD/raw/` remain as they are: a targeted
-`/k-review` run continues to create them, and `/k-remediation` works through the triage
-beside them; `ListRuns()` displays them as well. The run directory, by contrast, has no
-family because a run is precisely the container across families. Catalog recipes in the
+**There are two locations for raw data.** A single `/k-review` run keeps its finding list in
+its own working directory ([below](#merging-a-single-review-without-a-run)), outside every run
+directory; the old result families under `<ergebnisort>/<family>/YYYY-MM-DD/` are no longer
+created. The run directory has no family because a run is precisely the container across
+families. Catalog recipes in the
 run model do not create their own raw-data storage: a perspective reads the shared merge
 evidence from this run directory, while an evidence source writes its SARIF to its `raw/`;
 no recipe opens a family directory for this purpose.
@@ -208,7 +210,7 @@ evidence contract, reporting fails with `recipe_contract_invalid`.
 Later recipe changes otherwise do not alter existing runs.
 
 The `scan-triage` module entry receives the same run metadata from the effective command
-namespace: `recipePath` points to `commands/_audit/review-scan-triage.md`,
+namespace: `recipePath` is the reference `k-playbook:/commands/_audit/review-scan-triage.md`,
 `defaultResult` is `review-triage.md`, and `resultRequired` is `true`. An empty local
 overlay under `.k-playbook/commands/_audit/review-scan-triage.md` disables this entry.
 
@@ -679,8 +681,8 @@ that message, the sentence of the lock, with the pill "Pausiert"; the card "Revi
 overview shows the same instead of a count.
 
 Behind the lock the interface does no more either: **it does not create or start a run.**
-A run is created through `/k-audit` or `/k-review` in the assistant, and scanned in the
-terminal with `k-playbook scan`.
+A run is created through `/k-audit` in the assistant, and scanned in the terminal with
+`k-playbook scan`; `/k-review` creates no run.
 
 ## MCP Tools
 
@@ -695,10 +697,13 @@ manual path; MCP is intended for chat orchestration without shelling out to the
 | `k_playbook_review_scan` | run tool entries blocking | `k-playbook scan <lauf>` |
 | `k_playbook_review_merge` | write `review-input.json` and `review-input.md` | `k-playbook merge <lauf>` |
 | `k_playbook_review_write_ai_entry` | write an AI entry's status | no CLI equivalent |
+| `k_playbook_review_workdir` | determine the working directory of a single review | `k-playbook review workdir <rezept> [--dir <pfad>]` |
+| `k_playbook_review_merge_dir` | check and merge the finding lists of a working directory | `k-playbook review merge <verzeichnis> [--check]` |
 
-At present all five tools are paused: each call answers `reviews_paused` before the input
+At present the first five tools are paused: each call answers `reviews_paused` before the input
 is checked or the project is resolved, and reads and writes nothing. What follows is their
-contract behind the lock.
+contract behind the lock. The last two create no run and are not locked; they are described in
+[Merging a Single Review Without a Run](#merging-a-single-review-without-a-run).
 
 All tools require `projectDir`, search upward from there for `.k-playbook/K-PLAYBOOK.yaml`, and return
 structured JSON envelopes. Errors are domain tool results with `ok: false`, not MCP
@@ -776,9 +781,47 @@ The modification time of `review-input.json` is compared with `finishedAt` of th
 and never as `current`: an unsubstantiated assessment must not make a run look complete. A
 run with `state: stale` is not complete; the triage step runs again.
 
+## Merging a Single Review Without a Run
+
+A single review (`/k-review`, task 197) needs the merge but no run: one recipe, one finding
+list, no `run.json`, no `entries/`. For this there is a narrow entry next to the paused one,
+`merge.MergeDir` (`installer/internal/review/merge/dir.go`), reached through
+`k_playbook_review_merge_dir` and `k-playbook review merge <verzeichnis>`.
+
+```text
+<working directory>/
+├── code.sarif           the finding list, written by the recipe (building block "collect")
+├── review-input.json    written by the merge, mode 0600
+├── review-input.md      written by the merge, mode 0600
+└── review-triage.md     written by the triage (building block "summarize")
+```
+
+- **Sources.** Every regular file `<entry>.sarif` directly in the directory; `<entry>` is the
+  recipe key (`code`, `tech`). Other files and subdirectories do not count.
+- **Check.** Each source is checked against the recipe with that key in the review catalog of
+  the project, exactly as reporting an evidence entry does in a run
+  (`review.CheckEvidenceSARIF`): the recipe must carry a valid evidence contract, the tool name
+  must equal the entry, every rule ID must be in `audit.ruleIds`, and findings outside
+  `audit.scope.paths` are dropped, counted and rewritten out of the SARIF. An invalid source
+  stops the whole merge with `sarif_invalid`, naming every file and reason; nothing is written.
+  With `check: true` (`--check`) the tool only checks and writes nothing — the end of the
+  building block "collect".
+- **Merge.** Findings, groups, stable IDs (`ai-<entry>-…`) and severity are computed by the
+  same code as in a run. `run` carries the directory name and path, state `done`, and one
+  selected entry per source with `mode: evidence`; `entries[]` one `done` entry with one job.
+- **No known decisions.** This path matches none; `knownDecisions.warnings` says so in one
+  sentence, and the result file repeats it.
+- **The working directory.** `k_playbook_review_workdir` (`k-playbook review workdir`) takes
+  a given path — created with `0700` if missing, a symlink or a file is refused, a warning if it
+  lies inside the project or is open to others — or creates a new one directly under `/tmp`
+  (`$TMPDIR` is ignored) through `os.MkdirTemp` with project, recipe,
+  timestamp and a random part in the name and mode `0700`. There is no intermediate directory
+  another user could have created first.
+
 ## Consolidating with `k-playbook merge`
 
-`k-playbook merge` is paused at present, like `scan`.
+`k-playbook merge` is paused at present, like `scan`. The merge for a single review is not
+(section above).
 
 When a run is complete, a second step condenses its raw data into a review input that can
 be curated:
@@ -890,7 +933,7 @@ The assistant decides whether to bundle the evidence.
 
 **Two artifacts, clear roles.** `review-input.json` carries provenance and all evidence,
 so it may be large. Its fields are specified in
-`commands/_review-run/review-input-contract.md`, and only there. `review-input.md` remains
+`k-playbook:/commands/_review-run/review-input-contract.md`, and only there. `review-input.md` remains
 deliberately compact: groups are bundled, the detailed list has a hard cap, and it refers
 to the JSON once it exceeds that limit.
 
@@ -999,7 +1042,7 @@ Anyone who must exclude these cases uses `pathGlob` or `ruleId` instead of `stab
 **When this may change again.** `stablePath` is not changed incidentally. A change there
 shifts every stable ID whose path it affects and invalidates the corresponding decisions.
 It is a separate decision, documented here and synchronized in
-`commands/_review-run/review-input-contract.md`; a test in the merge package fixes the
+`k-playbook:/commands/_review-run/review-input-contract.md`; a test in the merge package fixes the
 state and fails if someone shifts it unnoticed.
 
 ## Effect of `known-decisions.md`
@@ -1096,16 +1139,17 @@ reads this coverage exclusively from `review-input.json`.
 ## Assessing with `review-scan-triage`
 
 After the merge, `/k-audit` assesses the run through the command module
-`commands/_audit/review-scan-triage.md`. The module is not a review recipe and is not
-loaded from `reviews/`. It resides in the `_audit/` namespace because the
-`scanTriageModule` constant and `scan-triage` entry name depend on that path; it is not
-audit-exclusive. In the run, it is maintained as the `scan-triage` AI entry. The
-`/k-review` report mode applies the same wording but does not write an MCP entry status.
+`k-playbook:/commands/_audit/review-scan-triage.md` (shipped under `defaults/commands/` since
+task 197). The module is not a review recipe and is not loaded from `reviews/`. It resides in
+the `_audit/` namespace because the `scanTriageModule` constant and `scan-triage` entry name
+depend on that path; it is not audit-exclusive. In the run, it is maintained as the
+`scan-triage` AI entry. `/k-review` applies the same wording through the building block
+"summarize" (`k-playbook:/commands/_review-run/zusammenfassen.md`) but writes no MCP entry
+status.
 
 Inputs are exclusively files in the run context: `review-input.json` as evidence and
-`review-input.md` as the compact view. What the evidence contains, the core,
-merge-only portion, and construction of stable group IDs, is described by
-`commands/_review-run/review-input-contract.md`.
+`review-input.md` as the compact view. What the evidence contains and how stable group IDs are
+constructed is described by `k-playbook:/commands/_review-run/review-input-contract.md`.
 
 The module writes exactly one new Markdown artifact directly into the run directory:
 
@@ -1115,7 +1159,11 @@ The module writes exactly one new Markdown artifact directly into the run direct
 
 `review-triage.md` bundles groups by common cause, assigns priority `P1`/`P2`/`P3` and
 category `S`/`T`/`K`/`F`/`A`/`X`, refers to stable group IDs, and names the next step per
-bundle. Groups covered by `known-decisions.md` remain visible and are marked covered; the
+bundle. Since task 197 it is a self-contained checklist: one table row per bundle sorted by
+priority with a "done" column, every finding of every bundle in detail below, and a residual
+section, so that no finding drops out silently. The paused `/k-audit` would get this format
+as well; the paused `/k-remediation` still expects the old sections `## Bündel` and
+`## Bündel-Details`. Groups covered by `known-decisions.md` remain visible and are marked covered; the
 assignment comes exclusively from `review-input.json`.
 
 After writing, `/k-audit` sets the AI entry to `done` with

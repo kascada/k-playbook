@@ -54,6 +54,13 @@ func applyMCPHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// Dieselbe Bedingung wie im Briefing (project.AcceptedConfig): Bei einer
+	// Fassung, die dieses Werkzeug nicht versteht, schreibt der Knopf weder
+	// MCP-Einträge noch Berechtigungen.
+	if err := project.AcceptedConfig(environment.ProjectDir); err != nil {
+		writeJSON(w, http.StatusConflict, mcpState("Nichts eingerichtet: "+err.Error()))
+		return
+	}
 
 	_, err := project.ApplyMCP(environment.ProjectDir)
 

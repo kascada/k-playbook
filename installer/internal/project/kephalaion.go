@@ -14,10 +14,11 @@ import (
 // über MCP (whoami). Scheitert nie — jeder Fehler ist ein Zustand. Ohne
 // Block wird nichts gefragt.
 //
-// Die Prüfung steht bewusst nicht in BuildContext: Den rufen auch Werkzeuge,
-// die nur den Katalog brauchen (etwa die Review-Auswahl), und die sollen den
-// Node nicht fragen. Das Briefing und die Oberfläche (GET /api/context) holen
-// das Ergebnis selbst.
+// Das Ergebnis steht nicht im Kontext (BuildContext); das Briefing und die
+// Oberfläche (GET /api/context) holen es selbst. Gefragt wird der Node aus
+// BuildContext trotzdem: Die Kataloge öffnen die mitgelieferte Ebene
+// (OpenDefaultsStore über openKephClientFor), und die prüft vorher die
+// Anbindung mit dieser Funktion.
 func KephalaionStatus(projectDir string) kephalaion.Status {
 	return kephalaionCheck(projectDir)
 }

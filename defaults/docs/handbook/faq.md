@@ -42,9 +42,9 @@ A `K-PLAYBOOK.yaml` directly in the project root is not an anchor: it is neither
 
 Nowhere: no path is configured. Tasks are not files: they are documents in the project's Kephalaion collection under `keph:/user/<user>/tasks/` (see [`task-flow.md`](./task-flow.md)). Project-owned review recipes are documents in the same collection under `keph:/k-playbook/reviews/`. What lies on disk, project-owned commands and skills under `.k-playbook/commands/` and `.k-playbook/skills/`, derives from the project root, the directory holding `.k-playbook/K-PLAYBOOK.yaml`.
 
-Review results belong to `<ergebnisort>`.
-`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
-All five review tools of the MCP server are blocked, and `/k-review`, `/k-audit` and `/k-remediation` are temporarily unavailable.
+Audit results belong to `<ergebnisort>`.
+`<ergebnisort>` stands for the location of audit results. It is not decided yet; audit runs are paused until then.
+The five run tools of the MCP server are blocked, and `/k-audit` and `/k-remediation` are temporarily unavailable. `/k-review` works: it keeps its result in a working directory, by default a new one under `/tmp/`.
 
 `K-PLAYBOOK.yaml` has no `paths:` block: the structure is fixed, and a key that always has the same value would only be a source of errors. The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).
 

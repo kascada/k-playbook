@@ -3,6 +3,8 @@ package webui
 import (
 	"net/http"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/kascada/k-playbook/installer/internal/project"
 )
@@ -89,6 +91,12 @@ func applyAssistantHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// Dieselbe Bedingung wie im Briefing (project.AcceptedConfig): Bei einer
+	// Fassung, die dieses Werkzeug nicht versteht, wird nichts eingerichtet.
+	if err := project.AcceptedConfig(environment.ProjectDir); err != nil {
+		writeJSON(w, http.StatusConflict, assistantState("Nichts eingerichtet: "+err.Error()))
+		return
+	}
 
 	writeJSON(w, http.StatusOK, assistantState(setupMessage(environment.ProjectDir)))
 }
@@ -131,6 +139,11 @@ func describeSetup(setup project.AssistantSetup) string {
 	case setup.RootExtended:
 		parts = append(parts, "Der Anstoß steht jetzt in "+project.RootInstructionsFile+".")
 	}
+	// Das Ergänzen des Blocks maintenance ändert die versionierte
+	// K-PLAYBOOK.yaml; dieselbe Zeile meldet auch `k-playbook upgrade`.
+	if note := project.DescribeMaintenanceBlock(setup.Maintenance, false); note != "" {
+		parts = append(parts, upperFirst(note))
+	}
 	if note := project.DescribeSetupReadmes(setup.Readmes); note != "" {
 		parts = append(parts, note)
 	}
@@ -157,4 +170,14 @@ func assistantState(message string) assistantResponse {
 	}
 
 	return response
+}
+
+// upperFirst setzt den ersten Buchstaben groß: DescribeMaintenanceBlock ist
+// für `k-playbook upgrade` geschrieben, dort folgt der Satz auf „Projekt: “.
+func upperFirst(text string) string {
+	first, size := utf8.DecodeRuneInString(text)
+	if first == utf8.RuneError {
+		return text
+	}
+	return string(unicode.ToUpper(first)) + text[size:]
 }

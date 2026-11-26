@@ -8,7 +8,7 @@ result-family: dependabot-alerts
 audit:
   enabled: false
 review:
-  enabled: true
+  enabled: false
 ---
 
 # Review: GitHub Dependabot Alerts Assessment
@@ -19,8 +19,10 @@ Dependency-Warnungen ist oder lokale Dependency-Scanner bewusst nicht genutzt we
 
 ## Stellung im Audit-Laufmodell
 
-Dieses Rezept bleibt im Audit-Laufmodell deaktiviert (`audit.enabled: false`). Über
-`/k-review dependabot-alerts` bleibt es gezielt auswählbar.
+Dieses Rezept bleibt im Audit-Laufmodell deaktiviert (`audit.enabled: false`) und ist
+vorerst auch in `/k-review` nicht wählbar (`review.enabled: false`, Task 197): `/k-review`
+kennt nur noch einen Weg zur Fundliste, das Evidence-SARIF, und den kann dieses Rezept aus
+den drei Gründen unten nicht schreiben. Bis zu seinem Umbau läuft es gar nicht.
 
 **Geprüft und verworfen: Umstellung auf `audit.mode: evidence`.** Der Gedanke lag nahe —
 das Rezept schriebe seine Alerts als SARIF nach `raw/dependabot-alerts.sarif`, liefe damit
@@ -55,21 +57,10 @@ Punkt-Verzeichnis-Regel im Pfad-Scope oder für einen Werkzeug-Eintrag mit SARIF
 nach dem Muster von `trufflehog` und `pip-audit`. Beides ist Arbeit am Go-Werkzeug und
 gehört nicht in dieses Rezept.
 
-**Was das für den Weg dieses Rezepts bedeutet.** Ein `/k-review dependabot-alerts`-Lauf
-legt einen Family-Ordner außerhalb jedes Laufordners an; sein `review-triage.md` geht
-direkt an `/k-remediation`:
-
-```text
-/k-remediation <ergebnisort>/dependabot-alerts/<datum>/review-triage.md
-```
-
-`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
-
-Es gibt dabei **keine familienübergreifende Zusammenführung und keine Dedupe gegen andere
-Quellen** mehr. `/k-remediation` nimmt genau eine Ergebnisdatei; ein Alert, den daneben
-auch `pip-audit` oder `trivy` im Audit-Lauf gemeldet hat, steht in beiden Ergebnissen
-einmal. Das ist die bewusste Folge des Umbaus, kein Fehler: Wer eine Zusammenführung
-braucht, bringt seine Belege in den Lauf, statt sie danach zusammenzurechnen.
+**Was das für den Weg dieses Rezepts bedeutet.** Der frühere Weg — ein
+`/k-review`-Lauf, der `review-input.json` von Hand schrieb — ist entfallen; einen von Hand
+geschriebenen Beleg gibt es nicht mehr. Bis der Umbau oben gebaut ist, bleibt das Rezept
+abgeschaltet. Was folgt, beschreibt, was es dann bewerten soll.
 
 ## Zweck
 
@@ -99,8 +90,8 @@ Zugangsdatei bietet erst die Hauptsitzung an.
 
 - Dieses Review konsumiert GitHub Dependabot Alerts über `gh api`, mit Dienst über
   `k-playbook github run` (Abschnitt „Zugang zu GitHub“).
-- Es ersetzt lokale Scans mit `pip-audit`, `trivy` oder `grype` nicht; diese gehören zu
-  `/k-review dependency-cve`.
+- Es ersetzt lokale Scans mit `pip-audit`, `trivy` oder `grype` nicht; diese gehören in
+  den Audit-Lauf mit der Perspektive `review-dependency-cve`.
 - Wenn für ein Projekt GitHub Dependabot als Quelle der Wahrheit reicht, darf dieses
   Review statt lokaler Dependency-CVE-Scans genutzt werden.
 - `open-pull-requests-limit: 0` in `.github/dependabot.yml` ist kein Fehler, wenn das
@@ -152,6 +143,6 @@ Review-Status im Remediation-Status von `review-triage.md`:
 
 ## Handoff
 
-Nach Abschluss verweist `/k-review` auf `review-triage.md` im Family-Ordner. Remediation,
+Vorerst nicht wählbar, siehe „Stellung im Audit-Laufmodell“. Remediation,
 Dependency-Upgrades und Dependabot-PR-Erzeugung sind ausdrücklich nicht Teil dieses
 Reviews.

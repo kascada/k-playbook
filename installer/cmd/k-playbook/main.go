@@ -1,21 +1,30 @@
 // Command k-playbook ist das Werkzeug für die projektlokale k-playbook-Installation.
 //
-// Ohne Argument startet es die lokale Oberfläche. Das Unterkommando `mcp`
+// Ohne Argument startet es die lokale Oberfläche. `config create` legt die
+// K-PLAYBOOK.yaml an, das Unterkommando `mcp`
 // bietet Briefing, Dokumente, Todos und die übrigen Auskünfte einem Assistenten
 // als MCP-Werkzeuge an, `scan` führt die Werkzeug-Einträge
-// eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen,
-// `inventory` erhebt das Versionsinventar des Projekts, `docs` holt erzeugte
-// Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo` verwaltet die
-// Todos, `findings check` prüft die Befund-Queue vor ihrer Einordnung, `read` löst einen Verweis im Präfixschema auf, `briefing` listet, was für das
-// Projekt gilt und was ansteht, `health` nennt Fehler und Warnungen über die
-// Umgebung des Projekts, `github` liest und prüft die persönliche
-// GitHub-Zugangsdatei, `upgrade` aktualisiert das Programm und zieht
-// das Projekt nach, `maintain` führt den Wartungslauf aus (Doku-Sicherung),
-// `vscode` installiert die mitgereiste VS-Code-Erweiterung ausdrücklich,
-// `version` nennt die Version des Programms, `gui status` nennt Zustand und
-// Adresse der Oberfläche, ohne sie anzufassen, `stop` beendet den
-// Hintergrunddienst der Oberfläche, `notify` zeigt dem Nutzer eine
-// Meldung auf diesem Rechner, und `lock` ist die Sperre des Arbeitsbaums.
+// eines Review-Laufs aus, `merge` fasst einen Lauf als Review-Input zusammen
+// (beide zurzeit gesperrt), `review` bestimmt das Arbeitsverzeichnis eines
+// eigenständigen Reviews und fasst dessen Fundlisten zusammen (nicht
+// gesperrt), `inventory` erhebt das Versionsinventar des
+// Projekts, `task` legt Tasks an, `doc` legt nummerierte Dokumente der
+// Collection an, listet, ändert, durchsucht und verschiebt sie, `docs` holt
+// erzeugte Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo`
+// verwaltet die Todos, `findings check` prüft die Befund-Queue vor ihrer
+// Einordnung, `read` löst einen Verweis im Präfixschema auf, `briefing`
+// listet, was für das Projekt gilt und was ansteht, `health` nennt Fehler und
+// Warnungen über die Umgebung des Projekts, `troubleshooting` soll Fehler der
+// Umgebung Schritt für Schritt suchen (noch nicht umgesetzt), `github` liest,
+// prüft und testet die persönliche GitHub-Zugangsdatei und startet Befehle mit
+// dem Zugang eines Dienstes (`github run`), `upgrade` aktualisiert Kephalaion
+// und das Programm und zieht das Projekt nach, `maintain` führt den
+// Wartungslauf aus (Doku-Sicherung), `vscode` installiert die mitgereiste
+// VS-Code-Erweiterung ausdrücklich, `version` nennt die Version des Programms,
+// `gui status` nennt Zustand und Adresse der Oberfläche, ohne sie anzufassen,
+// `stop` beendet den Hintergrunddienst der Oberfläche, `notify` zeigt dem
+// Nutzer eine Meldung auf diesem Rechner, und `lock` ist die Sperre des
+// Arbeitsbaums.
 package main
 
 import (
@@ -99,17 +108,23 @@ func run(args []string) error {
 		// Artefakte zusammen, ohne den Host nebenbei anzufassen. Zurzeit gesperrt
 		// wie scan.
 		return runMerge(args[1:])
+	case "review":
+		// Ohne Wirt-Pflege wie todo: die Ausgabe ist JSON und sonst nichts.
+		// Der Weg eines eigenständigen Reviews (/k-review, Task 197): das
+		// Arbeitsverzeichnis und der Merge darauf, ohne Audit-Lauf und
+		// deshalb nicht gesperrt wie scan und merge.
+		return runReview(args[1:])
 	case "inventory":
 		// Wie scan und merge ohne Wirt-Pflege: die Erhebung liest die
 		// deklarativen Quellen des Projekts und schreibt das Inventar und die
 		// README seines Verzeichnisses in die Collection des Projekts — auf
 		// der Platte nichts, und den Host fasst sie nicht nebenbei an. Dazu kommt:
-		// die Meldungen der Bereinigung gingen nach stdout und stünden mitten
+		// die Meldungen der Startpflege gingen nach stdout und stünden mitten
 		// im Bericht des Laufs, in dem jede Ablehnung sichtbar sein muss.
 		return runInventory(args[1:])
 	case "todo":
 		// Ohne Wirt-Pflege wie briefing: die Ausgabe ist
-		// maschinenlesbar und darf keine Bereinigungsmeldungen tragen.
+		// maschinenlesbar und darf keine Meldungen der Startpflege tragen.
 		return runTodo(args[1:])
 	case "task":
 		// Ohne Wirt-Pflege wie todo: die Ausgabe ist JSON und sonst nichts.
@@ -133,7 +148,7 @@ func run(args []string) error {
 		return runFindings(args[1:])
 	case "briefing":
 		// Ohne Wirt-Pflege: die Ausgabe ist das Briefing, als Klartext oder
-		// JSON, und sonst nichts — eine Bereinigungsmeldung daneben störte
+		// JSON, und sonst nichts — eine Meldung der Startpflege daneben störte
 		// die JSON-Ausgabe.
 		return runBriefing(args[1:])
 	case "health":
@@ -150,7 +165,7 @@ func run(args []string) error {
 	case "upgrade":
 		// Ohne Wirt-Pflege: der Nachzug meldet selbst je Schritt, was er tut,
 		// und seine Ausgabe wird von /k-upgrade wörtlich wiedergegeben — eine
-		// Bereinigungsmeldung dazwischen gehörte nicht dazu.
+		// Meldung der Startpflege dazwischen gehörte nicht dazu.
 		return runUpgrade(args[1:])
 	case "maintain":
 		// Ohne Wirt-Pflege: der Wartungslauf soll genau seine Schritte tun
@@ -169,7 +184,7 @@ func run(args []string) error {
 	case "gui":
 		// Ohne Wirt-Pflege aus demselben Grund wie briefing und todo: die
 		// Ausgabe ist maschinenlesbar und darf keine Meldungen der
-		// Bereinigung tragen. Dazu kommt der Grund von stop, nur umgekehrt:
+		// Startpflege tragen. Dazu kommt der Grund von stop, nur umgekehrt:
 		// wer nach dem Zustand fragt, will nichts eingerichtet bekommen.
 		return runGUICommand(args[1:])
 	case "stop":
@@ -311,6 +326,16 @@ Unterkommandos:
   merge     Vorübergehend nicht verfügbar, wie scan. Sonst: fasst einen
             bestehenden Review-Lauf zusammen, k-playbook merge <lauf>. Das
             Ergebnis wird als Review-Input in das Laufverzeichnis geschrieben.
+            Für ein eigenständiges Review gibt es k-playbook review merge.
+  review    Der Weg eines eigenständigen Reviews (/k-review), ohne
+            Audit-Lauf und deshalb nicht gesperrt: k-playbook review workdir
+            <rezept> [--dir <pfad>] bestimmt das Arbeitsverzeichnis — ohne
+            --dir ein neues mit den Rechten 0700 unmittelbar unter /tmp
+            ($TMPDIR gilt nicht) —, k-playbook review merge <verzeichnis>
+            [--check] prüft die Fundlisten <eintrag>.sarif darin gegen den Vertrag
+            ihres Rezepts und schreibt review-input.json und review-input.md
+            dorthin (Rechte 0600, ohne known-decisions); --check prüft nur.
+            Die Ausgabe ist JSON. Ohne Unterbefehl nur die Kurzhilfe.
   inventory Erhebt das Versionsinventar dieses Projekts und schreibt es in
             die Collection des Projekts nach
             keph:/docs/generated/versions/inventory.md: k-playbook inventory,
@@ -387,7 +412,10 @@ Unterkommandos:
             ist.
   github    Legt an, liest, prüft und testet die persönliche GitHub-
             Zugangsdatei ~/.config/k-playbook/github.yaml: k-playbook github
-            init|check|show|test [<dienst>] [--json]. init legt die Vorlage
+            init|check|show|test [<dienst>] [--json]; k-playbook github run
+            <dienst> [--write] -- <befehl> … startet git oder gh mit dem
+            Zugang des Dienstes, nur für diesen Prozess (Hilfe: k-playbook
+            github run --help). init legt die Vorlage
             an (als einziger; eine vorhandene Datei bleibt). check nennt alle Probleme,
             sortiert nach Position in der Datei, sonst Datei, Zahl der
             Dienste und die Zugänge, die auf diesem Rechner nicht verfügbar
@@ -400,11 +428,13 @@ Unterkommandos:
             nicht anlegbar), 2 bei Aufruffehlern.
             Vertrag: k-playbook:/docs/handbook/github-access.md.
   doc       Nummerierte Dokumente in der Kephalaion-Collection des
-            Projekts: k-playbook doc create|list|done|reopen [--json].
-            Legt an, listet und verschiebt nach done/ und zurück; den
-            Inhalt liest und schreibt man direkt über Kephalaion. Dasselbe
-            wie die MCP-Werkzeuge k_playbook_doc_create, _list, _done und
-            _reopen.
+            Projekts: k-playbook doc create|list|done|reopen|append|
+            replace|set|grep [--json]. Legt an, listet, verschiebt nach
+            done/ und zurück, hängt an, ersetzt eine Stelle, setzt ein Feld
+            des Frontmatters und durchsucht, jede Änderung wahlweise mit
+            --since <revision>; die Schalter nennt k-playbook doc --help.
+            Dasselbe wie die MCP-Werkzeuge k_playbook_doc_create, _list,
+            _done, _reopen, _append, _replace, _set_field und _grep.
   docs      Erzeugte Doku, ihr Scope und die Doku-Aufträge; die Schalter
             nennt k-playbook docs --help.
             k-playbook docs checkout <erzeuger> holt
@@ -430,7 +460,8 @@ Unterkommandos:
             installiert); dann das Release-Binary des neuesten Tags direkt
             von GitHub, geprüft gegen die SHA256SUMS des Tags — nur wenn das
             laufende Programm älter ist als der neueste Release-Tag; dann
-            AGENTS.md (Anstoß), CLAUDE.md, Verlinkung und MCP-Einträge. Je
+            AGENTS.md (Anstoß), CLAUDE.md, Verlinkung, MCP-Einträge und die
+            Berechtigungen der Clients für GitHub. Je
             Schritt eine Meldung, am Ende der Hinweis auf den Neustart der
             Sitzung, wenn das Binary gewechselt hat. --check schreibt nichts
             und meldet, was ein Lauf täte. Das Gegenstück zu /k-upgrade.
@@ -447,7 +478,9 @@ Unterkommandos:
             k-playbook maintain --help.
   vscode    Die VS-Code-Erweiterung „k-playbook Workspace Tools“, die in
             diesem Programm steckt: k-playbook vscode install|status|
-            vsix -o <datei>. Beim Start der Oberfläche wird sie selbsttätig
+            vsix -o <datei>|collections [--json]; collections nennt die
+            Collections, die ein VS-Code-Fenster dieses Projekts eingebunden
+            haben soll. Beim Start der Oberfläche wird sie selbsttätig
             installiert und nachgezogen; dieses Kommando ist der
             ausdrückliche Weg für den, der die Oberfläche nie startet.
   version   Gibt die Version dieses Programms aus, eine Zeile, sonst nichts.

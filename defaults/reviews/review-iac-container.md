@@ -13,14 +13,14 @@ audit:
   scope:
     tools: [trivy, syft, grype]
 review:
-  enabled: true
+  enabled: false
 ---
 
 # Review: IaC and Container Assessment
 
 Bewerte IaC-, Container- und Filesystem-Security-Belege als fokussierte Perspektive auf
 `review-input.json`. Dieses Rezept führt keine eigenen Scans aus und schreibt genau eine
-Ergebnisdatei im aktuellen Lauf- oder Family-Ordner.
+Ergebnisdatei im aktuellen Laufordner.
 
 ## Zweck
 
@@ -138,24 +138,6 @@ sind.
 Nach Abschluss verweist das Review auf `review-triage.md` im selben Ordner. Remediation
 und Infrastruktur-Änderungen sind ausdrücklich nicht Teil dieses Reviews.
 
-**Eigenständiger `/k-review`-Lauf nach dem Umbau.** Dieses Rezept läuft im Audit mit; dort
-steckt sein Beleg schon im gemeinsamen Merge und eine Aggregation danach wäre doppelt.
-Über `review.enabled: true` bleibt es daneben einzeln aufrufbar, und ein solcher Lauf legt
-einen eigenen Family-Ordner **außerhalb** jedes Laufordners an:
-
-```text
-<ergebnisort>/iac-container/<datum>/
-```
-
-`<ergebnisort>` steht für den Ort der Review-Ergebnisse. Er ist noch nicht entschieden; bis dahin pausieren die Reviews.
-
-Sein `review-triage.md` geht direkt an `/k-remediation`:
-
-```text
-/k-remediation <ergebnisort>/iac-container/<datum>/review-triage.md
-```
-
-Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen
-Befunde**. `/k-remediation` nimmt genau eine Ergebnisdatei; ein Befund, den derselbe Tag
-auch im Audit-Lauf trägt, steht dann in beiden Ergebnissen einmal. Wer beide Seiten
-zusammen sehen will, nimmt den Audit-Lauf — dort und nur dort sitzt die Zusammenführung.
+**Nur im Audit.** Dieses Rezept erhebt nichts, es bewertet Scanner-Funde aus dem Beleg eines
+Audit-Laufs. `/k-review` hat ihm nie einen Beleg geliefert; deshalb steht `review.enabled` auf
+`false`, und `/k-review` bietet es nicht an. Sein Platz ist die Zusammenfassung im Audit.

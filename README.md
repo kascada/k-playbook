@@ -128,11 +128,13 @@ token and the node's address come from Kephalaion itself (`kephalaion node clien
 Project-owned commands and skills live in `.k-playbook/commands/` and
 `.k-playbook/skills/`.
 
-The reviews are paused: the location of review results is not decided yet. Until then
-`/k-review`, `/k-audit` and `/k-remediation` only say so, `k-playbook scan` and
-`k-playbook merge` end with an error, and the MCP tools `k_playbook_review_status`,
-`_create`, `_scan`, `_merge` and `_write_ai_entry` answer `reviews_paused` and write
-nothing.
+`/k-review` runs a single review recipe again: it collects the findings as a SARIF finding
+list into a working directory (by default a new one under `/tmp/` that only the own user can
+read), merges them and writes a checklist `review-triage.md` sorted by priority. The audit path
+is still paused: the location of audit results is not decided yet. Until then `/k-audit` and
+`/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error, and
+the MCP tools `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`
+answer `reviews_paused` and write nothing.
 
 A project-owned entry of the same name fully replaces the shipped one; an empty one
 disables it. This holds for review recipes, instructions and includes in the project

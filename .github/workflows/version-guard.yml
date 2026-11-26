@@ -1,13 +1,16 @@
 name: VERSION-Wächter
 
-# Seit die Binaries Release-Assets sind, sagt allein VERSION, welches Binary zu
-# einem Stand gehört. Ein Push auf main, der installer/ ändert, ohne VERSION
-# anzuheben, liefert deshalb neuen Inhalt mit altem Code aus — und niemand
-# merkt es, weil nichts abbricht. Genau dieser Fall wird hier rot.
+# Code unter installer/ oder share/ kommt auf main nur zusammen mit einem
+# Versionswechsel an. Programm und bin/install holen das Binary des neuesten
+# veröffentlichten Releases (releases/latest); Code, der ohne neue VERSION auf
+# main landet, gehört zu keinem Release und erreicht keine Installation, ohne
+# dass etwas abbricht. Genau dieser Fall wird hier rot. Der Release-Weg
+# (make release, dann make release-publish) bringt VERSION und Code in einem
+# Commit auf main.
 #
-# Content-Commits an instructions, reviews oder docs sind nicht betroffen: sie ändern
-# das Binary nicht und lösen keinen Download aus. share/ dagegen — Commands und
-# Skills — bettet das Binary ein; eine Änderung dort ist eine am Binary.
+# share/ — Commands und Skills — bettet das Binary ein; eine Änderung dort ist
+# eine am Binary. defaults/ dagegen kommt über den Hub (Release-Asset
+# k-playbook-defaults.tar.gz), nicht über das Binary, und steht hier nicht.
 
 on:
   push:
@@ -60,9 +63,9 @@ jobs:
           if [ "$before_version" = "$after_version" ]; then
             echo "installer/ oder share/ hat sich geändert, VERSION aber nicht ($after_version)." >&2
             echo "" >&2
-            echo "Der Clone trägt kein Binary mehr; allein VERSION sagt, welches" >&2
-            echo "Release dazugehört. Ohne Bump laufen alle Installationen mit dem" >&2
-            echo "alten Binary weiter, obwohl der Inhalt neu ist." >&2
+            echo "Code unter installer/ oder share/ kommt auf main nur zusammen mit" >&2
+            echo "einem Versionswechsel an: Installationen holen das Binary des neuesten" >&2
+            echo "Releases, und dieser Code gehört zu keinem." >&2
             echo "" >&2
             echo "Auflösung: make release VERSION=<neue Version>, dann nach dem" >&2
             echo "Asset-Upload make release-publish VERSION=<neue Version>." >&2

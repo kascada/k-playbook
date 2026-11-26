@@ -36,7 +36,7 @@ The four docs commands are each one core plus modules (task 180), every resolved
 | `/k-danke` | Close a working session | presents the session's findings in the collection's `queue/findings/`, adds what is missing, sets each finding's `ziel` (`wissen`, `falle`, `regel`, `verwerfen`) after the user confirms it, and checks the docs follow-up via `/k-enforcement` as a safety net -- a documentation order of this session in `keph:/queue/docs/` counts as done; it writes nothing else, the takeover from the queue does the rest. What gets recorded while working is defined by `k-playbook:/instructions/on-demand/befunde.md` and applied by the skill `ks-befunde` |
 | `/k-befunde-einordnen` | Work through the finding queue of the project | takes the findings in `keph:/queue/findings/` one by one, oldest first, up to a limit per run (argument, default 25; the rest stays for the next run, the closing message always states how many are still open). It starts only when the preflight in the program (`k_playbook_findings_check`, `k-playbook findings check`, see [mcp.md](./mcp.md#findings-preflight)) reports the queue ready: replica freshly synced, rights `read`, `write` and `supersede`, every entry a readable finding; otherwise it reports the reasons with the number per user and stops without touching anything. Each finding is checked against the fetched main branch (`origin/HEAD`, fetched through `k-playbook github run`; with a restricted refspec `FETCH_HEAD`), the documentation, open tasks, todos and workbench topics, then moved to its target — hand-written docs under `keph:/docs/manual/`, a todo, an addendum to an own task or workbench topic, a documentation order plus todo, a change to a project file in the working tree plus todo, or `keph:/queue/unclear/` with a field `frage` — or deleted as `erledigt`, `abgedeckt (<wo>)` or `nicht nachhaltig`. Fixed order: write the target, read it back, delete or move the finding with `base_revision` and its own `request_id`, only then append the protocol line; deletion only by full name, never by pattern or directory. Targets never name the finding. Changes to instructions, skills, commands or `AGENTS.md` are only asked about. **Project extension:** the command reads `k-playbook:/instructions/on-demand/befunde-einordnen.md`, which k-playbook does not ship; a project creates it locally (`keph:/k-playbook/instructions/on-demand/`) with a `description` saying it applies only to `/k-befunde-einordnen`. If it is missing, `not_found` is no error there — the one deliberate exception to "a reference k-playbook does not know is an error". It takes precedence over the shipped text except for the preflight, `base_revision`, write-and-check-before-delete, full-name deletion and the protocol. Hull in `share/commands/`, text read as `k-playbook:/commands/k-befunde-einordnen.md` (task 166) |
 | **Code review** | | |
-| `/k-review` | Run review recipes — **temporarily unavailable** while the results storage moves; the command only says so | [`code-review.md`](./code-review.md) |
+| `/k-review` | Run one review recipe — a report as a checklist `review-triage.md` in a working directory (second argument, default a new one under `/tmp/`), or interactively | [`code-review.md`](./code-review.md) |
 | `/k-audit` | Create or continue a complete audit sweep through MCP and triage after the merge — **temporarily unavailable** while the results storage moves; the command only says so | [`review-runs.md`](./review-runs.md) |
 | `/k-remediation` | Bundle findings and turn them into tasks or fixes — **temporarily unavailable** while the results storage moves; the command only says so | [`code-review.md`](./code-review.md) |
 | **Task flow** | | |
@@ -54,16 +54,16 @@ There is no `/k-install-security-tools` command anymore. The interface provides 
 
 ## Review flow
 
-`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
-`/k-review`, `/k-audit` and `/k-remediation` are temporarily unavailable, and all five review tools of the MCP server are blocked. The code-review family is deliberately staged:
+`<ergebnisort>` stands for the location of audit results. It is not decided yet; audit runs are paused until then.
+`/k-audit` and `/k-remediation` are temporarily unavailable, and the five run tools of the MCP server are blocked; `/k-review` works with its own two tools. The code-review family is deliberately staged:
 
 | Occasion | Command | Result |
 |---|---|---|
 | complete security sweep across suitable tools and audit recipes | `/k-audit` | `<ergebnisort>/YYYY-MM-DD/review-input.json`, `review-input.md`, `review-triage.md` |
-| focused individual review recipe, interactive or as a report | `/k-review <name>` | interactive change proposals or `<ergebnisort>/<family>/YYYY-MM-DD/review-input.json` and `review-triage.md` |
+| focused individual review recipe, interactive or as a report | `/k-review <name> [working directory]` | interactive change proposals or, in the working directory, `<name>.sarif`, `review-input.json` and the checklist `review-triage.md` |
 | harden a task/instruction file before execution | `/k-task-refine [ref-or-path] [nochmal]` | review log directly in the reviewed task/instruction file |
 
-1. `/k-review <name>` runs a recipe and, depending on the recipe, produces interactive change proposals or `review-triage.md` as a report handoff.
+1. `/k-review <name>` runs a recipe and, depending on the recipe, produces interactive change proposals or — collect, then summarize — the checklist `review-triage.md` in a working directory. It names no follow-up command while `/k-remediation` reads the old triage format.
 2. `/k-audit` orchestrates the run model: creates or continues a run, starts scanners, runs evidence recipes before the merge, starts the merge, leads perspectives afterward, and writes `review-triage.md`.
 3. `/k-remediation <result>` plans how to address findings. It takes exactly one result file; merging happens exclusively in the audit run.
 
@@ -87,7 +87,8 @@ No command reads or guesses a path. Every target is a `keph:` reference into the
 |---|---|
 | `/k-task-create`, `/k-task-run` | `keph:/user/<user>/tasks/` in the project collection, completed tasks to `done/` below it (`k_playbook_doc_done`); `/k-task-create` writes through `k_playbook_task_create`; nothing on disk. `/k-task-run` also keeps one ref `refs/k-task-run/<task>` per task in the execution root until the task moves to `done/`, and while it runs the working-tree lock in `.k-playbook/work/lock/` (the directory ignores itself in git; the file stays after release and keeps the token counter) |
 | `/k-todo` | `todos/` in the project collection, written only through `k-playbook todo` or the MCP tools |
-| `/k-review`, `/k-audit` | `<ergebnisort>`; both commands are paused |
+| `/k-review` | its working directory: the given path, or a new directory under `/tmp/` with mode `0700` (files `0600`); nothing in the project collection |
+| `/k-audit` | `<ergebnisort>`; the command is paused |
 | `/k-docs-code`, skill `ks-overlay-repo-analyse` | `keph:/docs/generated/code/` in the project collection, only through `k-playbook docs publish code`; in between the machine-local working directory `.k-playbook/work/docs/code/` with the checkout record next to it (`/work` is git-ignored), removed after a complete publish together with `.k-playbook/work/docs/` and `.k-playbook/work/` when they are left empty. `/k-docs-code` also writes the split documentation orders, one per document, to `keph:/queue/docs/`; closed orders move to `keph:/queue/docs/done/` |
 | `/k-docs-tools` | `keph:/docs/generated/libs/` in the project collection, only through `k-playbook docs publish libs`; in between the machine-local working directory `.k-playbook/work/docs/libs/`, removed after a complete publish like the one of `/k-docs-code`; closed documentation orders move to `keph:/queue/docs/done/`; after confirmation also the inventory through `k-playbook inventory` when it is missing |
 | `/k-doc-inventory` | `keph:/docs/generated/versions/inventory.md` and the directory's `README.md` (from its template) in the project collection, through `k-playbook inventory`; plus the source configuration `keph:/k-playbook/inventory.md` only after explicit confirmation and exclusively by adding to it |
@@ -125,7 +126,7 @@ The output names the date, the resolved directories and the documents that apply
 
 The call occurs at the beginning of every command, but only once per session. Its output does not change during work and is the same for every command, so subsequent commands reuse it. It is retrieved again when `K-PLAYBOOK.yaml` has been written, the inventory of reviews has changed, or work has moved to another project. The partial call is not such a reload: it is fetched fresh whenever a command needs it.
 
-`/k-review` is paused; its text stays as the template for the rebuild of the reviews and carries a `NACHZIEHEN` note: the review modes have no source in it any more, and in the rebuild the recipe list comes from the briefing's `documents.reviews` and the modes from each recipe's frontmatter. The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
+`/k-review` takes its recipe list from the briefing's `documents.reviews` and the modes from each recipe's frontmatter (task 197). The detailed rules are in [`k-playbook-format.md`](./k-playbook-format.md#merge-shipped-and-project-owned-content).
 
 There is no check runner any more: `k-check` and the shipped checks were removed in task 155.
 

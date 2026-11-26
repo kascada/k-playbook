@@ -171,7 +171,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 |---|---|---|
 | Project | `/k-gui` | Start the interface, check and set up project state |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
-| Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings (temporarily unavailable while reviews are paused) |
+| Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings (`/k-audit` and `/k-remediation` temporarily unavailable while audit runs are paused) |
 | Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
 | Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check docs follow-up (`/k-enforcement` temporarily unavailable), diagnose tests, read histories, mark VS Code |
 
@@ -216,9 +216,10 @@ Details are in [`task-flow.md`](./task-flow.md).
 
 ### Code review flow
 
-Reviews are paused until the location of their results is decided; `/k-review`,
-`/k-audit` and `/k-remediation` are temporarily unavailable. The flow itself:
-report reviews produce auditable artifacts and lead to remediation when needed:
+Audit runs are paused until the location of their results is decided; `/k-audit` and
+`/k-remediation` are temporarily unavailable. `/k-review` runs: a report review writes a
+checklist `review-triage.md` into its working directory. The flow, once remediation reads
+that format again:
 
 ```text
 /k-review <name>

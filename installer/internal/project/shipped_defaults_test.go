@@ -331,7 +331,7 @@ func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 	const fallback = "ersatzweise in der Shell `k-playbook briefing`. Ist k-playbook"
 	for _, rel := range []string{
 		"defaults/commands/_shared/erster-schritt.md",
-		"share/commands/k-audit.md", "share/commands/k-danke.md", "share/commands/k-gui.md", "share/commands/k-review.md",
+		"share/commands/k-audit.md", "share/commands/k-danke.md", "share/commands/k-gui.md",
 		"share/commands/k-test-check.md", "share/commands/k-todo.md", "share/commands/k-verlauf.md",
 		"share/commands/k-vscode-project-color.md", "share/skills/befunde/SKILL.md",
 	} {
@@ -343,19 +343,23 @@ func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 			t.Errorf("%s nennt den Ersatzweg über den Klartext nicht", rel)
 		}
 	}
-	// Die Ausnahme: /k-review holt catalogs.reviews weiter aus der
-	// Kontextausgabe, bis es neu gebaut ist.
-	if review := readRepoShare(t, "commands/k-review.md"); !strings.Contains(review, "Take `catalogs.reviews` from the context output.") {
-		t.Errorf("k-review.md holt catalogs.reviews nicht mehr aus der Kontextausgabe")
+	// /k-review ist seit Task 197 neu gebaut und holt die Rezepte aus
+	// documents.reviews des Briefings, nicht mehr aus catalogs.reviews.
+	if review := readRepoDefault(t, "commands/k-review.md"); strings.Contains(review, "catalogs.reviews") || !strings.Contains(review, "`documents.reviews`") {
+		t.Errorf("k-review.md nennt catalogs.reviews noch oder documents.reviews nicht")
 	}
-	// Die Ausnahme gilt nur für catalogs.reviews: /k-audit und das Modul
+	// /k-audit und das Modul
 	// review-scan-triage.md holen den Katalog an keiner Stelle selbst aus der
 	// Kontextausgabe und nennen sie deshalb in keiner Schreibweise; die Felder
 	// von Schritt 1 in /k-audit (project.dir, now.date) kommen aus dem Briefing.
 	contextOutput := regexp.MustCompile(`(?i)context-ausgabe|kontextausgabe|context output|context-aufruf`)
-	for _, rel := range []string{"commands/k-audit.md", "commands/_audit/review-scan-triage.md"} {
-		if loc := contextOutput.FindString(readRepoShare(t, rel)); loc != "" {
-			t.Errorf("share/%s nennt die Kontextausgabe (%q), holt aber catalogs.reviews nicht daraus", rel, loc)
+	for rel, text := range map[string]string{
+		"share/commands/k-audit.md": readRepoShare(t, "commands/k-audit.md"),
+		// Das Triage-Modul liegt seit Task 197 unter defaults/commands/.
+		"defaults/commands/_audit/review-scan-triage.md": readRepoDefault(t, "commands/_audit/review-scan-triage.md"),
+	} {
+		if loc := contextOutput.FindString(text); loc != "" {
+			t.Errorf("%s nennt die Kontextausgabe (%q), holt aber catalogs.reviews nicht daraus", rel, loc)
 		}
 	}
 	if audit := space.ReplaceAllString(readRepoShare(t, "commands/k-audit.md"), " "); !strings.Contains(audit, "Löse aus dem Briefing: - `RESOLVED_PROJECT_DIR` = `project.dir` - `TODAY` = `now.date`") {
@@ -363,28 +367,28 @@ func TestMitgelieferteTexteLesenNichtMehrAusContext(t *testing.T) {
 	}
 }
 
-// Die gesperrten Review-Texte tragen einen Vermerk für den Neubau (Task 188):
+// Der gesperrte Review-Text /k-audit trägt einen Vermerk für den Neubau (Task 188):
 // catalogs.reviews hat mit dem entfernten context-Befehl keine Quelle mehr, und
 // der Vermerk nennt documents.reviews als Quelle der Rezeptliste. Er ist ein
-// Kommentar mit der Marke NACHZIEHEN und ändert nichts am Aufruf: Bei /k-review
-// und /k-audit bleibt „Vorübergehend nicht verfügbar“ der erste Abschnitt, der
+// Kommentar mit der Marke NACHZIEHEN und ändert nichts am Aufruf: Bei /k-audit
+// bleibt „Vorübergehend nicht verfügbar“ der erste Abschnitt, der
 // Vermerk steht darin vor „Erster Schritt“.
 func TestGesperrteReviewTexteTragenVermerk(t *testing.T) {
 	comment := regexp.MustCompile(`(?s)<!-- NACHZIEHEN:(.*?)-->`)
-	for _, rel := range []string{"commands/k-review.md", "commands/k-audit.md", "commands/_audit/review-scan-triage.md"} {
+	// /k-review ist seit Task 197 neu gebaut, und das Triage-Modul nennt
+	// catalogs.reviews nicht mehr; beide tragen den Vermerk nicht mehr.
+	for _, rel := range []string{"commands/k-audit.md"} {
 		text := readRepoShare(t, rel)
 		found := false
 		for _, match := range comment.FindAllStringSubmatchIndex(text, -1) {
 			body := text[match[2]:match[3]]
 			if strings.Contains(body, "`catalogs.reviews`") && strings.Contains(body, "`documents.reviews`") {
 				found = true
-				if rel != "commands/_audit/review-scan-triage.md" {
-					paused := strings.Index(text, "\n## Vorübergehend nicht verfügbar\n")
-					first := strings.Index(text, "\n## ")
-					next := strings.Index(text, "\n## Erster Schritt\n")
-					if paused < 0 || paused != first || match[0] < paused || next < 0 || match[0] > next {
-						t.Errorf("share/%s: Vermerk nicht im ersten Abschnitt „Vorübergehend nicht verfügbar“", rel)
-					}
+				paused := strings.Index(text, "\n## Vorübergehend nicht verfügbar\n")
+				first := strings.Index(text, "\n## ")
+				next := strings.Index(text, "\n## Erster Schritt\n")
+				if paused < 0 || paused != first || match[0] < paused || next < 0 || match[0] > next {
+					t.Errorf("share/%s: Vermerk nicht im ersten Abschnitt „Vorübergehend nicht verfügbar“", rel)
 				}
 			}
 		}
@@ -1859,6 +1863,75 @@ func TestKTaskRunSperreUndRefine(t *testing.T) {
 		"`check` der Sperre, dann pushen."} {
 		if !strings.Contains(bundle, want) {
 			t.Errorf("k-task-run.md ohne Prüfstelle %q", want)
+		}
+	}
+}
+
+// /k-review ist seit Task 197 Hülle plus Text und nicht mehr gesperrt: Die
+// Hülle nennt nur den Verweis und erlaubt die beiden Werkzeuge des
+// Arbeitsverzeichnisses, der Text bindet den ersten Schritt und die Bausteine
+// Erheben und Zusammenfassen ein. Log, Fälligkeit, known-decisions und der
+// handgeschriebene Beleg sind entfallen.
+func TestDefaultsKReviewIstHuelleUndText(t *testing.T) {
+	layers := repoDefaultsLayers(t)
+	const ref = "k-playbook:/commands/k-review.md"
+
+	hull := readRepoShare(t, "commands/k-review.md")
+	if !strings.Contains(hull, "`"+ref+"`") || strings.Contains(hull, "## Schritt") || strings.Contains(hull, "Vorübergehend nicht verfügbar") ||
+		strings.Contains(hull, "NACHZIEHEN") {
+		t.Errorf("Hülle ohne Verweis, mit altem Ablauf oder noch gesperrt:\n%s", hull)
+	}
+	allowed := ""
+	for _, line := range strings.Split(hull, "\n") {
+		if value, ok := strings.CutPrefix(line, "allowed-tools: "); ok {
+			allowed = value
+		}
+	}
+	want := "[Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, " +
+		"mcp__k-playbook__k_playbook_review_workdir, mcp__k-playbook__k_playbook_review_merge_dir]"
+	if allowed != want {
+		t.Errorf("allowed-tools:\n%s\nerwartet\n%s", allowed, want)
+	}
+	if !strings.Contains(hull, "\nargument-hint: \"[review-name] [arbeitsverzeichnis]\"\n") {
+		t.Errorf("argument-hint nennt das Arbeitsverzeichnis nicht:\n%s", hull)
+	}
+
+	file := readRepoDefault(t, "commands/k-review.md")
+	for _, line := range []string{"include: _shared/erster-schritt.md\n", "include: _review-run/erheben.md\n", "include: _review-run/zusammenfassen.md\n"} {
+		if !strings.Contains(file, "\n"+line) {
+			t.Errorf("k-review.md ohne %q", line)
+		}
+	}
+	for _, needle := range []string{"`documents.reviews`", "`k_playbook_review_workdir`", "`review.enabled`", "`handoff`",
+		"`audit.mode: evidence`", "`Okay` / `Änder so: …` / `Skip`", "`/tmp/`", "Folge-Command: keiner"} {
+		if !strings.Contains(file, needle) {
+			t.Errorf("k-review.md nennt %q nicht", needle)
+		}
+	}
+	for _, stale := range []string{"Vorübergehend nicht verfügbar", "NACHZIEHEN", "catalogs.reviews", "log.md", "known-decisions.md",
+		"<ergebnisort>", "Letzter Lauf", "/k-remediation <", "review-input-contract.md"} {
+		if strings.Contains(file, stale) {
+			t.Errorf("k-review.md trägt noch %q", stale)
+		}
+	}
+
+	got := mustResolveDoc(t, layers, ref)
+	if len(got.Problems) != 0 || len(got.Includes) != 3 {
+		t.Fatalf("eingesetzter Text: problems %v, includes %+v", got.Problems, got.Includes)
+	}
+	for _, needle := range []string{"`k_playbook_review_merge_dir`", "`check: true`", "k-playbook:/commands/_audit/review-scan-triage.md"} {
+		if !strings.Contains(got.Content, needle) {
+			t.Errorf("eingesetzter Text nennt %q nicht", needle)
+		}
+	}
+	// Die Module der Review-Familie liegen unter defaults/commands/ und sind
+	// als Verweis lesbar; unter share/commands/ gibt es sie nicht mehr.
+	for _, module := range []string{"_audit/review-scan-triage.md", "_review-run/review-input-contract.md", "_review-run/erheben.md", "_review-run/zusammenfassen.md"} {
+		if result := mustResolveDoc(t, layers, "k-playbook:/commands/"+module); result.Disabled || strings.TrimSpace(result.Content) == "" {
+			t.Errorf("%s nicht lesbar", module)
+		}
+		if _, err := os.Stat(filepath.Join("..", "..", "..", "share", "commands", filepath.FromSlash(module))); !os.IsNotExist(err) {
+			t.Errorf("share/commands/%s liegt noch (%v)", module, err)
 		}
 	}
 }

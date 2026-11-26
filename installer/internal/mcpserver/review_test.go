@@ -715,7 +715,9 @@ func newReviewProject(t *testing.T) string {
 	}
 	setReviewResultsDir(t, reviewResultsDir(root))
 	mustWriteFile(t, project.ConfigPath(root), "schema_version: 3\n\nproject:\n  repo_root: .\n  vcs: none\n  languages:\n    - go\n")
-	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n")
+	// Das Triage-Modul kommt seit Task 197 aus der mitgelieferten Ebene unter
+	// defaults/commands/, nicht mehr aus share/.
+	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "commands", filepath.FromSlash(scanTriageModule)), "# Review-Triage\n\nModul.\n")
 	mustWriteFile(t, filepath.Join(root, defaultstest.DefaultsDir, "reviews", "review-tech.md"), "---\ntitle: Technischer Review\naudit:\n  enabled: true\n  resultRequired: true\n  defaultResult: review-tech.md\n  scope:\n    tools: [mockscan]\nreview:\n  enabled: true\n---\n# Fallback\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "severity.tsv"), "tool\trule_prefix\tseverity\tnotes\n")
 	mustWriteFile(t, filepath.Join(sharetest.Dir(t), "scripts", "scanners.tsv"), "job\ttool\tlanguages\tcandidates\tsarif\toutput\ttimeout\tsoft_skip\tworkdir\targs\nmockscan\tmockscan\tgo\tsource\tnative\tstdout\t5s\t\ttarget\t--sarif\n")

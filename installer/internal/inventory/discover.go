@@ -64,7 +64,7 @@ func (e *excluder) excluded(relative string) bool {
 	return false
 }
 
-// exclusions liefert die Regeln in Dateireihenfolge, die feste zuerst.
+// exclusions liefert die Regeln in der Reihenfolge von `exclude:`.
 func (e *excluder) exclusions() []Exclusion {
 	out := make([]Exclusion, 0, len(e.rules))
 	for _, rule := range e.rules {

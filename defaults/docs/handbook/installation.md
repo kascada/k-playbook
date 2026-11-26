@@ -229,7 +229,7 @@ The **Workflows** section brings together the work queues. Two kinds have a page
 
 **Tasks** have no page in the interface. They are documents in the project collection (`keph:/user/<user>/tasks/`, see [`task-flow.md`](./task-flow.md)) and are created, hardened and executed through `/k-task-create`, `/k-task-refine` and `/k-task-run` in the assistant.
 
-**Reviews** (`/workflows/reviews`) lists no runs: reviews are paused until the location of their results is decided (task 147), and the page shows the message of the pause. `/k-review`, `/k-audit` and `/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with the same message, and all five MCP tools, `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`, answer `reviews_paused` and write nothing ([`mcp.md`](./mcp.md#review-tools-are-paused)). **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
+**Reviews** (`/workflows/reviews`) lists no runs: audit runs are paused until the location of their results is decided (task 147), and the page shows the message of the pause. `/k-audit` and `/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with the same message, and all five MCP tools, `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`, answer `reviews_paused` and write nothing ([`mcp.md`](./mcp.md#review-tools-are-paused)). **Todos** (`/workflows/todos`) lists the open items, with the checked-off ones in a collapsed section below.
 
 Each of the three pages opens with a short help block. Its head carries a small link into the shipped documentation — the overview and the todos to `commands.md`, the reviews to `code-review.md` and `review-runs.md`. It opens the file in the Docs section, with the index and its cross-references; the address behind it is `/docs?file=<file>`, which any page can use.
 
@@ -273,7 +273,7 @@ The newest release is the newest published one, and the release workflow publish
 
 If the installation fails -- no network, checksum mismatch, release not finished -- the old service keeps running and the page names the error, the output, and the command to catch up by hand: `k-playbook upgrade`. If `k-playbook upgrade` itself fails to install, it names the first installation instead: `curl -fsSL https://raw.githubusercontent.com/kascada/k-playbook/main/bin/install | bash`. The same holds if `k-playbook` in the `PATH` does not resolve to `~/.local/bin/k-playbook`: then there is no button and no installation, only a note with both paths. Installing anyway would put a new binary where the next call to `k-playbook` never looks; that call would start the old program again, and its startup would stop the newly started service. Remove the other file or move `~/.local/bin` to the front of the `PATH`, then run the first installation in the terminal. Afterwards, `k-playbook` starts the new version. After a program update in the terminal, an old service initially keeps running; it is detected and replaced only when the next call to `k-playbook` comes from a newly installed binary. The binary file itself is compared, not only its version, so a newly built binary with the same version also replaces the old service. If only commands, rules, or recipes are new, the service continues, `Reload` in the interface loads the version, and restarting the assistant is enough.
 
-**The MCP registration is caught up on every path.** Every start of the interface and the project step of `k-playbook upgrade` add a missing MCP entry, or create a missing file, when the target file is not tracked by Git. An existing entry stays, also one in no accepted form; *Set up* overwrites it. `k-playbook upgrade --check` does not report MCP entries.
+**The MCP registration is caught up on every path.** Every start of the interface and the project step of `k-playbook upgrade` add a missing MCP entry, or create a missing file, when the target file is not tracked by Git. An existing entry stays, also one in no accepted form; *Set up* overwrites it. `k-playbook upgrade --check` reports each file a run would add the entry to, with the same Git measurement, and writes nothing.
 
 **Linking catches itself up.** Because commands and skills are linked individually, a newly shipped command does not arrive by itself. It is therefore caught up on the read path, not only at the press of a button: the assistants section synchronizes registration when displayed and reports what changed (`Linking synchronized: 3 added, 1 removed.`), and `k-playbook briefing` does the same, the call already made at the beginning of every assistant session. How the program reached its version is irrelevant: through the interface, `k-playbook upgrade`, or a build of one's own. What cannot resolve itself, an actual project file in the way or a conflict in `CLAUDE.md`, remains and continues to appear in the assistants section.
 
@@ -318,6 +318,10 @@ It is not converted ([`k-playbook-format.md`](./k-playbook-format.md#schema_vers
 - places the old file alongside it as `K-PLAYBOOK.yaml.v1-alt`, rather than deleting it, so that custom values stay readable,
 - writes a fresh `K-PLAYBOOK.yaml` with `schema_version: 3`, prefilled with the old `project.repo_root`,
 - never overwrites an existing backup, instead appending `-2`, `-3`.
+
+The section then shows the server's message, with the name of the backup, until **Weiter** reloads the page; creating a new configuration works the same way.
+
+Until then the write paths do nothing: *Set up* of the MCP card and of the commands card, and the project step of `k-playbook upgrade`, refuse a configuration whose `schema_version` the program does not accept, with the same message as the briefing.
 
 Then go through the remaining sections as for a new installation and retrieve custom values from the backup. Files from an earlier model are neither detected nor reported; they are removed by hand.
 
@@ -404,7 +408,7 @@ the binding does not work has a message with its remedy:
 | `node-address` | `node.url` is not a loopback address | set `listen` under `node:` in the Kephalaion config to a loopback address |
 | `account-choice-missing` | several token files for the hub and no default | `kephalaion node account default <hub> <account>`; if the token directory is mounted read-only, as in the DevContainer, set the default on the host |
 | `token-missing` | no token file for the hub, only a waiting token (`.pending`), a token file elsewhere, or an unusable one | `kephalaion node account setup <hub> <account>` with a setup token from the admin, or first `kephalaion node setup <code>`; for a lone `.pending` the same `setup` call settles it |
-| `node-unreachable`, `hub-unknown`, `login-invalid`, `login-missing`, `replica-unreadable`, `collection-unreadable` | what the node or `whoami` reports | `kephalaion status`, `kephalaion node sync`, or another collection |
+| `node-unreachable`, `hub-unknown`, `login-invalid`, `login-missing`, `replica-unreadable`, `collection-unreadable` | what the node or `whoami` reports | `kephalaion status`, `kephalaion node sync <hub>` on the node's machine (in the DevContainer: on the host), or another collection |
 | `hub-never-synced` | the node has never synced the hub | `kephalaion node sync <hub>` on the node's machine, not in a pure client (in the DevContainer: on the host) |
 
 If a `.pending` lies next to the token file (an open `rotate`), the binding still works and the
