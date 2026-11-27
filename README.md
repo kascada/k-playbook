@@ -118,7 +118,8 @@ in the public collection `k-playbook` on the project's Kephalaion hub and are re
 `k-playbook:/…` references.
 
 Everything a project owns lies in its Kephalaion collection or under `.k-playbook/`.
-Tasks, todos, the project documentation and the source configuration of the version
+Tasks, todos, reports (`keph:/feedback/`: bugs and wishes someone else is to handle, kept
+through `/k-feedback`), the project documentation and the source configuration of the version
 inventory (`keph:/k-playbook/inventory.md`) live in the collection, and so do project-owned
 review recipes, instructions and includes (`keph:/k-playbook/`) and project-owned
 guidelines (`keph:/docs/guidelines/`); guidelines behind `k-playbook:` come shipped only.
@@ -130,7 +131,8 @@ Project-owned commands and skills live in `.k-playbook/commands/` and
 
 `/k-review` runs a single review recipe again: it collects the findings as a SARIF finding
 list into a working directory (by default a new one under `/tmp/` that only the own user can
-read), merges them and writes a checklist `review-triage.md` sorted by priority. The audit path
+read), merges them, writes a checklist `review-triage.md` sorted by priority and stores it in
+the project collection under `keph:/results/review/`. The audit path
 is still paused: the location of audit results is not decided yet. Until then `/k-audit` and
 `/k-remediation` only say so, `k-playbook scan` and `k-playbook merge` end with an error, and
 the MCP tools `k_playbook_review_status`, `_create`, `_scan`, `_merge` and `_write_ai_entry`
@@ -286,7 +288,7 @@ service name can be overridden with `GITHUB_SERVICE=…`.
 - Shipped and project-owned are strictly separated: what comes with the binary — `~/.local/share/k-playbook/` and the texts from the hub — is replaced by an update, what the project owns is never touched by one.
 - Shipped reviews are not edited. A project deviates from a review by overlay: a project-owned recipe of the same name under `keph:/k-playbook/reviews/` replaces completely, an empty one disables.
 - Paths are not part of the configuration. They follow from the main directory, the one holding `.k-playbook/K-PLAYBOOK.yaml`.
-- Tasks, todos, the project documentation and project-owned review recipes are documents in the project collection; project-owned commands and skills lie under `.k-playbook/`. The location of review results is not decided yet; reviews are paused until then.
+- Tasks, todos, reports, the project documentation and project-owned review recipes are documents in the project collection; project-owned commands and skills lie under `.k-playbook/`. The location of review results is not decided yet; reviews are paused until then.
 - Projects may use their own venvs. Security tools are installed separately from those, host-/user-local or in dedicated k-playbook tool venvs; they are one of the two deliberate exceptions to project locality.
 - The base tools k-playbook calls itself — `git`, `curl` or `wget`, `tar`, `python3`, `rg` — are the second exception, and a different one: they are not scanners but the ground the commands stand on, so a missing one warns and never stops a run. `install-base-tools.sh` prefers the distribution package manager and falls back to a user-local release install; k-playbook never escalates to root by itself, it prints the `sudo` command.
 - Nothing is written except after confirmation, step by step.

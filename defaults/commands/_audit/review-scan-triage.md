@@ -22,7 +22,8 @@ Der aufrufende Baustein nennt:
 - `RUN_DIR` — den Ordner mit `review-input.json`: das Arbeitsverzeichnis des Reviews, im
   Audit den Laufordner. Verwende ausschließlich diesen Ordner.
 - den Kopf der Ergebnisdatei: Rezept (im Audit die Einträge des Laufs), Scope in Worten
-  und Datum.
+  und Datum. Wer nicht `/k-audit` ist, ruft auf dem Weg von `/k-review`; der Kopf hängt vom
+  Weg ab (Abschnitt „Ausgabeformat“).
 
 Lies aus `RUN_DIR`:
 
@@ -118,12 +119,16 @@ nach.
 diese Teile in dieser Reihenfolge:
 
 ```markdown
+---
+title: "Review-Ergebnis <rezept> <datum>: <Scope in Worten>"
+---
+
 # Review-Ergebnis <rezept> <datum>
 
 Rezept: `<rezept>` (im Audit: die Einträge des Laufs)
 Scope: <Scope in Worten>
 Erzeugt: <RFC3339-Zeitstempel>
-Arbeitsverzeichnis: `<RUN_DIR>`
+Arbeitsverzeichnis: `<RUN_DIR>` — vergänglich, enthält nur Fundliste und Beleg (im Audit: nur `<RUN_DIR>`, ohne Zusatz)
 Beleg: `review-input.json` — <n> Funde in <m> Gruppen
 Bekannte Entscheidungen: <ein Satz>
 
@@ -157,10 +162,17 @@ Nächster Schritt: …
 
 Regeln dazu:
 
+- **Kopf je Weg.** Auf dem Weg von `/k-review` beginnt die Datei mit dem Frontmatter oben:
+  `title` in doppelten Anführungszeichen, Rezept, Datum und Scope in einem Satz, ein `"` im
+  Wert wird `\"`. `/k-review` legt die Datei so in Kephalaion ab, und der Text dort überlebt
+  das Arbeitsverzeichnis; deshalb sagt die Kopfzeile `Arbeitsverzeichnis:`, dass es
+  vergänglich ist und nur Fundliste und Beleg enthält (im Audit: ohne Frontmatter, die Datei
+  beginnt mit der Überschrift, und die Kopfzeile `Arbeitsverzeichnis:` nennt nur den
+  Laufordner wie bisher).
 - **Eine Zeile je Bündel**, sortiert nach Priorität `P1` → `P2` → `P3`, innerhalb einer
   Priorität nach Zahl der Funde absteigend. Die IDs `B1`, `B2`, … vergibst du in dieser
   Reihenfolge. Die Spalte `erledigt` steht für jedes Bündel auf `[ ]`; abgehakt wird sie
-  später von Hand (`[x]`).
+  später von Hand (`[x]`), auf dem Weg von `/k-review` im abgelegten Dokument in Kephalaion.
 - **Der Restabschnitt** `R — Nicht gebündelt` hat eine eigene Zeile am Ende der Tabelle,
   sobald er mindestens eine Gruppe trägt; ohne solche Gruppen entfallen Zeile und
   Abschnitt. Je Fund eine Zeile mit Gruppen-ID und dem Grund, warum die Gruppe in keinem

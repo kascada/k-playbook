@@ -11,7 +11,7 @@
 // Projekts, `task` legt Tasks an, `doc` legt nummerierte Dokumente der
 // Collection an, listet, ändert, durchsucht und verschiebt sie, `docs` holt
 // erzeugte Doku in ein Arbeitsverzeichnis und veröffentlicht sie, `todo`
-// verwaltet die Todos, `findings check` prüft die Befund-Queue vor ihrer
+// verwaltet die Todos, `feedback` die Meldungen, `findings check` prüft die Befund-Queue vor ihrer
 // Einordnung, `read` löst einen Verweis im Präfixschema auf, `briefing`
 // listet, was für das Projekt gilt und was ansteht, `health` nennt Fehler und
 // Warnungen über die Umgebung des Projekts, `troubleshooting` soll Fehler der
@@ -129,6 +129,9 @@ func run(args []string) error {
 	case "task":
 		// Ohne Wirt-Pflege wie todo: die Ausgabe ist JSON und sonst nichts.
 		return runTask(args[1:])
+	case "feedback":
+		// Ohne Wirt-Pflege wie todo: die Ausgabe ist JSON und sonst nichts.
+		return runFeedback(args[1:])
 	case "read":
 		// Ohne Wirt-Pflege wie todo: stdout trägt den Inhalt hinter dem
 		// Verweis und sonst nichts.
@@ -352,6 +355,10 @@ Unterkommandos:
             ist JSON auf stdout. Ohne Unterbefehl und mit --help erscheint
             nur die Kurzhilfe, ohne dass dabei Daten gelesen oder
             geschrieben werden.
+  feedback  Verwaltet die Meldungen des Projekts — Fehler und Wünsche, die
+            jemand anderes erledigt — in der Projekt-Collection (feedback/):
+            k-playbook feedback create|list|update. Die Ausgabe ist JSON auf
+            stdout. Ohne Unterbefehl nur die Kurzhilfe.
   task      Legt Tasks in der Projekt-Collection an: k-playbook task create
             --title <titel> --name <kurzname> [--dry-run] [--no-intent],
             Rumpf von stdin. Prüft, nummeriert und schreibt in einem Zug;

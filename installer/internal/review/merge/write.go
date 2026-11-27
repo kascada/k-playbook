@@ -53,7 +53,17 @@ func writeAtomicPerm(path string, data []byte, perm os.FileMode, mkdir bool) err
 	return nil
 }
 
-func markdown(result Result) string {
+// Was der Merge an den Rohdaten ändert, hängt am Weg: Der Audit-Merge schreibt
+// nichts zurück, weil schon beim Melden bereinigt wird; der Merge auf ein
+// Arbeitsverzeichnis schreibt eine Fundliste bereinigt zurück, wenn die
+// Prüfung Funde außerhalb des Pfad-Scopes verworfen hat (MergeDir).
+const (
+	auditRawNote = "SARIF-Rohdaten, `run.json` und `entries/*.json` bleiben unverändert."
+	dirRawNote   = "Funde, die die Prüfung außerhalb von `audit.scope.paths` verworfen hat, sind aus ihrer Fundliste `<eintrag>.sarif` entfernt; sie ist bereinigt zurückgeschrieben. Sonst bleiben die Fundlisten unverändert."
+)
+
+// markdown baut review-input.md; rawNote ist auditRawNote oder dirRawNote.
+func markdown(result Result, rawNote string) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "# Review-Input %s\n\n", result.Run.Name)
 	fmt.Fprintf(&builder, "Erzeugt: %s\n\n", result.Generated)
@@ -139,7 +149,7 @@ func markdown(result Result) string {
 	fmt.Fprintf(&builder, "- KI-Evidence (Stable-ID `ai-…`) wird je Rule-ID und Datei gebündelt, ohne Zeile und Meldung; die Zahl der Befunde nennt die Instanzen.\n")
 	fmt.Fprintf(&builder, "- Gleiche Datei/Zeile mit ähnlicher Rule-Familie wird nur als `possible-duplicate` markiert.\n")
 	fmt.Fprintf(&builder, "- Ebenso Dependency-Funde mit gemeinsamer Kennung, deren Package oder Version fehlt oder abweicht.\n")
-	fmt.Fprintf(&builder, "- SARIF-Rohdaten, `run.json` und `entries/*.json` bleiben unverändert.\n")
+	fmt.Fprintf(&builder, "- %s\n", rawNote)
 	fmt.Fprintf(&builder, "- Sehr große Detailblöcke stehen ausschließlich in `review-input.json`.\n")
 	return builder.String()
 }

@@ -78,8 +78,9 @@ An existing `K-PLAYBOOK.yaml` remains unchanged through this path as well.
 What a project owns is a document in the project collection or lies under `.k-playbook/` in
 the project root:
 
-- tasks, the workbench, todos and the project documentation in the project collection
-  (`keph:/user/<user>/tasks/`, `keph:/user/<user>/workbench/`, `todos/`, `keph:/docs/`);
+- tasks, the workbench, todos, reports and the project documentation in the project collection
+  (`keph:/user/<user>/tasks/`, `keph:/user/<user>/workbench/`, `todos/`, `keph:/feedback/`,
+  `keph:/docs/`);
 - project-owned commands and skills in `.k-playbook/commands/` and `.k-playbook/skills/`,
   versioned next to the configuration. Setup does not create these two; they appear when
   the project puts something there;

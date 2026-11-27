@@ -27,12 +27,14 @@ Schreibweise `.k-playbook/...` richtig; zum Schreiben wird der aufgelöste Pfad 
 | Task, offen | `keph:/user/~/tasks/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Task | `/k-task-create` über `k_playbook_task_create`, `/k-remediation` (abgeschaltet) bis zum Umbau über `k_playbook_doc_create` und Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/tasks.md` |
 | Task, erledigt | `keph:/user/~/tasks/done/<NNN>-<slug>.md` — in der Projekt-Collection | `/k-task-run` verschiebt sie dorthin mit `k_playbook_doc_done` |
 | Kurznotiz, unsortiert | `todos/` in der Projekt-Collection | `/k-todo`, `k-playbook todo`, die Oberfläche |
+| Meldung: Fehler oder Wunsch, den jemand anderes erledigt (an k-playbook, Kephalaion oder das Projekt) | `keph:/feedback/<NNN>-<slug>.md` — in der Projekt-Collection, projektweit, ein Dokument je Meldung; erledigt und abgelehnt unter `keph:/feedback/done/` | die Sitzung oder der Mensch über `k_playbook_feedback_create` bzw. `k-playbook feedback create` und `/k-feedback`; Status über `k_playbook_feedback_update` bzw. `k-playbook feedback update` |
 | Befund aus Analyse oder Fehlersuche | `keph:/queue/findings/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Befund | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`, Nachträge von `/k-danke`; Form nach `k-playbook:/instructions/on-demand/befunde.md` |
 | Doku-Auftrag (Nachzug der erzeugten Doku) | `keph:/queue/docs/<NNN>-<slug>.md` — in der Projekt-Collection, ein Dokument je Auftrag; erledigt unter `keph:/queue/docs/done/` | jede Sitzung nach einer Codeänderung über `k_playbook_docs_order_add`, `/k-docs`; die zerlegten Aufträge `/k-docs-code` über `k_playbook_docs_orders_split`, das sie auch abschließt (`k_playbook_doc_done`); Form nach `k-playbook:/instructions/on-demand/doku-auftraege.md` |
 | Protokoll eines Laufs von `/k-befunde-einordnen` | `keph:/queue/einordnung/<NNN>-<datum>-<sitzung>.md` — in der Projekt-Collection, ein Dokument je Lauf | `/k-befunde-einordnen` |
 | Befund, den die Einordnung nicht zuordnen kann | `keph:/queue/unclear/<dateiname>` — in der Projekt-Collection | `/k-befunde-einordnen` |
 | Stand eines laufenden Vorhabens | `keph:/user/~/workbench/<NNN>-<slug>.md` — in der Projekt-Collection | die Sitzung selbst über `k_playbook_doc_create` und Kephalaion `write`; Form nach der Anweisung „Die Workbench“ |
 | Ergebnis, das der Nutzer mittelfristig sichern und zeigen will | `keph:/results/<YYYY-MM-DD>-<kurzname>.md` — in der Projekt-Collection, projektweit, nur `.md` | nur auf Wunsch des Nutzers oder wenn ein Command es ausdrücklich vorsieht, nie als Pflicht; über Kephalaion `create`, aufgeräumt vom Nutzer; Form nach `k-playbook:/instructions/on-demand/ergebnisse.md` |
+| Ergebnis eines Bericht-Laufs von `/k-review` | `keph:/results/review/<YYYY-MM-DD>-<rezept>.md` — in der Projekt-Collection, projektweit, nur die Ergebnisdatei `review-triage.md`, nie SARIF oder Beleg | `/k-review` bei jedem Bericht-Lauf über Kephalaion `create`, nie überschreibend; abgehakt vom Nutzer oder auf seinen Wunsch von einer Sitzung mit Kephalaion `write`; Form nach `k-playbook:/instructions/on-demand/ergebnisse.md` |
 | Doku aus dem Code | `keph:/docs/generated/code/<NN>-<slug>.md` — in der Projekt-Collection; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/code/`, ohne Kephalaion gibt es keine | `/k-docs-code` und der Skill `ks-overlay-repo-analyse`, nur über `k-playbook docs checkout\|publish code` |
 | Steckbrief zu Library oder Tool | `keph:/docs/generated/libs/<name>.md` — in der Projekt-Collection; dazwischen das rechnerlokale Arbeitsverzeichnis `.k-playbook/work/docs/libs/`, ohne Kephalaion gibt es keine | `/k-docs-tools`, nur über `k-playbook docs checkout\|publish libs` |
 | Versionsinventar | `keph:/docs/generated/versions/inventory.md` — in der Projekt-Collection; entsteht beim ersten Lauf von `/k-doc-inventory`, ohne Kephalaion gibt es kein Inventar | `/k-doc-inventory`, `k-playbook inventory` |
@@ -53,8 +55,16 @@ geschrieben wird sie über den Command, über das Subkommando `k-playbook todo` 
 die Oberfläche. Wer sie selbst öffnet, führt eine zweite Auslegung des Formats ein, die
 in keine Prüfung eingeht.
 
-Für Review-Ergebnisse nennt die Tabelle keinen Ort: Er ist noch nicht entschieden; bis
-dahin pausieren die Reviews.
+**Meldungen gehen ausschließlich über die Feedback-Werkzeuge, nie von Hand.** Ihre Ablage,
+die Dokumente unter `feedback/` in der Projekt-Collection, gehört dem Programm wie die der
+Todos: gelesen und geschrieben wird sie über `/k-feedback`, die MCP-Werkzeuge
+`k_playbook_feedback_*` oder das Subkommando `k-playbook feedback`. Den Kopf einer Meldung
+setzt das Werkzeug; eine Meldung ist kein Befund und wartet nicht in der Queue, sondern
+bleibt bis zur Erledigung liegen.
+
+Die Ergebnisse von `/k-review` legt der Command selbst unter `keph:/results/review/` ab; Fundliste
+und Beleg bleiben im Arbeitsverzeichnis des Laufs. Der Ort für die Ergebnisse von `/k-audit` ist
+noch offen; bis dahin pausiert der Audit.
 
 Die Projektdoku ist nach Herkunft geteilt, nicht nach Thema. Das Unterverzeichnis von
 `keph:/docs/` sagt, wer die Datei erzeugt hat und was sie veralten lässt:

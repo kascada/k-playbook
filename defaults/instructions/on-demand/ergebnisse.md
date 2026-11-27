@@ -1,6 +1,6 @@
 ---
 title: Ergebnisse ablegen
-description: Wo ein Ergebnis liegt, das der Nutzer mittelfristig sichern und zeigen will — keph:/results/, projektweit, nur .md, Name mit Datum vorn; geschrieben nur auf Wunsch des Nutzers oder wenn ein Command es vorsieht, nie als Pflicht; aufgeräumt wird vom Nutzer.
+description: Wo ein Ergebnis liegt, das der Nutzer mittelfristig sichern und zeigen will — keph:/results/, projektweit, nur .md, Name mit Datum vorn; geschrieben nur auf Wunsch des Nutzers oder wenn ein Command es vorsieht, wie /k-review unter results/review/, nie als Pflicht; aufgeräumt wird vom Nutzer.
 ---
 
 ## Ergebnisse ablegen
@@ -17,6 +17,9 @@ will.
 - **Nicht von dir aus.** Ein fertiger Task, ein abgeschlossenes Review oder ein bestandener
   Test ist kein Anlass. Biete das Ablegen auch nicht am Ende einer Arbeit an: Wer einen Platz
   braucht, fragt danach.
+- **`/k-review` sieht die Ablage vor.** Jeder Bericht-Lauf von `/k-review` legt seine
+  Ergebnisdatei ohne Rückfrage als `keph:/results/review/<YYYY-MM-DD>-<rezept>.md` ab; Fundliste
+  und Beleg bleiben im Arbeitsverzeichnis des Laufs. Die Regeln unten gelten auch dafür.
 
 ### Wohin
 
@@ -54,6 +57,10 @@ Verzeichnis gelistet wird.
   verweisen, etwa aus einem Task, einem Befund oder einem Workbench-Thema.
 - **Geändert, verschoben oder gelöscht wird es nur auf Wunsch des Nutzers.** Aufgeräumt wird
   vom Nutzer; eine Sitzung löscht unter `results/` nichts von sich aus.
+- **Abhaken eines Review-Ergebnisses.** Ein Ergebnis unter `results/review/` wird dort
+  abgehakt, vom Nutzer selbst oder von einer Sitzung auf seinen Wunsch: mit Kephalaion `write`
+  und `base_revision` aus dem letzten `read`. `/k-review` selbst ändert ein abgelegtes Ergebnis
+  nicht.
 - **Nicht indiziert.** `results/` liegt außerhalb von `docs/`: Die Volltextsuche findet es
   nicht, Kephalaion `list` schon.
 

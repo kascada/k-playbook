@@ -1038,7 +1038,7 @@ func TestMarkdownToolsListetZeroDoneUndKeineSkips(t *testing.T) {
 		},
 		Findings: []Finding{},
 	}
-	content := markdown(result)
+	content := markdown(result, auditRawNote)
 	if !strings.Contains(content, "- ruff: 0") {
 		t.Fatalf("Zero-Findings-Tool fehlt: %s", content)
 	}

@@ -11,8 +11,10 @@ What differs is state, tooling, and scope.
 **`/k-review` runs again (task 197); the rest is still paused.** `/k-review` is built from two
 building blocks — collect (a recipe writes its findings as a SARIF finding list into a working
 directory) and summarize (the Go merge writes `review-input.json`, the triage writes
-`review-triage.md`) — and keeps its results only in that working directory, by default a new
-directory under `/tmp/` that only the own user can read. It uses two MCP tools that create no
+`review-triage.md`) — and stores every report result in the project collection as
+`keph:/results/review/<YYYY-MM-DD>-<recipe>.md`. The working directory, by default a new
+directory under `/tmp/` that only the own user can read, keeps only the finding list and the
+evidence. It uses two MCP tools that create no
 audit run and are not locked: `k_playbook_review_workdir` and `k_playbook_review_merge_dir`
 (CLI `k-playbook review workdir|merge`). Still locked (task 147), because the storage of audit
 results is being rebuilt: `/k-audit` and `/k-remediation` only say that they are temporarily
@@ -39,7 +41,7 @@ here instead of repeated.
 | `review-input.json` | Go, through `merge.Run` | Go, through `merge.MergeDir` on the working directory |
 | Consolidation across sources | yes | no — one recipe, one finding list |
 | known decisions | matched by the merge | not matched; the result says so in one sentence |
-| Location | `<ergebnisort>/YYYY-MM-DD/` | the working directory: given, or new under `/tmp/` (`0700`) |
+| Location | `<ergebnisort>/YYYY-MM-DD/` | result file in `keph:/results/review/`; finding list and evidence in the working directory: given, or new under `/tmp/` (`0700`) |
 
 `/k-audit` drives its whole run through the five `k_playbook_review_*` run tools. `/k-review`
 starts no scanner and holds no run state; it only lets the program create the working directory
@@ -65,6 +67,7 @@ flowchart TD
     L --> R["Go: merge.MergeDir"]
     R --> M["review-scan-triage"]
     M --> T
+    M --> S["keph:/results/review/ (stored result)"]
     T --> N["/k-remediation"]
     N --> O["Tasks in the project collection"]
     O --> P["/k-task-refine and /k-task-run"]
@@ -146,7 +149,7 @@ Interactive reviews moderate one location at a time:
 - Show a proposal for each location and wait for approval.
 - Apply only confirmed changes.
 
-A report review runs three steps:
+A report review runs four steps:
 
 1. **Working directory.** `k_playbook_review_workdir` takes the given path or creates a new
    directory directly under `/tmp/` (`$TMPDIR` is ignored) through `os.MkdirTemp`: project, recipe
@@ -161,9 +164,21 @@ A report review runs three steps:
 3. **Summarize** (`k-playbook:/commands/_review-run/zusammenfassen.md`).
    `k_playbook_review_merge_dir` writes `review-input.json` and `review-input.md` (mode `0600`)
    with the same dedupe, stable group IDs and severity as the audit merge, without known
-   decisions; then the triage module writes `review-triage.md`.
+   decisions; then the triage module writes `review-triage.md`. Where the check dropped
+   findings outside `audit.scope.paths`, the merge rewrites `<recipe>.sarif` without them.
+4. **Store.** The command creates the result file with Kephalaion `create` in the project
+   collection as `keph:/results/review/<now.date>-<recipe>.md`, for example
+   `keph:/results/review/2026-11-27-tech.md`, on every report run and without asking. If the
+   name is taken, it appends `-2`, `-3` … to the short name; an existing result is never
+   overwritten. Only the Markdown result file goes to Kephalaion — never SARIF,
+   `review-input.json` or `review-input.md` — and never a result file that repeats a secret in
+   plain text. If Kephalaion is not reachable, or `create` fails for any other reason, the run
+   ends with the result file only in the working directory, and the closing message says so with
+   code and reason; there is no fallback location. The closing message names the `keph:`
+   reference first.
 
-The working directory afterwards holds:
+The working directory afterwards holds the finding list and the evidence, plus
+`review-triage.md` as an interim copy of the stored result:
 
 ```text
 <working directory>/<recipe>.sarif
@@ -175,13 +190,22 @@ The working directory afterwards holds:
 `review-triage.md` is self-contained: a header (recipe, scope, date, working directory), a
 table with one row per bundle sorted `P1` → `P3` with a "done" column, then per bundle its
 reasoning, next step and every finding with location, rule ID, level and message, and a residual
-section for groups in no bundle. Nobody needs to read the JSON. The format is defined in
+section for groups in no bundle. Nobody needs to read the JSON. On the `/k-review` path it
+starts with a `title` frontmatter, and the header line for the working directory says that the
+directory is transient and holds only the finding list and the evidence; the audit path keeps
+its header without frontmatter. The format is defined in
 `k-playbook:/commands/_audit/review-scan-triage.md`; the evidence contract in
 `k-playbook:/commands/_review-run/review-input-contract.md`.
 
-`/k-review` keeps no log and no due date, reads no `known-decisions.md`, and writes nothing to
-Kephalaion. A `/k-review` run consolidates nothing across sources; its working directory sits
-outside every audit run. There is no follow-up command yet: `/k-remediation` still reads only
+**Ticking off.** The stored document under `keph:/results/review/` is the result; bundles are
+ticked off there (`[x]`), by the user or by a session at the user's request, with Kephalaion
+`write` and `base_revision` from the last `read`. `/k-review` itself never changes a stored
+result. The rules for `keph:/results/` are in
+`k-playbook:/instructions/on-demand/ergebnisse.md`.
+
+`/k-review` keeps no log and no due date, reads no `known-decisions.md`, and writes only the
+result file to Kephalaion. A `/k-review` run consolidates nothing across sources; its working
+directory sits outside every audit run. There is no follow-up command yet: `/k-remediation` still reads only
 the old triage format.
 
 ## /k-remediation
@@ -352,7 +376,7 @@ secrets to Secret Scanning, and IaC or container configuration to IaC/Container.
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-tech.md` |
-| `/k-review` | report; working directory with `tech.sarif` and `review-triage.md` |
+| `/k-review` | report; result file `keph:/results/review/<date>-tech.md`, working directory with `tech.sarif` and evidence |
 | Audit entry | Evidence source `tech`, SARIF under `<ergebnisort>/YYYY-MM-DD/raw/tech.sarif` |
 
 Through `/k-review` and in the audit run it writes the same SARIF finding list; only where it
@@ -363,7 +387,7 @@ lands differs. See also **Recipes as evidence sources** below.
 | | |
 |---|---|
 | Recipe | `k-playbook:/reviews/review-code.md` |
-| `/k-review` | report; working directory with `code.sarif` and `review-triage.md` |
+| `/k-review` | report; result file `keph:/results/review/<date>-code.md`, working directory with `code.sarif` and evidence |
 | Audit entry | Evidence source `code`, SARIF under `<ergebnisort>/YYYY-MM-DD/raw/code.sarif` |
 | Diff of a task | Section `## Ergebnisform für den Diff eines Tasks` in the recipe, for `/k-task-run` |
 

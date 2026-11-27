@@ -1,6 +1,6 @@
 // Package mcpserver bietet die Auskünfte und Operationen von k-playbook als
 // MCP-Werkzeuge an: Briefing, Umgebungsprüfung, Dokumente der Collection,
-// Todos, Doku-Aufträge, Sperre, Oberfläche und die gesperrten
+// Todos, Meldungen, Doku-Aufträge, Sperre, Oberfläche und die gesperrten
 // Review-Werkzeuge. Jedes Werkzeug ist eine Hülle über derselben Funktion
 // wie das gleichnamige Unterkommando; eine eigene Fassung im Server gibt es
 // nicht.
@@ -47,6 +47,7 @@ func Run(ctx context.Context) error {
 
 	addReviewTools(server)
 	addTodoTools(server)
+	addFeedbackTools(server)
 	addDocTools(server)
 	addBriefingTool(server)
 	addHealthTool(server)

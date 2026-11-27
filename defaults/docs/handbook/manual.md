@@ -34,7 +34,7 @@ project/
 | Part | Owner | What happens on update |
 |---|---|---|
 | `.k-playbook/K-PLAYBOOK.yaml`, `.k-playbook/commands/`, `.k-playbook/skills/` | the project | remains untouched |
-| the project collection in Kephalaion: `keph:/k-playbook/`, `keph:/docs/`, `keph:/user/<user>/tasks/`, `todos/` | the project | remains untouched |
+| the project collection in Kephalaion: `keph:/k-playbook/`, `keph:/docs/`, `keph:/user/<user>/tasks/`, `todos/`, `keph:/feedback/` | the project | remains untouched |
 | the binary `~/.local/bin/k-playbook` and what it unpacks into `~/.local/share/k-playbook/` (commands, skills, scripts) | k-playbook | replaced by `k-playbook upgrade` or the update button |
 | the shipped texts in `<hub>:k-playbook/defaults/` | k-playbook | the hub fetches the new release |
 
@@ -49,7 +49,7 @@ flowchart LR
 
     Project --> Overlay["commands/ · skills/"]
     Anchor --> Layer["project collection: keph:/k-playbook/reviews/ · instructions/"]
-    Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/"]
+    Anchor --> Collection["project collection: keph:/user/~/tasks/ · keph:/docs/ · todos/ · feedback/"]
 
     Share --> Effective["effective set"]
     Base --> Effective
@@ -172,7 +172,7 @@ The complete index is in [`commands.md`](./commands.md). The groups are:
 | Project | `/k-gui` | Start the interface, check and set up project state |
 | Docs | `/k-docs`, `/k-docs-code`, `/k-docs-tools`, `/k-doc-inventory` | Check and document project knowledge by origin in `keph:/docs/` |
 | Code review | `/k-review`, `/k-audit`, `/k-remediation` | Run reviews and audits, address findings (`/k-audit` and `/k-remediation` temporarily unavailable while audit runs are paused) |
-| Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo` | Create, harden, and execute planned work |
+| Task flow | `/k-task-create`, `/k-task-refine`, `/k-task-run`, `/k-todo`, `/k-feedback` | Create, harden, and execute planned work; report bugs and wishes someone else is to handle |
 | Utilities | `/k-enforcement`, `/k-test-check`, `/k-verlauf`, `/k-vscode-project-color` | Check docs follow-up (`/k-enforcement` temporarily unavailable), diagnose tests, read histories, mark VS Code |
 
 New or changed commands become visible only after restarting the assistant.
@@ -218,8 +218,9 @@ Details are in [`task-flow.md`](./task-flow.md).
 
 Audit runs are paused until the location of their results is decided; `/k-audit` and
 `/k-remediation` are temporarily unavailable. `/k-review` runs: a report review writes a
-checklist `review-triage.md` into its working directory. The flow, once remediation reads
-that format again:
+checklist `review-triage.md` and stores it in the project collection under
+`keph:/results/review/`, where it is ticked off; the working directory keeps the finding list
+and the evidence. The flow, once remediation reads that format again:
 
 ```text
 /k-review <name>

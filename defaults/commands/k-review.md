@@ -5,21 +5,24 @@ einen Scope; je nach Rezept läuft es auf einem von zwei Wegen:
 
 - **Bericht** (`handoff` im Frontmatter des Rezepts): Erheben und Zusammenfassen. Das
   Rezept schreibt seine Funde als SARIF-Fundliste in ein Arbeitsverzeichnis, der Merge
-  fasst sie zusammen, die Triage schreibt die Ergebnisdatei. Am Code ändert sich nichts.
+  fasst sie zusammen, die Triage schreibt die Ergebnisdatei, und der Command legt sie in der
+  Projekt-Collection unter `keph:/results/review/` ab. Am Code ändert sich nichts.
 - **Interaktiv** (kein `handoff`): Das Rezept führt Stelle für Stelle durch den Code und
   ändert jede erst nach Freigabe. Es entsteht keine Fundliste und keine Ergebnisdatei.
 
 Produces:
 
-- Bericht: im Arbeitsverzeichnis die Fundliste `<rezept>.sarif`, den Beleg
-  `review-input.json` und `review-input.md` und die Ergebnisdatei `review-triage.md` — eine
-  Tabelle mit einer Zeile je Bündel, nach Priorität sortiert, mit der Spalte „erledigt“,
-  darunter jeder Fund im Detail.
+- Bericht: die Ergebnisdatei als `keph:/results/review/<YYYY-MM-DD>-<schlüssel>.md` in der
+  Projekt-Collection — eine Tabelle mit einer Zeile je Bündel, nach Priorität sortiert, mit
+  der Spalte „erledigt“, darunter jeder Fund im Detail; dort wird sie abgehakt. Im
+  Arbeitsverzeichnis die Fundliste `<rezept>.sarif`, den Beleg `review-input.json` und
+  `review-input.md` und `review-triage.md` als Zwischenstand der Ergebnisdatei.
 - Interaktiv: Änderungen am Code, je Stelle erst nach Freigabe.
 
-Nichts sonst: kein Log, keine Fälligkeit, nichts nach Kephalaion. Das Arbeitsverzeichnis
-ist das zweite Argument; ohne es legt das Programm ein neues unter `/tmp/` an, das nur der
-eigene Benutzer lesen kann.
+Nichts sonst: kein Log, keine Fälligkeit. Nach Kephalaion geht nur die Ergebnisdatei, nie
+SARIF, `review-input.json` oder `review-input.md`. Das Arbeitsverzeichnis ist das zweite
+Argument; ohne es legt das Programm ein neues unter `/tmp/` an, das nur der eigene Benutzer
+lesen kann.
 
 ## Schritt 1 — Briefing
 
@@ -112,9 +115,39 @@ include: _review-run/erheben.md
 ### Zusammenfassen
 
 Mit `WORK_DIR` wie oben; der Kopf der Ergebnisdatei ist das Rezept (`review-<schlüssel>`),
-der Scope aus Schritt 3 in Worten und `now.date`:
+der Scope aus Schritt 3 in Worten und `now.date`, auf dem Weg von `/k-review` (mit
+Frontmatter `title`):
 
 include: _review-run/zusammenfassen.md
+
+### Ablegen
+
+Nach dem Zusammenfassen legt der Command die Ergebnisdatei in der Projekt-Collection ab, bei
+jedem Bericht-Lauf und ohne Rückfrage. Die Regeln für `keph:/results/` stehen in
+`k-playbook:/instructions/on-demand/ergebnisse.md`; hier gilt:
+
+- **Name:** `results/review/<now.date>-<schlüssel>.md`, etwa `results/review/2026-11-27-tech.md`.
+- **Inhalt:** genau `WORK_DIR/review-triage.md`, mit dem Frontmatter `title` aus der Triage.
+  Fehlt es, ergänze es vor dem Ablegen in der Datei im Arbeitsverzeichnis: in doppelten
+  Anführungszeichen, Rezept, Datum und Scope in einem Satz.
+- **Anlegen** mit Kephalaion `create`, `collection` = `kephalaion.address`, `name` wie oben,
+  `content` der Inhalt. Antwortet es mit `name_taken`, hänge `-2`, `-3` … an den Kurznamen
+  (`2026-11-27-tech-2.md`) und versuche es erneut, bis der Name frei ist. Ein vorhandenes
+  Ergebnis wird nie überschrieben: kein `write`, kein `delete`. Nach `outcome_unknown` denselben
+  Aufruf mit demselben `request_id` noch einmal schicken, nicht mit einem neuen Namen.
+- **Nur die Ergebnisdatei.** SARIF, `review-input.json` und `review-input.md` bleiben im
+  Arbeitsverzeichnis.
+- **Kein Geheimnis im Klartext.** Gibt die Ergebnisdatei ein Geheimnis im Klartext wieder,
+  etwa ein Token aus einer Meldung, wird sie nicht abgelegt; der Abschluss sagt das.
+- **Danach** ist das Dokument in Kephalaion das Ergebnis; die Fassung im Arbeitsverzeichnis
+  ist nur noch Zwischenstand. `/k-review` ändert ein abgelegtes Ergebnis nicht. Abgehakt wird
+  dort vom Nutzer oder von einer Sitzung auf seinen Wunsch, mit Kephalaion `write` und
+  `base_revision` aus dem letzten `read`.
+
+Ist Kephalaion nicht erreichbar (`kephalaion.ok` nicht `true` oder `create` meldet
+`kephalaion_unavailable`), endet der Lauf mit der Ergebnisdatei nur im Arbeitsverzeichnis;
+dasselbe gilt für jeden anderen Fehler von `create`. Ausgewichen wird nicht auf einen anderen
+Ort (Fehlerfälle unten).
 
 ## Schritt 5 — Interaktiv
 
@@ -148,13 +181,16 @@ Harte Regeln, immer:
 
 **Bericht:**
 
-- den Pfad `WORK_DIR/review-triage.md`,
+- zuerst den `keph:`-Verweis des abgelegten Ergebnisses, etwa
+  `keph:/results/review/2026-11-27-tech.md`, als das Ergebnis des Laufs; ist nichts abgelegt,
+  stattdessen ausdrücklich, dass nichts in Kephalaion liegt, und warum (Code und Grund),
+  dazu den Pfad `WORK_DIR/review-triage.md` als einzigen Ort des Ergebnisses,
 - die Zahl der Bündel je Priorität `P1`/`P2`/`P3` und die Zahl der Funde im Restabschnitt,
 - die Zahl der Funde, die beim Prüfen außerhalb von `audit.scope.paths` verworfen wurden,
   und eine Kürzung durch den Mengendeckel des Rezepts,
 - dass keine bekannten Entscheidungen berücksichtigt wurden,
-- dass das Arbeitsverzeichnis temporär ist: Unter `/tmp/` übersteht es keinen Neustart;
-  wer das Ergebnis behalten will, kopiert die Ergebnisdatei.
+- das Arbeitsverzeichnis `WORK_DIR` als Ort von Fundliste und Beleg; es ist temporär und
+  übersteht unter `/tmp/` keinen Neustart.
 - Folge-Command: keiner. `/k-remediation` liest diese Ergebnisdatei noch nicht.
 
 **Interaktiv:** kompakt N geprüft / M übernommen / K übersprungen / L nicht adressiert.
@@ -171,3 +207,9 @@ ausdrücklich, dass kein Folge-Command ansteht.
   nennen und abbrechen; keinen anderen Pfad raten.
 - **Fundliste ungültig oder Merge gescheitert:** wie in den Bausteinen beschrieben
   abbrechen; eine Ergebnisdatei ohne Beleg entsteht nicht.
+- **Kephalaion nicht erreichbar** (`kephalaion.ok` nicht `true` oder `create` meldet
+  `kephalaion_unavailable`): Das Ergebnis bleibt nur im Arbeitsverzeichnis; der Abschluss
+  sagt ausdrücklich, dass nichts in Kephalaion liegt, und warum. Kein anderer Ablageort.
+- **Jeder andere Fehler von `create`** (etwa fehlendes Schreibrecht oder ein Fehler des
+  Hubs): Code und Grund im Abschluss nennen; das Ergebnis bleibt nur im Arbeitsverzeichnis,
+  kein Ausweichen.

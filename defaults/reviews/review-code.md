@@ -302,7 +302,7 @@ solchen Fehlern aufbauen würde; das begründet sie, ist aber kein zweites Krite
 ## Handoff
 
 Remediation ist ausdrücklich nicht Teil dieses Reviews. In `/k-review` endet der Lauf mit
-der Ergebnisdatei `review-triage.md` im Arbeitsverzeichnis; einen Folge-Command gibt es
+der Ergebnisdatei, abgelegt unter `keph:/results/review/`; einen Folge-Command gibt es
 nicht, solange `/k-remediation` dieses Format nicht liest. Im Audit-Lauf gibt es keinen
 Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage. Das Review für den
 Diff eines Tasks geht an `/k-task-run` zurück.
@@ -318,6 +318,8 @@ daneben einzeln aufrufbar. Ein solcher Lauf arbeitet in einem eigenen Arbeitsver
 <arbeitsverzeichnis>/review-input.md
 <arbeitsverzeichnis>/review-triage.md
 ```
+
+Die Ergebnisdatei legt `/k-review` zusätzlich unter `keph:/results/review/` ab.
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen
 Befunde**. Wer beide Seiten zusammen sehen will, nimmt den Audit-Lauf — dort und nur dort

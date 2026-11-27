@@ -305,6 +305,9 @@ then nothing is written and the interface says so.
 | `k_playbook_todo_add` | add a todo and assign the next id |
 | `k_playbook_todo_update` | change the text, tick a todo off, reopen it, or set, change or remove its origin (`origin`; `""` removes it) |
 | `k_playbook_todo_delete` | remove a todo permanently |
+| `k_playbook_feedback_create` | create a report -- a bug or wish someone else is to handle, about k-playbook, Kephalaion or the project -- under `feedback/` of the project collection (task 198): from `title`, `art`, `dringlichkeit`, `betrifft`, `body`, `sitzung`, `modell` and optionally `client` it takes the next number and creates the document with the finished head in one write; `von` is always `ki`, `client` falls back to the `clientInfo` of the initialization, `user` and `account` come from the node, `version` is the program's own, `status` starts at `offen`; answer: `ref`, `number`, `name`, `revision`, `feedback` ([below](#feedback-contract)) |
+| `k_playbook_feedback_list` | list the reports of the own collection by number with head, text and `revision` (`items`); without `includeDone` only those under `feedback/`; `art`, `betrifft` and `status` filter; with `allCollections` also, per other collection of every hub the account of that hub may read (not the own one, not the public `<hub>:k-playbook`), the number of open reports split by `betrifft` (`collections`: `address`, `open`, `byBetrifft`, `error`) |
+| `k_playbook_feedback_update` | set the `status` of a report of the own collection, chosen by `ref` or `number`: `erledigt` and `abgelehnt` move it to `feedback/done/`, `offen` and `angenommen` bring it back; the same status writes nothing (`changed: false`); optional `since_revision`, a different revision is `foreign_change`; answer: `feedback` (new `ref` and `revision`), `from`, `changed` |
 | `k_playbook_doc_read` | read what lies behind a reference (`ref`) in the prefix scheme: `project:/…` a file of the project, `keph:/…` a document of the project's collection through the node (`~` for the own user), `k-playbook:/…` local and shipped already resolved against each other -- `/instructions/…`, `/reviews/…`, `/guidelines/…` (shipped only) and `/commands/…` (the text of a command whose hull lies with the assistant); a reference ending in `/` assembles the directory into one text, today only `k-playbook:/instructions/always/`; include lines are inserted unless `includes: false`; `lines` (`from-to`) or `section` (a heading line) return only part of a single file; the answer carries `totalLines` and, for `keph:`, `revision` |
 | `k_playbook_doc_create` | create an empty numbered document of a kind (`tasks`, `workbench`, `findings`, `docs`, `einordnung`) in the project's Kephalaion collection; returns its `keph:` reference with the real user name |
 | `k_playbook_task_create` | create a task in one step (task 178): from `title`, `name` (short name) and `body` (Markdown without frontmatter and without the H1) it takes the next number like `doc_create`, builds the document (frontmatter with `title` in double quotes, `# Task <NNN> — <Title>`, body), checks the structure, and creates it with the finished content in one write -- no empty intermediate document; `dryRun` returns the rendered text with `<NNN>` instead of the number and creates nothing, `noIntent` lifts the duty to have an `## Intent`; answer: `ref`, `number`, `name`, `revision`, `warnings` (`rendered` with `dryRun`) |
@@ -686,6 +689,78 @@ The envelope is `{ok, tool, projectDir, ...}` with an `error` of `code` and `mes
 failure. A missing, empty, or whitespace-only `projectDir` is `invalid_input` and nothing is
 written; a `projectDir` that leads to no project is `project_not_found`.
 
+### Feedback Contract
+
+A report (`feedback`, task 198) is a bug or a wish that someone else is to handle -- at
+k-playbook, at Kephalaion or at the project itself. It is not a finding: a finding is evidenced
+knowledge about the project and goes into the knowledge base, a report waits until someone
+handles it and stays visible until then. The three tools are thin wrappers like the todo tools;
+the load-bearing layer is the subcommand `k-playbook feedback create|list|update`, with the same
+functions in `internal/project` and JSON on stdout. `/k-feedback` uses them, MCP first.
+
+The store is the project's collection: one document per report, `feedback/<nnn>-<short-name>.md`,
+handled and rejected ones under `feedback/done/` -- project-wide, not under `user/<name>/`,
+because the reader is not the reporter. Not under `queue/`, because `/k-befunde-einordnen`
+empties the queue and a task that fixes a report may reference it. The kind `feedback` is an
+entry of `DocKinds` with `OwnTools`, like `todos`: the `doc` tools reject it. Numbers come from
+`feedback/` and `feedback/done/` together, starting at 1; the short name is made from the first
+words of the title. The format belongs to Go: reports are read and written only through these
+tools.
+
+```markdown
+---
+title: "Sync hangs after rename"
+art: fehler
+dringlichkeit: hoch
+betrifft: kephalaion
+status: offen
+von: ki
+user: "kamran"
+account: "kamran-wsl"
+client: "claude-code"
+modell: "claude-opus-5-5"
+sitzung: "20261127-141205-619d6d"
+version: "v0.16.60"
+---
+
+# Meldung 003 — Sync hangs after rename
+
+What happened, what was expected, how to reproduce it.
+```
+
+- **Who sets which field.** The session supplies `title`, `art` (`fehler`, `wunsch`),
+  `dringlichkeit` (`hoch`, `mittel`, `niedrig`; `hoch` for a bug means it blocks the work),
+  `betrifft` (`k-playbook`, `kephalaion`, `projekt`) and the text. `user` and `account` come
+  from the Kephalaion node, `version` is the program's own, `status` starts at `offen`. `von`
+  follows the path: over MCP always `ki`; the CLI requires `--von ki|mensch`, because a model
+  can call it through the shell as well. With `von: ki`, `client`, `modell` and `sitzung` are
+  required -- over MCP `client` falls back to the `clientInfo` name of the initialization;
+  with `von: mensch`, `client` and `modell` are not allowed and `sitzung` is optional. Free-text
+  values stand in double quotes, the enumerations without. Invalid values come collected as
+  `invalid_input`, nothing is written.
+- **Status.** `offen`, `angenommen`, `erledigt`, `abgelehnt`. `erledigt` and `abgelehnt` write the
+  status first and then rename into `done/`; `offen` and `angenommen` rename back first and
+  then write. Only the `status:` line changes, everything else in the document stays as it was.
+  If the second step fails, the tool says which step already happened; the next update cleans
+  it up. `since_revision` (`--since`) is the revision last seen; a different one is
+  `foreign_change` with `revision` and `updatedAt`, nothing written. The status is changed by
+  whoever works in the report's collection: the reporter or a recipient with a session in that
+  project.
+- **Counting across collections.** `allCollections` (`--all-collections`) asks every hub of the
+  node's client information with that hub's account (`kephalaion.ProbeHubs`), as one `whoami`
+  with one hub's account does not name the other hubs. Every collection with the right `read`
+  counts, except the own one and the public `<hub>:k-playbook`; there is no check of who the
+  caller is -- visibility follows the read rights in Kephalaion alone. Per collection it lists
+  `feedback/` without `done/` with frontmatter and counts `status: offen`, split by `betrifft`
+  (missing: `unbekannt`). A collection without `feedback/` counts 0; one whose reading fails
+  carries `error` instead of numbers, a hub that is not logged in appears as `<hub>:` with its
+  error, and neither stops the rest. Directory scopes (`dirs` in `whoami`) only widen writing
+  in Kephalaion and restrict no reading, so `read` on the collection decides. Reports of other
+  collections are only counted, never listed or changed; that is a later step.
+- **Without a usable Kephalaion there are no reports:** `kephalaion_unavailable`, no fallback to
+  the disk. `outcome_unknown` means the operation may have arrived: do not repeat, look with
+  `k_playbook_feedback_list` (`includeDone`).
+
 ### Doc Read Contract
 
 `k_playbook_doc_read` is a thin wrapper over `project.ResolveDocRef` (`project/docref.go`); the
@@ -807,10 +882,12 @@ from it.
 | `docs` | `queue/docs/` | no | the directory including `done/` | yes | 001 |
 | `einordnung` | `queue/einordnung/` | no | the directory | no | 001 |
 | `todos` | `todos/` | no | the directory including `done/` | yes | 001 |
+| `feedback` | `feedback/` | no | the directory including `done/` | yes | 001 |
 
 `todos` has tools of its own (`OwnTools`, task 097) and is not reachable through the `doc`
 tools: it is not in their `kind` list, and a `todos` kind or a `keph:/todos/…` reference is
-`invalid_input` there. Contract: "Todo Contract".
+`invalid_input` there. Contract: "Todo Contract". `feedback` has tools of its own in the same way
+(task 198); contract: "Feedback Contract".
 
 `docs` are the documentation orders (task 124). After a code change a session writes one per
 session and producer; for `code` it extends its open order with further paths instead of
@@ -894,7 +971,7 @@ Error codes in `error.code`:
 
 | Code | When |
 |---|---|
-| `invalid_input` | `projectDir` missing; unknown `kind` or the kind `todos`; a reference into `todos/`; a short name that is empty after adjusting it; a `user` that is not a valid name; `ref` not a reference in the scheme, not `keph:`, or a directory |
+| `invalid_input` | `projectDir` missing; unknown `kind` or the kinds `todos` and `feedback`; a reference into `todos/` or `feedback/`; a short name that is empty after adjusting it; a `user` that is not a valid name; `ref` not a reference in the scheme, not `keph:`, or a directory |
 | `project_not_found` | `projectDir` leads to no project |
 | `kephalaion_unavailable` | nothing reached the hub: the binding is not ready, the node cannot be reached or is older than v0.3.1, the session could not be opened, or the node reports `unreachable`, `unsupported` or `internal` (nothing stored, nothing sent); never after a `create` or `rename` may have reached the hub |
 | `outcome_unknown` | `create` or `rename` may have reached the hub and the retry with the same key did not settle it; do not call again, look with `k_playbook_doc_list` |
@@ -930,7 +1007,7 @@ context as a whole to change one paragraph. The manual belongs to everyone -- no
 no `foreign_user`; `since_revision` catches two writers. `set_field` does not reach it
 (`invalid_input`): the manual has no mandatory frontmatter, and `set_field` would create one
 where none belongs. The areas beyond the kinds come from one table, `project.DocEditAreas`
-(`project/docedit.go`). Every other reference -- `todos/`, `docs/index.md`, `docs/generated/`
+(`project/docedit.go`). Every other reference -- `todos/`, `feedback/`, `docs/index.md`, `docs/generated/`
 (owned by the producers through `docs checkout/publish`), any other `keph:` path, a
 directory, `project:`, `k-playbook:` -- is `invalid_input`, decided without reading.
 

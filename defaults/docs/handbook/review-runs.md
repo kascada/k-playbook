@@ -790,10 +790,12 @@ list, no `run.json`, no `entries/`. For this there is a narrow entry next to the
 
 ```text
 <working directory>/
-├── code.sarif           the finding list, written by the recipe (building block "collect")
+├── code.sarif           the finding list, written by the recipe (building block "collect"),
+│                        rewritten by the merge (mode 0600) when the check dropped findings
 ├── review-input.json    written by the merge, mode 0600
 ├── review-input.md      written by the merge, mode 0600
-└── review-triage.md     written by the triage (building block "summarize")
+└── review-triage.md     written by the triage (building block "summarize"), stored by
+                         /k-review in keph:/results/review/
 ```
 
 - **Sources.** Every regular file `<entry>.sarif` directly in the directory; `<entry>` is the
@@ -811,6 +813,9 @@ list, no `run.json`, no `entries/`. For this there is a narrow entry next to the
   selected entry per source with `mode: evidence`; `entries[]` one `done` entry with one job.
 - **No known decisions.** This path matches none; `knownDecisions.warnings` says so in one
   sentence, and the result file repeats it.
+- **The cleaned finding list.** Unlike the audit merge, which leaves SARIF raw data,
+  `run.json` and `entries/*.json` unchanged because a run cleans when reporting, this path
+  rewrites a source without the findings the check dropped; `review-input.md` says so per path.
 - **The working directory.** `k_playbook_review_workdir` (`k-playbook review workdir`) takes
   a given path — created with `0700` if missing, a symlink or a file is refused, a warning if it
   lies inside the project or is open to others — or creates a new one directly under `/tmp`

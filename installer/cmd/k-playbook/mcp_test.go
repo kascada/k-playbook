@@ -311,8 +311,8 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2, 3)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 36 {
-		t.Fatalf("tools/list meldet nicht genau sechsunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 39 {
+		t.Fatalf("tools/list meldet nicht genau neununddreißig Werkzeuge: %v", responses[1])
 	}
 	found := map[string]bool{}
 	for _, item := range tools {
@@ -336,6 +336,9 @@ func TestStdoutTraegtNurProtokoll(t *testing.T) {
 		"k_playbook_todo_add",
 		"k_playbook_todo_update",
 		"k_playbook_todo_delete",
+		"k_playbook_feedback_create",
+		"k_playbook_feedback_list",
+		"k_playbook_feedback_update",
 		"k_playbook_doc_read",
 		"k_playbook_doc_create",
 		"k_playbook_task_create",
@@ -397,8 +400,8 @@ func TestReviewWerkzeugeUeberMCPProtokoll(t *testing.T) {
 	responses := decodeResponses(t, stdout, 1, 2)
 
 	tools, ok := result(t, responses[1])["tools"].([]any)
-	if !ok || len(tools) != 36 {
-		t.Fatalf("tools/list meldet nicht genau sechsunddreißig Werkzeuge: %v", responses[1])
+	if !ok || len(tools) != 39 {
+		t.Fatalf("tools/list meldet nicht genau neununddreißig Werkzeuge: %v", responses[1])
 	}
 
 	resultsDir := mcpReviewResultsDir(root)
@@ -554,8 +557,8 @@ func TestProjectDirIstImSchemaOptional(t *testing.T) {
 			t.Errorf("%s: Beschreibung von projectDir beginnt nicht mit „Pflicht.“: %q", name, description)
 		}
 	}
-	if withProjectDir != 36 {
-		t.Errorf("%d Werkzeuge mit projectDir, erwartet 36", withProjectDir)
+	if withProjectDir != 39 {
+		t.Errorf("%d Werkzeuge mit projectDir, erwartet 39", withProjectDir)
 	}
 }
 
@@ -597,6 +600,9 @@ var projectDirCalls = []struct {
 	{name: "k_playbook_docs_exclude_add", args: map[string]any{"patterns": []any{"ohne-projectdir/"}}},
 	{name: "k_playbook_todo_list", args: map[string]any{}},
 	{name: "k_playbook_todo_add", args: map[string]any{"text": "Ohne projectDir"}},
+	{name: "k_playbook_feedback_list", args: map[string]any{}},
+	{name: "k_playbook_feedback_create", args: map[string]any{"title": "T", "art": "fehler", "dringlichkeit": "hoch",
+		"betrifft": "projekt", "body": "Text", "sitzung": "s", "modell": "m"}},
 	{name: "k_playbook_doc_read", args: map[string]any{"ref": "k-playbook:/instructions/always/"}},
 	{name: "k_playbook_doc_create", args: map[string]any{"kind": "tasks", "name": "ohne-projectdir"}},
 	{name: "k_playbook_task_create", args: map[string]any{"title": "T", "name": "ohne-projectdir", "body": "Ein Satz.\n"}},

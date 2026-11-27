@@ -228,7 +228,7 @@ func MergeDir(options DirOptions) (Result, []DirSource, Output, error) {
 	if err := writeAtomicPerm(jsonPath, append(data, '\n'), dirFilePerm, false); err != nil {
 		return Result{}, nil, Output{}, err
 	}
-	if err := writeAtomicPerm(markdownPath, []byte(markdown(result)), dirFilePerm, false); err != nil {
+	if err := writeAtomicPerm(markdownPath, []byte(markdown(result, dirRawNote)), dirFilePerm, false); err != nil {
 		return Result{}, nil, Output{}, err
 	}
 	return result, sources, Output{JSON: jsonPath, Markdown: markdownPath}, nil

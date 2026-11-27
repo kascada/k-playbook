@@ -147,7 +147,7 @@ Auswahlregel bei Überschreitung:
 ## Handoff
 
 Remediation ist ausdrücklich nicht Teil dieses Reviews. In `/k-review` endet der Lauf mit
-der Ergebnisdatei `review-triage.md` im Arbeitsverzeichnis; einen Folge-Command gibt es
+der Ergebnisdatei, abgelegt unter `keph:/results/review/`; einen Folge-Command gibt es
 nicht, solange `/k-remediation` dieses Format nicht liest. Im Audit-Lauf gibt es keinen
 Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage.
 
@@ -155,7 +155,8 @@ Handoff aus diesem Rezept: die Funde gehen über den Merge in die Triage.
 dort steckt sein Beleg schon im gemeinsamen Merge. Über `review.enabled: true` bleibt es
 daneben einzeln aufrufbar. Ein solcher Lauf arbeitet in einem eigenen Arbeitsverzeichnis —
 übergeben oder vom Programm neu unter `/tmp/` angelegt — und hinterlässt dort `tech.sarif`,
-`review-input.json`, `review-input.md` und `review-triage.md`.
+`review-input.json`, `review-input.md` und `review-triage.md`; die Ergebnisdatei legt
+`/k-review` zusätzlich unter `keph:/results/review/` ab.
 
 Es gibt dabei **keine Zusammenführung mit dem Audit-Lauf und keine Dedupe gegen dessen
 Befunde**: Ein Befund, den der Audit-Lauf auch trägt, steht dann in beiden Ergebnissen

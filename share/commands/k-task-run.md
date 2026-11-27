@@ -10,5 +10,5 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep, TodoWrite, Task, Agent, mcp
 Der Text dieses Commands steht unter `k-playbook:/commands/k-task-run.md`. Lies ihn
 nach der Verweisregel aus dem Briefing — MCP `k_playbook_doc_read` mit dem Verweis als
 `ref`, ersatzweise `k-playbook read k-playbook:/commands/k-task-run.md` in der
-Shell — und befolge ihn. Das Argument des Aufrufs ist `$ARGUMENTS`. Diese Datei selbst
-enthält sonst nichts.
+Shell — und befolge ihn. Das Argument des Aufrufs ist `$ARGUMENTS`; ist es leer, wurde
+keins übergeben. Diese Datei selbst enthält sonst nichts.

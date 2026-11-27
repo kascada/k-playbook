@@ -59,6 +59,7 @@ The configuration names no paths. All locations derive from the project root, th
 | completed tasks | `keph:/user/<user>/tasks/done/` — in the project collection |
 | findings | `keph:/queue/findings/` — in the project collection |
 | project todos | `todos/` in the project collection |
+| reports (bugs and wishes someone else is to handle) | `keph:/feedback/` — in the project collection, handled and rejected ones under `keph:/feedback/done/`; only through `k_playbook_feedback_*`, `k-playbook feedback` and `/k-feedback` |
 | version sources | `keph:/k-playbook/inventory.md` — in the project collection, settings in the frontmatter |
 
 A key whose value is always the same would only be a source of errors.
@@ -139,7 +140,7 @@ so no derived key is required.
 
 **The project-owned side of instructions, includes and review recipes lies in the
 project collection** (task 143), under `keph:/k-playbook/<kind>/` beside `docs/`,
-`queue/`, `todos/` and `user/`, with the same tree as below `k-playbook:/`: a project-owned
+`queue/`, `todos/`, `feedback/` and `user/`, with the same tree as below `k-playbook:/`: a project-owned
 `k-playbook:/instructions/on-demand/muster.md` is `keph:/k-playbook/instructions/on-demand/muster.md`.
 It applies to everyone who uses the project; write access is that of the rest of the
 collection, without a scope of its own. The rule is the same as for every layer: the same
@@ -224,7 +225,7 @@ Everything else has no counterpart on the other side:
 
 | | Directories |
 |---|---|
-| project-owned only | in the project collection: `docs/`, `queue/`, `results/`, `todos/`, `user/` |
+| project-owned only | in the project collection: `docs/`, `feedback/`, `queue/`, `results/`, `todos/`, `user/` |
 | shipped only | `docs/`, `scripts/`, `bin/`, `installer/` |
 
 The two `docs/` are not a pair: the shipped handbook (`k-playbook:/docs/handbook/`, in the

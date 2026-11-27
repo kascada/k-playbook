@@ -1888,7 +1888,7 @@ func TestDefaultsKReviewIstHuelleUndText(t *testing.T) {
 		}
 	}
 	want := "[Read, Write, Edit, Bash, Glob, Grep, TodoWrite, mcp__k-playbook__k_playbook_briefing, mcp__k-playbook__k_playbook_doc_read, " +
-		"mcp__k-playbook__k_playbook_review_workdir, mcp__k-playbook__k_playbook_review_merge_dir]"
+		"mcp__k-playbook__k_playbook_review_workdir, mcp__k-playbook__k_playbook_review_merge_dir, mcp__kephalaion__create]"
 	if allowed != want {
 		t.Errorf("allowed-tools:\n%s\nerwartet\n%s", allowed, want)
 	}

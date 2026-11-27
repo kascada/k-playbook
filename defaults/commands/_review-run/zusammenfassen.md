@@ -11,7 +11,8 @@ vielen.
 Der aufrufende Command nennt:
 
 - `WORK_DIR` — das Arbeitsverzeichnis mit den Fundlisten `<eintrag>.sarif`, absolut,
-- den Kopf der Ergebnisdatei: Rezept, Scope in Worten, Datum (`now.date`).
+- den Kopf der Ergebnisdatei: Rezept, Scope in Worten, Datum (`now.date`) und den Weg
+  (`/k-review` oder Audit), von dem im Triage-Modul der Kopf abhängt.
 
 **1. Merge.** Rufe `k_playbook_review_merge_dir` mit `projectDir` = `project.dir` und
 `dir` = `WORK_DIR`, ersatzweise in der Shell `k-playbook review merge <WORK_DIR>`. Er prüft
@@ -35,5 +36,7 @@ der Abhakliste stehen dort und nirgends sonst.
 `review-input.json` steht in genau einem Bündel oder im Restabschnitt. Stimmt das nicht,
 ergänze die fehlenden Gruppen im Restabschnitt, bevor du abschließt.
 
-Zusammenfassen ändert keine Fundliste und keinen Beleg; es schreibt nur
-`review-triage.md`.
+Zusammenfassen schreibt eine Fundliste `<eintrag>.sarif` bereinigt zurück, wenn die Prüfung im
+Merge Funde außerhalb von `audit.scope.paths` verworfen hat; sonst ändert es keine Fundliste.
+Daneben schreibt es nur den Beleg `review-input.json` und `review-input.md` und die
+Ergebnisdatei `review-triage.md`.

@@ -130,6 +130,38 @@ func TestMergeDirFasstEineFundlisteZusammen(t *testing.T) {
 	}
 }
 
+// review-input.md sagt je Weg richtig, was mit den Rohdaten geschieht (Task 199):
+// MergeDir schreibt die Fundliste bereinigt zurück, der Audit-Merge (Write)
+// lässt SARIF, run.json und entries/*.json unverändert.
+func TestReviewInputMarkdownNenntRohdatenJeWeg(t *testing.T) {
+	dir := newWorkDir(t)
+	writeText(t, filepath.Join(dir, "code.sarif"), codeSARIF)
+	result, _, output, err := MergeDir(dirOptions(t.TempDir(), dir))
+	if err != nil {
+		t.Fatalf("MergeDir: %v", err)
+	}
+	dirMarkdown, err := os.ReadFile(output.Markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(dirMarkdown), "- "+dirRawNote+"\n") || strings.Contains(string(dirMarkdown), auditRawNote) {
+		t.Errorf("review-input.md aus MergeDir nennt den Rückschrieb nicht oder den Satz des Audits:\n%s", dirMarkdown)
+	}
+
+	auditOutput, err := Write(Options{RunDir: t.TempDir()}, result)
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	auditMarkdown, err := os.ReadFile(auditOutput.Markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(auditMarkdown), "- SARIF-Rohdaten, `run.json` und `entries/*.json` bleiben unverändert.\n") ||
+		strings.Contains(string(auditMarkdown), dirRawNote) {
+		t.Errorf("review-input.md aus dem Audit-Merge trägt nicht den alten Satz:\n%s", auditMarkdown)
+	}
+}
+
 // Die stabile ID hängt an Eintrag, Rule-ID und Pfad wie im Audit-Lauf: ein
 // zweiter Merge über dieselben Funde vergibt dieselbe.
 func TestMergeDirStabileIDWieImAudit(t *testing.T) {

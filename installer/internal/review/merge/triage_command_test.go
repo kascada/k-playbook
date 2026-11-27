@@ -63,6 +63,11 @@ func TestReviewScanTriageIstAbhakliste(t *testing.T) {
 		"**Kein Fund fällt still heraus.**",
 		"| Ort | Rule-ID | Level | Meldung |",
 		"Bekannte Entscheidungen:",
+		// Task 199: Frontmatter für die Ablage von /k-review in Kephalaion,
+		// der Audit-Weg behält seinen Kopf ohne Frontmatter.
+		"title: \"Review-Ergebnis <rezept> <datum>: <Scope in Worten>\"",
+		"`<RUN_DIR>` — vergänglich, enthält nur Fundliste und Beleg",
+		"(im Audit: ohne Frontmatter",
 	} {
 		if !strings.Contains(content, needle) {
 			t.Errorf("Triage-Modul nennt %q nicht", needle)

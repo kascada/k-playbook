@@ -94,6 +94,10 @@ type DocKind struct {
 // einordnung (Task 166) sind die Protokolle von /k-befunde-einordnen: ein
 // Dokument je Lauf, <NNN>-<datum>-<sitzung>.md, projektweit unter
 // queue/einordnung/, ohne done/ — gelesen und gelöscht vom Nutzer.
+// feedback (Task 198) sind die Meldungen — Fehler und Wünsche, die jemand
+// anderes erledigt: projektweit unter feedback/, erledigt und abgelehnt unter
+// feedback/done/, mit eigenen Werkzeugen (feedback.go), weil das Programm den
+// Kopf baut und der Status das Verschieben steuert.
 var DocKinds = []DocKind{
 	{Kind: "tasks", Dir: "user/~/tasks", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
 	{Kind: "workbench", Dir: "user/~/workbench", UserArea: true, Counting: DocCountAllUsers, Done: true, Start: 1},
@@ -101,6 +105,7 @@ var DocKinds = []DocKind{
 	{Kind: "docs", Dir: "queue/docs", UserArea: false, Counting: DocCountDir, Done: true, Start: 1},
 	{Kind: "einordnung", Dir: "queue/einordnung", UserArea: false, Counting: DocCountDir, Done: false, Start: 1},
 	{Kind: TodoKindName, Dir: "todos", UserArea: false, Counting: DocCountDir, Done: true, Start: 1, OwnTools: true},
+	{Kind: FeedbackKindName, Dir: "feedback", UserArea: false, Counting: DocCountDir, Done: true, Start: 1, OwnTools: true},
 }
 
 // DocKindNames sind die Namen der Sorten in der Reihenfolge der Tabelle, die
@@ -123,6 +128,10 @@ func ownToolsError(kind DocKind) error {
 	if kind.Kind == TodoKindName {
 		return docRefErrorf(DocCodeInvalidInput, "die Sorte %s hat eigene Werkzeuge und ist über die doc-Werkzeuge nicht erreichbar — "+
 			"Todos gehen über k_playbook_todo_* bzw. k-playbook todo", kind.Kind)
+	}
+	if kind.Kind == FeedbackKindName {
+		return docRefErrorf(DocCodeInvalidInput, "die Sorte %s hat eigene Werkzeuge und ist über die doc-Werkzeuge nicht erreichbar — "+
+			"Meldungen gehen über k_playbook_feedback_* bzw. k-playbook feedback", kind.Kind)
 	}
 	return docRefErrorf(DocCodeInvalidInput, "die Sorte %s hat eigene Werkzeuge und ist über die doc-Werkzeuge nicht erreichbar", kind.Kind)
 }

@@ -280,9 +280,13 @@ func sameLocationToolKey(finding Finding) string {
 // hasDependency meldet, ob aus dem Fund überhaupt eine Dependency erkannt
 // wurde — gleich ob strukturiert oder nur aus dem Freitext für die Anzeige.
 //
-// Die Bedingung ist dieselbe, an der extractDependency entscheidet, ob es eine
-// Dependency herausgibt oder die leere Struktur, um die beiden Stellen nicht
-// auseinanderlaufen zu lassen.
+// Die Bedingung ist weiter als die, an der extractDependency entscheidet, ob es
+// eine Dependency herausgibt oder die leere Struktur: Dort zählen nur Package,
+// Version und die Kennungen, hier zusätzlich TextPackage und TextVersion. Für
+// eine Dependency aus extractDependency ergibt das dasselbe, weil eine ohne
+// Package, Version und Kennung dort leer herauskommt, auch wenn der Freitext
+// ein Paket nannte; die zusätzlichen Felder greifen nur bei einer Dependency,
+// die anders entstanden ist.
 func hasDependency(dependency Dependency) bool {
 	return len(dependency.IDs) > 0 || dependency.Package != "" || dependency.Version != "" ||
 		dependency.TextPackage != "" || dependency.TextVersion != ""
@@ -344,13 +348,17 @@ func findingsByID(findings []Finding) map[string]Finding {
 // nur die eine oder nur die andere.
 //
 // Die Einschränkung auf dieselbe Dependency ist nötig, weil eine Gruppe nicht
-// zwangsläufig über den Dependency-Schlüssel entstanden ist. Bildet
-// sameLocationToolKey sie, stehen darin verschiedene Schwachstellen
-// nebeneinander: bei Manifest-Funden zeigen alle Funde eines Werkzeugs auf
-// dieselbe Zeile. Eine Vereinigung über *alle* Findings schriebe deren
-// Kennungen in einen dependency-Block, dessen Package und Version weiter vom
-// ersten Finding stammen — in sich widersprüchlich, und als Vorfilter des
-// weichen Zweigs ein Magnet, der die Gruppe mit fast jeder anderen verbindet.
+// zwangsläufig über den Dependency-Schlüssel entstanden ist. Bildet sie ein
+// anderer harter Schlüssel — exactKey, ein zugelassener Fingerprint oder die
+// Transitivität von Union-Find über mehrere Schlüssel —, können darin Findings
+// stehen, deren Paket oder Version abweicht oder fehlt. sameLocationToolKey
+// trägt dazu nicht mehr bei: Seit Task 028 bildet er für Dependency-Funde
+// keinen Schlüssel, die Ortsgruppierung von Manifest-Funden, gegen die diese
+// Einschränkung ursprünglich gebaut wurde, gibt es nicht mehr. Eine Vereinigung
+// über *alle* Findings schriebe deren Kennungen in einen dependency-Block,
+// dessen Package und Version weiter vom ersten Finding stammen — in sich
+// widersprüchlich, und als Vorfilter des weichen Zweigs ein Magnet, der die
+// Gruppe mit anderen verbindet.
 //
 // Package, Version und Manifest bleiben unverändert vom ersten Finding: sie
 // sind Angaben über *einen* Fund und lassen sich nicht vereinigen.

@@ -332,7 +332,7 @@ func Write(options Options, result Result) (Output, error) {
 	if err := writeAtomic(jsonPath, append(data, '\n')); err != nil {
 		return Output{}, err
 	}
-	if err := writeAtomic(markdownPath, []byte(markdown(result))); err != nil {
+	if err := writeAtomic(markdownPath, []byte(markdown(result, auditRawNote))); err != nil {
 		return Output{}, err
 	}
 	return Output{JSON: jsonPath, Markdown: markdownPath}, nil
