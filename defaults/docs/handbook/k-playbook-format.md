@@ -46,8 +46,8 @@ The configuration names no paths. All locations derive from the project root, th
 | project-owned skills | `.k-playbook/skills/` — setup does not create it; it appears when the project puts a skill there |
 | project-owned review recipes | `keph:/k-playbook/reviews/` — in the project collection |
 | checks | none, neither shipped nor project-owned |
-| review results | `<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then. |
-| results kept to present | `keph:/results/` — in the project collection, project-wide, `.md` only, names start with the date (`<YYYY-MM-DD>-<name>.md`); written only when the user asks or a command provides for it, never as a duty, and cleaned up by the user. The rules are `k-playbook:/instructions/on-demand/ergebnisse.md`. Not the same as `<ergebnisort>`, where `/k-review` and `/k-audit` write |
+| review results | `/k-review`: `keph:/results/review/<YYYY-MM-DD>-<recipe>.md` in the project collection, one document per report run, never overwritten. Audit results: `<ergebnisort>` stands for their location; it is not decided yet, and audit runs are paused until then. |
+| results kept to present | `keph:/results/` — in the project collection, project-wide, `.md` only, names start with the date (`<YYYY-MM-DD>-<name>.md`); written only when the user asks or a command provides for it, never as a duty, and cleaned up by the user. The rules are `k-playbook:/instructions/on-demand/ergebnisse.md`. `/k-review` stores its report results here under `results/review/`; not the same as `<ergebnisort>`, where `/k-audit` writes |
 | project documentation | `keph:/docs/` — in the project collection; the briefing names the entry under `projectDocs`. `/k-docs-code` writes to `keph:/docs/generated/code/` and `/k-docs-tools` to `keph:/docs/generated/libs/`, both through `k-playbook docs checkout|publish` |
 | tool profiles | `keph:/docs/generated/libs/` — in the project collection, written by `/k-docs-tools` through `k-playbook docs checkout|publish libs` |
 | version inventory | `keph:/docs/generated/versions/inventory.md` — in the project collection |

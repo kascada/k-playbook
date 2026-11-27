@@ -90,8 +90,9 @@ the project root:
   `keph:/k-playbook/inventory.md`, created by `/k-doc-inventory` on the first confirmed
   addition.
 
-The location of review results is not decided yet; until it is, reviews are paused, see
-[Reviews and tasks](#reviews-and-tasks).
+`/k-review` stores its report results in the project collection under
+`keph:/results/review/`. The location of audit results is not decided yet; until it is,
+audit runs are paused, see [Reviews and tasks](#reviews-and-tasks).
 
 ### 2. Register the MCP server
 

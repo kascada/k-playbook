@@ -439,7 +439,8 @@ Recipes and results are strictly separate:
 ```text
 <hub>:k-playbook/defaults/reviews/     shipped recipes
 keph:/k-playbook/reviews/              project-owned recipes, overlay (project collection)
-<working directory>/                   everything one /k-review run creates
+keph:/results/review/                  result files of /k-review report runs (project collection)
+<working directory>/                   finding list and evidence of one /k-review run
 <ergebnisort>/                         everything an audit run creates (paused)
 <ergebnisort>/known-decisions.md       deliberately made decisions, maintained by hand (audit)
 ```
@@ -450,8 +451,9 @@ file follows the same rule: same filename, the local file completely wins.
 The working directory of `/k-review` is a parameter. Without it, the program creates
 `/tmp/k-review-<project>-<recipe>-<timestamp>-<random>/` with mode `0700`; files the merge
 writes get `0600`. Outside the project, later scanner runs do not read it. `/tmp/` does not
-survive a restart everywhere (in WSL it does not); whoever wants to keep a result copies
-`review-triage.md`. Keeping a result in Kephalaion on request is todo 78.
+survive a restart everywhere (in WSL it does not); that is why every report result is stored
+in `keph:/results/review/`, and the `review-triage.md` in the working directory is only an
+interim copy.
 
 The audit layout behind the lock:
 

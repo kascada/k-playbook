@@ -65,8 +65,9 @@ There is no `paths:` block. Every location is fixed: project-owned
 commands and skills are under `.k-playbook/`, next to `K-PLAYBOOK.yaml`, and
 project knowledge is under `keph:/docs/` in the project collection. Tasks are
 documents in the project collection as well, `keph:/user/<user>/tasks/`, not
-files on disk. The location of review results is not decided yet; reviews are
-paused until then (task 147). A command therefore neither guesses nor reads a
+files on disk. Report results of `/k-review` are stored under
+`keph:/results/review/`; the location of audit results is not decided yet, and
+audit runs are paused until then (task 147). A command therefore neither guesses nor reads a
 path: it derives it, or it takes the reference.
 
 The complete mapping is in [`k-playbook-format.md`](./k-playbook-format.md).

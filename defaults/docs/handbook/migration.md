@@ -39,10 +39,11 @@ installation, not against a newly created example project.
 Discussed, not yet implemented. The section grows with the individual steps; what is stated
 here is decided, everything else is listed under "Open" at the end.
 
-`<ergebnisort>` stands for the location of review results. It is not decided yet; reviews are paused until then.
-While they are paused, all five review tools of the MCP server answer `reviews_paused`,
-`k-playbook scan` and `k-playbook merge` end with the same refusal, and `/k-review`, `/k-audit`
-and `/k-remediation` are temporarily unavailable. What follows records what was decided and
+`<ergebnisort>` stands for the location of audit results. It is not decided yet; audit runs are paused until then.
+`/k-review` runs and stores its report results under `keph:/results/review/`.
+While audit runs are paused, all five review tools of the MCP server answer `reviews_paused`,
+`k-playbook scan` and `k-playbook merge` end with the same refusal, and `/k-audit` and
+`/k-remediation` are temporarily unavailable. What follows records what was decided and
 built before the pause.
 
 **The problem.** Today, every scan review starts its own tools -- described in prose in the
